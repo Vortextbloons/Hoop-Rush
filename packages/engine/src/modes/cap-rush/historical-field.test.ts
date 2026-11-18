@@ -101,6 +101,50 @@ test('historical fields reject franchises without a complete eligible lineup', (
   ).toThrow('Cap Rush has no historical lineup');
 });
 
+test('an incomplete anchor can fill two slots from either adjacent season', () => {
+  const setup = capRushTestSetup();
+  const bracket = setup.lockSources.bracket;
+  const anchor = seasonKeySchema.parse('1995-96');
+  const overall = setup.catalog.candidates[0]?.summaryRatings.overallRating;
+  const starters = setup.catalog.candidates.filter(
+    (player) => player.summaryRatings.overallRating === overall,
+  );
+  const candidates = bracket.opponents.flatMap((opponent) =>
+    starters.map((player) => ({
+      ...player,
+      franchiseId: opponent.teamId,
+      seasonKey: player.positions.playable.includes('PG')
+        ? seasonKeySchema.parse('1994-95')
+        : player.positions.playable.includes('C')
+          ? seasonKeySchema.parse('1996-97')
+          : anchor,
+    })),
+  );
+  const catalog = { ...setup.catalog, candidates };
+  const seed = seedSchema.parse('0123456789abcdef');
+  const field = buildCapRushHistoricalField(bracket, catalog, seed);
+  expect(
+    buildCapRushHistoricalField(
+      bracket,
+      { ...catalog, candidates: [...candidates].reverse() },
+      seed,
+    ),
+  ).toEqual(field);
+  for (const team of field.opponents) {
+    expect(team.seasonKey).toBe(anchor);
+    const sourceYears = team.players.map(
+      (player) =>
+        candidates.find(
+          (source) =>
+            source.franchiseId === team.teamId && source.playerVersionId === player.playerVersionId,
+        )?.seasonKey,
+    );
+    expect(sourceYears.filter((key) => key === anchor)).toHaveLength(3);
+    expect(sourceYears.filter((key) => key === '1994-95')).toHaveLength(1);
+    expect(sourceYears.filter((key) => key === '1996-97')).toHaveLength(1);
+  }
+});
+
 test('one adjacent-season starter can vary a complete anchor lineup', () => {
   const setup = capRushTestSetup();
   const bracket = setup.lockSources.bracket;

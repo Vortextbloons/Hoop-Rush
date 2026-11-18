@@ -14,28 +14,43 @@ function strengthOf(lineup: readonly Candidate[]): number {
   );
 }
 
-function lineupOf(candidates: readonly Candidate[]): Candidate[] | null {
+function lineupOf(
+  candidates: readonly Candidate[],
+  seasonKey: string,
+  adjacentLimit = 0,
+): Candidate[] | null {
   const ordered = [...candidates].sort(
     (a, b) =>
       (b.anchors?.minutesPerGame ?? 0) - (a.anchors?.minutesPerGame ?? 0) ||
       a.playerVersionId.localeCompare(b.playerVersionId),
   );
+  const byPosition = POSITIONS.map((position) =>
+    ordered.filter((player) => player.positions.playable.includes(position)),
+  );
+  if (
+    byPosition.some((players) => players.length === 0) ||
+    byPosition.filter((players) => players.every((player) => player.seasonKey !== seasonKey))
+      .length > adjacentLimit
+  )
+    return null;
   const selected: Candidate[] = [];
   const used = new Set<string>();
-  function assign(slot: number): boolean {
-    const position = POSITIONS[slot];
-    if (position === undefined) return true;
-    for (const player of ordered) {
-      if (used.has(player.playerId) || !player.positions.playable.includes(position)) continue;
+  function assign(slot: number, remainingAdjacent: number): boolean {
+    const players = byPosition[slot];
+    if (players === undefined) return true;
+    for (const player of players) {
+      if (used.has(player.playerId)) continue;
+      const adjacent = player.seasonKey !== seasonKey;
+      if (adjacent && remainingAdjacent === 0) continue;
       selected.push(player);
       used.add(player.playerId);
-      if (assign(slot + 1)) return true;
+      if (assign(slot + 1, remainingAdjacent - Number(adjacent))) return true;
       selected.pop();
       used.delete(player.playerId);
     }
     return false;
   }
-  return assign(0) ? selected : null;
+  return assign(0, adjacentLimit) ? selected : null;
 }
 
 function varyLineup(lineup: Candidate[], roster: readonly Candidate[], rng: Rng): Candidate[] {
@@ -93,24 +108,28 @@ export function buildCapRushHistoricalField(
       const choices = franchiseSeasons
         .sort(([a], [b]) => a.localeCompare(b))
         .flatMap(([seasonKey, roster]) => {
-          const lineup = lineupOf(roster);
-          if (lineup === null) return [];
+          const lineup = lineupOf(roster, seasonKey);
           const year = Number(seasonKey.slice(0, 4));
           const adjacent = franchiseSeasons.flatMap(([key, players]) =>
             Math.abs(Number(key.slice(0, 4)) - year) === 1 ? players : [],
           );
-          const varied = varyLineup(
-            lineup,
-            [...roster, ...adjacent],
-            createRng(
-              havocInstanceSeed(
-                runSeed,
-                'cap-rush-historical-lineup-v3',
-                opponent.teamId,
-                seasonKey,
-              ),
-            ),
-          );
+          const candidates = [...roster, ...adjacent];
+          const varied =
+            lineup === null
+              ? (lineupOf(candidates, seasonKey, 1) ?? lineupOf(candidates, seasonKey, 2))
+              : varyLineup(
+                  lineup,
+                  candidates,
+                  createRng(
+                    havocInstanceSeed(
+                      runSeed,
+                      'cap-rush-historical-lineup-v3',
+                      opponent.teamId,
+                      seasonKey,
+                    ),
+                  ),
+                );
+          if (varied === null) return [];
           return [{ seasonKey, lineup: varied, distance: Math.abs(strengthOf(varied) - target) }];
         });
       if (choices.length === 0)
