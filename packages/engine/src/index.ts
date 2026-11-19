@@ -334,6 +334,42 @@ export {
 } from './modes/draft-duel/digests.ts';
 export * from './modes/havoc/index.ts';
 export * from './modes/cap-rush/index.ts';
+export {
+  buildFullCourtHistoricalField,
+  buildFullCourtLeagueSchedule,
+  type FullCourtHistoricalTeam,
+  type FullCourtLeagueGame,
+} from './modes/full-court/league.ts';
+export {
+  fullCourtDraftIndexOf,
+  fullCourtSalaryDollarsOf,
+  type FullCourtCatalogIndex,
+} from './modes/full-court/draft-catalog.ts';
+export {
+  applyFullCourtCommand,
+  createFullCourtDraftState,
+} from './modes/full-court/draft-commands.ts';
+export {
+  fullCourtAbsenceTolerance,
+  fullCourtAssessPick,
+  fullCourtDepthForecast,
+  fullCourtPayrollDollars,
+  fullCourtPayrollStatus,
+  fullCourtWarChestDollars,
+} from './modes/full-court/draft-economy.ts';
+export { fullCourtStateDigest } from './modes/full-court/state-digest.ts';
+export {
+  simulateFullCourtGame,
+  simulateRecordedFullCourtGame,
+  type FullCourtGameInput,
+  type FullCourtGameResult,
+  type FullCourtRecordedGameOutput,
+} from './modes/full-court/game.ts';
+export {
+  buildFullCourtRegularSeason,
+  fullCourtRegularSeasonGameInput,
+  type FullCourtRegularSeason,
+} from './modes/full-court/regular-season.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {

@@ -77,6 +77,10 @@ import type {
   StoredCapRushMultiplayerGameRow,
   StoredCapRushMultiplayerHistoryRow,
 } from '../schemas/cap-rush-multiplayer-record.ts';
+import type {
+  StoredFullCourtDraft,
+  StoredFullCourtDraftCommand,
+} from '../schemas/full-court-draft-record.ts';
 import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -140,14 +144,20 @@ export const HOOP_RUSH_DATABASE_STORES_V15: Record<string, string> = {
 };
 
 /**
- * Current database shape. Version 16 adds Cap Rush's immutable locked-input
+ * Version 16 adds Cap Rush's immutable locked-input
  * record and the compact league score rows; opening a version-15 database only
  * creates these tables and keeps every existing record.
  */
-export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+export const HOOP_RUSH_DATABASE_STORES_V16: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V15,
   capRushLockedInputs: 'runId',
   capRushLeagueResults: '[runId+gameId], runId',
+};
+
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V16,
+  fullCourtDrafts: 'runId',
+  fullCourtDraftCommands: '[runId+commandId], runId',
 };
 
 export class HoopRushDatabase extends Dexie {
@@ -203,6 +213,8 @@ export class HoopRushDatabase extends Dexie {
   capRushMultiplayerGames!: Table<StoredCapRushMultiplayerGameRow, [string, string]>;
   capRushMultiplayerCompleted!: EntityTable<StoredCapRushMultiplayerCompletedRow, 'roomId'>;
   capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
+  fullCourtDrafts!: EntityTable<StoredFullCourtDraft, 'runId'>;
+  fullCourtDraftCommands!: Table<StoredFullCourtDraftCommand, [string, string]>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
     // Versions below 15 are unsupported and reset. A version-15 database keeps
@@ -216,7 +228,8 @@ export class HoopRushDatabase extends Dexie {
             .map((name) => transaction.table(name).clear()),
         ),
       );
-    this.version(16).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(16).stores(HOOP_RUSH_DATABASE_STORES_V16);
+    this.version(17).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {

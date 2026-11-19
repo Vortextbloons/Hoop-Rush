@@ -29,7 +29,7 @@
     rowKey: (row: Row, index: number) => string;
     identity: Snippet<[Row]>;
     cell?: Snippet<[Row, PlayerStatColumn<Row>]> | null;
-    totals?: PlayerStatsTotals<Row> | null;
+    totals?: PlayerStatsTotals<Row> | readonly PlayerStatsTotals<Row>[] | null;
     playerLabel?: string;
     caption?: string | null;
     tableClass?: string;
@@ -46,6 +46,8 @@
     playerHeadCellClass?: string;
     stickyIdentity?: boolean;
   } = $props();
+
+  const footerRows = $derived(totals === null ? [] : 'value' in totals ? [totals] : totals);
 </script>
 
 <table
@@ -92,21 +94,24 @@
       </tr>
     {/each}
   </tbody>
-  {#if totals !== null}
+  {#if footerRows.length > 0}
     <tfoot class={footClass}>
-      <tr>
-        <th scope="row" data-align="start" class={playerTotalCellClass}>{totals.label ?? 'Team'}</th
-        >
-        {#each columns as column (column.key)}
-          <td
-            data-align={column.align ?? 'end'}
-            data-hide-below={column.hideBelow}
-            class={[totalCellClass, column.totalClass ?? column.cellClass]}
+      {#each footerRows as footer (footer)}
+        <tr>
+          <th scope="row" data-align="start" class={playerTotalCellClass}
+            >{footer.label ?? 'Team'}</th
           >
-            {totals.value(column)}
-          </td>
-        {/each}
-      </tr>
+          {#each columns as column (column.key)}
+            <td
+              data-align={column.align ?? 'end'}
+              data-hide-below={column.hideBelow}
+              class={[totalCellClass, column.totalClass ?? column.cellClass]}
+            >
+              {footer.value(column)}
+            </td>
+          {/each}
+        </tr>
+      {/each}
     </tfoot>
   {/if}
 </table>

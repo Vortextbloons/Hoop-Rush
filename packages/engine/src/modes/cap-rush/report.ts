@@ -4,6 +4,7 @@ import type {
   CapRushLeagueGame,
   CapRushLockedInputs,
   CapRushMvpEntry,
+  CapRushPlayoffGameSummary,
   CapRushPlayerSeasonLine,
   CapRushPostseason,
   CapRushPostseasonReport,
@@ -152,6 +153,35 @@ function pickNameOf(locked: CapRushLockedInputs, playerId: string, slot: string)
     (candidate) => candidate.slot === slot && candidate.source.playerId === playerId,
   );
   return starter?.source.displayName ?? playerId;
+}
+
+export function capRushPostseasonPlayerStats(input: {
+  readonly players: readonly CapRushPlayerSeasonLine[];
+  readonly games: readonly CapRushPlayoffGameSummary[];
+}): {
+  games: number;
+  players: CapRushPlayerSeasonLine[];
+} | null {
+  const { gamesPlayed, ...countingStats } = emptySlotTotals();
+  const fields = Object.keys(countingStats) as (keyof typeof countingStats)[];
+  const players = input.players.map((line) => ({ ...line, gamesPlayed, ...countingStats }));
+  const bySlot = new Map(players.map((line) => [line.slot, line]));
+  let games = 0;
+  for (const game of input.games) {
+    if (game.userSide === null) continue;
+    if (game.box === undefined) return null;
+
+    games += 1;
+    const appeared = new Set<CapRushPlayerSeasonLine>();
+    for (const line of game.box[game.userSide].participants) {
+      const totals = bySlot.get(line.slot);
+      if (totals === undefined || line.kind === 'clone') continue;
+      for (const field of fields) totals[field] += line[field];
+      appeared.add(totals);
+    }
+    for (const line of appeared) line.gamesPlayed += 1;
+  }
+  return games === 0 ? null : { games, players };
 }
 
 export interface CapRushLeagueBaseline {

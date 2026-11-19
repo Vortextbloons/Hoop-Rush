@@ -29,7 +29,8 @@ import {
   capRushPlayoffTeam,
 } from './playoff.ts';
 import { simulateCapRushPlayoffGame } from './playoff-sim.ts';
-import { simulateCapRushGame } from './season.ts';
+import { capRushPlayerSeasonLines, capRushPostseasonPlayerStats } from './report.ts';
+import { capRushStoredGameOf, simulateCapRushGame } from './season.ts';
 import { createEngineContext } from '../../sim/kernel.ts';
 
 const SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
@@ -230,6 +231,52 @@ function planOf(locked: ReturnType<typeof lockedOf>): CapRushPlayoffGamePlan {
     seed: capRushPlayoffGameSeed(locked.runSeed, 1, 0, 1),
   };
 }
+
+it('compares saved playoff box scores using the same signed slots as the regular season', () => {
+  const locked = lockedOf(undefined, { versioned: true });
+  const context = createEngineContext();
+  const regular = simulateCapRushGame({ locked, gameNumber: 1, context });
+  const players = capRushPlayerSeasonLines({ locked, games: [capRushStoredGameOf(regular)] });
+  const { game } = simulateCapRushPlayoffGame({ locked, plan: planOf(locked), context });
+  const box = required(game.summary.box, 'playoff box score');
+  const starter = required(box.home.participants[0], 'playoff starter');
+  const playoffGame = {
+    ...game.summary,
+    box: {
+      ...box,
+      home: {
+        ...box.home,
+        participants: [
+          ...box.home.participants,
+          { ...starter, kind: 'replacement' as const, points: 2, fieldGoalsAttempted: 1 },
+          { ...starter, kind: 'clone' as const, points: 9 },
+        ],
+      },
+    },
+  };
+  const stats = capRushPostseasonPlayerStats({
+    players,
+    games: [playoffGame, { ...game.summary, userSide: null, box: undefined }],
+  });
+  const regularLine = required(
+    players.find((line) => line.slot === starter.slot),
+    'season line',
+  );
+  const slotLines = box.home.participants.filter(
+    (line) => line.slot === starter.slot && line.kind !== 'clone',
+  );
+  expect(stats?.games).toBe(1);
+  expect(stats?.players.find((line) => line.slot === starter.slot)).toMatchObject({
+    playerId: regularLine.playerId,
+    gamesPlayed: 1,
+    points: slotLines.reduce((sum, line) => sum + line.points, 2),
+    fieldGoalsAttempted: slotLines.reduce((sum, line) => sum + line.fieldGoalsAttempted, 1),
+  });
+  expect(capRushPostseasonPlayerStats({ players, games: [] })).toBeNull();
+  expect(
+    capRushPostseasonPlayerStats({ players, games: [{ ...game.summary, box: undefined }] }),
+  ).toBeNull();
+});
 
 function humanOf() {
   return lockedOf().human;

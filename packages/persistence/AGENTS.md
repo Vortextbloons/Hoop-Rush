@@ -18,8 +18,8 @@ schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
 - **Storage namespace**: the database is `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `src/repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; do not add upgrade
-  hooks for it. Only database versions 15 and 16 are supported. Version 15
-  upgrades additively to 16 without clearing records; older databases reset all
+  hooks for it. Database versions 15 and 16 upgrade additively to version 17
+  without clearing records. Databases older than version 15 reset all
   local saves, history, and profiles during upgrade. Do not restore historical migrations.
 - **Record envelopes**: every stored record carries its domain
   `saveSchemaVersion`. Readers raise unsupported-version errors through the

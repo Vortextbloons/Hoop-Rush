@@ -6,9 +6,10 @@
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
-  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
@@ -17,7 +18,7 @@
     type CapRushPlayerSeasonLine,
     type CapRushReport,
   } from '@hoop-rush/data-contracts';
-  import { havocMutationDefinitionOf } from '@hoop-rush/engine';
+  import { capRushPostseasonPlayerStats, havocMutationDefinitionOf } from '@hoop-rush/engine';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import CapRushBracket from './CapRushBracket.svelte';
@@ -72,15 +73,50 @@
       : (playerIndex?.players.find((entry) => entry.playerId === postseason.finalsMvp.playerId) ??
           null),
   );
-  const teamUsagePossessions = $derived(
-    usagePossessions(
-      totalOf('fieldGoalsAttempted'),
-      totalOf('freeThrowsAttempted'),
-      totalOf('turnovers'),
-    ),
-  );
+  type StatsPhase = 'regular' | 'postseason';
+  type StatsView = StatsPhase | 'compare';
+  type StatsRow = CapRushPlayerSeasonLine & { phase: StatsPhase };
 
-  const statColumns: PlayerStatColumn<CapRushPlayerSeasonLine>[] = [
+  const statsOptions: readonly { value: StatsView; label: string }[] = [
+    { value: 'regular', label: 'Regular season' },
+    { value: 'postseason', label: 'Postseason' },
+    { value: 'compare', label: 'Compare' },
+  ];
+  let statsView = $state<StatsView>('regular');
+  const playoffStats = $derived(
+    postseason === null
+      ? null
+      : capRushPostseasonPlayerStats({
+          players,
+          games: postseason.series.flatMap((series) => series.games),
+        }),
+  );
+  const postseasonMessage = $derived(
+    postseason?.userOutcome.status === 'not-qualified'
+      ? 'Your team did not qualify for the postseason.'
+      : 'Postseason box scores are unavailable for this run.',
+  );
+  const regularRows = $derived(players.map((line): StatsRow => ({ ...line, phase: 'regular' })));
+  const playoffRows = $derived(
+    (playoffStats?.players ?? [])
+      .map((line): StatsRow => ({ ...line, phase: 'postseason' }))
+      .sort((left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot)),
+  );
+  const comparing = $derived(statsView === 'compare' && playoffStats !== null);
+  const statRows = $derived.by(() => {
+    if (statsView === 'postseason') return playoffRows;
+    if (!comparing) return regularRows;
+    return [...regularRows, ...playoffRows].sort(
+      (left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot),
+    );
+  });
+  const usageByPhase = $derived({
+    regular: teamUsageOf(regularRows),
+    postseason: teamUsageOf(playoffRows),
+  });
+
+  const statColumns: PlayerStatColumn<StatsRow>[] = [
+    { key: 'gamesPlayed', label: 'GP', value: (line) => line.gamesPlayed },
     ...(
       [
         ['points', 'Pts'],
@@ -117,40 +153,66 @@
     {
       key: 'usage',
       label: 'USG%',
-      value: (line: CapRushPlayerSeasonLine) =>
+      value: (line) =>
         usagePct(
           usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
-          teamUsagePossessions,
+          usageByPhase[line.phase],
         ),
     },
   ];
-  const statTotals = $derived({
-    label: 'Season totals',
-    value: (column: PlayerStatColumn<CapRushPlayerSeasonLine>) => {
-      if (column.key === 'trueShooting') {
-        return trueShootingPct(
-          totalOf('points'),
-          totalOf('fieldGoalsAttempted'),
-          totalOf('freeThrowsAttempted'),
+  const statTotals = $derived([
+    ...(statsView === 'postseason'
+      ? []
+      : [totalsFor('Regular-season totals', regularRows, aggregate.games, usageByPhase.regular)]),
+    ...(playoffStats !== null && statsView !== 'regular'
+      ? [totalsFor('Postseason totals', playoffRows, playoffStats.games, usageByPhase.postseason)]
+      : []),
+  ]);
+
+  function totalsFor(
+    label: string,
+    rows: readonly StatsRow[],
+    games: number,
+    teamUsage: number,
+  ): PlayerStatsTotals<StatsRow> {
+    return {
+      label,
+      value: (column) => {
+        if (column.key === 'gamesPlayed') return games;
+        if (column.key === 'trueShooting') {
+          return trueShootingPct(
+            totalOf(rows, 'points'),
+            totalOf(rows, 'fieldGoalsAttempted'),
+            totalOf(rows, 'freeThrowsAttempted'),
+          );
+        }
+        if (column.key === 'usage') return usagePct(teamUsage, teamUsage);
+        const shooting = {
+          fieldGoals: ['fieldGoalsMade', 'fieldGoalsAttempted'],
+          freeThrows: ['freeThrowsMade', 'freeThrowsAttempted'],
+          threes: ['threesMade', 'threesAttempted'],
+        } as const;
+        const fields = shooting[column.key as keyof typeof shooting];
+        if (fields)
+          return formatShootingPercentage(totalOf(rows, fields[0]), totalOf(rows, fields[1]));
+        return totalOf(
+          rows,
+          column.key as 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
         );
-      }
-      if (column.key === 'usage') {
-        return usagePct(teamUsagePossessions, teamUsagePossessions);
-      }
-      const shooting = {
-        fieldGoals: ['fieldGoalsMade', 'fieldGoalsAttempted'],
-        freeThrows: ['freeThrowsMade', 'freeThrowsAttempted'],
-        threes: ['threesMade', 'threesAttempted'],
-      } as const;
-      const fields = shooting[column.key as keyof typeof shooting];
-      if (fields) return formatShootingPercentage(totalOf(fields[0]), totalOf(fields[1]));
-      return totalOf(
-        column.key as 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
-      );
-    },
-  });
+      },
+    };
+  }
+
+  function teamUsageOf(rows: readonly StatsRow[]): number {
+    return usagePossessions(
+      totalOf(rows, 'fieldGoalsAttempted'),
+      totalOf(rows, 'freeThrowsAttempted'),
+      totalOf(rows, 'turnovers'),
+    );
+  }
 
   function totalOf(
+    rows: readonly StatsRow[],
     field:
       | 'points'
       | 'rebounds'
@@ -165,7 +227,7 @@
       | 'threesMade'
       | 'threesAttempted',
   ): number {
-    return players.reduce((total, line: CapRushPlayerSeasonLine) => total + line[field], 0);
+    return rows.reduce((total, line) => total + line[field], 0);
   }
 </script>
 
@@ -449,7 +511,7 @@
                       line.freeThrowsAttempted,
                       line.turnovers,
                     ),
-                    teamUsagePossessions,
+                    usageByPhase.regular,
                   )}
                 </dd>
               </div>
@@ -600,49 +662,70 @@
     <SectionHeading eyebrow="The box score" title="Season statistics" level={3}>
       <span class="text-sm text-muted-foreground">&middot; per game</span>
     </SectionHeading>
-    <Panel padding="none" class="mt-4 overflow-x-auto">
-      <PlayerStatsTable
-        columns={statColumns}
-        rows={players}
-        rowKey={(line) => line.slot}
-        totals={statTotals}
-        caption="Season totals and averages for the five signed slots"
-        tableClass="min-w-[860px] text-xs"
-        headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-        rowClass={() => 'border-b border-border/40'}
-        playerCellClass="px-3 py-2 text-left font-semibold"
-        playerHeadCellClass="px-2 py-1 text-left font-medium"
-        headCellClass="px-2 py-1 text-right font-medium"
-        statCellClass="px-2 py-1 text-right font-mono"
-        footClass="font-semibold"
-        playerTotalCellClass="px-2 py-1 text-left"
-        totalCellClass="px-2 py-1 text-right font-mono"
-      >
-        {#snippet identity(line)}
-          {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
-          <div class="flex min-w-40 items-center gap-2">
-            {#if manifest && face}
-              <PlayerFace
-                player={face}
-                {manifest}
-                size="sm"
-                fallbackInitials={initialsOf(line.displayName)}
-              />
+    <SegmentedControl
+      class="mt-4"
+      options={statsOptions}
+      value={statsView}
+      onchange={(view) => (statsView = view)}
+      label="Statistics split"
+    />
+    {#if statsView !== 'regular' && playoffStats === null}
+      <p class="mt-3 text-sm text-muted-foreground" role="status">{postseasonMessage}</p>
+    {/if}
+    {#if statRows.length > 0}
+      <Panel padding="none" class="mt-4 overflow-x-auto">
+        <PlayerStatsTable
+          columns={statColumns}
+          rows={statRows}
+          rowKey={(line) => `${line.slot}:${line.phase}`}
+          totals={statTotals}
+          caption={`${comparing ? 'Regular season and postseason' : statsView === 'postseason' ? 'Postseason' : 'Regular season'} totals and averages for the five signed slots`}
+          tableClass="min-w-[860px] text-xs"
+          headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+          rowClass={(line) => {
+            if (!comparing) return 'border-b border-border/40';
+            return line.phase === 'postseason' ? 'border-b border-border/60 bg-surface-2' : '';
+          }}
+          playerCellClass="px-3 py-2 text-left font-semibold"
+          playerHeadCellClass="px-2 py-1 text-left font-medium"
+          headCellClass="px-2 py-1 text-right font-medium"
+          statCellClass="px-2 py-1 text-right font-mono"
+          footClass="font-semibold"
+          playerTotalCellClass="px-2 py-1 text-left"
+          totalCellClass="px-2 py-1 text-right font-mono"
+        >
+          {#snippet identity(line)}
+            {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
+            {#if comparing && line.phase === 'postseason'}
+              <span class="sr-only">{line.displayName} {line.slot}</span>
+              <span class="pl-11 font-mono text-[9px] text-muted-foreground">Postseason</span>
             {:else}
-              <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
-                >{initialsOf(line.displayName)}</span
-              >
+              <div class="flex min-w-40 items-center gap-2">
+                {#if manifest && face}
+                  <PlayerFace
+                    player={face}
+                    {manifest}
+                    size="sm"
+                    fallbackInitials={initialsOf(line.displayName)}
+                  />
+                {:else}
+                  <span
+                    class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
+                    >{initialsOf(line.displayName)}</span
+                  >
+                {/if}
+                <span
+                  ><span class="block">{line.displayName}</span><span
+                    class="font-mono text-[9px] text-muted-foreground"
+                    >{line.slot}{comparing ? ' · Regular season' : ''}</span
+                  ></span
+                >
+              </div>
             {/if}
-            <span
-              ><span class="block">{line.displayName}</span><span
-                class="font-mono text-[9px] text-muted-foreground">{line.slot}</span
-              ></span
-            >
-          </div>
-        {/snippet}
-      </PlayerStatsTable>
-    </Panel>
+          {/snippet}
+        </PlayerStatsTable>
+      </Panel>
+    {/if}
   </Panel>
 
   <Panel as="section" padding="md" class="sm:p-7" aria-label="League MVP">

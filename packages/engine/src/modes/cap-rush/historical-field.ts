@@ -1,56 +1,25 @@
-import type { OpponentBracket, SeasonDraftCatalog, Seed } from '@hoop-rush/data-contracts';
+import type {
+  OpponentBracket,
+  SeasonDraftCatalog,
+  SeasonKey,
+  Seed,
+} from '@hoop-rush/data-contracts';
 import { POSITIONS, havocInstanceSeed, opponentBracketSchema } from '@hoop-rush/data-contracts';
 import { createRng, type Rng } from '../../sim/rng.ts';
+import {
+  adjacentHistoricalPlayers,
+  chooseHistoricalTeam,
+  groupHistoricalRosters,
+  historicalLeagueStrengthTarget,
+  historicalLineupOf,
+} from '../historical-rosters.ts';
 
 type Candidate = SeasonDraftCatalog['candidates'][number];
-
-const LEAGUE_TARGET_MIN = 65;
-const LEAGUE_TARGET_MAX = 85;
-const LEAGUE_BAND_RADIUS = 15;
 
 function strengthOf(lineup: readonly Candidate[]): number {
   return (
     lineup.reduce((sum, player) => sum + player.summaryRatings.overallRating, 0) / lineup.length
   );
-}
-
-function lineupOf(
-  candidates: readonly Candidate[],
-  seasonKey: string,
-  adjacentLimit = 0,
-): Candidate[] | null {
-  const ordered = [...candidates].sort(
-    (a, b) =>
-      (b.anchors?.minutesPerGame ?? 0) - (a.anchors?.minutesPerGame ?? 0) ||
-      a.playerVersionId.localeCompare(b.playerVersionId),
-  );
-  const byPosition = POSITIONS.map((position) =>
-    ordered.filter((player) => player.positions.playable.includes(position)),
-  );
-  if (
-    byPosition.some((players) => players.length === 0) ||
-    byPosition.filter((players) => players.every((player) => player.seasonKey !== seasonKey))
-      .length > adjacentLimit
-  )
-    return null;
-  const selected: Candidate[] = [];
-  const used = new Set<string>();
-  function assign(slot: number, remainingAdjacent: number): boolean {
-    const players = byPosition[slot];
-    if (players === undefined) return true;
-    for (const player of players) {
-      if (used.has(player.playerId)) continue;
-      const adjacent = player.seasonKey !== seasonKey;
-      if (adjacent && remainingAdjacent === 0) continue;
-      selected.push(player);
-      used.add(player.playerId);
-      if (assign(slot + 1, remainingAdjacent - Number(adjacent))) return true;
-      selected.pop();
-      used.delete(player.playerId);
-    }
-    return false;
-  }
-  return assign(0, adjacentLimit) ? selected : null;
 }
 
 function varyLineup(lineup: Candidate[], roster: readonly Candidate[], rng: Rng): Candidate[] {
@@ -83,40 +52,23 @@ export function buildCapRushHistoricalField(
   runSeed: Seed,
 ): OpponentBracket {
   const leagueRng = createRng(havocInstanceSeed(runSeed, 'cap-rush-league-strength-v1'));
-  const target =
-    LEAGUE_TARGET_MIN +
-    ((leagueRng.next() + leagueRng.next()) / 2) * (LEAGUE_TARGET_MAX - LEAGUE_TARGET_MIN);
-  const seasons = new Map<string, Map<string, Candidate[]>>();
-  for (const player of catalog.candidates) {
-    if (player.anchors === undefined) continue;
-    let franchise = seasons.get(player.franchiseId);
-    if (franchise === undefined) {
-      franchise = new Map<string, Candidate[]>();
-      seasons.set(player.franchiseId, franchise);
-    }
-    let roster = franchise.get(player.seasonKey);
-    if (roster === undefined) {
-      roster = [];
-      franchise.set(player.seasonKey, roster);
-    }
-    roster.push(player);
-  }
+  const target = historicalLeagueStrengthTarget(leagueRng);
+  const seasons = groupHistoricalRosters(catalog);
   return opponentBracketSchema.parse({
     ...bracket,
     opponents: bracket.opponents.map((opponent) => {
-      const franchiseSeasons = [...(seasons.get(opponent.teamId) ?? [])];
-      const choices = franchiseSeasons
+      const franchiseSeasons =
+        seasons.get(opponent.teamId) ?? new Map<SeasonKey, readonly Candidate[]>();
+      const choices = [...franchiseSeasons]
         .sort(([a], [b]) => a.localeCompare(b))
         .flatMap(([seasonKey, roster]) => {
-          const lineup = lineupOf(roster, seasonKey);
-          const year = Number(seasonKey.slice(0, 4));
-          const adjacent = franchiseSeasons.flatMap(([key, players]) =>
-            Math.abs(Number(key.slice(0, 4)) - year) === 1 ? players : [],
-          );
+          const lineup = historicalLineupOf(roster, seasonKey);
+          const adjacent = adjacentHistoricalPlayers(franchiseSeasons, seasonKey);
           const candidates = [...roster, ...adjacent];
           const varied =
             lineup === null
-              ? (lineupOf(candidates, seasonKey, 1) ?? lineupOf(candidates, seasonKey, 2))
+              ? (historicalLineupOf(candidates, seasonKey, 1) ??
+                historicalLineupOf(candidates, seasonKey, 2))
               : varyLineup(
                   lineup,
                   candidates,
@@ -137,16 +89,7 @@ export function buildCapRushHistoricalField(
       const rng = createRng(
         havocInstanceSeed(runSeed, 'cap-rush-historical-field-v3', opponent.teamId),
       );
-      const inBand = choices.filter((choice) => choice.distance <= LEAGUE_BAND_RADIUS);
-      const nearestDistance = Math.min(...choices.map((choice) => choice.distance));
-      const eligible =
-        inBand.length > 0
-          ? inBand
-          : choices.filter((choice) => choice.distance === nearestDistance);
-      const chosen = rng.weightedPick(
-        eligible,
-        eligible.map((choice) => 1 + Math.max(0, 1 - choice.distance / LEAGUE_BAND_RADIUS)),
-      );
+      const chosen = chooseHistoricalTeam(choices, rng);
       const lineup = chosen.lineup;
       return {
         ...opponent,

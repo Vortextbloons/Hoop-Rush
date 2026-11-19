@@ -14,3 +14,5 @@ export * from './schemas/havoc-multiplayer-record.ts';
 export * from './repositories/havoc-multiplayer.ts';
 export * from './schemas/cap-rush-multiplayer-record.ts';
 export * from './repositories/cap-rush-multiplayer.ts';
+export { DexieFullCourtDraftRepository } from './repositories/full-court-draft.ts';
+export * from './schemas/full-court-draft-record.ts';
