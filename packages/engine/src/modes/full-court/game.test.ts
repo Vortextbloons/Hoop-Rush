@@ -516,7 +516,9 @@ describe('full court fatigue', () => {
     );
     const swaps = tape.filter((event) => event.kind === 'substitution' && event.side === 0);
     expect(swaps.length).toBeGreaterThan(0);
-    const byId = new Map(result.home.players.map((player) => [player.playerId, player]));
+    const byId = new Map<string, FullCourtPlayerLine>(
+      result.home.players.map((player) => [player.playerId, player]),
+    );
     for (const event of swaps) {
       if (event.kind !== 'substitution') continue;
       const out = byId.get(event.outPlayerId);

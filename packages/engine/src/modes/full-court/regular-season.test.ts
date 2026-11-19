@@ -11,8 +11,12 @@ import { createEngineContext } from '../../sim/kernel.ts';
 import { fullCourtDraftIndexOf } from './draft-catalog.ts';
 import { applyFullCourtCommand, createFullCourtDraftState } from './draft-commands.ts';
 import { fullCourtTestSetup } from './draft-test-support.ts';
-import { checkFullCourtGameResult, simulateFullCourtGame } from './game.ts';
-import { buildFullCourtRegularSeason, fullCourtRegularSeasonGameInput } from './regular-season.ts';
+import { checkFullCourtGameResult } from './game.ts';
+import {
+  buildFullCourtRegularSeason,
+  fullCourtRegularSeasonGameInput,
+  simulateFullCourtRegularSeasonGame,
+} from './regular-season.ts';
 
 test('a confirmed six-guard roster plays a scheduled game against a historical rotation', () => {
   const setup = fullCourtTestSetup({ overalls: [70, 71, 72, 73, 74, 75] });
@@ -93,7 +97,15 @@ test('a confirmed six-guard roster plays a scheduled game against a historical r
   expect(opponent.roster).toHaveLength(12);
   expect(opponent.rotation?.startingFive).toHaveLength(5);
 
-  const result = simulateFullCourtGame(game, createEngineContext());
+  const gameOutcome = simulateFullCourtRegularSeasonGame(
+    season,
+    fixture.gameId,
+    createEngineContext(),
+  );
+  if (gameOutcome.kind !== 'played') throw new Error('Expected a playable fixture');
+  const { result, health } = gameOutcome;
+  expect(health.home.throughDay).toBe(fixture.dayOffset);
+  expect(Object.keys(health.away.players).length).toBeGreaterThan(5);
   expect(checkFullCourtGameResult(result)).toEqual([]);
   const played = homeUser ? result.home : result.away;
   expect(played.players.some((player) => !player.startedGame && player.seconds > 0)).toBe(true);

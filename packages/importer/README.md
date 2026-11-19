@@ -59,3 +59,25 @@ bun run hoop-rush data validate
 `pools/compute.test.ts` covers pool derivation and manifest updates;
 `ratings/overall.test.ts` the Overall scale. `scripts/import-nba` holds the
 Python fetch layer (`bun run test:import-nba`).
+
+## Full Court historical health
+
+Use the cached game and player tables with `scripts/import-nba/derive_full_court_health_evidence.py`.
+The command's `--help` lists the required paths. Fit profiles from its JSON
+output and the packaged draft catalog with the offline importer:
+
+```text
+bun packages/importer/src/full-court-health/index.ts apps/web/static/data/draft-catalog.json .raw_nba_cache/full-court-health-evidence.json .raw_nba_cache/full-court-health-profiles.json
+```
+
+The first-pass profiles estimate documented time-loss episodes per 10,000
+recorded appearances. Seasons need at least 1,000 coded absences and reasons
+for at least 40% of the absences within observed roster windows. An individual
+season needs 20 appearances and no more unknown absences than the greater of
+two or its coded absences. Era and minutes-per-game cohorts provide priors for
+sparse records. An eligible player's estimate borrows 160 appearances from
+their cohort. An appearance and a combined injury/illness report are limited
+sources of evidence, and the rollup can split episodes at gaps in coverage.
+The offline output records both input hashes and distinguishes player-season
+estimates from population-only estimates. Validate frequency and duration on
+held-out seasons before using the profiles to generate injuries in games.

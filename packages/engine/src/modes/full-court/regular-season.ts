@@ -12,6 +12,7 @@ import {
   type Seed,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { assertCapRushCatalogSourceMatches } from '../cap-rush/catalog.ts';
 import { capRushAssignFranchise, type CapRushLeagueField } from '../cap-rush/league-schedule.ts';
 import { fullCourtDraftIndexOf, fullCourtSalaryDollarsOf } from './draft-catalog.ts';
@@ -21,6 +22,7 @@ import {
   fullCourtPayrollStatus,
 } from './draft-economy.ts';
 import type { FullCourtGameInput, FullCourtTeamGameInput } from './game.ts';
+import { runFullCourtGameWithHealth, type FullCourtGameHealthOptions } from './health.ts';
 import {
   buildFullCourtHistoricalField,
   buildFullCourtLeagueSchedule,
@@ -153,12 +155,38 @@ export function fullCourtRegularSeasonGameInput(
   season: FullCourtRegularSeason,
   gameId: string,
 ): FullCourtGameInput {
+  return gameInputOf(season, scheduledGameOf(season, gameId));
+}
+
+export function simulateFullCourtRegularSeasonGame(
+  season: FullCourtRegularSeason,
+  gameId: string,
+  context: EngineContext,
+  options: FullCourtGameHealthOptions = {},
+) {
+  const fixture = scheduledGameOf(season, gameId);
+  return runFullCourtGameWithHealth(
+    gameInputOf(season, fixture),
+    fixture.dayOffset,
+    context,
+    options,
+  );
+}
+
+function scheduledGameOf(season: FullCourtRegularSeason, gameId: string): FullCourtLeagueGame {
   const fixture = season.games.find((game) => game.gameId === gameId);
   if (fixture === undefined) throw new Error(`Full Court game ${gameId} is not on the schedule`);
+  return fixture;
+}
+
+function gameInputOf(
+  season: FullCourtRegularSeason,
+  fixture: FullCourtLeagueGame,
+): FullCourtGameInput {
   const home = season.teams.find((team) => team.teamId === fixture.homeTeamId);
   const away = season.teams.find((team) => team.teamId === fixture.awayTeamId);
   if (home === undefined || away === undefined)
-    throw new Error(`Full Court game ${gameId} has an unknown team`);
+    throw new Error(`Full Court game ${fixture.gameId} has an unknown team`);
   return {
     schemaVersion: 1,
     seed: havocInstanceSeed(season.runSeed, 'full-court-regular-game-v1', fixture.gameId),

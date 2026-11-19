@@ -129,7 +129,7 @@ export interface FullCourtLineupStint {
 }
 
 export interface FullCourtPlayerLine {
-  readonly playerId: string;
+  readonly playerId: SimulationPlayer['playerId'];
   readonly displayName: string;
   readonly startedGame: boolean;
   readonly available: boolean;
@@ -974,7 +974,7 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
   for (const side of ['home', 'away'] as const) {
     const team = result[side];
     const box = team.box;
-    const ids = new Set(team.players.map((player) => player.playerId));
+    const ids = new Set<string>(team.players.map((player) => player.playerId));
     if (ids.size !== team.players.length) failures.push(`${side}: duplicate player ids`);
     if (team.players.length < FULL_COURT_MIN_ROSTER) {
       failures.push(`${side}: fewer than five players in the box score`);

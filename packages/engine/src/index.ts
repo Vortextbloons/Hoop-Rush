@@ -368,8 +368,13 @@ export {
 export {
   buildFullCourtRegularSeason,
   fullCourtRegularSeasonGameInput,
+  simulateFullCourtRegularSeasonGame,
   type FullCourtRegularSeason,
 } from './modes/full-court/regular-season.ts';
+export {
+  type FullCourtGameHealthOptions,
+  type FullCourtGameHealthOutcome,
+} from './modes/full-court/health.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {
