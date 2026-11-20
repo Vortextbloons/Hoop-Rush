@@ -375,6 +375,7 @@
     </Panel>
 
     <div class="grid items-stretch gap-4 md:grid-cols-2">
+      {@render leagueMvpCard()}
       <MvpCard
         class="h-full border-accent/40"
         label="Finals MVP"
@@ -427,7 +428,6 @@
           {/if}
         {/snippet}
       </MvpCard>
-      {@render leagueMvpCard()}
     </div>
 
     <CapRushBracket
