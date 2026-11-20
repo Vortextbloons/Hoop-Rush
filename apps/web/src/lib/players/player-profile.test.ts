@@ -90,9 +90,15 @@ function cohort(size: number, position = 'PG'): ProfileSample[] {
       }),
       tendencies: tendencies({
         stealAttemptRate: 4 + step * 12,
-        usageRate: 12 + step * 20,
+        usageRate: 12 + step * 26,
         threePointRate: 10 + step * 40,
-        postUpRate: 2 + step * 26,
+        postUpRate: 2 + step * 12,
+        isolationRate: 2 + step * 24,
+        shotRate: 14 + step * 26,
+        transitionRate: 6 + step * 18,
+        freeThrowRate: 10 + step * 28,
+        rimFrequency: 15 + step * 35,
+        driveRate: 8 + step * 26,
       }),
     };
   });
@@ -249,6 +255,34 @@ describe('player profile traits', () => {
     expect(view.weaknesses.length).toBeGreaterThan(1);
   });
 
+  it('keeps a two-way guard labeled by his strongest defensive evidence', () => {
+    // Both the pickpocket and scorer rules fire; the defender has more evidence.
+    const view = profileOf(
+      {
+        ratings: ratings({
+          steal: 86,
+          perimeterDefense: 84,
+          defensiveIq: 79,
+          offensiveIq: 74,
+          insideScoring: 72,
+        }),
+        tendencies: tendencies({
+          stealAttemptRate: 17,
+          usageRate: 30,
+          isolationRate: 18,
+          shotRate: 32,
+        }),
+      },
+      samples,
+    );
+    const labels = view.strengths.map((trait) => trait.label);
+    expect(labels).toContain('Perimeter pickpocket');
+    // Whatever the label, it must be one this player actually earns.
+    expect(['Defensive guard', 'Scoring guard', 'Creator', 'Rotation guard']).toContain(
+      view.archetype,
+    );
+  });
+
   it('keeps a center out of guard archetypes even with guard-like skills', () => {
     const view = profileOf(
       {
@@ -284,6 +318,109 @@ describe('player profile traits', () => {
     );
     expect(view.summary.length).toBeGreaterThan(0);
     expect(view.summary).toContain('steals');
+  });
+});
+
+describe('player profile production', () => {
+  const samples = cohort(101);
+
+  it('groups the stat line into per-game, shooting, and advanced sections', () => {
+    const references = buildPlayerProfileReferences(samples);
+    const view = buildPlayerProfile(
+      {
+        displayName: 'Stat Line',
+        franchiseLabel: null,
+        seasonKey: '1999-00',
+        positions: ['PG'],
+        heightInches: null,
+        weightLbs: null,
+        overall: 80,
+        offense: null,
+        defense: null,
+        ratings: ratings(),
+        tendencies: tendencies(),
+        anchors: null,
+        stats: {
+          gamesPlayed: 82,
+          minutes: 36.4,
+          points: 22.1,
+          rebounds: 5.2,
+          assists: 6.8,
+          steals: 1.7,
+          blocks: 0.4,
+          turnovers: 2.9,
+          fgPct: 0.472,
+          threePct: 0.381,
+          ftPct: 0.812,
+          tsPct: 0.581,
+          efgPct: 0.521,
+          usageRate: 27.4,
+          per: 19.8,
+          boxPlusMinus: 4.2,
+        },
+        slot: 'PG',
+      },
+      references.forSlot('PG'),
+    );
+    expect(view.production?.map((group) => group.title)).toEqual([
+      'Per game',
+      'Shooting',
+      'Advanced',
+    ]);
+    const flat = (view.production ?? []).flatMap((group) => group.rows);
+    expect(flat.find((row) => row.label === 'Points')?.value).toBe('22.1');
+    expect(flat.find((row) => row.label === 'FG%')?.value).toBe('47.2%');
+    expect(flat.find((row) => row.label === 'USG%')?.value).toBe('27.4%');
+    expect(flat.find((row) => row.label === 'Games')?.value).toBe('82');
+  });
+
+  it('keeps missing stats visible as an em dash instead of dropping the row', () => {
+    const references = buildPlayerProfileReferences(samples);
+    const view = buildPlayerProfile(
+      {
+        displayName: 'Old Timer',
+        franchiseLabel: null,
+        seasonKey: '1965-66',
+        positions: ['PG'],
+        heightInches: null,
+        weightLbs: null,
+        overall: 70,
+        offense: null,
+        defense: null,
+        ratings: ratings(),
+        tendencies: tendencies(),
+        anchors: null,
+        stats: {
+          gamesPlayed: 70,
+          minutes: 30,
+          points: 12,
+          rebounds: 3,
+          assists: 4,
+          steals: null,
+          blocks: null,
+          turnovers: null,
+          fgPct: 0.44,
+          threePct: null,
+          ftPct: 0.75,
+          tsPct: null,
+          efgPct: null,
+          usageRate: null,
+          per: null,
+          boxPlusMinus: null,
+        },
+        slot: 'PG',
+      },
+      references.forSlot('PG'),
+    );
+    const flat = (view.production ?? []).flatMap((group) => group.rows);
+    expect(flat.find((row) => row.label === 'Steals')?.value).toBe('\u2014');
+    expect(flat.find((row) => row.label === '3P%')?.value).toBe('\u2014');
+    expect(flat.find((row) => row.label === 'BPM')?.value).toBe('\u2014');
+  });
+
+  it('reports no production at all when the mode has no stat line', () => {
+    const view = profileOf({ ratings: ratings(), tendencies: tendencies() }, samples);
+    expect(view.production).toBeNull();
   });
 });
 

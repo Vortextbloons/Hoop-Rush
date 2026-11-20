@@ -31,6 +31,37 @@ export const PROFILE_RATING_LABELS: Readonly<Record<RatingKey, string>> = {
 
 export const PROFILE_RATING_KEYS = Object.keys(PROFILE_RATING_LABELS) as readonly RatingKey[];
 
+/** Placeholders for identity-only renders, so no rating section is fabricated. */
+export const ZERO_RATINGS: Readonly<SimulationRatings> = Object.fromEntries(
+  PROFILE_RATING_KEYS.map((key) => [key, 0]),
+) as unknown as Readonly<SimulationRatings>;
+
+export const ZERO_TENDENCIES: Readonly<SimulationTendencies> = {
+  usageRate: 0,
+  passRate: 0,
+  shotRate: 0,
+  driveRate: 0,
+  postUpRate: 0,
+  rimFrequency: 0,
+  shortMidFrequency: 0,
+  longMidFrequency: 0,
+  cornerThreeFrequency: 0,
+  aboveBreakThreeFrequency: 0,
+  threePointRate: 0,
+  freeThrowRate: 0,
+  turnoverRate: 0,
+  isolationRate: 0,
+  pickAndRollBallHandlerRate: 0,
+  pickAndRollRollManRate: 0,
+  spotUpRate: 0,
+  transitionRate: 0,
+  cutRate: 0,
+  foulRate: 0,
+  stealAttemptRate: 0,
+  blockAttemptRate: 0,
+  crashOffensiveGlassRate: 0,
+};
+
 export interface ProfileRatingGroup {
   readonly title: string;
   readonly keys: readonly RatingKey[];
@@ -210,6 +241,10 @@ export interface PlayerProfileInput {
   readonly ratings: Readonly<SimulationRatings>;
   readonly tendencies: Readonly<SimulationTendencies>;
   readonly anchors?: Readonly<SimulationAnchors> | null;
+  /** Season stat line for the Production tab. Omitted by modes without stats. */
+  readonly stats?: PlayerProfileStats | null;
+  /** Playoff sample, rendered as its own section when present. */
+  readonly postseason?: readonly PlayerProfileStatGroup[] | null;
   /** Slot whose cohort the percentiles came from. */
   readonly slot: string | null;
 }
@@ -246,7 +281,41 @@ export interface PlayerProfileView {
   readonly actions: readonly PlayerProfileShare[] | null;
   readonly habits: readonly PlayerProfileTrait[];
   readonly ratingGroups: readonly PlayerProfileRatingGroup[];
+  /** Season production grouped for the Production tab. Null without stats. */
+  readonly production: readonly PlayerProfileStatGroup[] | null;
+  /** Playoff-vs-regular-season evidence, when a recorded sample exists. */
+  readonly postseason: readonly PlayerProfileStatGroup[] | null;
   readonly cohort: { readonly label: string; readonly size: number } | null;
+}
+
+export interface PlayerProfileStatRow {
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface PlayerProfileStatGroup {
+  readonly title: string;
+  readonly rows: readonly PlayerProfileStatRow[];
+}
+
+/** Per-game production, mirroring the season-table column names. */
+export interface PlayerProfileStats {
+  readonly gamesPlayed: number;
+  readonly minutes: number | null;
+  readonly points: number | null;
+  readonly rebounds: number | null;
+  readonly assists: number | null;
+  readonly steals: number | null;
+  readonly blocks: number | null;
+  readonly turnovers: number | null;
+  readonly fgPct: number | null;
+  readonly threePct: number | null;
+  readonly ftPct: number | null;
+  readonly tsPct: number | null;
+  readonly efgPct: number | null;
+  readonly usageRate: number | null;
+  readonly per: number | null;
+  readonly boxPlusMinus: number | null;
 }
 
 export function profileInitials(displayName: string): string {
@@ -372,7 +441,7 @@ const STRENGTH_RULES: readonly TraitRule[] = [
     label: 'High-usage engine',
     phrase: 'shot volume',
     signal: { tendencies: ['usageRate'] },
-    test: (c) => c.tendency('usageRate') >= 0.9 && c.rating('offensiveIq') >= 0.6,
+    test: (c) => c.tendency('usageRate') >= 0.8 && c.rating('offensiveIq') >= 0.6,
   },
   {
     label: 'Isolation scorer',
@@ -576,6 +645,11 @@ function joinPhrases(phrases: readonly string[]): string {
   return `${first}, ${second}${rest.length > 1 ? `, ${rest.slice(0, -1).join(', ')}` : ''}, and ${last}`;
 }
 
+/**
+ * Picks the archetype backed by the strongest evidence rather than the first
+ * fixed rule that matches. A guard with elite steals and passing should not be
+ * labelled a scorer just because one usage marker also fired.
+ */
 function archetypeOf(
   allStrengths: readonly PlayerProfileTrait[],
   allWeaknesses: readonly PlayerProfileTrait[],
@@ -584,43 +658,127 @@ function archetypeOf(
 ): string {
   const labels = new Set([...allStrengths, ...allWeaknesses].map((trait) => trait.label));
   const has = (label: string) => labels.has(label);
+  const strengthOf = (label: string): number =>
+    allStrengths.find((trait) => trait.label === label)?.percentile ?? 0;
+  /** Mean percentile across the traits that define the archetype. */
+  const evidence = (...required: readonly string[]): number => {
+    if (!required.every(has)) return 0;
+    return required.reduce((sum, label) => sum + strengthOf(label), 0) / required.length;
+  };
+
   const isGuard = positions.some((position) => position === 'PG' || position === 'SG');
   const isBig = positions.some((position) => position === 'C' || position === 'PF');
+  const shootsIt = has('Unlimited range') || has('High-volume shooter');
 
-  // Signature skills outrank position defaults, so a center who can shoot is a
-  // shooter first and a big second. "Gravity shooter" stays reserved for the
-  // genuinely elite, so a rotation bench big never claims the label.
-  const eliteRange = has('Unlimited range');
-  const shootsIt = eliteRange || has('High-volume shooter');
+  const candidates: { label: string; score: number }[] = [];
 
+  if (has('Unlimited range')) {
+    candidates.push({
+      label: isGuard ? 'Gravity shooter' : 'Shooting big',
+      score: evidence('Unlimited range'),
+    });
+  }
   if (isGuard) {
-    if (eliteRange) return 'Gravity shooter';
-    if (has('Perimeter pickpocket') && has('Perimeter stopper')) return 'Defensive guard';
-    if (has('Table-setting passer')) return 'Creator';
-    if (shootsIt) return 'Floor spacer';
-    if (has('Downhill driver') || has('Transition weapon')) return 'Slashing guard';
-    return 'Rotation guard';
+    candidates.push({
+      label: 'Defensive guard',
+      score: evidence('Perimeter pickpocket', 'Perimeter stopper'),
+    });
+    candidates.push({ label: 'Creator', score: evidence('Table-setting passer') });
+    candidates.push({
+      label: 'Scoring guard',
+      score: evidence('High-usage engine', 'Isolation scorer'),
+    });
+    candidates.push({ label: 'Slashing guard', score: evidence('Downhill driver') });
+    if (shootsIt)
+      candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
+  } else if (isBig) {
+    candidates.push({ label: 'Interior force', score: evidence('Post scorer', 'Owns the glass') });
+    candidates.push({ label: 'Anchor big', score: evidence('Rim protector', 'Owns the glass') });
+    candidates.push({ label: 'Glass specialist', score: evidence('Owns the glass') });
+    candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
+    if (shootsIt) candidates.push({ label: 'Stretch big', score: evidence('High-volume shooter') });
+  } else {
+    candidates.push({
+      label: 'Two-way wing',
+      score: evidence('Perimeter stopper', 'High-volume shooter'),
+    });
+    candidates.push({ label: 'Wing stopper', score: evidence('Perimeter stopper') });
+    candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
+    candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
+    candidates.push({ label: 'Slashing wing', score: evidence('Downhill driver') });
   }
 
-  if (isBig) {
-    if (eliteRange) return 'Shooting big';
-    if (has('Post scorer') && has('Owns the glass')) return 'Interior force';
-    if (has('Rim protector') && has('Owns the glass')) return 'Anchor big';
-    if (has('Owns the glass')) return 'Glass specialist';
-    if (has('Rim protector')) return 'Anchor big';
-    if (shootsIt) return 'Stretch big';
-    if (has('Table-setting passer')) return 'Connector';
-    return 'Rotation big';
+  // Ties are common at the ceiling (many traits reach the 100th percentile), so
+  // usage decides: a scorer with elite volume is described by his scoring first.
+  const best = candidates.reduce<{ label: string; score: number } | null>(
+    (winner, entry) => (winner === null || entry.score > winner.score ? entry : winner),
+    null,
+  );
+  const tied = candidates.filter((entry) => best !== null && entry.score === best.score);
+  const floor = isGuard ? 'Rotation guard' : isBig ? 'Rotation big' : 'Rotation wing';
+  if (best === null || best.score <= 0) return floor;
+  if (tied.length > 1) {
+    const scoring = tied.find((entry) => entry.label === 'Scoring guard');
+    if (scoring !== undefined && tendencies.usageRate >= 30) return scoring.label;
+    const gravity = tied.find((entry) => entry.label === 'Gravity shooter');
+    if (gravity !== undefined) return gravity.label;
   }
+  return best.label;
+}
 
-  if (eliteRange) return 'Gravity shooter';
-  if (has('Perimeter stopper') && shootsIt) return 'Two-way wing';
-  if (has('Perimeter stopper')) return 'Wing stopper';
-  if (shootsIt) return 'Floor spacer';
-  if (has('Table-setting passer')) return 'Connector';
-  if (has('Downhill driver') || has('Transition weapon')) return 'Slashing wing';
-  if (tendencies.usageRate >= 24) return 'Scoring wing';
-  return 'Rotation wing';
+function formatStat(value: number | null, digits = 1): string {
+  return value === null || !Number.isFinite(value) ? '\u2014' : value.toFixed(digits);
+}
+
+function formatStatPct(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? '\u2014' : `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * Season production, grouped the way a box score reads: volume first, then
+ * efficiency, then the rate stats. Rows with no recorded value stay visible as
+ * an em dash, because an absent stat is information for older seasons.
+ */
+function productionGroupsOf(
+  stats: PlayerProfileStats | null | undefined,
+): PlayerProfileStatGroup[] | null {
+  if (stats === null || stats === undefined) return null;
+  return [
+    {
+      title: 'Per game',
+      rows: [
+        { label: 'Minutes', value: formatStat(stats.minutes) },
+        { label: 'Points', value: formatStat(stats.points) },
+        { label: 'Rebounds', value: formatStat(stats.rebounds) },
+        { label: 'Assists', value: formatStat(stats.assists) },
+        { label: 'Steals', value: formatStat(stats.steals) },
+        { label: 'Blocks', value: formatStat(stats.blocks) },
+        { label: 'Turnovers', value: formatStat(stats.turnovers) },
+      ],
+    },
+    {
+      title: 'Shooting',
+      rows: [
+        { label: 'FG%', value: formatStatPct(stats.fgPct) },
+        { label: '3P%', value: formatStatPct(stats.threePct) },
+        { label: 'FT%', value: formatStatPct(stats.ftPct) },
+        { label: 'eFG%', value: formatStatPct(stats.efgPct) },
+        { label: 'TS%', value: formatStatPct(stats.tsPct) },
+      ],
+    },
+    {
+      title: 'Advanced',
+      rows: [
+        {
+          label: 'USG%',
+          value: stats.usageRate === null ? '\u2014' : `${formatStat(stats.usageRate)}%`,
+        },
+        { label: 'PER', value: formatStat(stats.per) },
+        { label: 'BPM', value: formatStat(stats.boxPlusMinus) },
+        { label: 'Games', value: String(stats.gamesPlayed) },
+      ],
+    },
+  ];
 }
 
 function normalizeShares(
@@ -706,6 +864,8 @@ export function buildPlayerProfile(
     actions: actions.length > 0 ? actions : null,
     habits,
     ratingGroups,
+    production: productionGroupsOf(input.stats),
+    postseason: input.postseason ?? null,
     cohort:
       reference === null ? null : { label: reference.cohortLabel, size: reference.sampleSize },
   };

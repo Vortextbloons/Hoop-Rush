@@ -12,7 +12,7 @@
     PlayerProfileView,
   } from '#lib/players/player-profile.js';
 
-  export type ProfileTab = 'details' | 'tendencies' | 'ratings' | 'apron';
+  export type ProfileTab = 'details' | 'production' | 'tendencies' | 'ratings' | 'apron';
 
   let {
     profile,
@@ -42,11 +42,13 @@
   } = $props();
 
   const availableTabs = $derived.by((): ProfileTab[] => {
-    const base: ProfileTab[] = tabs ? [...tabs] : ['details', 'tendencies', 'ratings'];
-    if (apron !== null && apron.status.kind !== 'none' && base.includes('apron')) {
-      return base;
+    let base: ProfileTab[] = tabs ? [...tabs] : ['details', 'production', 'ratings'];
+    // Production needs a stat line; drop it rather than show an empty tab.
+    if (profile.production === null) base = base.filter((entry) => entry !== 'production');
+    if (apron !== null && apron.status.kind === 'none') {
+      base = base.filter((entry) => entry !== 'apron');
     }
-    return base.filter((entry) => entry !== 'apron');
+    return base;
   });
 
   // Apron disappears when there is nothing to pay, so fall back rather than
@@ -170,7 +172,8 @@
       </div>
 
       <div class="flex shrink-0 flex-col items-end">
-        <span class="font-display text-2xl font-extrabold leading-none tabular-nums sm:text-3xl"
+        <span
+          class="font-display pt-px text-2xl font-extrabold leading-[1.15] tabular-nums sm:text-3xl"
           >{profile.overall}</span
         >
         <span
@@ -220,6 +223,7 @@
           onclick={() => (tab = entry)}
         >
           {entry === 'details' ? 'Details' : null}
+          {entry === 'production' ? 'Stats' : null}
           {entry === 'tendencies' ? 'Tendencies' : null}
           {entry === 'ratings' ? 'Ratings' : null}
           {entry === 'apron' ? 'Apron' : null}
@@ -297,8 +301,11 @@
             <ul class="divide-y divide-border/50 overflow-hidden rounded-lg bg-surface-2">
               {#each traitRows(profile.weaknesses) as row (row.label)}
                 <li class="flex items-center gap-2.5 px-2.5 py-1.5">
-                  <span class="min-w-0 flex-1 truncate text-[12px]">{row.label}</span>
-                  <span class="font-mono text-[9px] font-bold tabular-nums text-muted-foreground"
+                  <span
+                    class="min-w-0 flex-1 truncate font-mono text-[10px] font-bold uppercase tracking-[0.03em] text-negative"
+                    >{row.label}</span
+                  >
+                  <span class="font-mono text-[9px] font-bold tabular-nums text-negative/80"
                     >{row.rank}</span
                   >
                   <span class="h-1 w-11 shrink-0 overflow-hidden rounded-full bg-border/80">
@@ -326,7 +333,7 @@
                 <dt class="font-mono text-[8px] uppercase tracking-[0.08em] text-muted-foreground">
                   Minutes
                 </dt>
-                <dd class="font-display mt-0.5 text-base font-extrabold leading-none tabular-nums">
+                <dd class="font-display mt-0.5 text-base font-extrabold leading-[1.2] tabular-nums">
                   {profile.workload.minutes === null ? '—' : profile.workload.minutes.toFixed(1)}
                 </dd>
               </div>
@@ -334,7 +341,7 @@
                 <dt class="font-mono text-[8px] uppercase tracking-[0.08em] text-muted-foreground">
                   Shots
                 </dt>
-                <dd class="font-display mt-0.5 text-base font-extrabold leading-none tabular-nums">
+                <dd class="font-display mt-0.5 text-base font-extrabold leading-[1.2] tabular-nums">
                   {profile.workload.shotAttempts === null
                     ? '—'
                     : profile.workload.shotAttempts.toFixed(1)}
@@ -344,13 +351,59 @@
                 <dt class="font-mono text-[8px] uppercase tracking-[0.08em] text-muted-foreground">
                   Usage
                 </dt>
-                <dd class="font-display mt-0.5 text-base font-extrabold leading-none tabular-nums">
+                <dd class="font-display mt-0.5 text-base font-extrabold leading-[1.2] tabular-nums">
                   {profile.workload.usage.toFixed(1)}%
                 </dd>
               </div>
             </dl>
           </section>
         {/if}
+      </div>
+    {:else if active === 'production' && profile.production !== null}
+      <div class="grid gap-3.5">
+        {#each profile.production as group (group.title)}
+          <section>
+            <div class="mb-1.5 flex items-baseline justify-between gap-2">
+              <h3 class="font-mono text-[9px] font-bold tracking-[0.13em] text-primary uppercase">
+                {group.title}
+              </h3>
+              <span class="font-mono text-[8px] text-muted-foreground uppercase">
+                {group.title === 'Shooting' ? 'Percentages' : 'Season totals'}
+              </span>
+            </div>
+            <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-border/50">
+              {#each group.rows as row (row.label)}
+                <div class="flex items-baseline justify-between gap-2 bg-surface-2 px-2.5 py-1.5">
+                  <dt class="truncate text-[11px] text-muted-foreground">{row.label}</dt>
+                  <dd class="font-mono text-[12px] font-bold tabular-nums">{row.value}</dd>
+                </div>
+              {/each}
+            </dl>
+          </section>
+        {/each}
+        {#if profile.postseason !== null && profile.postseason.length > 0}
+          <section>
+            <div class="mb-1.5 flex items-baseline justify-between gap-2">
+              <h3 class="font-mono text-[9px] font-bold tracking-[0.13em] text-accent uppercase">
+                Playoffs
+              </h3>
+              <span class="font-mono text-[8px] text-muted-foreground uppercase"
+                >Recorded sample</span
+              >
+            </div>
+            <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-border/50">
+              {#each profile.postseason.flatMap((group) => group.rows) as row (row.label)}
+                <div class="flex items-baseline justify-between gap-2 bg-surface-2 px-2.5 py-1.5">
+                  <dt class="truncate text-[11px] text-muted-foreground">{row.label}</dt>
+                  <dd class="font-mono text-[12px] font-bold tabular-nums">{row.value}</dd>
+                </div>
+              {/each}
+            </dl>
+          </section>
+        {/if}
+        <p class="font-mono text-[8px] leading-relaxed text-muted-foreground">
+          An em dash means the stat was not recorded for this season.
+        </p>
       </div>
     {:else if active === 'tendencies'}
       <div class="grid gap-4">
@@ -466,8 +519,12 @@
             <ul class="divide-y divide-border/50 overflow-hidden rounded-lg bg-surface-2">
               {#each group.rows as row (row.label)}
                 {@const tone = toneOf(row.percentile)}
-                <li class="grid grid-cols-[3.75rem_1.5rem_1fr] items-center gap-2 px-2.5 py-1">
-                  <span class="truncate text-[11px] text-muted-foreground">{row.label}</span>
+                <li class="grid grid-cols-[4.5rem_1.5rem_1fr] items-center gap-2 px-2.5 py-1">
+                  <span
+                    class="truncate {tone === 'negative'
+                      ? 'font-mono text-[9.5px] font-bold uppercase tracking-[0.03em] text-negative'
+                      : 'text-[11px] text-muted-foreground'}">{row.label}</span
+                  >
                   <span
                     class="text-right font-mono text-[11px] font-bold tabular-nums {tone ===
                     'positive'

@@ -193,6 +193,8 @@ function peakPlayerToRosterDetails(player: ReturnType<typeof parsePool>['players
     heightInches: player.heightInches,
     weightLbs: player.weightLbs,
     stats: player.stats,
+    ratings: player.detailedRatings,
+    tendencies: player.tendencies,
   };
 }
 export function rebuildPlayersIndex(
@@ -270,7 +272,7 @@ export function rebuildRosterDetails(
   if (detailPlayers.length === 0) return null;
   const detailsPath = join(dataDir, 'roster-details.json');
   const details = parseRosterDetails({
-    schemaVersion: 1,
+    schemaVersion: 2,
     dataVersion: DATA_VERSION,
     players: detailPlayers,
   });

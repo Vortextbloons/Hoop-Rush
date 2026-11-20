@@ -24,7 +24,6 @@
   } from '#lib/data.js';
   import { loadPlayoffProfiles } from '#lib/data-assets.js';
   import { errorMessageOf } from '#lib/errors.js';
-  import { lazyModule } from '#lib/lazy-module.js';
   import { LITE_TOGGLE_EVENT, deferIdle, isLiteMode } from '#lib/device-capabilities.js';
   import { DETAILED_POSITIONS } from '#lib/player-positions.js';
   import {
@@ -45,9 +44,16 @@
   import RosterTable from '#lib/components/RosterTable.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
-  const loadPlayerDetailDialog = lazyModule(
-    () => import('#lib/components/PlayerDetailDialog.svelte'),
-  );
+  import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
+  import type { ProfileTab } from '#lib/components/PlayerProfileSheet.svelte';
+  import {
+    buildPlayerProfile,
+    buildPlayerProfileReferences,
+    type PlayerProfileReferences,
+  } from '#lib/players/player-profile.js';
+  import { rosterProfileInput, rosterProfileSamples } from '#lib/players/roster-profile.js';
+  import { teamLabelFor } from '#lib/branding.js';
+  import { ZERO_RATINGS, ZERO_TENDENCIES } from '#lib/players/player-profile.js';
   type IndexRow = RosterRow;
   const SORT_OPTIONS: {
     id: RosterSortId;
@@ -77,8 +83,6 @@
   let detailsError: string | null = $state(null);
   let detailsLoading = $state(false);
   let playoffProfiles = $state.raw<SeasonPlayoffProfiles | null>(null);
-  let playoffProfilesError: string | null = $state(null);
-  let playoffProfilesLoading = $state(false);
   let liteActive = $state(false);
   const pageSize = $derived(liteActive ? LITE_PAGE_SIZE : DEFAULT_PAGE_SIZE);
   let franchiseId = $state('');
@@ -124,8 +128,6 @@
     detailsError = null;
     detailsLoading = false;
     detailsRequest = null;
-    playoffProfilesError = null;
-    playoffProfilesLoading = false;
     playoffProfilesRequest = null;
     manifest = null;
     index = null;
@@ -178,19 +180,15 @@
     }
     if (playoffProfilesRequest !== null) return playoffProfilesRequest;
     const generation = dataGeneration;
-    playoffProfilesLoading = true;
-    playoffProfilesError = null;
     const request = loadPlayoffProfiles(manifest).then(
       (profiles) => {
         if (generation !== dataGeneration) return;
         playoffProfiles = profiles;
-        playoffProfilesLoading = false;
         playoffProfilesRequest = null;
       },
-      (error: unknown) => {
+      () => {
         if (generation !== dataGeneration) return;
-        playoffProfilesError = errorMessageOf(error);
-        playoffProfilesLoading = false;
+        // Postseason evidence is optional; the sheet simply omits the section.
         playoffProfilesRequest = null;
       },
     );
@@ -303,7 +301,59 @@
     );
   }
   const dialogPlayer = $derived(dialogKey === null ? null : (rowsByKey.get(dialogKey) ?? null));
-  const dialogPlayoffPerformance = $derived(playoffPerformanceFor(dialogPlayer));
+
+  /**
+   * Percentile cohorts for the whole roster, built once when details arrive so a
+   * row opened later does not pay the cost of sorting 8k players.
+   */
+  const profileReferences = $derived.by((): PlayerProfileReferences | null => {
+    if (rosterRows.length === 0) return null;
+    if (!rosterRows.some((row) => row.detail?.ratings !== undefined)) return null;
+    return buildPlayerProfileReferences(rosterProfileSamples(rosterRows));
+  });
+
+  const dialogProfile = $derived.by(() => {
+    const row = dialogPlayer;
+    if (row === null || profileReferences === null) return null;
+    const input = rosterProfileInput(
+      {
+        ...row,
+        playoffPerformance: playoffPerformanceFor(row),
+      },
+      teamLabelFor(manifest!, row.franchiseId, row.eraId),
+    );
+    if (input === null) return null;
+    return buildPlayerProfile(
+      input,
+      profileReferences.forSlot(row.positionsPlayable[0] ?? '') ?? null,
+    );
+  });
+
+  let dialogTab = $state<ProfileTab>('details');
+
+  /**
+   * Identity-only fallback while details are still loading, or when the artifact
+   * predates ratings. Keeps the header accurate instead of showing a blank sheet.
+   */
+  function identityProfileInput(row: IndexRow) {
+    return {
+      displayName: row.displayName,
+      franchiseLabel: teamLabelFor(manifest!, row.franchiseId, row.eraId),
+      seasonKey: row.seasonKey,
+      positions: row.positionsPlayable,
+      heightInches: row.detail?.heightInches ?? null,
+      weightLbs: row.detail?.weightLbs ?? null,
+      overall: row.overall,
+      offense: row.offense,
+      defense: row.defense,
+      ratings: ZERO_RATINGS,
+      tendencies: ZERO_TENDENCIES,
+      anchors: null,
+      stats: null,
+      slot: row.positionsPlayable[0] ?? null,
+    };
+  }
+
   const compareSelection = $derived(
     compareKeys
       .map((key) => rowsByKey.get(key))
@@ -594,23 +644,28 @@
     />
   {/if}
 
-  {#if dialogPlayer}
-    {#await loadPlayerDetailDialog() then { default: PlayerDetailDialog }}
-      <PlayerDetailDialog
-        player={dialogPlayer}
-        manifest={manifest!}
-        {franchiseName}
-        {eraLabel}
-        onClose={closePlayer}
-        {detailsError}
-        onRetry={() => {
-          void ensureDetails();
-          void ensurePlayoffProfiles();
-        }}
-        playoffPerformance={dialogPlayoffPerformance}
-        playoffLoading={playoffProfilesLoading}
-        playoffError={playoffProfilesError}
-      />
-    {/await}
+  {#if dialogProfile}
+    <PlayerProfileSheet
+      profile={dialogProfile}
+      face={dialogPlayer}
+      {manifest}
+      tabs={['details', 'production', 'tendencies', 'ratings']}
+      bind:tab={dialogTab}
+      open
+      onOpenChange={(next) => {
+        if (!next) closePlayer();
+      }}
+    />
+  {:else if dialogPlayer}
+    <PlayerProfileSheet
+      profile={buildPlayerProfile(identityProfileInput(dialogPlayer), null)}
+      face={dialogPlayer}
+      {manifest}
+      bind:tab={dialogTab}
+      open
+      onOpenChange={(next) => {
+        if (!next) closePlayer();
+      }}
+    />
   {/if}
 </PageShell>

@@ -197,10 +197,10 @@
         <div class="flex w-full flex-wrap items-start gap-1">
           {#each chips as chip (chip.label)}
             <span
-              class="shrink-0 rounded px-1 py-0.5 font-mono text-[7.5px] leading-tight font-bold uppercase tracking-[0.04em] {chip.tone ===
+              class="shrink-0 rounded border px-1 py-0.5 font-mono text-[7.5px] leading-tight font-bold uppercase tracking-[0.04em] {chip.tone ===
               'good'
-                ? 'bg-positive/13 text-positive'
-                : 'bg-surface-3 text-muted-foreground'}">{chip.label}</span
+                ? 'border-positive/40 bg-positive/10 text-positive'
+                : 'border-negative/45 bg-negative/10 text-negative'}">{chip.label}</span
             >
           {/each}
         </div>
@@ -218,7 +218,7 @@
   <div class="mx-2 mt-auto border-t border-line-soft py-1.5 sm:mx-2.5">
     <div class="flex items-baseline justify-between gap-1.5">
       <p
-        class="font-display text-base leading-none font-extrabold tracking-tight tabular-nums sm:text-xl"
+        class="font-display text-base leading-[1.2] font-extrabold tracking-tight tabular-nums sm:text-xl"
       >
         {formatMillions(card.salaryDollars)}
       </p>

@@ -161,11 +161,18 @@ export const rosterDetailsEntrySchema = z.object({
       usageRate: z.url().optional(),
     })
     .optional(),
+  /**
+   * Simulation ratings and tendencies for the player-profile panel. Optional so
+   * older packaged artifacts still parse; the panel simply omits the rating and
+   * tendency sections when they are absent.
+   */
+  ratings: simulationRatingsSchema.optional(),
+  tendencies: simulationTendenciesSchema.optional(),
   playoffPerformance: playoffPerformanceSchema.optional(),
 });
 export type RosterDetailsEntry = z.infer<typeof rosterDetailsEntrySchema>;
 export const rosterDetailsSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   dataVersion: z.string().min(1).max(64),
   players: z.array(rosterDetailsEntrySchema).min(1),
 });
