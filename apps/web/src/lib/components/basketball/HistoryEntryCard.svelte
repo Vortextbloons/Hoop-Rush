@@ -115,4 +115,13 @@
   .ui-history-entry-trailing {
     flex: none;
   }
+
+  @media (max-width: 640px) {
+    .ui-history-entry-trailing {
+      display: flex;
+      flex: 1 1 100%;
+      justify-content: center;
+      margin-top: 0.25rem;
+    }
+  }
 </style>

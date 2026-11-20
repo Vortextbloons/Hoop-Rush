@@ -275,7 +275,7 @@
               </span>
             {/snippet}
             {#snippet trailing()}
-              <span class="flex shrink-0 flex-col items-end gap-1">
+              <span class="flex shrink-0 flex-col items-center gap-1 sm:items-end">
                 <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
