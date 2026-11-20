@@ -218,24 +218,3 @@ export function apronImpact(
     };
   });
 }
-
-export const KEY_RATING_FIELDS = [
-  ['insideScoring', 'Inside'],
-  ['closeShot', 'Close'],
-  ['midrange', 'Midrange'],
-  ['threePoint', 'Three'],
-  ['freeThrow', 'Free throw'],
-  ['ballHandling', 'Handle'],
-  ['passing', 'Passing'],
-  ['offensiveIq', 'Off. IQ'],
-  ['offensiveRebound', 'Off. reb'],
-  ['defensiveRebound', 'Def. reb'],
-  ['perimeterDefense', 'Perimeter D'],
-  ['interiorDefense', 'Interior D'],
-  ['steal', 'Steal'],
-  ['block', 'Block'],
-  ['defensiveIq', 'Def. IQ'],
-  ['speed', 'Speed'],
-  ['strength', 'Strength'],
-  ['vertical', 'Vertical'],
-] as const;

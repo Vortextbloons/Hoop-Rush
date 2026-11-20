@@ -196,7 +196,7 @@ as $$
 $$;
 
 insert into public.ff_pgtap_ctx (name, value) values
-  ('versions', '{"dataVersion":"data-v1","ratingVersion":"ratings-v3.12","positionNormalizationVersion":"position-v4","engineVersion":"m3-engine-v25","bracketVersion":"bracket-m3-v4","scheduleVersion":"schedule-v1","seedDerivationVersion":"seed-v1","classicRollVersion":"classic-roll-v1","profileVersion":"2010s-fixed-v1","multiplayerVersion":"fixed-five-multiplayer-v5","autopickVersion":"fixed-five-autopick-v1"}'),
+  ('versions', '{"dataVersion":"data-v1","ratingVersion":"ratings-v3.12","positionNormalizationVersion":"position-v4","engineVersion":"m3-engine-v28","bracketVersion":"bracket-m3-v4","scheduleVersion":"schedule-v1","seedDerivationVersion":"seed-v1","classicRollVersion":"classic-roll-v1","profileVersion":"2010s-fixed-v1","multiplayerVersion":"fixed-five-multiplayer-v5","autopickVersion":"fixed-five-autopick-v1"}'),
   ('uid_a1', '00000000-0000-4000-8000-000000000001'),
   ('uid_a2', '00000000-0000-4000-8000-000000000002'),
   ('uid_b1', '00000000-0000-4000-8000-000000000003'),

@@ -34,6 +34,8 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import { loadCapRushProfileReferences } from './cap-rush-profile-references.ts';
+  import type { PlayerProfileReferences } from '#lib/players/player-profile.js';
 
   let {
     view,
@@ -66,6 +68,21 @@
   let protectMode = $state(false);
   let confirmAbandon = $state(false);
   let spinTargetId = $state<string | null>(null);
+  let references = $state.raw<PlayerProfileReferences | null>(null);
+
+  $effect(() => {
+    let cancelled = false;
+    void loadCapRushProfileReferences()
+      .then((loaded) => {
+        if (!cancelled) references = loaded;
+      })
+      .catch(() => {
+        // Percentiles are optional: cards fall back to a flat layout.
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   const draft = $derived(view.draft);
   const offer = $derived(draft.offer);
@@ -192,10 +209,6 @@
           {CAP_RUSH_CONFERENCE_NAMES[view.franchise.conference]} · {view.franchise.division}
         </p>
       </div>
-      <p class="ml-auto max-w-xs text-[11px] leading-snug text-muted-foreground">
-        Your drafted five replaces this franchise's frozen lineup. Its identity and schedule slot
-        stay.
-      </p>
     </div>
   {/if}
   <header class="flex flex-wrap items-end justify-between gap-4">
@@ -251,6 +264,8 @@
           slots={view.slots}
           {art}
           locked={view.draft.locked}
+          payrollDollars={view.payrollDollars}
+          {references}
           playoffStatus={capRushPlayoffStatusOf(view.draft)}
         />
       </div>
@@ -348,6 +363,7 @@
                   {protectMode}
                   disabled={busy}
                   {art}
+                  {references}
                   onSign={sign}
                   onProtect={protect}
                 />

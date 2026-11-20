@@ -3,8 +3,17 @@
   import type { CapRushLockedInputs } from '@hoop-rush/data-contracts';
   import { Crown } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
+  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import type { PlayerProfileReferences } from '#lib/players/player-profile.js';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, initialsOf } from './cap-rush-presentation.ts';
+  import {
+    NO_APRON,
+    capRushLockedApron,
+    capRushProfileInput,
+    capRushProjectedApron,
+  } from './cap-rush-player-profile.ts';
   import CapRushPlayoffMark from './CapRushPlayoffMark.svelte';
   import {
     capRushPlayoffCoverage,
@@ -17,13 +26,18 @@
     slots,
     art = null,
     locked = null,
+    payrollDollars = 0,
+    references = null,
     playoffStatus = 'no-sample',
   }: {
     slots: CapRushDraftView['slots'];
     art?: CapRushArt | null;
     locked?: CapRushLockedInputs | null;
+    payrollDollars?: number;
+    references?: PlayerProfileReferences | null;
     playoffStatus?: CapRushPlayoffStatus;
   } = $props();
+
   const filled = $derived(slots.filter((slot) => slot.player !== null).length);
   const coverage = $derived(
     capRushPlayoffCoverage(
@@ -43,6 +57,41 @@
     pending: 'playoffs only',
     'no-sample': 'no sample',
   };
+
+  let selectedId = $state<string | null>(null);
+  let sheetTab = $state<'details' | 'tendencies' | 'ratings' | 'apron'>('details');
+
+  const selectedSlot = $derived(
+    selectedId === null
+      ? null
+      : (slots.find((slot) => slot.player?.playerVersionId === selectedId) ?? null),
+  );
+
+  const selectedTeam = $derived.by(() => {
+    const player = selectedSlot?.player ?? null;
+    return player === null || art === null ? null : art.teamFor(player.franchiseId);
+  });
+
+  const selectedApron = $derived.by(() => {
+    const player = selectedSlot?.player ?? null;
+    if (player === null) return NO_APRON;
+    if (locked !== null) return capRushLockedApron(player, locked.payrollDollars);
+    return capRushProjectedApron(player, payrollDollars);
+  });
+
+  const selectedProfile = $derived.by(() => {
+    const player = selectedSlot?.player ?? null;
+    if (player === null) return null;
+    return buildPlayerProfile(
+      capRushProfileInput(player, selectedTeam?.abbreviation ?? player.franchiseId),
+      references?.forSlot(player.positions[0] ?? '') ?? null,
+    );
+  });
+
+  const selectedFace = $derived.by(() => {
+    const player = selectedSlot?.player ?? null;
+    return player === null || art === null ? null : art.faceFor(player);
+  });
 </script>
 
 <section aria-label="Your lineup" class="min-w-0">
@@ -86,8 +135,8 @@
       >
         <div class="relative inline-block">
           {#if player !== null}
-            <span
-              class="block h-14 w-14 overflow-hidden rounded-full border-[3px] border-white/90 bg-[#20242c] shadow-lg sm:h-16 sm:w-16"
+            <div
+              class="h-14 w-14 overflow-hidden rounded-full border-[3px] border-white/90 bg-[#20242c] shadow-lg sm:h-16 sm:w-16"
             >
               {#if face !== null && art !== null}
                 <PlayerFace
@@ -102,7 +151,13 @@
                   >{initialsOf(player.displayName)}</span
                 >
               {/if}
-            </span>
+            </div>
+            <button
+              type="button"
+              class="absolute inset-0 z-10 rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`${player.displayName} details`}
+              onclick={() => (selectedId = player.playerVersionId)}
+            ></button>
           {:else}
             <span
               class="grid h-14 w-14 place-items-center rounded-full border-2 border-dashed border-white/80 font-display text-xl font-bold text-white/80 sm:h-16 sm:w-16"
@@ -120,7 +175,18 @@
               ></span
             >{/if}
         </div>
-        <span class="slot-name">{player?.displayName ?? `Open ${slot.slot}`}</span>
+        {#if player !== null}
+          <button
+            type="button"
+            class="slot-name outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`${player.displayName} details`}
+            onclick={() => (selectedId = player.playerVersionId)}
+          >
+            {player.displayName}
+          </button>
+        {:else}
+          <span class="slot-name">Open {slot.slot}</span>
+        {/if}
         {#if player}
           <span class="slot-salary">
             {formatMillions(slot.salaryDollars)}{#if playoffRow !== null}<span class="slot-playoff"
@@ -132,6 +198,26 @@
     {/each}
   </div>
 </section>
+
+{#if selectedProfile !== null}
+  <PlayerProfileSheet
+    profile={selectedProfile}
+    apron={selectedApron}
+    face={selectedFace}
+    manifest={art?.manifest ?? null}
+    money={{
+      salaryLabel: formatMillions(selectedSlot?.salaryDollars ?? 0),
+      statusLabel: locked !== null ? 'Signed' : 'Projected',
+      note: null,
+    }}
+    tabs={['details', 'tendencies', 'ratings', 'apron']}
+    bind:tab={sheetTab}
+    open={selectedId !== null}
+    onOpenChange={(open) => {
+      if (!open) selectedId = null;
+    }}
+  />
+{/if}
 
 <style>
   .court {
@@ -207,6 +293,7 @@
   }
   .slot-name {
     margin-top: 4px;
+    width: 100%;
     font-family: var(--font-display);
     font-size: 10px;
   }

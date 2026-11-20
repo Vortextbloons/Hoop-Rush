@@ -20,6 +20,8 @@
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, recordLabel, variantLabel } from './cap-rush-presentation.ts';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import { loadCapRushProfileReferences } from './cap-rush-profile-references.ts';
+  import type { PlayerProfileReferences } from '#lib/players/player-profile.js';
 
   let {
     controller,
@@ -64,6 +66,21 @@
         },
   );
   let selectedBox = $state<{ label: string; box: CapRushBoxScoreData } | null>(null);
+  let references = $state.raw<PlayerProfileReferences | null>(null);
+
+  $effect(() => {
+    let cancelled = false;
+    void loadCapRushProfileReferences()
+      .then((loaded) => {
+        if (!cancelled) references = loaded;
+      })
+      .catch(() => {
+        // Percentiles are optional: the lineup falls back to a flat layout.
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   function openRegularSeasonBox(gameNumber: number): void {
     const stored = controller.games.find((game) => game.gameNumber === gameNumber);
@@ -354,6 +371,8 @@
         slots={view.slots}
         {art}
         locked={view.draft.locked}
+        payrollDollars={view.payrollDollars}
+        {references}
         playoffStatus={capRushPlayoffStatusOf(view.draft)}
       />
 
