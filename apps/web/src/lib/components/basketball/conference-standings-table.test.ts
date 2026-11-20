@@ -7,10 +7,9 @@ describe('ConferenceStandingsTable', () => {
     const { body } = render(Harness, { props: { selectable: true } });
 
     expect(body).toContain('West standings');
-    expect(body).toContain('Qualification cutoff');
+    expect(body).toContain('Playoff cutoff');
     expect(body).toContain('Team 3');
     expect(body).toContain('You');
-    expect(body).toContain('Cutoff note');
     expect(body).toContain('<button');
   });
 

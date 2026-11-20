@@ -41,6 +41,8 @@
   import MvpCard from '#lib/components/screens/MvpCard.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { franchiseIdentityOf } from '#lib/branding.js';
   import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
@@ -67,7 +69,6 @@
     onRetrySameTeam?: (() => void) | null;
     editTeamHref?: SandboxHref | null;
   } = $props();
-  let totalsMode = $state(false);
   let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
   function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
@@ -75,6 +76,11 @@
   const era = $derived(manifest?.eras.find((e) => e.eraId === run.eraId) ?? null);
   const aggregates = $derived(run.aggregates ?? null);
   const record = $derived(aggregates?.team ?? null);
+  const franchiseIdentity = $derived(
+    manifest === null || run.franchiseId === null || run.franchiseId === undefined
+      ? null
+      : franchiseIdentityOf(manifest, run.franchiseId),
+  );
   const mvp = $derived(run.games.length > 0 ? leagueMvp(run) : null);
   const mvpFace = $derived.by(() => {
     const current = mvp;
@@ -115,7 +121,7 @@
     if (!aggregates) return null;
     return {
       team: aggregates.team,
-      players: aggregates.players.map((p) => (totalsMode ? p : perGamePlayer(p))),
+      players: aggregates.players.map((p) => perGamePlayer(p)),
     } satisfies RunAggregates;
   });
   type SeasonStatsRow = {
@@ -134,7 +140,6 @@
     }));
   });
   const seasonStatsColumns = $derived.by((): readonly PlayerStatColumn<SeasonStatsRow>[] => {
-    void totalsMode;
     return [
       {
         key: 'points',
@@ -353,7 +358,7 @@
     return (value / Math.max(1, games)).toFixed(decimals);
   }
   function formatAggregateStat(value: number): string {
-    return totalsMode ? String(value) : oneDecimal(value);
+    return oneDecimal(value);
   }
   function viewSeasonStats() {
     tab = 'team';
@@ -394,6 +399,17 @@
       meta={`${franchiseLabel(run.franchiseId)} · ${era?.label ?? run.eraId}`}
       tone={run.outcome === 'perfect' ? 'champion' : 'default'}
     >
+      {#snippet logo()}
+        {#if manifest && franchiseIdentity}
+          <TeamLogo
+            {manifest}
+            franchiseId={franchiseIdentity.franchiseId}
+            teamExternalId={franchiseIdentity.teamExternalId}
+            className="h-full w-full"
+            eager
+          />
+        {/if}
+      {/snippet}
       {#snippet badges()}
         <TierBadge wins={record.wins} size="large" />
       {/snippet}
@@ -740,15 +756,10 @@
           surface="none"
           ariaLabel="Your five, season table"
           title="Your five · season"
-          valuesLabel="Season values"
-          values={totalsMode ? 'totals' : 'game'}
-          onvalueschange={(next) => (totalsMode = next === 'totals')}
           rows={seasonStatsRows}
           columns={seasonStatsColumns}
           rowKey={(row) => row.aggregate.playerId}
-          caption={totalsMode
-            ? 'Season totals for the five drafted players'
-            : 'Per-game season averages for the five drafted players'}
+          caption="Per-game season averages for the five drafted players"
           tableClass="min-w-[1080px] text-sm"
           statCellClass="font-mono"
         >

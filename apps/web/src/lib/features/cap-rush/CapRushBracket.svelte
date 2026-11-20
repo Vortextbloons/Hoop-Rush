@@ -142,7 +142,7 @@
 </script>
 
 <Panel as="section" padding="none" class="bracket p-4 sm:p-6" aria-label="Playoff bracket">
-  <SectionHeading eyebrow="Conference bracket" title="West to East. One champion." size="md">
+  <SectionHeading title="Bracket" size="md">
     {#snippet actions()}
       <SegmentedControl
         class="lg:hidden"

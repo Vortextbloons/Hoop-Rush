@@ -20,5 +20,4 @@
   {rows}
   userTeamId="team-3"
   onTeamSelect={selectable ? () => {} : null}
-  cutoffNote="Cutoff note"
 />

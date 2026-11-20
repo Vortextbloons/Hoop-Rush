@@ -70,7 +70,6 @@
   const rows = $derived(havocMultiplayerSeriesRows(series, outputs, localParticipantId));
   const stats = $derived(havocMultiplayerSeriesStats(series, outputs, localParticipantId));
   let statsSide = $state<'home' | 'away'>('home');
-  let statsTotals = $state(false);
   const selectedBoxes = $derived(stats.boxes.filter((box) => box.side === statsSide));
   const mvpStats = $derived(
     stats.boxes
@@ -241,13 +240,11 @@
           ]}
           side={statsSide}
           onsidechange={(next) => (statsSide = next)}
-          values={statsTotals ? 'totals' : 'game'}
-          onvalueschange={(next) => (statsTotals = next === 'totals')}
         />
       {/if}
     </div>
     <p class="ui-label" data-tone="muted">
-      {statsTotals ? 'Totals' : 'Averages per series game'} from {stats.games} of {series.games.filter(
+      Averages per series game from {stats.games} of {series.games.filter(
         (game) => game.status === 'verified',
       ).length} verified games available on this device
     </p>
@@ -255,7 +252,7 @@
       <GamecastBattleBox
         boxes={selectedBoxes}
         localSide="home"
-        perGame={!statsTotals}
+        perGame={true}
         games={stats.games}
       />
     {:else}
@@ -311,16 +308,17 @@
     {#each rows as row (row.gameNumber)}
       {@const output = outputs[row.gameNumber]}
       {#if output && row.status === 'verified'}
-        <Disclosure
-          summary={`Game ${row.gameNumber} · ${statusLabel(row)} · ${
-            row.localIsHome ? row.homeScore : row.awayScore
-          }–${row.localIsHome ? row.awayScore : row.homeScore}`}
-        >
+        <section class="border-t border-line-soft pt-3">
+          <p class="ui-label text-muted-foreground">
+            Game {row.gameNumber} · {statusLabel(row)} · {row.localIsHome
+              ? row.homeScore
+              : row.awayScore}–{row.localIsHome ? row.awayScore : row.homeScore}
+          </p>
           <GamecastBattleBox
             boxes={gamecastBattleFinalBoxes(output.result)}
             localSide={row.localIsHome ? 'home' : 'away'}
           />
-        </Disclosure>
+        </section>
       {/if}
     {/each}
   </section>

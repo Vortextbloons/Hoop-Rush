@@ -1,3 +1,5 @@
+import type { Snippet } from 'svelte';
+
 export type ButtonTone = 'default' | 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'md' | 'sm';
 export type BadgeTone = 'neutral' | 'primary' | 'accent' | 'positive' | 'negative';
@@ -26,9 +28,10 @@ export interface ComparisonRow {
 
 export interface BoxScoreTeam {
   name: string;
-  score: string | number;
+  score?: string | number;
   periods?: readonly (string | number)[];
   isUser?: boolean;
+  logo?: Snippet;
 }
 
 export interface SeriesRecapGame {

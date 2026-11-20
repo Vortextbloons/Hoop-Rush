@@ -46,11 +46,8 @@
     {#if resultState.loading}
       <LoadingState variant="skeleton" lines={2} />
     {:else if resultState.report !== null}
-      <header class="mb-4">
+      <header class="mb-4 flex justify-end">
         <ActionRow>
-          {#snippet secondary()}
-            <ActionLink href={resolve('cap-rush/history/')}>Run history</ActionLink>
-          {/snippet}
           {#snippet primary()}
             <Button
               tone="primary"
@@ -63,6 +60,11 @@
         </ActionRow>
       </header>
       <CapRushReportView report={resultState.report} />
+      <div class="mt-10 flex justify-center">
+        <ActionLink href={resolve('cap-rush/history/')} tone="ghost" size="sm">
+          Run history
+        </ActionLink>
+      </div>
     {:else if resultState.postseasonInProgress}
       <EmptyState
         kind="empty"

@@ -84,7 +84,6 @@
 
   let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
   let statsSide = $state<'you' | 'opp'>('you');
-  let statsTotals = $state(false);
   const statsSideOptions = [
     { value: 'you', label: 'You' },
     { value: 'opp', label: 'Opponent' },
@@ -114,7 +113,7 @@
     ),
   );
   function statValue(value: number, games: number): string {
-    return statsTotals ? String(value) : perGameText(value, games);
+    return perGameText(value, games);
   }
   function pctStr(made: number, attempted: number): string {
     if (attempted <= 0) return '—';
@@ -863,9 +862,6 @@
           sideOptions={statsSideOptions}
           side={statsSide}
           onsidechange={(next) => (statsSide = next)}
-          valuesLabel="Stats values"
-          values={statsTotals ? 'totals' : 'game'}
-          onvalueschange={(next) => (statsTotals = next === 'totals')}
           rows={statsRows}
           columns={statsColumns}
           rowKey={(row) => row.entry?.playerId ?? `slot-${row.slotIndex}`}

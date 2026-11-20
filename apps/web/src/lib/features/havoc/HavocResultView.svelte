@@ -210,9 +210,9 @@
       </ActionRow>
 
       {#if comparison !== null && resultState.comparisonComplete}
-        <Disclosure summary="Explore the box scores, powers & game-by-game comparison">
+        <div class="mt-6">
           <HavocComparisonView {comparison} showChart={false} />
-        </Disclosure>
+        </div>
       {/if}
 
       <div>

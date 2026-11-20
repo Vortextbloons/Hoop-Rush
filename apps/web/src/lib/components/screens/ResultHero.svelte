@@ -10,6 +10,7 @@
     tone = 'default',
     scoreLabel = null,
     badges = null,
+    logo = null,
     class: className = '',
     ...rest
   }: {
@@ -20,12 +21,16 @@
     tone?: 'default' | 'champion' | 'defeat';
     scoreLabel?: string | null;
     badges?: Snippet | null;
+    logo?: Snippet | null;
   } & HTMLAttributes<HTMLDivElement> = $props();
 </script>
 
 <div {...rest} class={['ui-panel', 'ui-result-hero', className]} data-tone={tone}>
   {#if badges !== null}
     <div class="ui-result-hero-badges">{@render badges()}</div>
+  {/if}
+  {#if logo !== null}
+    <div class="ui-result-hero-logo">{@render logo()}</div>
   {/if}
   <p class="ui-result-hero-score" aria-label={scoreLabel ?? undefined}>{score}</p>
   {#if caption !== null}

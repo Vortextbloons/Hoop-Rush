@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   import BoxScorePanel from '#lib/components/screens/BoxScorePanel.svelte';
   import MvpCard from '#lib/components/screens/MvpCard.svelte';
   import ResultHero from '#lib/components/screens/ResultHero.svelte';
@@ -16,7 +17,7 @@
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { BadgeTone } from '#lib/components/ui/types.js';
-  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
@@ -30,6 +31,7 @@
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import CapRushBracket from './CapRushBracket.svelte';
+  import { loadCapRushArt, type CapRushArt } from './cap-rush-art.js';
   import { Crown, Trophy } from '@lucide/svelte';
   import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import {
@@ -48,13 +50,17 @@
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let playerIndex = $state.raw<PlayersIndex | null>(null);
+  let art = $state.raw<CapRushArt | null>(null);
   onMount(() => {
     let mounted = true;
-    void Promise.allSettled([getManifest(), getPlayersIndex()]).then(([branding, index]) => {
-      if (!mounted) return;
-      if (branding.status === 'fulfilled') manifest = branding.value;
-      if (index.status === 'fulfilled') playerIndex = index.value;
-    });
+    void Promise.allSettled([getManifest(), getPlayersIndex(), loadCapRushArt()]).then(
+      ([branding, index, loadedArt]) => {
+        if (!mounted) return;
+        if (branding.status === 'fulfilled') manifest = branding.value;
+        if (index.status === 'fulfilled') playerIndex = index.value;
+        if (loadedArt.status === 'fulfilled') art = loadedArt.value;
+      },
+    );
     return () => {
       mounted = false;
     };
@@ -74,10 +80,18 @@
   const mvp = $derived(report.mvp);
   const postseason = $derived(report.postseason ?? null);
   const roundName = capRushConferenceRoundName;
-  const seasonTeams = $derived([
-    { name: 'Your five', score: aggregate.pointsFor, isUser: true },
-    { name: 'Opponents', score: aggregate.pointsAgainst },
-  ]);
+  const seasonTeams = $derived([{ name: 'Your five', isUser: true }, { name: 'Opponents' }]);
+  const championIdentity = $derived(
+    art === null || postseason?.championTeamId == null
+      ? null
+      : art.teamFor(postseason.championTeamId),
+  );
+  const userIdentity = $derived(
+    art === null || report.franchise === undefined || report.franchise === null
+      ? null
+      : art.teamFor(report.franchise.franchiseId),
+  );
+  const mvpIdentity = $derived(art === null || mvp === null ? null : art.teamFor(mvp.teamId));
   const finalsMvpFace = $derived(
     postseason === null
       ? null
@@ -171,54 +185,12 @@
         ),
     },
   ];
-  const statTotals = $derived([
-    ...(statsView === 'postseason'
-      ? []
-      : [totalsFor('Regular-season totals', regularRows, aggregate.games, usageByPhase.regular)]),
-    ...(playoffStats !== null && statsView !== 'regular'
-      ? [totalsFor('Postseason totals', playoffRows, playoffStats.games, usageByPhase.postseason)]
-      : []),
-  ]);
 
   function capTone(status: CapRushPayrollStatus): BadgeTone {
     if (status === 'under-cap') return 'positive';
     if (status === 'first-apron') return 'accent';
     if (status === 'second-apron') return 'primary';
     return 'negative';
-  }
-
-  function totalsFor(
-    label: string,
-    rows: readonly StatsRow[],
-    games: number,
-    teamUsage: number,
-  ): PlayerStatsTotals<StatsRow> {
-    return {
-      label,
-      value: (column) => {
-        if (column.key === 'gamesPlayed') return games;
-        if (column.key === 'trueShooting') {
-          return trueShootingPct(
-            totalOf(rows, 'points'),
-            totalOf(rows, 'fieldGoalsAttempted'),
-            totalOf(rows, 'freeThrowsAttempted'),
-          );
-        }
-        if (column.key === 'usage') return usagePct(teamUsage, teamUsage);
-        const shooting = {
-          fieldGoals: ['fieldGoalsMade', 'fieldGoalsAttempted'],
-          freeThrows: ['freeThrowsMade', 'freeThrowsAttempted'],
-          threes: ['threesMade', 'threesAttempted'],
-        } as const;
-        const fields = shooting[column.key as keyof typeof shooting];
-        if (fields)
-          return formatShootingPercentage(totalOf(rows, fields[0]), totalOf(rows, fields[1]));
-        return totalOf(
-          rows,
-          column.key as 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
-        );
-      },
-    };
   }
 
   function teamUsageOf(rows: readonly StatsRow[]): number {
@@ -263,7 +235,19 @@
       score={recordLabel(aggregate.wins, aggregate.losses)}
       meta={`${aggregate.games} games · ${aggregate.pointsFor} for · ${aggregate.pointsAgainst} against`}
       tone={postseason?.isUserChampion === true ? 'champion' : 'default'}
-    />
+    >
+      {#snippet logo()}
+        {#if manifest && userIdentity}
+          <TeamLogo
+            {manifest}
+            franchiseId={userIdentity.franchiseId}
+            teamExternalId={userIdentity.teamExternalId}
+            className="h-full w-full"
+            eager
+          />
+        {/if}
+      {/snippet}
+    </ResultHero>
     <StatGrid class="mt-4" columns={3} mobile={3} gap="md">
       <StatTile
         label="Points / game"
@@ -297,11 +281,21 @@
       aria-label="Postseason result"
     >
       <div class="flex flex-wrap items-center gap-4">
-        <Trophy
-          size={34}
-          class="shrink-0 {postseason.isUserChampion ? 'text-accent' : 'text-muted-foreground'}"
-          aria-hidden="true"
-        />
+        {#if manifest && championIdentity}
+          <TeamLogo
+            {manifest}
+            franchiseId={championIdentity.franchiseId}
+            teamExternalId={championIdentity.teamExternalId}
+            className="h-10 w-10"
+            eager
+          />
+        {:else}
+          <Trophy
+            size={34}
+            class="shrink-0 {postseason.isUserChampion ? 'text-accent' : 'text-muted-foreground'}"
+            aria-hidden="true"
+          />
+        {/if}
         <div class="min-w-0 flex-1">
           <p class="ui-label {postseason.isUserChampion ? 'text-accent' : 'text-muted-foreground'}">
             {postseason.isUserChampion ? 'Cap Rush champion' : 'Champion'}
@@ -354,8 +348,20 @@
           value: formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games),
         },
       ]}
+      tone="accent"
       class="border-accent/40"
     >
+      {#snippet icon()}<Crown size={18} aria-hidden="true" />{/snippet}
+      {#snippet logo()}
+        {#if manifest && championIdentity}
+          <TeamLogo
+            {manifest}
+            franchiseId={championIdentity.franchiseId}
+            teamExternalId={championIdentity.teamExternalId}
+            className="h-full w-full"
+          />
+        {/if}
+      {/snippet}
       {#snippet portrait()}
         {#if manifest && finalsMvpFace}
           <PlayerFace
@@ -371,13 +377,6 @@
         {/if}
       {/snippet}
     </MvpCard>
-
-    <p class="text-[11px] text-muted-foreground">
-      Cumulative Finals game score
-      <strong class="text-foreground">{postseason.finalsMvp.totalGameScore.toFixed(1)}</strong>.
-      Ranked by cumulative Finals game score, then Finals points, assists, rebounds and stable
-      player ID.
-    </p>
 
     <CapRushBracket
       series={postseason.series}
@@ -618,13 +617,16 @@
     {/if}
   </div>
 
-  <Disclosure summary="The box score" meta="Per game">
-    <SegmentedControl
-      options={statsOptions}
-      value={statsView}
-      onchange={(view) => (statsView = view)}
-      label="Statistics split"
-    />
+  <Panel as="section" padding="md" aria-label="Season statistics">
+    <SectionHeading eyebrow="The box score" title="Season statistics" level={3} />
+    <div class="mt-3">
+      <SegmentedControl
+        options={statsOptions}
+        value={statsView}
+        onchange={(view) => (statsView = view)}
+        label="Statistics split"
+      />
+    </div>
     {#if statsView !== 'regular' && playoffStats === null}
       <p class="mt-3 text-sm text-muted-foreground" role="status">{postseasonMessage}</p>
     {/if}
@@ -635,8 +637,7 @@
             columns={statColumns}
             rows={statRows}
             rowKey={(line) => `${line.slot}:${line.phase}`}
-            totals={statTotals}
-            caption={`${comparing ? 'Regular season and postseason' : statsView === 'postseason' ? 'Postseason' : 'Regular season'} totals and averages for the five signed slots`}
+            caption={`${comparing ? 'Regular season and postseason' : statsView === 'postseason' ? 'Postseason' : 'Regular season'} averages for the five signed slots`}
             tableClass="min-w-[860px] text-xs"
             headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
             rowClass={(line) => {
@@ -684,7 +685,7 @@
         </div>
       </BoxScorePanel>
     {/if}
-  </Disclosure>
+  </Panel>
 
   <Panel as="section" padding="md" aria-label="League MVP">
     <SectionHeading eyebrow="Season honors" title="League MVP" level={3} />
@@ -710,6 +711,17 @@
           { label: 'MVP score', value: mvp.mvpScore.toFixed(2) },
         ]}
       >
+        {#snippet icon()}<Trophy size={18} aria-hidden="true" />{/snippet}
+        {#snippet logo()}
+          {#if manifest && mvpIdentity}
+            <TeamLogo
+              {manifest}
+              franchiseId={mvpIdentity.franchiseId}
+              teamExternalId={mvpIdentity.teamExternalId}
+              className="h-full w-full"
+            />
+          {/if}
+        {/snippet}
         {#snippet portrait()}
           {#if manifest && mvpFace}
             <PlayerFace
