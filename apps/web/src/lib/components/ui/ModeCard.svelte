@@ -71,6 +71,7 @@
     class={['ui-panel', 'ui-mode-card', className]}
     data-disabled={disabled ? 'true' : undefined}
     data-selected={selected ? 'true' : undefined}
+    data-has-footer={footer !== null ? 'true' : undefined}
   >
     {#if disabled}
       <div class="ui-mode-card-main" aria-disabled="true">
