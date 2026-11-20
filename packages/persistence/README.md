@@ -1,9 +1,9 @@
 # @hoop-rush/persistence
 
 IndexedDB/Dexie adapters for challenge (classic/sandbox), cap-rush, havoc,
-draft-duel, fixed-five, and havoc-multiplayer saves. Record-level schemas live
-here; domain schemas stay in `@hoop-rush/data-contracts`. See **AGENTS.md** in
-this package for namespace rules and testing notes.
+draft-duel, fixed-five, havoc-multiplayer, and Full Court saves. Record-level
+schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
+**AGENTS.md** in this package for namespace rules and testing notes.
 
 ## Hard rules
 
@@ -12,10 +12,14 @@ this package for namespace rules and testing notes.
   domain schema or enum.
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
-  `hoop-rush-saves` database is never read or migrated. **Dexie versions 15 and
-  16 are supported**: version 15 upgrades additively to 16 and keeps its
+  `hoop-rush-saves` database is never read or migrated. **Dexie versions 15
+  through 17 are supported**: each upgrades additively to 18 and keeps its
   records; older databases reset all local saves, history, and profiles during
   upgrade so users can start fresh. Do not restore historical migrations.
+- **Full Court save layout**: `fullCourtSeasonCheckpoints` (key `runId`) stores
+  the checkpoint and `fullCourtSeasonScores` (key `[runId+gameId]`) stores the
+  compact results. A slot commit writes the checkpoint and all 15 score rows in
+  one transaction, guarded by the next slot and the run's lock digest.
 - **Cap Rush save layout**: save schema 4 keeps the immutable locked inputs in
   `capRushLockedInputs`, writes only a reference into `capRushActive`, and
   records compact `capRushLeagueResults` beside the full league boxes. Save
@@ -42,7 +46,8 @@ this package for namespace rules and testing notes.
 - `src/index.ts` — runtime surface (repositories + record schemas).
 - `src/repositories/` — `dexie.ts`, `cap-rush.ts`, `cap-rush-multiplayer.ts`,
   `havoc.ts`, `fixed-five.ts`, `draft-duel.ts`, `havoc-multiplayer.ts`,
-  `profile.ts`, `support.ts`, `save-envelope.ts`.
+  `full-court-draft.ts`, `full-court-season.ts`, `profile.ts`, `support.ts`,
+  `save-envelope.ts`.
 - `src/schemas/` — record envelopes per mode.
 - `src/testing/` — fake-IndexedDB test support.
 

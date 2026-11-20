@@ -4,7 +4,7 @@ import { clamp } from '../../domain/math.ts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
 
-export const FULL_COURT_ROTATION_VERSION = 'full-court-rotation-v1';
+export const FULL_COURT_ROTATION_VERSION = 'full-court-rotation-v2';
 
 export const FULL_COURT_MIN_ROSTER = 5;
 export const FULL_COURT_MAX_ROSTER = 12;

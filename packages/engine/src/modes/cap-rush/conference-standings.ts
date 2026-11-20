@@ -15,6 +15,11 @@ import {
   capRushConferenceStandingsSchema,
   capRushDivisionSchema,
 } from '@hoop-rush/data-contracts';
+import {
+  compareCodeUnits,
+  ratioCompare,
+  resolveConferenceTieGroup,
+} from '../conference-tiebreak.ts';
 
 export interface CapRushStandingsTeam {
   readonly teamId: string;
@@ -43,93 +48,6 @@ interface TeamTotals {
   pointsFor: number;
   pointsAgainst: number;
   headToHead: Map<string, { wins: number; losses: number }>;
-}
-
-function compareCodeUnits(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function ratioCompare(
-  left: { wins: number; games: number },
-  right: { wins: number; games: number },
-): number {
-  if (left.games === 0 || right.games === 0) {
-    if (left.games === 0 && right.games === 0) return 0;
-    return left.games === 0 ? 1 : -1;
-  }
-  const difference = right.wins * left.games - left.wins * right.games;
-  return difference === 0 ? 0 : difference > 0 ? 1 : -1;
-}
-
-type Criterion = 'head-to-head' | 'conference' | 'point-differential' | 'points-for' | 'team-id';
-const CRITERIA: readonly Criterion[] = [
-  'head-to-head',
-  'conference',
-  'point-differential',
-  'points-for',
-  'team-id',
-];
-
-function partitionOnCriterion(
-  teams: readonly TeamTotals[],
-  criterion: Criterion,
-): { sorted: TeamTotals[]; groups: TeamTotals[][] } {
-  if (criterion === 'team-id') {
-    const sorted = [...teams].sort((left, right) => compareCodeUnits(left.teamId, right.teamId));
-    return { sorted, groups: sorted.map((team) => [team]) };
-  }
-  const valueOf = (
-    team: TeamTotals,
-    other: TeamTotals,
-  ): number | { wins: number; games: number } => {
-    switch (criterion) {
-      case 'head-to-head': {
-        const record = team.headToHead.get(other.teamId) ?? { wins: 0, losses: 0 };
-        return { wins: record.wins, games: record.wins + record.losses };
-      }
-      case 'conference':
-        return { wins: team.conferenceWins, games: team.conferenceWins + team.conferenceLosses };
-      case 'point-differential':
-        return team.pointsFor - team.pointsAgainst;
-      case 'points-for':
-        return team.pointsFor;
-    }
-  };
-  const compare = (left: TeamTotals, right: TeamTotals): number => {
-    const a = valueOf(left, right);
-    const b = valueOf(right, left);
-    if (typeof a === 'number' && typeof b === 'number') {
-      return b - a;
-    }
-    if (typeof a === 'object' && typeof b === 'object') {
-      return ratioCompare(a, b);
-    }
-    return 0;
-  };
-  const sorted = [...teams].sort(compare);
-  const groups: TeamTotals[][] = [];
-  for (const team of sorted) {
-    const current = groups[groups.length - 1];
-    const previous = current?.[0];
-    if (current !== undefined && previous !== undefined && compare(previous, team) === 0) {
-      current.push(team);
-    } else {
-      groups.push([team]);
-    }
-  }
-  return { sorted, groups };
-}
-
-function resolveTieGroup(teams: readonly TeamTotals[], index: number): TeamTotals[] {
-  if (teams.length <= 1) return [...teams];
-  if (index >= CRITERIA.length) {
-    return [...teams].sort((left, right) => compareCodeUnits(left.teamId, right.teamId));
-  }
-  const criterion = CRITERIA[index];
-  if (criterion === undefined) return [...teams];
-  const { sorted, groups } = partitionOnCriterion(teams, criterion);
-  if (groups.length === 1) return resolveTieGroup(sorted, index + 1);
-  return groups.flatMap((group) => resolveTieGroup(group, index + 1));
 }
 
 function cutoffTieBreakOf(
@@ -285,7 +203,7 @@ function buildTable(
   const ordered: TeamTotals[] = [];
   for (const wins of orderedWins) {
     const group = byWins.get(wins) ?? [];
-    ordered.push(...resolveTieGroup(group, 0));
+    ordered.push(...resolveConferenceTieGroup(group, 'pairwise'));
   }
   const entries: CapRushLeagueStandingsEntry[] = ordered.map((team, index) => ({
     teamId: team.teamId,

@@ -2,9 +2,13 @@ import { expect, test } from 'bun:test';
 import {
   CAP_RUSH_FRANCHISE_ALIGNMENT,
   FULL_COURT_DEFAULT_MONEY,
+  FULL_COURT_HEALTH_PROFILE_VERSION,
   commandIdSchema,
+  contentHashSchema,
   franchiseIdSchema,
+  fullCourtSeasonCheckpointSchema,
   playerVersionId,
+  type FullCourtHealthProfileSet,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
@@ -17,8 +21,13 @@ import {
   fullCourtRegularSeasonGameInput,
   simulateFullCourtRegularSeasonGame,
 } from './regular-season.ts';
+import {
+  createFullCourtSeasonCheckpoint,
+  lockFullCourtRegularSeason,
+  simulateFullCourtSeasonSlot,
+} from './season-slot.ts';
 
-test('a confirmed six-guard roster plays a scheduled game against a historical rotation', () => {
+function preparedSeason() {
   const setup = fullCourtTestSetup({ overalls: [70, 71, 72, 73, 74, 75] });
   const field = CAP_RUSH_FRANCHISE_ALIGNMENT.map(({ franchiseId }) => ({
     teamId: franchiseId,
@@ -78,6 +87,11 @@ test('a confirmed six-guard roster plays a scheduled game against a historical r
     catalogSource,
     profile: DEFAULT_ERA_SIM_PROFILE,
   });
+  return { season, chosen };
+}
+
+test('a confirmed six-guard roster plays a scheduled game against a historical rotation', () => {
+  const { season, chosen } = preparedSeason();
   expect(season.teams).toHaveLength(30);
   const fixture = season.games.find(
     (game) => game.homeTeamId === season.userTeamId || game.awayTeamId === season.userTeamId,
@@ -109,4 +123,78 @@ test('a confirmed six-guard roster plays a scheduled game against a historical r
   expect(checkFullCourtGameResult(result)).toEqual([]);
   const played = homeUser ? result.home : result.away;
   expect(played.players.some((player) => !player.startedGame && player.seconds > 0)).toBe(true);
+});
+
+test('pins the checked injury profile to the slot lock', () => {
+  const { season } = preparedSeason();
+  const catalogHash = contentHashSchema.parse('a'.repeat(64));
+  const players: FullCourtHealthProfileSet['players'] = {};
+  for (const team of season.teams) {
+    for (const { playerVersionId } of team.roster) {
+      if (playerVersionId === undefined) throw new Error('Missing fixture profile key');
+      players[playerVersionId] = {
+        cohortId: 'prior',
+        episodesPer10kAppearances: 100,
+        playerEvidence: { source: 'population' },
+      };
+    }
+  }
+  const profiles: FullCourtHealthProfileSet = {
+    version: FULL_COURT_HEALTH_PROFILE_VERSION,
+    catalogHash,
+    evidenceHash: contentHashSchema.parse('b'.repeat(64)),
+    cohorts: { prior: { durationCounts: [1, 0, 0, 0], observedAppearances: 100 } },
+    players,
+  };
+  expect(() =>
+    lockFullCourtRegularSeason(season, { profiles, catalogAssetHash: 'b'.repeat(64) }),
+  ).toThrow('different catalog asset');
+  const initial = createFullCourtSeasonCheckpoint(lockFullCourtRegularSeason(season));
+  const lock = lockFullCourtRegularSeason(season, { profiles, catalogAssetHash: catalogHash });
+  expect(() => simulateFullCourtSeasonSlot(lock, initial, createEngineContext())).toThrow(
+    'does not match',
+  );
+});
+
+test('simulates an entire slot, resumes serialized health, and pauses for decisions', () => {
+  const { season, chosen } = preparedSeason();
+  const lock = lockFullCourtRegularSeason(season);
+  const initial = createFullCourtSeasonCheckpoint(lock);
+  const context = createEngineContext();
+  expect(
+    simulateFullCourtSeasonSlot(lock, initial, context, {
+      restingPlayerIds: chosen.slice(0, 2).map((player) => player.playerId),
+    }),
+  ).toMatchObject({ kind: 'decision', reason: 'rest-conflict' });
+  const first = simulateFullCourtSeasonSlot(lock, initial, context);
+  const watched = simulateFullCourtSeasonSlot(lock, initial, context, { record: true });
+  if (first.kind !== 'simulated' || watched.kind !== 'simulated')
+    throw new Error('Expected an opening slot');
+  expect(first.scores).toHaveLength(15);
+  expect(watched.scores).toEqual(first.scores);
+  expect(watched.checkpoint).toEqual(first.checkpoint);
+  expect(watched.userGame.kind === 'played' ? watched.userGame.tape?.length : 0).toBeGreaterThan(0);
+  expect(Object.keys(first.checkpoint.healthByTeam)).toHaveLength(30);
+
+  const restored = fullCourtSeasonCheckpointSchema.parse(
+    JSON.parse(JSON.stringify(first.checkpoint)),
+  );
+  const next = simulateFullCourtSeasonSlot(lockFullCourtRegularSeason(season), restored, context);
+  expect(next).toMatchObject({ kind: 'simulated', checkpoint: { completedThroughSlot: 2 } });
+
+  const userHealth = restored.healthByTeam[season.userTeamId];
+  if (userHealth === undefined) throw new Error('Missing user health');
+  for (const player of chosen.slice(0, 2)) {
+    userHealth.players[player.playerId] = { loadBasisPoints: 0, availableFromDay: 100 };
+  }
+  expect(simulateFullCourtSeasonSlot(lock, restored, context)).toMatchObject({
+    kind: 'decision',
+    reason: 'confirm-forfeit',
+  });
+  const accepted = simulateFullCourtSeasonSlot(lock, restored, context, { acceptForfeit: true });
+  if (accepted.kind !== 'simulated' || accepted.userGame.kind !== 'forfeit') {
+    throw new Error('Expected an accepted forfeit');
+  }
+  expect(accepted.checkpoint.completedThroughSlot).toBe(2);
+  expect(accepted.scores.filter((score) => score.outcome.kind === 'forfeit')).toHaveLength(1);
 });

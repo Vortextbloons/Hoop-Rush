@@ -354,6 +354,7 @@ struct Constants {
     deep_four_split: f64,
     deep_four_make_scale: f64,
     deep_four_ft_miss: usize,
+    disqualification_limit: f64,
     internal_rng: bool,
 }
 
@@ -938,6 +939,14 @@ impl Trip<'_> {
     fn record_personal_foul(&mut self, side: usize, player: usize) {
         self.personal[side][player] += 1.0;
     }
+    fn reached_disqualification(&self, side: usize, player: usize) -> bool {
+        self.c.disqualification_limit > 0.0
+            && self.personal[side][player] == self.c.disqualification_limit
+    }
+    fn pause_for_disqualification(&mut self) {
+        self.possession_start = START_DEAD;
+        self.finish_plain(false, self.remaining <= 0.0);
+    }
     fn avoidance(&self, side: usize, player: usize) -> f64 {
         let trouble = (self.personal[side][player] - self.c.foul_trouble_start).max(0.0);
         (1.0 - self.c.foul_avoid_per * trouble * trouble).max(self.c.foul_avoid_floor)
@@ -1257,6 +1266,7 @@ impl Trip<'_> {
         let fouler = self.fouler(defense);
         self.foul(defense, fouler);
         self.record_personal_foul(defense, fouler);
+        let disqualified = self.reached_disqualification(defense, fouler);
         let in_bonus = self.period_fouls[defense]
             >= if self.period_index >= 4 {
                 self.c.bonus_overtime
@@ -1284,7 +1294,11 @@ impl Trip<'_> {
                 awards.double_or_nothing,
             );
             if free_throws.continues {
-                self.phase_continuation();
+                if disqualified {
+                    self.pause_for_disqualification();
+                } else {
+                    self.phase_continuation();
+                }
                 return;
             }
             self.team_add(offense, 15);
@@ -1315,7 +1329,11 @@ impl Trip<'_> {
             };
             self.clock = Some(clock.max(reset));
         }
-        self.phase_inbound();
+        if disqualified {
+            self.pause_for_disqualification();
+        } else {
+            self.phase_inbound();
+        }
     }
     fn phase_inbound(&mut self) {
         self.consume(self.c.inbound);
@@ -1338,6 +1356,11 @@ impl Trip<'_> {
         } else {
             -1
         };
+        let before_fouls = if self.c.disqualification_limit > 0.0 {
+            Some(self.personal[defense])
+        } else {
+            None
+        };
         let outcome = self.resolve_shot(offense, defense, handler);
         self.shooter = outcome.shooter;
         self.defender = outcome.defender;
@@ -1346,6 +1369,17 @@ impl Trip<'_> {
             let period_ended = self.remaining <= 0.0;
             self.finish_end(true, period_ended);
             return;
+        }
+        if let Some(before_fouls) = before_fouls {
+            if outcome.defender >= 0 {
+                let defender = outcome.defender as usize;
+                if self.reached_disqualification(defense, defender)
+                    && self.personal[defense][defender] > before_fouls[defender]
+                {
+                    self.pause_for_disqualification();
+                    return;
+                }
+            }
         }
         if self.continuations >= 4 {
             self.team_add(offense, 15);
@@ -2108,6 +2142,7 @@ pub extern "C" fn run_trip() -> u32 {
         deep_four_split: reader.f(),
         deep_four_make_scale: reader.f(),
         deep_four_ft_miss: reader.f() as usize,
+        disqualification_limit: reader.f(),
         internal_rng: false,
     };
     let count0 = reader.usize();
@@ -2525,6 +2560,7 @@ impl Battle {
                 deep_four_split: 0.0,
                 deep_four_make_scale: 0.0,
                 deep_four_ft_miss: 0,
+                disqualification_limit: 0.0,
                 internal_rng: false,
             },
             strings: Vec::new(),
@@ -2994,6 +3030,7 @@ pub extern "C" fn battle_init(handle: u32, length: u32) -> u32 {
         deep_four_split: r.f(),
         deep_four_make_scale: r.f(),
         deep_four_ft_miss: r.f() as usize,
+        disqualification_limit: 0.0,
         has_havoc: true,
         twenty_second: false,
         deep_four: false,

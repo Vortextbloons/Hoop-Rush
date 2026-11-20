@@ -117,6 +117,7 @@ export interface TripContext {
   effects?: EffectsHook;
   havoc?: HavocRuntimeHooks;
   apron?: ApronRuntimeHooks;
+  disqualificationLimit?: number;
   /** True when `rng` is a custom implementation that the Rust kernel must call back. */
   externalRng?: boolean;
 }

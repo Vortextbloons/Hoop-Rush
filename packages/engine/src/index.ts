@@ -375,6 +375,22 @@ export {
   type FullCourtGameHealthOptions,
   type FullCourtGameHealthOutcome,
 } from './modes/full-court/health.ts';
+export {
+  createFullCourtSeasonCheckpoint,
+  lockFullCourtRegularSeason,
+  simulateFullCourtSeasonSlot,
+  type FullCourtSeasonLock,
+  type FullCourtSeasonSlotOptions,
+  type FullCourtSeasonSlotOutcome,
+} from './modes/full-court/season-slot.ts';
+export { type FullCourtInjuryEvent } from './modes/full-court/injuries.ts';
+export {
+  fullCourtPlayoffSeeds,
+  fullCourtStandings,
+  type FullCourtPlayoffSeeds,
+  type FullCourtStandings,
+  type FullCourtStandingsRow,
+} from './modes/full-court/standings.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {

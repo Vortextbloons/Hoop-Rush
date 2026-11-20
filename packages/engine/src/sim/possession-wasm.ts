@@ -310,6 +310,7 @@ function buildStatic(ctx: TripContext): StaticLayout {
     0.2,
     0.75,
     4,
+    ctx.disqualificationLimit ?? 0,
     counts[0],
     counts[1],
     struckKeys[0] === null ? 0 : 1,

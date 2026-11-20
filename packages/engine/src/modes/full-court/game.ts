@@ -501,6 +501,7 @@ export function runFullCourtGame(
     [home.lineup.prep, away.lineup.prep],
   );
   ctx.externalRng = context.rngFactory !== createRng;
+  ctx.disqualificationLimit = FULL_COURT_FOUL_LIMIT;
   ctx.teamUnits = [home.lineup.units, away.lineup.units];
   effects?.setActiveUnits(home.lineup.units, away.lineup.units);
 

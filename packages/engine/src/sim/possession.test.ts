@@ -4,6 +4,7 @@ import { seedSchema } from '@hoop-rush/data-contracts';
 import type { GameSimulationInput } from '@hoop-rush/data-contracts';
 import { createEngineContext } from './kernel.ts';
 import { GameRecorder, type RecorderSide, type SideIndex } from './recorder.ts';
+import { createRng } from './rng.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
@@ -114,6 +115,25 @@ function driveGame(input: GameSimulationInput, mode: DriveMode): DriveResult {
   };
 }
 const GAME_SEEDS = ['golden-1', 'golden-svsw', 'mirror-1', 'inv-sw', 'perf-1', 'mm-0', 'sw-5'];
+it('returns to the rotation runner when a defender reaches the foul limit mid-possession', () => {
+  const seed = seedSchema.parse(seedFromString('foul-threshold'));
+  const input = buildGameSimulationInput({ seed });
+  const state = createGameState();
+  state.secondsRemaining = 500;
+  const ctx = createTripContext(createRng(seed, 373), new GameRecorder(), state, input.profile, [
+    input.home,
+    input.away,
+  ]);
+  ctx.disqualificationLimit = 6;
+  for (const player of input.away.players) ctx.personalFouls[1].set(ctx.preps[1].keyOf(player), 5);
+
+  const result = resolveTrip(ctx, 0);
+  expect(result.ended).toBe(false);
+  expect(ctx.possessionStart).toBe('deadBall');
+  expect(Math.max(...ctx.personalFouls[1].values())).toBe(6);
+  expect(state.periodFouls[1]).toBe(1);
+});
+
 describe('PossessionStepper decomposition', () => {
   it('step-by-step and pausing at boundaries both match resolveTrip', () => {
     for (const seed of GAME_SEEDS) {

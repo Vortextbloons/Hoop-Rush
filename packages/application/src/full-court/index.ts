@@ -12,6 +12,12 @@ import {
   type FullCourtCatalogIndex,
 } from '@hoop-rush/engine';
 
+export {
+  advanceFullCourtSeasonSlot,
+  startFullCourtSeason,
+  type FullCourtSeasonRepository,
+} from './season.ts';
+
 export interface FullCourtDraftRepository {
   load(runId: string): Promise<FullCourtDraftState | null>;
   getReceipt(command: FullCourtCommand): Promise<FullCourtCommandResult | null>;

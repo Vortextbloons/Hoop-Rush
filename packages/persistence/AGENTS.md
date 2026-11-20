@@ -3,8 +3,9 @@
 Package overview and verification commands: **README.md**.
 
 IndexedDB/Dexie repository adapters for challenge (classic/sandbox), cap-rush,
-havoc, draft-duel, fixed-five, and havoc-multiplayer saves. Record-level
-schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
+havoc, draft-duel, fixed-five, havoc-multiplayer, and Full Court saves.
+Record-level schemas live here; domain schemas live in
+`@hoop-rush/data-contracts`.
 
 ## Hard rules
 
@@ -18,9 +19,15 @@ schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
 - **Storage namespace**: the database is `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `src/repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; do not add upgrade
-  hooks for it. Database versions 15 and 16 upgrade additively to version 17
+  hooks for it. Database versions 15 through 17 upgrade additively to version 18
   without clearing records. Databases older than version 15 reset all
   local saves, history, and profiles during upgrade. Do not restore historical migrations.
+- **Full Court save layout**: save schema 1 keeps the season checkpoint in
+  `fullCourtSeasonCheckpoints` (key `runId`) and compact results in
+  `fullCourtSeasonScores` (key `[runId+gameId]`). A slot commit writes the
+  checkpoint and its 15 score rows in one transaction, requires the checkpoint's
+  next slot and lock digest to match, and validates unique fixtures plus 30
+  advancing health rows before writing.
 - **Record envelopes**: every stored record carries its domain
   `saveSchemaVersion`. Readers raise unsupported-version errors through the
   mode's load error; never silently delete or rewrite a record on read.

@@ -1,6 +1,7 @@
 import {
   FULL_COURT_HEALTH_VERSION,
   fullCourtTeamHealthSchema,
+  type FullCourtHealthProfileSet,
   type FullCourtPlayerHealth,
   type FullCourtTeamHealth,
 } from '@hoop-rush/data-contracts';
@@ -12,6 +13,11 @@ import {
   type FullCourtTeamGameInput,
   type FullCourtTeamResult,
 } from './game.ts';
+import {
+  drawFullCourtInjuries,
+  fullCourtInjuryParticipants,
+  type FullCourtInjuryEvent,
+} from './injuries.ts';
 import { FULL_COURT_MIN_ROSTER, FULL_COURT_REGULATION_SECONDS } from './rotation.ts';
 
 const FULL_LOAD = 10_000;
@@ -25,6 +31,14 @@ export interface FullCourtGameHealthOptions {
   readonly health?: Readonly<Partial<Record<Side, FullCourtTeamHealth>>>;
   readonly restingPlayerIds?: Readonly<Partial<Record<Side, readonly string[]>>>;
   readonly record?: boolean;
+  /**
+   * Experimental explicit opt-in for postgame time-loss injuries. There is no
+   * default profile set; the caller supplies packaged profiles and checks their
+   * catalog hash. Absent profiles leave the game RNG, result, and health as before.
+   */
+  readonly injuryProfiles?: FullCourtHealthProfileSet;
+  /** Each side's future fixture days, strictly after this game's day. */
+  readonly futureGameDays?: Readonly<Partial<Record<Side, readonly number[]>>>;
 }
 
 export type FullCourtGameHealthOutcome =
@@ -38,6 +52,8 @@ export type FullCourtGameHealthOutcome =
   | ({
       readonly kind: 'played';
       readonly health: Readonly<Record<Side, FullCourtTeamHealth>>;
+      /** Postgame time-loss events; empty when the injury slice is disabled. */
+      readonly injuries: readonly FullCourtInjuryEvent[];
     } & FullCourtGameRun);
 
 function prepareTeamHealth(
@@ -114,6 +130,15 @@ function addWorkload(health: FullCourtTeamHealth, result: FullCourtTeamResult): 
   }
 }
 
+/** Extends an existing return day; an injury never shortens another absence. */
+function applyInjury(health: FullCourtTeamHealth, injury: FullCourtInjuryEvent): void {
+  const prior = health.players[injury.playerId];
+  health.players[injury.playerId] = {
+    loadBasisPoints: prior?.loadBasisPoints ?? 0,
+    availableFromDay: Math.max(prior?.availableFromDay ?? 0, injury.availableFromDay),
+  };
+}
+
 export function runFullCourtGameWithHealth(
   game: FullCourtGameInput,
   dayOffset: number,
@@ -149,5 +174,25 @@ export function runFullCourtGameWithHealth(
   });
   addWorkload(health.home, run.result.home);
   addWorkload(health.away, run.result.away);
-  return { kind: 'played', ...run, health };
+  const injuries: FullCourtInjuryEvent[] = [];
+  const profiles = options.injuryProfiles;
+  if (profiles !== undefined) {
+    for (const side of sides) {
+      const drawn = drawFullCourtInjuries({
+        seed: game.seed,
+        dayOffset,
+        teamId: prepared[side].team.teamId,
+        participants: fullCourtInjuryParticipants(
+          prepared[side].team.roster,
+          run.result[side].players,
+        ),
+        profiles,
+        futureDays: options.futureGameDays?.[side],
+        context,
+      });
+      for (const injury of drawn) applyInjury(health[side], injury);
+      injuries.push(...drawn);
+    }
+  }
+  return { kind: 'played', ...run, health, injuries };
 }

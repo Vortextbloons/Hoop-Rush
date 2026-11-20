@@ -81,6 +81,10 @@ import type {
   StoredFullCourtDraft,
   StoredFullCourtDraftCommand,
 } from '../schemas/full-court-draft-record.ts';
+import type {
+  StoredFullCourtSeasonCheckpoint,
+  StoredFullCourtSeasonScore,
+} from '../schemas/full-court-season-record.ts';
 import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -154,10 +158,25 @@ export const HOOP_RUSH_DATABASE_STORES_V16: Record<string, string> = {
   capRushLeagueResults: '[runId+gameId], runId',
 };
 
-export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+/**
+ * Version 17 adds the Full Court draft and its command receipts; opening a
+ * version-16 database only creates these tables and keeps every existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES_V17: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V16,
   fullCourtDrafts: 'runId',
   fullCourtDraftCommands: '[runId+commandId], runId',
+};
+
+/**
+ * Version 18 adds the Full Court season checkpoint and compact score rows;
+ * opening a version-17 database only creates these tables and keeps every
+ * existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V17,
+  fullCourtSeasonCheckpoints: 'runId',
+  fullCourtSeasonScores: '[runId+gameId], runId',
 };
 
 export class HoopRushDatabase extends Dexie {
@@ -215,10 +234,12 @@ export class HoopRushDatabase extends Dexie {
   capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
   fullCourtDrafts!: EntityTable<StoredFullCourtDraft, 'runId'>;
   fullCourtDraftCommands!: Table<StoredFullCourtDraftCommand, [string, string]>;
+  fullCourtSeasonCheckpoints!: EntityTable<StoredFullCourtSeasonCheckpoint, 'runId'>;
+  fullCourtSeasonScores!: Table<StoredFullCourtSeasonScore, [string, string]>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    // Versions below 15 are unsupported and reset. A version-15 database keeps
-    // every record and only gains the version-16 store and indexes.
+    // Versions below 15 are unsupported and reset. Versions 15 through 17 keep
+    // every record and only gain the tables and indexes added after them.
     this.version(15)
       .stores(HOOP_RUSH_DATABASE_STORES_V15)
       .upgrade((transaction) =>
@@ -229,7 +250,8 @@ export class HoopRushDatabase extends Dexie {
         ),
       );
     this.version(16).stores(HOOP_RUSH_DATABASE_STORES_V16);
-    this.version(17).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(17).stores(HOOP_RUSH_DATABASE_STORES_V17);
+    this.version(18).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {
