@@ -6,7 +6,7 @@ verification checkpoints. IndexedDB owns saves and completed history.
 The public RPCs and tables are the compatibility boundary. Internal shared
 coordination lives in `multiplayer_private`, which is absent from the exposed
 API schemas and has no client usage or execution grants. Public RPC wrappers
-retain authentication/authorization and transactional room/lobby locks.
+keep authentication, authorization, and transactional room and lobby locks.
 The private dispatcher has an explicit protocol allowlist and static adapters
 for Fixed Five, Draft Duel, and Havoc. Mode command validation, deadlines,
 series transitions, and verification stay with their mode handlers.
@@ -58,7 +58,7 @@ access the private schema or execute its functions.
    schema changes as part of publishing a web-only artifact.
 
 No IndexedDB migration, membership-key change, or seed change is required by
-the shared coordination refactor — but the **room protocol did change**: see
+the shared coordination refactor. The **room protocol did change**, though: see
 below.
 
 ## Room protocol version

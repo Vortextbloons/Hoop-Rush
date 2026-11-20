@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
-export const modeIdSchema = z.enum(['classic', 'sandbox', 'havoc', 'draft-duel', 'cap-rush']);
+export const modeIdSchema = z.enum([
+  'classic',
+  'sandbox',
+  'havoc',
+  'draft-duel',
+  'cap-rush',
+  'full-court',
+]);
 export type ModeId = z.infer<typeof modeIdSchema>;
 export const multiplayerFormatIdSchema = z.enum([
   'season',

@@ -1,0 +1,38 @@
+{
+  "Docs/engine/shooting.md": [
+    ["# Engine — shooting math", "# Engine: shooting math"],
+    [
+      "`-(0.04 + min(1, (4 - remaining) / 4) * 0.06)` — up to −0.10 at the buzzer.",
+      "`-(0.04 + min(1, (4 - remaining) / 4) * 0.06)`, up to −0.10 at the buzzer."
+    ],
+    [
+      "  which reads as zero attempts — the player never shoots threes.",
+      "  which reads as zero attempts, so the player never shoots threes."
+    ],
+    [
+      "`accuracyConservative` (posterior 25th percentile) directly — no observed-era\nblend, no generic historical penalty, and the profile's per-zone floors\n(below the established `.32/.34`) replace `zoneMakeFloor`.",
+      "`accuracyConservative` (posterior 25th percentile) directly. There is no\nobserved-era blend, no generic historical penalty, and the profile's per-zone\nfloors (below the established `.32/.34`) replace `zoneMakeFloor`."
+    ],
+    [
+      "`pickZone(action, prep, rng)` starts from `blendedZoneWeights` — the player's\nfrequency tendencies blended with the era zone mix at\n`eraZoneMixBlend = 0.55` — rescales two/three-point weights to the player's\n`threePointTarget`, nudges rims for transition/post-up and short-mid for\npost-up, and returns a weighted pick.",
+      "`pickZone(action, prep, rng)` starts from `blendedZoneWeights`, the player's\nfrequency tendencies blended with the era zone mix at\n`eraZoneMixBlend = 0.55`. It rescales two and three-point weights to the\nplayer's `threePointTarget`, nudges rims for transition and post-up and\nshort-mid for post-up, then returns a weighted pick."
+    ],
+    [
+      "The responsibility modifiers move only who acts — initiation, handler/roll/\npost-up selection, roll-man targets, and defender assignment.",
+      "The responsibility modifiers move only who acts: initiation, handler/roll/\npost-up selection, roll-man targets, and defender assignment."
+    ]
+  ],
+  "Docs/engine/turnovers-fouls-rebounds.md": [
+    ["# Engine — turnovers, fouls, and rebounds", "# Engine: turnovers, fouls, and rebounds"]
+  ],
+  "Docs/engine/challenge.md": [
+    [
+      "# Engine — challenge runs and season analysis",
+      "# Engine: challenge runs and season analysis"
+    ],
+    [
+      "The run freezes every version — save schema, data, rating, position\nnormalization, engine, bracket, schedule, and seed-derivation — plus the era\nprofile version and difficulty, then starts `status: 'active'` with empty",
+      "The run freezes every version (save schema, data, rating, position\nnormalization, engine, bracket, schedule, and seed-derivation) plus the era\nprofile version and difficulty, then starts `status: 'active'` with empty"
+    ]
+  ]
+}

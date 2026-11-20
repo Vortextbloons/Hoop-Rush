@@ -6,7 +6,7 @@
 
 ### Every dynasty has a first loss. **Make yours never.**
 
-Pick real NBA peaks, build a lineup, and chase a perfect run through a fixed 82-game gauntlet — or lean into salary-cap drafting, mutated roguelike seasons, and online draft duels on top of the same possession sim.
+Pick real NBA peaks, build a lineup, and chase a perfect run through a fixed 82-game gauntlet. Or lean into salary-cap drafting, mutated roguelike seasons, and online draft duels on top of the same possession sim.
 
 <br />
 
@@ -16,11 +16,11 @@ Pick real NBA peaks, build a lineup, and chase a perfect run through a fixed 82-
 
 ---
 
-## What you’re playing
+## What you're playing
 
 Hoop Rush is a **fantasy lineup basketball sim** built around one obsessive question: *can this five go undefeated?*
 
-You draft from decades of real player seasons, then sim **possession by possession** — box scores, fatigue, matchups, and streaks emerge from the engine, not from scripted story beats. Every run has a **seed**, so you can replay, compare, and argue about the same game later.
+You draft from decades of real player seasons, then sim **possession by possession**. Box scores, fatigue, matchups, and streaks come out of the engine, not from scripted story beats. Every run has a **seed**, so you can replay, compare, and argue about the same game later.
 
 Progress **saves in your browser** (IndexedDB). No account required for solo modes.
 
@@ -31,11 +31,11 @@ Progress **saves in your browser** (IndexedDB). No account required for solo mod
 <table>
 <tr>
 <td width="28%"><strong>Classic</strong></td>
-<td>Five draft rounds. Each round assigns a franchise and decade; you get one franchise reroll and one era reroll for the whole draft, then lock a <code>G, G, F, F, C</code> lineup. Same frozen 30-team bracket as the other challenge modes — the draft is the puzzle.</td>
+<td>Five draft rounds. Each round assigns a franchise and decade; you get one franchise reroll and one era reroll for the whole draft, then lock a <code>G, G, F, F, C</code> lineup. Same frozen 30-team bracket as the other challenge modes. The draft is the puzzle.</td>
 </tr>
 <tr>
 <td><strong>Sandbox</strong></td>
-<td>Skip the roulette: pick any five peak seasons you want, then take on all 30 opponents on the shared 82-game schedule. Pure “what if this lineup?” energy.</td>
+<td>Skip the roulette: pick any five peak seasons you want, then take on all 30 opponents on the shared 82-game schedule. Pure "what if this lineup?" energy.</td>
 </tr>
 <tr>
 <td><strong>Hoop Havoc</strong></td>
@@ -43,23 +43,23 @@ Progress **saves in your browser** (IndexedDB). No account required for solo mod
 </tr>
 <tr>
 <td><strong>Cap Rush</strong></td>
-<td>Salary-cap draft: five historical seasons at fixed positions, apron pressure, optional mutation spins — then an 82-game season (and postseason) built from that payroll puzzle. Still chasing 82–0 when the build allows it.</td>
+<td>Salary-cap draft: five historical seasons at fixed positions, apron pressure, optional mutation spins. Then an 82-game season (and postseason) built from that payroll puzzle. Still chasing 82-0 when the build allows it.</td>
 </tr>
 </table>
 
-**Draft Duel** is **online only**: five rounds of simultaneous picks, then a best-of-seven broadcast — registered in the lobby, not on the solo home screen.
+**Draft Duel** is **online only**: five rounds of simultaneous picks, then a best-of-seven broadcast. It's registered in the lobby, not on the solo home screen.
 
 ---
 
 ## The 82-game gauntlet
 
-Classic, Sandbox, and Havoc share a **fixed opponent set** and **82-game road** — everyone faces the same teams in the same order, so records are comparable. Cap Rush runs its own 82-game (and playoff) arc after the cap draft, with a generated opponent field tied to your build.
+Classic, Sandbox, and Havoc share a **fixed opponent set** and **82-game road**, so everyone faces the same teams in the same order and records are comparable. Cap Rush runs its own 82-game (and playoff) arc after the cap draft, with a generated opponent field tied to your build.
 
 | | |
 | --- | --- |
 | **30 teams** | Work through the full league on an authored schedule, not a random draw each night. |
 | **Game-by-game** | Step through the season or sim ahead; read box scores and trends like a real standings push. |
-| **Tier chase** | Finish with a record that matches how close you came to perfection — the home screen remembers your recent runs. |
+| **Tier chase** | Finish with a record that shows how close you came to perfection. The home screen remembers your recent runs. |
 | **Resume anytime** | Pick up mid-season from a saved checkpoint in this browser. |
 
 ---
@@ -70,11 +70,11 @@ Classic, Sandbox, and Havoc share a **fixed opponent set** and **82-game road** 
 
 | Format | Vibe |
 | --- | --- |
-| **Shared season** (Classic or Sandbox) | Everyone builds a five and plays the **same 82-game schedule** — compare records and head-to-head. |
-| **Duel** | Two lineups, **best of seven** — first to four wins the series. |
+| **Shared season** (Classic or Sandbox) | Everyone builds a five and plays the **same 82-game schedule**, so you can compare records and head-to-head results. |
+| **Duel** | Two lineups, **best of seven**. First to four wins the series. |
 | **Draft Duel** | Five draft rounds, eight cards per round, simultaneous reveals, then **best of seven**. |
 | **Hoop Havoc** | Mutated five-man drafts, then a **best-of-seven** broadcast. |
-| **Cap Rush** | Cap Clash / Cap Roulette — salary-cap auction drafts and shared season progression (see lobby formats). |
+| **Cap Rush** | Cap Clash / Cap Roulette: salary-cap auction drafts and shared season progression (see lobby formats). |
 
 Solo **Classic, Sandbox, Havoc, and Cap Rush** work offline in the browser. Multiplayer formats need the hosted coordination service.
 
@@ -82,9 +82,9 @@ Solo **Classic, Sandbox, Havoc, and Cap Rush** work offline in the browser. Mult
 
 ## Why the box scores feel real
 
-Hoop Rush cares about **credible stat lines** — shooting splits, usage, fatigue, and game flow tied to player ratings and possessions. If a box score looks wrong, the goal is to explain it from **what actually happened in the sim**, not to fudge the narrative.
+Hoop Rush cares about **credible stat lines**: shooting splits, usage, fatigue, and game flow tied to player ratings and possessions. If a box score looks wrong, the goal is to explain it from **what actually happened in the sim**, not to fudge the narrative.
 
-That discipline is why seeds, replays, and “run it again” comparisons matter to the project — even if you only care about beating 82–0 once.
+That discipline is why seeds, replays, and "run it again" comparisons matter here. Even if you only care about beating 82-0 once.
 
 ---
 
@@ -102,7 +102,7 @@ Open **http://localhost:5173**, choose a mode, and draft.
 ---
 
 <details>
-<summary><strong>For developers</strong> — repo layout & commands</summary>
+<summary><strong>For developers</strong>: repo layout and commands</summary>
 
 <br />
 
@@ -126,7 +126,7 @@ tools/cli                 → `hoop-rush` CLI (sim, audit, data, calibration)
 | `bun run verify:quick` | Lint + typecheck + quick tests (typical pre-push) |
 | `bun run verify` | Full static checks, all tests, and production build |
 | `bun run verify:changed` | Checks for workspaces touched vs `HEAD` |
-| `bun run hoop-rush` | CLI — sim, audit, data tools (`bun run hoop-rush help`) |
+| `bun run hoop-rush` | CLI: sim, audit, and data tools (`bun run hoop-rush help`) |
 
 See the root **AGENTS.md** (agent defaults), checked-in scoped guides
 (`apps/web/AGENTS.md`, `packages/engine/AGENTS.md`, `packages/persistence/AGENTS.md`, …),

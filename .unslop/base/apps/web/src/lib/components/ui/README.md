@@ -1,0 +1,155 @@
+# Shared UI primitives
+
+Reusable building blocks live in `src/lib/components/ui/`. Shared basketball
+presentation that is not a general primitive lives in
+`src/lib/components/basketball/`. Mode components compose these instead of
+repeating button, panel, badge, and segmented-control markup.
+
+## Components
+
+| Component                 | Renders                              | Notes                                                                                                                                |
+| ------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Button.svelte`           | native `<button>`                    | Defaults to `type="button"`. `loading` disables the control and sets `aria-busy`. Accepts native button attributes and events.       |
+| `ActionLink.svelte`       | native `<a>`                         | Use for navigation. There is deliberately no disabled state; render different content instead of a dead link.                        |
+| `IconButton.svelte`       | native `<button>`                    | Requires `label`, which becomes the accessible name. Use for icon-only actions.                                                      |
+| `Panel.svelte`            | `div`, `section`, `article`, or `li` | Surface only. Choose padding with `padding="none \| sm \| md \| lg"`.                                                                |
+| `Badge.svelte`            | `<span>`                             | Semantic tones: `neutral`, `primary`, `accent`, `positive`, `negative`.                                                              |
+| `SegmentedControl.svelte` | `role="group"` of pressed buttons    | For immediate option groups such as "Per game / Totals". Not a tab list; it does not change panels.                                  |
+| `PageHeader.svelte`       | page header                          | Eyebrow, title, description, and an optional `actions` snippet.                                                                      |
+| `PageShell.svelte`        | page-width wrapper                   | `width="sm \| md \| lg \| xl \| full"` and `padding="none \| sm \| md \| lg \| xl"`. Replaces hand-written `mx-auto max-w-*` shells. |
+| `SectionHeading.svelte`   | eyebrow, heading, description        | `level` picks `h2`–`h4`; `size` picks the display scale; optional `actions` snippet.                                                 |
+| `StatGrid.svelte`         | `<dl>` of stat tiles                 | `columns` is the desktop count, `mobile` the small-screen count. Put `StatTile` children inside.                                     |
+| `StatTile.svelte`         | `<dt>`/`<dd>` pair                   | `label`, `value`, `note`, `size`, `tone`, and `surface="tile"` for a bordered card. A default snippet overrides the value.           |
+| `Alert.svelte`            | inline notice                        | Tones `info`, `success`, `warning`, `danger` set the colour and `role`. Optional `title`, `icon`, and `actions` snippets.            |
+| `EmptyState.svelte`       | empty result block                   | `title`, `message`, optional `actions`. Use `surface="none"` inline inside an existing panel.                                        |
+
+`types.ts` exports the shared `ButtonTone`, `ButtonSize`, and `BadgeTone`
+unions. Prefer the typed variants over passing one-off color classes.
+
+Two text roles cover the small-type scale: `.ui-label` for section eyebrows and
+`.ui-micro` for stat labels and metadata. Do not hand-roll
+`font-mono text-[9px] … uppercase` combinations.
+
+## Usage
+
+```svelte
+<Button tone="primary" loading={controller.busy} onclick={() => controller.startDraft()}>
+  Start draft
+</Button>
+
+<ActionLink href={resolve('havoc/')}>Start a Havoc run</ActionLink>
+
+<Panel as="section" padding="md" aria-label="Payroll and apron status">...</Panel>
+
+<Badge tone="positive">Under cap</Badge>
+
+<SegmentedControl
+  label="Stat values"
+  value={statsTotals ? 'totals' : 'game'}
+  onchange={(next) => (statsTotals = next === 'totals')}
+  options={[
+    { value: 'game', label: 'Per game' },
+    { value: 'totals', label: 'Totals' },
+  ]}
+/>
+
+<PageShell as="section" width="lg" padding="md" aria-label="Season report">
+  <Panel as="section" padding="md">
+    <SectionHeading eyebrow="The box score" title="Season statistics" level={3} />
+
+    <StatGrid class="mt-4" columns={3} mobile={2}>
+      <StatTile label="Points / game" size="lg" value={formatAverage(points, games)} />
+      <StatTile label="Allowed / game" size="lg" value={formatAverage(allowed, games)} />
+      <StatTile label="Margin / game" size="lg" tone="negative" value="-3.1" />
+    </StatGrid>
+
+    <Alert tone="warning" title="Perfect season">
+      {#snippet icon()}<Trophy size={22} aria-hidden="true" />{/snippet}
+      No losses in the regular season.
+    </Alert>
+
+    {#if !hasMvp}
+      <EmptyState class="mt-4" title="No league MVP" surface="none" />
+    {/if}
+  </Panel>
+</PageShell>
+```
+
+History screens share `#lib/components/basketball/HistoryEntryCard.svelte`.
+The mode supplies its own record, badges, and metadata through snippets, so
+Cap Rush keeps cap/postseason badges while Havoc keeps its completion state.
+
+## Basketball compositions
+
+`components/basketball/PlayerStatsSection.svelte` composes the repeated player
+stats block: heading/description/actions, roster and per-game/totals controls,
+a horizontally scrollable `PlayerStatsTable`, a footnote, an empty state, and an
+optional mobile `cards` snippet. Modes keep data selection, aggregation, and
+column formatting.
+
+```svelte
+<PlayerStatsSection
+  title="Series player stats"
+  ariaLabel="Series player stats"
+  sideOptions={[
+    { value: 'you', label: 'You' },
+    { value: 'opp', label: 'Opponent' },
+  ]}
+  {side}
+  onsidechange={(next) => (side = next)}
+  values={totals ? 'totals' : 'game'}
+  onvalueschange={(next) => (totals = next === 'totals')}
+  {rows}
+  {columns}
+  rowKey={(row) => row.playerId}
+  note={`${totals ? 'Series totals' : 'Per-game averages'} · ${rows.length} players`}
+>
+  {#snippet identity(row)}
+    <span class="ui-stats-player">
+      <span class="ui-stats-player-text">
+        <span class="ui-stats-player-name">{row.displayName}</span>
+        <span class="ui-stats-player-meta">{row.slot}</span>
+      </span>
+    </span>
+  {/snippet}
+</PlayerStatsSection>
+```
+
+Columns can set `hideBelow: 'sm' | 'md'` for responsive visibility and
+`cellClass` for emphasis. Pass `stickyIdentity` when the first column must stay
+visible during horizontal scrolling, and set `--ui-stats-line`,
+`--ui-stats-row-line`, `--ui-stats-muted`, or `--ui-stats-player-width` on an
+ancestor to theme a table without mode checks. `surface="none"` leaves the
+section unstyled inside an existing mode panel.
+
+`PlayerStatsControls.svelte` is the controls-only form for modes that supply
+their own table or box score, such as the Havoc championship:
+`<PlayerStatsControls valuesLabel="Season values" {values} {onvalueschange} />`.
+
+## Theming
+
+`lib/styles/foundations.css` owns the defaults. Mode wrappers override scoped
+CSS variables rather than branching inside a primitive:
+
+```css
+.havoc-world {
+  --ui-control-bg: var(--h-gold);
+  --ui-control-fg: var(--h-ink);
+  --ui-control-hover-transform: translateY(-2px);
+  --ui-panel-bg: #20294c;
+  --ui-panel-line: #465273;
+  --ui-panel-radius: 22px;
+}
+
+.room-page {
+  --ui-control-bg: var(--color-primary);
+  --ui-control-transform: none;
+  --ui-control-radius: 7px;
+  --ui-secondary-border: var(--color-line-strong);
+}
+```
+
+Add a new token to `foundations.css` when a mode needs a different shape or
+color. Do not add mode-name conditions to the primitives. When a mode has a
+genuinely different interaction model, keep a mode component and compose the
+primitives inside it.

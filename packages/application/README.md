@@ -7,7 +7,7 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ## Boundary rules
 
 - May import `@hoop-rush/data-contracts` and `@hoop-rush/engine`.
-- **Must not import `@hoop-rush/persistence` at all** — not for runtime, and
+- **Must not import `@hoop-rush/persistence` at all**, not for runtime and
   not for types. Use-case contracts live in each mode's `ports.ts` as ordinary
   interfaces, and the persistence repositories satisfy them structurally. This
   is enforced by `eslint.config.js`, which rejects the import outright.
@@ -55,8 +55,8 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 - `runSubmission` and submission policies/report types: the retry and
   conflict policy runtime shared by every mode (`src/submission.ts`).
 - `decideCommandAdmission` (`src/multiplayer/command-admission.ts`): the shared
-  command admission order — identity, payload size, duplicate replay, expected
-  revision, ordinal continuity, payload schema. It reports a neutral reason and
+  command admission order (identity, payload size, duplicate replay, expected
+  revision, ordinal continuity, payload schema). It reports a neutral reason and
   each mode maps that to its own published rejection code, so per-mode
   vocabularies stay intact until they are unified deliberately.
 - Series room orchestration composes `RoomSynchronization` (validated logs and

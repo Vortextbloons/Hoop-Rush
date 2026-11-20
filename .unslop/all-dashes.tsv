@@ -1,0 +1,1205 @@
+apps/web/src/lib/components/ui/README.md	20	| `SectionHeading.svelte`   | eyebrow, heading, description        | `level` picks `h2`–`h4`; `size` picks the display scale; optional `actions` snippet.                                                 |
+Docs/architecture/current-state.md	83	| `packages/persistence` | Dexie repositories for challenge, classic draft, fixed-five, Draft Duel, Havoc, Havoc multiplayer, **Cap Rush**, **Cap Rush multiplayer**, and profiles. Removed Season Run stores are no longer declared from Dexie v11; legacy rows may remain on disk. Database **`hoop-rush-saves-v2`, Dexie schema version 15** — see [persistence/indexeddb.md](../persistence/indexeddb.md). |
+Docs/architecture/current-state.md	93	Season Run — the solo roguelike season built on the same possession engine —
+Docs/decisions/decisions.md	53	| Dexie database version (current) | 15 (append-only; v7–v10 Cap Rush stores; v11 drops Season Run store declarations; v13 Cap Rush playback evidence/cursors + migration; v15 Cap Rush league aggregate store) | `packages/persistence/src/repositories/dexie.ts` |
+Docs/decisions/decisions.md	74	| Collection game targets (current) | `collection-game-targets-v1` (constant shipped; artifact NOT frozen/packaged — calibration pending, `game-calibrate` runs in `scaffold` status) | `packages/data-contracts/src/collection-versions.ts` |
+Docs/decisions/decisions.md	121	how each version changed — the "(current)" rows above are the truth (code
+Docs/decisions/decisions.md	196	| Season Run room protocol (M2.7) | 1 | `packages/data-contracts/src/season-versions.ts` — archived, kept |
+Docs/decisions/decisions.md	197	| Season Run multiplayer (M2.7) | `season-multiplayer-v1` | `packages/data-contracts/src/season-versions.ts` — archived, kept |
+Docs/decisions/decisions.md	198	| Season Run timer policy (M2.7) | `season-timers-v1` | `packages/data-contracts/src/season-versions.ts` — archived, kept |
+Docs/decisions/decisions.md	199	| Season Run authority (M2.7) | `season-authority-v1` | `packages/data-contracts/src/season-versions.ts` — archived, kept |
+Docs/decisions/decisions.md	229	> M2.7 frozen versions above and is now frozen reference. Solo Season Run remains active; multiplayer UI is hidden but code/migrations/functions are kept. The M2.5.5 code-wins note is retired — save schema
+Docs/decisions/decisions.md	272	Every run — regardless of the eras the player drafted from — simulates in the
+Docs/decisions/decisions.md	285	per-player totals are stored on the run (`run.league`) — 13 sums per player,
+Docs/decisions/decisions.md	287	`totalValueBaseSquared`, `totalShotsSquared`, `totalValueShots`) — so a run
+Docs/decisions/decisions.md	314	failure — rules are never relaxed. Selecting an exact `playerVersionId` makes
+Docs/decisions/decisions.md	345	and Overall has no pick authority — it appears only as a report field.
+Docs/decisions/decisions.md	424	   of membership — derive-v11's honest tail labels (e.g. sub-200-minute 1960s
+Docs/decisions/decisions.md	444	skills over diffuse two-way excellence by ~1 raw point at the extremes —
+Docs/decisions/decisions.md	471	   offense blend — pre-spacing guards keep their base without a 39-attempt
+Docs/decisions/decisions.md	506	toward priors — sourcing real totals is a data-acquisition follow-up, not a
+Docs/decisions/decisions.md	529	— initiation, pick-and-roll handler, roll-man, post-up, rebound attribution,
+Docs/decisions/decisions.md	530	and interior rim protection — each clamped to ±8-12% around 1.0
+Docs/decisions/decisions.md	545	`m3-engine-v12` fixes two credibility bugs. (1) Overtime: `MAX_PERIODS=12` with `resolveGameWinner` picking a random winner on a tied score violated `checkGameResult` / `checkSeasonGameResult`. Both `playFixedFivePeriods` (`packages/engine/src/sim/game.ts:7`) and `SeasonGameController` (`packages/engine/src/season/season-game.ts:220`) now loop unbounded (hard cap 30) until the score is untied; the winner is always `score >`. (2) Shooting floors: `zoneMakeFloor` lowered from `0.46/0.42/0.40/0.34/0.32` to `0.24/0.20/0.18/0.15/0.12` (`packages/engine/src/sim/constants.ts:14`) so poor shooters, elite contests, bad shot quality (`isolation`/`postUp`) and late-clock (`-0.10` at 0s) are no longer clipped. Verified by `game.test.ts` golden hashes, `invariants`/`properties`, `sensitivity`, and `season-game` audits; scoring averages drop ~8-12pp and defensive variance widens — recalibrate before shipping.
+Docs/decisions/decisions.md	547	### Engine v12 to v13 (2026-08-29): balance pass — star differentiation and era fairness
+Docs/decisions/decisions.md	551	### Engine v13 to v14 (2026-09-04): shot-distribution concentration — creators finish, bigs finish assisted
+Docs/decisions/decisions.md	553	`m3-engine-v14` fixes flat shot distribution on stacked lineups: a five-star unit (Curry/Jordan/LeBron/Duncan/Hakeem tendencies) previously produced 15.7–17.0 FGA/game each with Duncan leading scoring, because initiator shares (max/min 1.59x) were erased by high pass rates and flat finisher weights into final shares of 1.16x. Changes in `packages/engine/src/sim/usage.ts` + `constants.ts:80`: `usageExponent 1.45` from 1.35, initiator `creationMod 0.65 + 0.7 * creationScore` from `0.75 + 0.5`, finisher `usagePull 0.65 + 0.35 * min(1, usage/36)` from `0.8 + 0.2`, `passProbability` bases (iso 0.17 from 0.20, pick-and-roll 0.53 from 0.62, post-up 0.35 from 0.28) with a steeper usage-based `creationFactor 1.15 - usageRate/150` from `1.1 - usageRate/200`, so high-usage perimeter creators keep their own actions more and post-ups kick out more. No shooting, turnover, rebound, foul, or contest math touched; RNG/clocks/IDs still injected, determinism preserved (golden digests refreshed in `game.test.ts`: equal-fixture 1861299245, strong-weak 827787984, overtime seed `ot-v14-30`).
+Docs/decisions/decisions.md	555	Evidence: synthetic all-star 300-seed measure moves from Curry 18.9/Jordan 17.4/LeBron 16.4/Duncan 17.3/Hakeem 16.5 FGA (Duncan top scorer) to Curry 19.4/Jordan 18.1/Duncan 17.0/LeBron 16.5/Hakeem 15.5 with team totals preserved (86.6 FGA, ~106 PPG); `roles.test.ts` 6/6 (creator share 0.269 vs target 0.270, all role gates centered); `sensitivity.test.ts` usage rel 0.56 < 0.60 cap and steal opp-turnover rel 0.023 > 0.02 floor; `calibrate sensitivity --samples 100` 9/9 (creation +56%); `calibrate run --samples 2000` 25/26 core gates pass. Known residual: `strongVsWeakWinRate` 0.9445 vs target 0.863 ± 0.070 (bound 0.933) — concentrating shots on stars inherently lifts favorites, and the 1990s target was frozen under flatter v13 distribution; all game-competitiveness gates (close/blowout/OT/equal-home) still pass. Follow-up is a profile-target recalibration, not a code revert.
+Docs/decisions/decisions.md	557	### Engine v16 to v17 (2026-09-05): lineup-relative two-stage usage — initiators initiate, finishers finish
+Docs/decisions/decisions.md	559	`m3-engine-v17` replaces absolute usage powers with a lineup-relative role curve (`packages/engine/src/sim/usage.ts` + `constants.ts:81`): `relativeUsage = usage / lineupMeanUsage` over the on-court unit, `initiatorRole = clamp(0.65, 1.55, relativeUsage ^ 1.60)` with `usageExponent 1.60` from 1.45 and `creationMod 0.70 + 0.60 * creationScore` from `0.65 + 0.70`, and `finisherRole = clamp(0.70, 1.35, relativeUsage ^ 1.25)` applied to passed-shot, roll-man, and bonus free-throw-shooter weights (`fouls.ts`), replacing flat `usagePull` and deleting `creationBurden` outright — a lone star on a weak-creation team is already boosted by a low team mean. Creation and consumption separate emergently: high-creation/high-pass players keep initiating while passing away finishes. No shooting, turnover, rebound, contest, zone, or accounting math touched; USG% stays `FGA + 0.44*FTA + TOV`; RNG/clocks/IDs still injected, determinism preserved (both v14 golden digests hold unchanged: equal-fixture 1861299245, strong-weak 827787984 — uniform-tendency fixtures are invariant under the relative curve by construction).
+Docs/decisions/decisions.md	561	Evidence: synthetic five-star 300-seed measure (tendencies 31/28/27/25/17) produces USG% 25.9/22.5/21.0/17.5/13.1, a 12.8pp top-bottom spread (v14 all-star spread ~4.5pp), with team FGA preserved (~87/game) and the high-pass post proxy 2nd in assists while 4th in usage; `roles.test.ts` 6/6; `slot-permutations` 2/2; `game.test.ts` goldens unchanged; `sensitivity.test.ts` 17/17 with the usage-concentration cap widened 0.60 → 0.70 (`sensitivity.test.ts:166`) because the +35 single-player probe now concentrates +64% (was +56%) — the probe sits deep in clamp territory, so the extra concentration is the intended finisher pull, not runaway handling. Still pending: full `calibrate run --samples 2000` (expect the v14 `strongVsWeakWinRate` residual to grow — profile-target recalibration, not revert), `calibrate sensitivity`, `diagnose`, and season block audit.
+Docs/decisions/decisions.md	563	### Engine v17 to v19 (2026-09-06): season parity tune — trade v7, free agency v3
+Docs/decisions/decisions.md	567	### Engine v19 to v20 (2026-09-07): player sponsorship gear — boosts are ratings inputs
+Docs/decisions/decisions.md	569	`m3-engine-v20` adds the Season Run sponsorship gear layer (`season-sponsor-gear-v1`, spec `spec/3.0/m3.12-player-sponsorship-gear.md`) with zero possession-formula changes: every block deals 5 seeded sponsor offers (tier weights BUZZ 55 / PRIME 32 / ICON 13, prices 1/2/3 Influence, slot round-robin so every block carries shoe/apparel/fuel), bought offers enter a run-wide vault, and applying fits one sponsor per player slot permanently. `applySponsorBoosts` maps base ratings through the applied snapshots (summed per key, clamped 0–100) at game-input build time, in trade valuation (`seasonTradeCatalogFactsOf`), and in the smart AI kit resolver (≤1 slot per AI team per block, minutes-weighted starter need × brand-weight fit, same tier distribution, no ledger). The sim never sees sponsors — only boosted ratings, which is why the version bumps by construction. Seeded RNG only (`sponsors/deal` + `sponsors/ai` namespaces); same rootSeed replays byte-identical offers, vaults, and boosted inputs.
+Docs/decisions/decisions.md	571	Evidence: `sponsors.test.ts` 16/16 (100-seed dealing determinism, slot coverage every block, tier envelope over 10k offers, pool/tax/cap rails, pricing, expiry, all eight apply rejections, irreversibility, AI cap + determinism, sim-hookup through `expandSeasonRunRosters`); max-kit edge audit (full ICON 3-slot five, clamps at 100, 20 simulated games with `checkGameResult` clean); `state-digest.test.ts` proves old replays hash identically (absent sponsors omit the digest key) while geared runs fork by construction; persistence round-trip + backfill suites green; `data validate` covers the 30-entry catalog against packaged logo assets. Release gate still pending: league-shape calibration over ≥1k seeded runs vs the pre-gear baseline (net-rating / pace / title-concentration within the `spec/2.0/08` envelope) plus worker-vs-direct replay parity on a sponsor-heavy run — slices merge behind the gear version gate, calibration runs before release.
+Docs/decisions/decisions.md	573	Economy note: expected shop price averages ~1.58 Influence per offer (0.55×1 + 0.32×2 + 0.13×3), so buying a full 5-card block costs ~7.9 against ~1–2 earnable Influence per block under the 8-cap — full sweeps are impossible by construction and every buy competes with trades, rehab, and free agency. Bad fits are permanent (no swap/refund/resale), which prices the choice.
+Docs/decisions/decisions.md	579	### Engine v20 to v21: interior-finisher fidelity — seeded formulas unchanged
+Docs/decisions/decisions.md	581	`m3-engine-v21` tunes interior finishing (`packages/engine/src/sim/constants.ts` header): 2P anchor 0.70/1.32 with block-aware conversion, rim-heavy importer diet, foul-draw 0.70 blend, assist 1.01, saturated usage caps 1.48/1.28. Seeded formulas unchanged; same seeds replay identically apart from the intended conversion shift. Full league-shape calibration vs the pre-v21 baseline is still pending — see `quality/calibration.md`.
+Docs/decisions/decisions.md	585	No engine, data, or version constants changed. 36 files in `apps/web` were edited presentation-only — shorter headings, one-line descriptions, and removal of developer-facing text that did not affect the next decision. No `Math.random`/`Date.now` introduced; Web Worker and persistence boundaries unchanged; `pnpm --filter @hoop-rush/web build` passes.
+Docs/decisions/decisions.md	587	- **Home `routes/+page.svelte`**: removed `Pick a mode · Chase the run` kicker and `82 games / 30 opponents` legends, dropped `01/02/03` and `Available` pills, shortened mode lines (`5 rounds. Each assigns a franchise + decade. One reroll each, then build.` / `Pick any 5 peak seasons, then play all 30.` / `10-round draft. Build 10, then play 82.`), shortened `Continue · Game 23 · 22–0`.
+Docs/decisions/decisions.md	588	- **Classic/Sandbox**: removed duplicate roll/variant paragraphs (`Each round rolls a franchise...`, `The variant is fixed...`), shortened variant cards to `Draft by ratings.` / `Ratings hidden. Draft on memory.`, hero `Five players, any team, any era. Build your five and chase 82–0.`, humanized `Preparing the player index…` → `Loading…` and raw `Failed to load data: ${manifestError}` → `Couldn’t load data. Try again.`.
+Docs/decisions/decisions.md	590	- **Season Run**: standardized on `Block` (was mixed `checkpoint`/`Block`), removed `Generating — board stays responsive…`, `All nine checkpoints are accepted...`, `Nothing saved until the block...`, `Folded from accepted game summaries`, `Facts come from the saved postseason state`, `Identity is the player-season version...`; shortened `Projected from pending rotation…` → `Estimates based on current minutes.`, `Markets open after Blocks 2,4,6...` → `Up to 2 targets per window.`; deleted `How trades work` 6-bullet spec and Hub `Fatigue risk` duplication; collapsed `BlockProgress` ticker and `CheckpointRecap` dense ledgers.
+Docs/decisions/decisions.md	591	- **Multiplayer `multiplayer/**`**: removed `Rooms are temporary — code, presence, checkpoint hashes`, raw `VITE_SUPABASE_*`, `Settings rev`, `Heartbeat fresh / No heartbeat — 30s offline` → `Online/Offline`, `Integrity failed — hashes diverged`, `DUO_BAND_QUOTAS` / `drawGlobalOffer` / `applySeasonDraftCommand` / `seed`/`digest`/`rev`/`cursor` leaks, collapsed 5× `Coming in next update` to single banner and single stepper `1. Lock → 2. Simulate → 3. Verify`.
+Docs/decisions/decisions.md	601	review — see spec/1.0/11); observed data never changes; engine consumes only
+Docs/decisions/decisions.md	628	The home advantage is `season-home-court-v1`: two named, bounded mechanisms —
+Docs/decisions/decisions.md	629	improved home defensive communication and additional away turnover pressure —
+Docs/decisions/decisions.md	673	execution path — uninterrupted, cancelled/retried, worker-restarted, CLI, and
+Docs/decisions/decisions.md	674	persistence-resumed — reproduces the same per-block state and digests.
+Docs/decisions/decisions.md	692	only minutes, fatigue, workload, durability, and prior injury — never
+Docs/decisions/implementation-status.md	92	1–8, 4–5, 3–6, 2–7 mirrored inward to an East-vs-West Finals with Finals home
+Docs/decisions/implementation-status.md	180	  and multiplayer rooms — including the Ball Knowledge variant presentation.
+Docs/decisions/implementation-status.md	223	- Collection M4.3 difficulty, objectives, and rewards (spec `spec/4.0/m4.3-difficulty-objectives-rewards.md`; dependency order and evidence in `spec/4.0/m4.3-implementation-guide.md`; recorded 2026-09-12). **Status: implemented, calibration freeze pending — not shipped. Removed with the Collection mode on 2026-10-22; preserved as history.** Every bullet below is code-backed in the working tree at recording time:
+Docs/decisions/implementation-status.md	236	  - **open/blocked:** calibration freeze pending (no committed exact-card fixtures, no frozen targets artifact — §12 gates unmeasured); production build fails on pre-existing deleted Season UI components (commit `dccb7f29`), so production-build Collection e2e could not run; `verify:quick` lint and `test:quick` are red on pre-existing season/challenge files; no direct RNG draw-count instrumentation.
+Docs/decisions/implementation-status.md	238	- Collection M4.4 challenges, targeting, and sets (spec `spec/4.0/m4.4-challenges-targeting-sets.md`; dependency order and evidence in `spec/4.0/m4.4-implementation-guide.md`; recorded 2026-09-22). **Status: implemented, progression calibration freeze pending — not shipped. Removed with the Collection mode on 2026-10-22; preserved as history.** Every bullet below is code-backed in the working tree at recording time:
+Docs/decisions/implementation-status.md	251	- Ultimate Run M4.5 hub and visual system (spec `spec/4.0/m4.5-ultimate-hub-visuals.md`; delivery order in `spec/4.0/m4.5-implementation-guide.md`; recorded 2026-09-22). **Status: implementation present at recording time, release validation incomplete — not shipped. Removed with the Collection mode on 2026-10-22; preserved as history.** The working tree at recording time contained the shared Ultimate shell and Hub, card identity/detail views, URL-backed Collection filters, pack shelf and committed-receipt theater, responsive Team board, Play presentation, and canonical route wrappers.
+Docs/decisions/implementation-status.md	261	  - engine: five-round mutated draft over the packaged Season Draft catalog with `(playerId, seasonKey)` claim dedup, Overall windows `[t, t+3]`, identity-independent 60/30/10 tiers, one whole-offer reroll, deterministic offers and nicknames; runtime participants with clone units (5–10 active), six-foul replacements with replacement technicals, per-side shot clocks with real violations, physical/reach effects, rim dunk classification, the full 30-mutation catalog, a typed scoring ledger (`(nominal + addends) × multipliers`, signed adjustments, negative totals), and a strict Havoc auditor;
+Docs/decisions/implementation-status.md	265	  - CLI: `havoc simulate|audit|calibrate` reuse the browser engine and schemas; the post-fix 128+32 calibration cohort passed with zero audit or typed failures (paired 128-seed seasons: havoc 8,810–1,686 vs matched normal 5,149–5,347, +3,661 wins; Time Lord 12-second violations present at the packaged pace), and mechanism cohorts confirm each advertised channel responds while accounting stays exact;
+Docs/decisions/implementation-status.md	266	  - evidence recorded 2026-10-11: `pnpm check` passes for data-contracts, engine, persistence, fixtures, and CLI (apps/web carries one pre-existing Season accessibility warning plus one unrelated in-flight error in `packages/engine/src/challenge/league.ts` owned by concurrent work); `pnpm test:quick` 101 files / 966 passed / 1 skipped; `pnpm test:run` 1021 passed / 1 skipped with two unrelated failures in concurrent Season/league work (`challenge/league.test.ts` schedule stats, `season-generation.integration.test.ts` timeout); `pnpm build` passes (client + SSR, `havoc-worker` chunk emitted); `pnpm hoop-rush data validate` OK; engine Havoc plus standard-guard suites 237 passed / 1 skipped with standard golden hashes unchanged; persistence suite 97 passed; Havoc web suites 42 node + 20 jsdom; CLI focused 11 passed; `havoc simulate --comparison` + `havoc audit` round-trip clean; browser smoke on the dev server completed a real draft (5 rounds, reroll UI, packages/physical math), lineup lock, hub advance (0–0 → 0–1 with the objective updating), and a watched Gamecast game accepted through the real worker and IndexedDB (0–2); three independent read-only reviews (engine accounting, Svelte experience, storage/recovery) ran, and their blockers were fixed: post-game-82 archive resume, watch payload participant names/roles, canceled-turnover live counts, and 5-on-5 defender selection;
+Docs/decisions/implementation-status.md	397	`hoop-rush-saves-v2` namespace. The M4.1–M4.5 milestone entries above are
+Docs/decisions/implementation-status.md	428	Cap Rush offers ten distinct players per round: one 95–99, one 90–99, two
+Docs/decisions/implementation-status.md	429	80–89, two 75–79, two 60–74, and two 40–99 wildcards. Protected rerolls keep
+Docs/decisions/README.md	5	- [`decisions.md`](./decisions.md) — versioned constants and ADR-style decisions
+Docs/decisions/README.md	6	- [`implementation-status.md`](./implementation-status.md) — what is actually built
+Docs/design/arm-guard.md	11	| Luka Dončić | 2023–24 | 97 → 100 | 60 → 85 | 117.05 → 109.36 |
+Docs/design/arm-guard.md	12	| Magic Johnson | 1988–89 | 96 → 100 | 62 → 87 | 118.55 → 109.52 |
+Docs/design/arm-guard.md	13	| Trae Young | 2021–22 | 93 → 100 | 51 → 77 | 118.71 → 113.97 |
+Docs/design/arm-guard.md	14	| James Harden | 2018–19 | 96 → 100 | 60 → 84 | 118.25 → 111.35 |
+Docs/design/arm-guard.md	15	| D'Angelo Russell | 2023–24 | 88 → 98 | 55 → 78 | 119.50 → 113.81 |
+Docs/design/arm-guard.md	16	| Jordan Clarkson | 2020–21 | 82 → 92 | 55 → 77 | 117.71 → 113.45 |
+Docs/design/arm-guard.md	17	| Bogdan Bogdanović | 2020–21 | 89 → 100 | 57 → 81 | 118.72 → 112.19 |
+Docs/design/README.md	15	Collection milestone requirements are historical: `spec/4.0/m4.1`–`m4.5` and
+Docs/developer/cli.md	8	this page and the registry disagree, the registry wins — file a fix for this
+Docs/developer/cli.md	141	| `import manifest` | Refresh manifest content hashes for pools, era profiles, opponents/bracket, and the draft catalog | — |
+Docs/developer/README.md	5	- [`setup.md`](./setup.md) — environment and first run
+Docs/developer/README.md	6	- [`cli.md`](./cli.md) — `bun run hoop-rush` command reference
+Docs/developer/README.md	7	- [`workflows.md`](./workflows.md) — change and verification workflows
+Docs/developer/README.md	8	- [`test-fixtures.md`](./test-fixtures.md) — `@hoop-rush/test-fixtures` package
+Docs/developer/setup.md	48	The browser reads every artifact from `apps/web/static/data` — franchise-era
+Docs/developer/test-fixtures.md	23	`season-draft.ts` — the packaged draft-catalog builder, and `havoc.ts`).
+Docs/developer/workflows.md	25	4. Run the focused package tests, then the workspace gate — `bun run check`,
+Docs/developer/workflows.md	26	   `bun run lint`, `bun run test:run`, `bun run format:check` — plus the data and
+Docs/engine/classic.md	97	`apps/web/static/data/pools/` — so Classic and Sandbox draw on identical peak
+Docs/engine/possession.md	159	   0.5 — real passes convert more often than isolations), a **zone factor**
+Docs/handoffs/cap-rush-multiplayer-plan.md	1	# Cap Rush Multiplayer — implementation plan
+Docs/handoffs/cap-rush-multiplayer-plan.md	36	## 1. Current code — facts that shape the plan
+Docs/handoffs/cap-rush-multiplayer-plan.md	64	  (`feasibility.ts:33-128`) — call once per seat.
+Docs/handoffs/cap-rush-multiplayer-plan.md	122	## 2. Decisions to lock (D1–D13)
+Docs/handoffs/cap-rush-multiplayer-plan.md	238	### D7. Joint completion feasibility — exact algorithm
+Docs/handoffs/cap-rush-multiplayer-plan.md	355	**Q1 — AI-game presentation inside a block.** The spec says the faster player waits
+Docs/handoffs/cap-rush-multiplayer-plan.md	362	**Q2 — Auction closure authority.** Recommended: either member may submit
+Docs/handoffs/cap-rush-multiplayer-plan.md	369	**Q3 — Mutation purchase visibility during preparation.** Recommended: purchases are
+Docs/handoffs/cap-rush-multiplayer-plan.md	373	**Q4 — Final report shape.** Recommended: one combined league report with a league
+Docs/handoffs/cap-rush-multiplayer-plan.md	378	**Q5 — Room route.** Recommended: a dedicated `/cap-rush/room/[roomId]` route
+Docs/handoffs/cap-rush-multiplayer-plan.md	599	### WS1 — Contracts and versions (Wave 0)
+Docs/handoffs/cap-rush-multiplayer-plan.md	646	### WS2 — Engine: market and auction (Wave 1)
+Docs/handoffs/cap-rush-multiplayer-plan.md	697	### WS3 — Engine: shared league and postseason (Wave 1)
+Docs/handoffs/cap-rush-multiplayer-plan.md	756	### WS4 — Application coordinator (Wave 2)
+Docs/handoffs/cap-rush-multiplayer-plan.md	766	**Read only:** WS1–WS3; `multiplayer/command-log.ts`, `command-execution.ts`,
+Docs/handoffs/cap-rush-multiplayer-plan.md	805	### WS5 — Persistence and Supabase (Wave 1)
+Docs/handoffs/cap-rush-multiplayer-plan.md	852	**Stop and ask:** if auctions need a dedicated deadline table (they should not — the
+Docs/handoffs/cap-rush-multiplayer-plan.md	857	### WS6A — Web: design and presentational components (Wave 1)
+Docs/handoffs/cap-rush-multiplayer-plan.md	897	### WS6B — Web: live wiring and mode registration (Wave 3)
+Docs/handoffs/cap-rush-multiplayer-plan.md	935	### WS7 — Verification and documentation (Wave 3/4)
+Docs/handoffs/cap-rush-multiplayer-plan.md	1011	The design inherits the existing Cap Rush identity — dark slate, orange as the live
+Docs/handoffs/cap-rush-multiplayer-plan.md	1040	| Lot player name | Barlow Condensed | 1.25–1.5rem, 700 |
+Docs/handoffs/cap-rush-multiplayer-plan.md	1041	| Money | Roboto Mono | 0.8–1rem, 500, tabular |
+Docs/handoffs/cap-rush-multiplayer-plan.md	1042	| Round clock | Roboto Mono | 2–2.5rem, 600, tabular |
+Docs/handoffs/cap-rush-multiplayer-plan.md	1045	| Body / help | Inter | 0.75–0.875rem |
+Docs/handoffs/cap-rush-multiplayer-plan.md	1049	### 8.4 Layout — auction (desktop ≥ 1100px)
+Docs/handoffs/cap-rush-multiplayer-plan.md	1075	### 8.5 Layout — mobile
+Docs/handoffs/cap-rush-multiplayer-plan.md	1094	### 8.6 Layout — season and playoffs
+Docs/handoffs/cap-rush-multiplayer-plan.md	1146	- Sold: `Sold to you — $24.1M.`
+Docs/handoffs/cap-rush-multiplayer-plan.md	1219	- [ ] Owner confirms Q1–Q5.
+Docs/handoffs/m255-implementation-spec.md	1	# M2.5.5 GM Campaign and Trade Board — AI Implementation Spec
+Docs/handoffs/m255-implementation-spec.md	495	### Stage 0 — lead only: baseline and contract freeze
+Docs/handoffs/m255-implementation-spec.md	514	### Wave 1 — three sub-agents in parallel, lead integrates
+Docs/handoffs/m255-implementation-spec.md	516	**Sub-agent A — Campaign engine**
+Docs/handoffs/m255-implementation-spec.md	524	**Sub-agent B — Trade Board, Influence, and rehab engine**
+Docs/handoffs/m255-implementation-spec.md	533	**Sub-agent C — persistence**
+Docs/handoffs/m255-implementation-spec.md	547	### Wave 2 — three sub-agents in parallel after engine integration
+Docs/handoffs/m255-implementation-spec.md	553	**Sub-agent A — web orchestration, no Svelte components**
+Docs/handoffs/m255-implementation-spec.md	560	**Sub-agent B — Svelte UI and browser journeys**
+Docs/handoffs/m255-implementation-spec.md	568	**Sub-agent C — CLI, calibration, and replay**
+Docs/handoffs/m255-implementation-spec.md	581	### Wave 3 — independent audits, then lead fixes
+Docs/handoffs/m26-handoff.md	1	# M2.6 Final Implementation Wave — Stage 3 Integration Record (lead-owned)
+Docs/handoffs/m26-handoff.md	26	  preserve them — never `git checkout`/`stash` anything.
+Docs/handoffs/m26-handoff.md	54	1. **Effects/digest scope (Track A flag) — RESOLVED**: the engine state
+Docs/handoffs/m26-handoff.md	60	2. **Awards before completion — RESOLVED (engine seam)**: the run command
+Docs/handoffs/m26-handoff.md	68	   partial-facts replays) leaves `awards` null — documented.
+Docs/handoffs/m26-handoff.md	69	3. **Trade grades before completion — RESOLVED**: `seasonAlmanacSchema`
+Docs/handoffs/m26-handoff.md	120	- `handleSeasonRunCommand(command: SeasonRunCommand, context: SeasonRunCommandContext): SeasonRunCommandOutput` — dispatches all 5 postseason commands (start/advance/submit-rotation/spectate/fast-forward) PLUS the M2.5 between-block commands. No "not implemented" cases remain except `submit-season-block` (handled by the block pipeline).
+Docs/handoffs/m26-handoff.md	121	- `SeasonRunCommandContext`: `{ run, pending, humanFranchiseId, catalog?, effects?, rankings?, profile?, postseasonGameResolver? }`. `rankings` DEFAULTS to `rankSeasonPostseason` (tiebreakers) — no seam needed for start-postseason. `profile` (EraSimulationProfile) and `catalog` are REQUIRED by the four simulating handlers (`SeasonPostseasonContextError` otherwise).
+Docs/handoffs/m26-handoff.md	122	- `SeasonRunCommandOutput`: `{ result: SeasonRunCommandResult; run: SeasonRun; pending; postseasonSummaries?: SeasonPostseasonSummary[] }` — the accepted advance carries its summaries OUT of the run (persisted as separate rows).
+Docs/handoffs/m26-handoff.md	131	- State chain: `seasonRunStateDigest(facts)` — digest covers `stateRevision, stage, postseason, awards, completion, checkpointState, health, influence, transactions, trade, objectives, rosters, ownership, rotations, effects`. Every accepted command bumps `stateRevision` by exactly 1 and recomputes the digest.
+Docs/handoffs/m26-handoff.md	135	- `seasonRunCommandSchema` union includes all 5 postseason commands; per-command rejection unions (see `season-commands.ts` lines 269-403). New rejection codes for UI copy: `invalid-stage`, `wrong-game`, `invalid-rotation`, `unavailable-player`, `insufficient-rehab-resources`, `invalid-series-state`, `integrity-failure`. NOTE: `describeCommandRejection` in `season-hub-state.ts` does NOT yet map the postseason codes — default arm used.
+Docs/handoffs/m26-handoff.md	140	- `seasonReplayExportSchema` (`season-replay-export.ts`, replay-export-v1): CURRENTLY per-game only (runId, gameId, summary, digest). Track C extends/completes this contract for the full-run export (root seed, material versions, asset hashes, accepted command log, expected digests, completed almanac) — keep version literal `replay-export-v1` (already frozen) or bump deliberately with a documented decision.
+Docs/handoffs/m26-handoff.md	145	- `DexieSeasonRunRepository implements SeasonRunRepository AND SeasonPostseasonRepository` (one class, `season-run-dexie.ts:236`). Web constructs it via `getSeasonRunRepository(schedule?)` in `apps/web/src/lib/season/season-repo.ts` (typed `SeasonRunRepository` only — widen for postseason methods).
+Docs/handoffs/m26-handoff.md	146	- `SeasonPostseasonRepository` (`season-postseason.ts`): `commitPostseasonAdvancement(input: CommitPostseasonAdvancementInput)` — atomic (run state + summaries + optional details + command-log row in ONE transaction; duplicate commandId/ordinal rejected); `loadPostseasonSummaries(runId)`, `loadPostseasonSummary(runId, gameId)`, `loadPostseasonDetails(runId)`, `loadCommandLog(runId)`, `promoteChampionToCompleted(input: PromoteChampionInput)` — atomic (final result + almanac + champion + finalized command log + completed-history registration + active-run removal); `loadCompletedSeason(runId)`, `listCompletedSeasonRuns()`, `deleteCompletedSeason(runId)`, `buildReplayExport(runId, gameId)`.
+Docs/handoffs/m26-handoff.md	154	- `SeasonHubState` (`apps/web/src/lib/season/season-hub-state.ts`): owns snapshot/index/block/pending/interruption/commandError; `dispatch(command)` is the ONE command path (validate -> engine `handleSeasonRunCommand` -> `repo.applySeasonRunCommand` -> snapshot mirror -> refresh). Postseason command methods DO NOT exist yet — Track A adds them following the `selectBlockObjective`/`acceptTradeOffer` pattern, plus worker orchestration for the four simulating commands.
+Docs/handoffs/m26-handoff.md	169	shapes are FROZEN — build against these exactly.
+Docs/handoffs/m26-handoff.md	217	## Track ownership (Stage 2, parallel — no shared-file edits)
+Docs/handoffs/m265-handoff.md	1	# M2.6.5 Roster Depth and Free Agency — Stage 0 Contract Freeze (lead-owned)
+Docs/handoffs/m265-handoff.md	43	compatibility alias — runtime roster-capacity validation must use the v2
+Docs/handoffs/m265-handoff.md	62	  max 6 — all 30 franchises enforced).
+Docs/handoffs/m265-handoff.md	65	- `season-effects.ts`: effects state schemaVersion 2 —
+Docs/handoffs/m265-handoff.md	70	  UNCHANGED (300/300) — games only ever see the ten-player rotation.
+Docs/handoffs/m265-handoff.md	73	- `season-trade.ts`: v2 — offers may be uneven (1-2 vs 1-2); the equal-count
+Docs/handoffs/m265-handoff.md	96	- `season-aggregates.ts`: v2 — `players` 300-450.
+Docs/handoffs/m265-handoff.md	97	- `season-run.ts`: schema 10 — rosters 10-15 each, ownership 300-450,
+Docs/handoffs/m265-handoff.md	109	## Engine function signatures (freeze for track A — engine)
+Docs/handoffs/m265-handoff.md	121	- `effects.ts`: new `reconcileSeasonEffects(previous, rosters, rotations)` —
+Docs/handoffs/m265-handoff.md	135	  resolution (`resolveSeasonFreeAgencyWindow` — legality, role credibility
+Docs/handoffs/m265-handoff.md	138	  (`applySeasonFreeAgencySigning` — ownership, roster insertion, influence
+Docs/handoffs/m265-handoff.md	163	## Repository application delta (freeze for track C — persistence)
+Docs/handoffs/m265-handoff.md	183	## Shell actions and rejection copy map (freeze for track A — web/CLI)
+Docs/handoffs/m265-handoff.md	226	  freeAgency — 196 tests green, check+lint green.
+Docs/handoffs/m265-handoff.md	232	  m25 digest facts, reproduce literals) — check+lint green.
+Docs/handoffs/m265-handoff.md	234	  fixtures, season-repo shapes, effects v2, recap v4, wire 6) — Wave 2A owns
+Docs/handoffs/m265-handoff.md	265	  selectors) but NOT run to completion at the user's request — the user
+Docs/handoffs/README.md	11	| `m26-handoff.md` | M2.6 postseason, awards, and history integration | Archived — M2.6 shipped (replay-export now v2, schema 13/save 10, wire 7) |
+Docs/handoffs/README.md	12	| `m265-handoff.md` | M2.6.5 roster depth and free agency contract freeze | Archived — Stage-0 freeze superseded (current schema 13/save 10) |
+Docs/handoffs/README.md	13	| `m255-implementation-spec.md` | M2.5.5 GM Campaign and Trade Board v2 | Fulfilled plan — M2.5.5 shipped (campaign v2, trade v4); retained as spec archaeology |
+Docs/handoffs/README.md	16	projection, or the M3 UI pass — see `decisions.md` for those milestones.
+Docs/havoc/integration-manifest.md	68	- edit: `packages/persistence/src/repositories/dexie.ts` — append version 22 (current top 21) with
+Docs/havoc/integration-manifest.md	107	  `.../card/<cardIndex>/{tier|mutations|physical|nickname}` — one named RNG stream each.
+Docs/havoc/integration-manifest.md	108	- Game: `havoc-v1/<runSeed>/game/<gameNumber>/basketball` — one seed for both variants, no variant
+Docs/havoc/README.md	6	- [`../engine/havoc.md`](../engine/havoc.md) — as-built engine map, seeds,
+Docs/havoc/README.md	8	- [`integration-manifest.md`](./integration-manifest.md) — historical Stage-0
+Docs/interface/current-routes.md	42	| `/season/*` | Season Run was removed 2026-10-14; there is no redirect route — bookmarked URLs are unsupported | N/A |
+Docs/interface/current-routes.md	54	- **Manifest and static data** — every artifact under `apps/web/static/data`
+Docs/interface/current-routes.md	58	- **Persistence** — `apps/web/src/lib/persistence.ts` composes
+Docs/interface/current-routes.md	62	- **Workers** — eight workers under `apps/web/src/workers/`; see
+Docs/interface/current-routes.md	65	- **URL** — the sandbox draft carries five player selections plus an optional
+Docs/interface/README.md	6	- [`current-routes.md`](./current-routes.md) — route/state table
+Docs/interface/README.md	7	- [`screens.md`](./screens.md) — screen-by-screen walkthrough
+Docs/interface/screens.md	1	# Screens — walkthrough
+Docs/interface/screens.md	16	## Home — `/`
+Docs/interface/screens.md	23	## Roster browser — `/roster`
+Docs/interface/screens.md	34	## Sandbox draft — `/sandbox`
+Docs/interface/screens.md	48	## Sandbox challenge overlay — `/sandbox/challenge`
+Docs/interface/screens.md	57	## Sandbox result and history — `/sandbox/result`, `/sandbox/history`
+Docs/interface/screens.md	62	route owns the actions — Run again (cleared draft), Edit team (restores the
+Docs/interface/screens.md	67	## Classic draft — `/classic`
+Docs/interface/screens.md	88	## Cap Rush — `/cap-rush`, `/cap-rush/run`, `/cap-rush/result`, `/cap-rush/history`
+Docs/interface/screens.md	99	## Cap Rush multiplayer — `/cap-rush/room/[roomId]`
+Docs/interface/screens.md	110	## Hoop Havoc — `/havoc`, `/havoc/run`, `/havoc/result`, `/havoc/history`
+Docs/interface/screens.md	123	## Draft Duel — `/draft-duel`, `/draft-duel/room/[roomId]`
+Docs/interface/screens.md	130	## Fixed-five multiplayer — `/multiplayer`, `/multiplayer/room/[roomId]/*`
+Docs/interface/screens.md	138	## Profile — `/profile`
+Docs/operations/ci-cd.md	6	## verify.yml — PR and main gate
+Docs/operations/ci-cd.md	12	## supabase.yml — Supabase checks
+Docs/operations/ci-cd.md	19	## deploy-pages.yml — Deploy to GitHub Pages
+Docs/operations/ci-cd.md	28	- `pre-commit` — Prettier via `lint-staged` when `bun` is on `PATH`.
+Docs/operations/README.md	5	- [`ci-cd.md`](./ci-cd.md) — GitHub Actions gates
+Docs/operations/README.md	6	- [`deployment.md`](./deployment.md) — static GitHub Pages deployment
+Docs/operations/README.md	7	- [`supabase-multiplayer.md`](./supabase-multiplayer.md) — Supabase room coordination runbook
+Docs/operations/supabase-multiplayer.md	252	- [`persistence/indexeddb.md`](../persistence/indexeddb.md) — Dexie v15 tables
+Docs/operations/supabase-multiplayer.md	253	- [`decisions/decisions.md`](../decisions/decisions.md) — M2.8 digest decision
+Docs/persistence/indexeddb.md	21	- `active` — one checkpoint row for the run currently being played
+Docs/persistence/indexeddb.md	23	- `activeGames` — one row per accepted game, keyed by the `[runId+gameNumber]`
+Docs/persistence/indexeddb.md	25	- `completed` — full run records for finished runs (`recordId` = run id).
+Docs/persistence/indexeddb.md	26	- `history` — compact completed-run index for the history screens
+Docs/persistence/indexeddb.md	28	- `classicDrafts` — the single in-progress Classic draft (`recordId` =
+Docs/persistence/indexeddb.md	43	- `havocActiveRuns` — the single active draft/run row (`recordId` = `'active'`):
+Docs/persistence/indexeddb.md	45	- `havocCommands` — accepted/rejected command records keyed by `commandId`
+Docs/persistence/indexeddb.md	47	- `havocGames` — compact per-variant results keyed by
+Docs/persistence/indexeddb.md	49	- `havocRetainedTapes` — selected watched-game tapes keyed by
+Docs/persistence/indexeddb.md	52	- `havocCompletedRuns` — completed/abandoned run snapshots with comparison and
+Docs/persistence/indexeddb.md	54	- `havocHistory` — lightweight Hall of Freaks index; listing never hydrates
+Docs/persistence/indexeddb.md	61	  `havocMultiplayerHistory` — Havoc multiplayer room coordination rows.
+Docs/persistence/indexeddb.md	65	- `capRushActive` — the active draft/season command-log row.
+Docs/persistence/indexeddb.md	66	- `capRushCommands` — accepted/rejected command receipts keyed by `commandId`
+Docs/persistence/indexeddb.md	68	- `capRushGames` — user regular-season game rows keyed by
+Docs/persistence/indexeddb.md	70	- `capRushLeagueGames` — background AI league box scores keyed by
+Docs/persistence/indexeddb.md	72	- `capRushLeagueAggregates` — one compact team/player season-total row per run,
+Docs/persistence/indexeddb.md	74	- `capRushPlayoffGames` — playoff box scores keyed by `[runId+gameId]`.
+Docs/persistence/indexeddb.md	75	- `capRushReports`, `capRushHistory` — finished reports and the history index.
+Docs/persistence/indexeddb.md	76	- `capRushPlaybackEvidence` / `capRushPlaybackCursors` — recorded single-game
+Docs/persistence/indexeddb.md	87	- `capRushMultiplayerActive` — room snapshot and command cursor keyed by
+Docs/persistence/indexeddb.md	89	- `capRushMultiplayerCommands` — accepted command log keyed by
+Docs/persistence/indexeddb.md	91	- `capRushMultiplayerGames` — recorded league/playoff game rows keyed by
+Docs/persistence/indexeddb.md	93	- `capRushMultiplayerCompleted`, `capRushMultiplayerHistory` — finished room
+Docs/persistence/indexeddb.md	135	finished draft into the active-run checkpoint in one transaction — but only
+Docs/persistence/indexeddb.md	148	`CHECKPOINT_SAVE_SCHEMA_VERSION`, `CLASSIC_DRAFT_SCHEMA_VERSION`) — never
+Docs/persistence/indexeddb.md	156	persistence a storage adapter, never a source of basketball rules — run
+Docs/persistence/indexeddb.md	166	failures never break pool loading — every read falls back to the network path.
+Docs/persistence/README.md	5	- [`indexeddb.md`](./indexeddb.md) — Dexie schemas, migrations, and the active-run model
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	24	## A — Balanced elite baseline
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	47	## B — Maximum offense / spacing
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	70	## C — Maximum defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	93	## D1 — Weak POA defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	116	## D2 — Strong POA defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	139	## E1 — Weak wing defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	162	## E2 — Strong wing defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	185	## F1 — Weak-ish interior defense / spacing PF
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	208	## F2 — Elite rim protector
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	231	## G1 — Weak rebounding/defensive PF context
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	254	## G2 — Elite glass / PF defense
+Docs/quality/benchmarks/lineup-challenge-benchmark.md	277	## H — Offensive talent with bad team defense
+Docs/quality/benchmarks/lineup-paired-benchmark.md	18	## Pair D — POA defense
+Docs/quality/benchmarks/lineup-paired-benchmark.md	46	## Pair E — Wing defense
+Docs/quality/benchmarks/lineup-paired-benchmark.md	74	## Pair F — Rim protection
+Docs/quality/benchmarks/lineup-paired-benchmark.md	102	## Pair G — PF defense / glass
+Docs/quality/benchmarks/README.md	13	- `poolCold` — constructing `PackagedData` and loading the `lakers` 1990s pool
+Docs/quality/benchmarks/README.md	15	- `poolCached` — re-reading the same pool from a warm data instance.
+Docs/quality/benchmarks/README.md	16	- `singleGame` — a warm single game against the equal fixture (after 20
+Docs/quality/benchmarks/README.md	18	- `challenge82` — a complete 82-game sandbox run against the packaged bracket.
+Docs/quality/benchmarks/README.md	19	- `heapUsedMb` / `heap` — heap used after the run and the before/after delta.
+Docs/quality/benchmarks/README.md	20	- `environment` — node version, platform, arch, CPU count, and the joined
+Docs/quality/benchmarks/README.md	33	- `environment` — `node`, `platform`, `arch`, `cpus`, and `fingerprint`.
+Docs/quality/benchmarks/README.md	35	  `scheduleVersion` — the version set folded into the fingerprint.
+Docs/quality/benchmarks/README.md	36	- `fixture`, `samples`, `workers` — the measurement configuration.
+Docs/quality/benchmarks/README.md	37	- `poolCold`, `poolCached`, `singleGame`, `challenge82` — each with
+Docs/quality/benchmarks/README.md	40	- `baselineComparison` — `not-requested`, `skipped-fingerprint`, `matched`, or
+Docs/quality/benchmarks/README.md	45	- `m5-desktop.json` — the desktop reference, captured on Windows x64 with Node
+Docs/quality/benchmarks/README.md	49	- `m5-mobile-emulation.json` — the companion control artifact for the 320/390px
+Docs/quality/benchmarks/README.md	112	- `balanced` — the legal card closest to 85 overall per slot; lands under the
+Docs/quality/benchmarks/README.md	114	- `premium` — the highest-salary legal card per slot; lands in the second
+Docs/quality/benchmarks/README.md	182	- `cap-rush-full-before-2026-10-30.json` — engine before the digest/audit
+Docs/quality/benchmarks/README.md	185	- `cap-rush-full-2026-10-30.json` — engine after the optimizations: balanced
+Docs/quality/benchmarks/rust-feasibility-2026-11-09.md	1	# Rust/Wasm feasibility measurements — 2026-11-09
+Docs/quality/benchmarks/rust-feasibility-2026-11-09.md	6	boundary* to Rust/Wasm — clock, possessions, RNG, accounting counters, and
+Docs/quality/benchmarks/rust-feasibility-2026-11-09.md	7	result encoding — while keeping TypeScript preparation and decoding. That ships
+Docs/quality/benchmarks/usage-investigation.md	45	| Curry + Green/Battier/Diaw/Anthony        |       39.7% |            — |           32.8 |               — |         60.4 |
+Docs/quality/benchmarks/usage-overhaul-v25.md	18	| Curry, four role players | 39.7% → 35.3% | — |
+Docs/quality/havoc-audit-2026-10-11.md	1	# Hoop Havoc buff and outcome audit — October 11, 2026
+Docs/quality/havoc-audit-2026-10-11.md	13	- All 30 individual mutations: 64 paired games each against the same 512 cached control games, using eight named seeds and games 1–8. These use the highest eligible source Overall at each slot. They are stress tests on an elite lineup, not population estimates for all draftable players. Single Tier 1/Tier 2 mutations are deliberately isolated through the profile transformation, rather than presented as legal full draft bundles. Growth Spurt uses an eight-inch sample.
+Docs/quality/havoc-audit-2026-10-11.md	23	The isolated 64-seed shipped mechanism check went 64–0. Opponent scoring fell from 88.70 to 16.25 points per game. Opponents committed 83.17 shot-clock violations per game. A separate individual-mutation cohort likewise went 64–0, averaging 83.66 opponent violations and improving margin by 92.75 points per game.
+Docs/quality/havoc-audit-2026-10-11.md	25	Cause: `packages/engine/src/sim/possession.ts`, `stepSampleHavoc`, samples an ordinary full-possession duration and immediately turns it into a violation if it exceeds the active clock. The attack does not select a rushed attempt when it has 12 seconds. `packages/engine/src/sim/clock.ts` derives the natural mean from pace, and the sampled range is 0.6–1.4 times that mean. Twelve seconds cuts through this distribution, causing most opposing possessions to end before any shot. The 30-second owner limit barely constrains the owner.
+Docs/quality/havoc-audit-2026-10-11.md	27	The combined extreme lineup went 984–0 across training and holdout, averaging about 262–264 points against 16 under the current one-point Double or Nothing miss penalty. This is mechanically explained by Time Lord suppressing attempts and the scoring powers raising offensive value. It is far more than a normal short-clock advantage.
+Docs/quality/multiplayer-perf-2026-11-01/README.md	1	# Multiplayer request/write performance pass — 2026-11-01
+Docs/quality/multiplayer-perf-2026-11-01/README.md	58	unchanged — it stays at 1 request, 0 selects, 0 `getUser` calls.
+Docs/quality/multiplayer-perf-2026-11-01/README.md	85	The sender is now per client (`WeakMap<SupabaseClient, Map<topic, sender>>` —
+Docs/quality/multiplayer-perf-2026-11-01/README.md	97	  per second = 41 RPCs. The composition is already correct — one lazy
+Docs/quality/multiplayer-perf-2026-11-01/README.md	111	  the `snapshot.series` identity comparison in `applySnapshot`. Rejected — no
+Docs/quality/multiplayer-perf-2026-11-01/README.md	124	- `bun --filter @hoop-rush/web check` — 0 errors, 1 pre-existing warning.
+Docs/quality/multiplayer-perf-2026-11-01/README.md	125	- `bun --filter @hoop-rush/web lint` — clean (ESLint + Prettier).
+Docs/quality/multiplayer-perf-2026-11-01/README.md	126	- `bun --filter @hoop-rush/web test:run` — 278 pass / 0 fail (33 files).
+Docs/quality/multiplayer-perf-2026-11-01/README.md	127	- `bun --filter @hoop-rush/application test:run` — 172 pass, 2 fail. Both
+Docs/quality/performance-pass-2026-10-31.md	1	# Playback, worker, and bulk-simulation performance pass — 2026-10-31
+Docs/quality/performance-pass-2026-10-31.md	86	The structural observation is correct — weights are rebuilt on every call and
+Docs/quality/performance-pass-2026-10-31.md	87	the visible state is folded from the start — but at current tape sizes the whole
+Docs/quality/performance-pass-2026-11-11.md	1	# App performance pass — 2026-11-11
+Docs/quality/performance-pass-2026-11-11.md	35	single warm game **0.26–0.48 ms**, 82-game run **9.4–12.6 ms** median. The
+Docs/quality/performance-pass-2026-11-11.md	86	`simulateCapRushLeagueSlot` for 1,148 games is ~1.6–1.7 s in the CLI benchmark.
+Docs/quality/performance-pass-2026-11-11.md	104	   **18.4 ms** after the change; the earlier pass measured 50–57 ms.
+Docs/quality/performance-pass-2026-11-11.md	114	   box score: 45.8 ms for 1,148 rows (was ~58–62 ms), of which 44 ms is the
+Docs/quality/performance-pass-2026-11-11.md	148	fixed game-count cadence (13–21 sleeps per request; ~4 ms each in browsers).
+Docs/quality/performance-pass-2026-11-11.md	202	  ~50–100 ms of main-thread parse on reloads of `/roster`, `/cap-rush`, and
+Docs/quality/performance-review-2026-10-29.md	1	# Simulation and online performance review — 2026-10-29
+Docs/quality/performance-review-2026-10-29.md	13	- Live Hoop Rush Supabase: read-only logs, deployed policies, publication inventory, and performance advisors. Log queries used the default rolling last 24 hours around 20:53–20:59 UTC, October 29. Aggregate counts can differ slightly between queries.
+Docs/quality/performance-review-2026-10-29.md	38	**Evidence:** 181 `RlsPolicyError` events and 181 `Unauthorized` events in live logs. All 181 policy errors contain `invalid input syntax for type uuid`. They span 16:53:21–19:16:03 UTC. These are event counts, not counts of users or independent incidents.
+Docs/quality/performance-review-2026-10-29.md	152	The 17.93 MB catalog still requires substantial first-load parsing, and adapting/indexing it happens synchronously in [CapRushSession.buildAssets](../../packages/application/src/cap-rush/session.ts). The measured adaptation/indexing block alone is about 107 ms here. Cold browser network loading could add substantially more, but was not timed. Draft position generation plus subsequent full signing assessments can consume around 10–25 ms in these samples.
+Docs/quality/performance-review-2026-10-29.md	167	| 2020s calibration, 10,000 samples | **Assist rate remains a failure: 67.21% vs 62.02% target, allowed 59.02–65.02%**; 3P% and blowouts pass |
+Docs/quality/performance-review-2026-10-29.md	180	Live performance advisors report two per-row auth/RLS evaluation warnings on fixed-five room/command policies, and three unindexed successor-room foreign keys. Consider `(select auth.uid())` where appropriate and covering successor indexes after verifying query plans and actual room volumes. Current reads show upstream medians in the 2–7 ms range; the audit does not justify an infrastructure upgrade as the first solution.
+Docs/quality/ratings-v6-review.md	35	| 1980s free throws attempted/game | 24.8180 | 24.9360 | 25.6006–31.6006 |
+Docs/quality/ratings-v6-review.md	36	| 1980s offensive rebound rate | .3498 | .3541 | .3091–.3491 |
+Docs/quality/ratings-v6-review.md	37	| 2020s assist rate | .6713 | .6710 | .5902–.6502 |
+Docs/quality/ratings-v6-review.md	38	| 2020s blowout rate | .2365 | .2470 | .1500–.2300 |
+Docs/quality/README.md	5	- [`verification.md`](./verification.md) — runbook for `bun run verify`
+Docs/quality/README.md	6	- [`testing.md`](./testing.md) — test coverage map
+Docs/quality/README.md	7	- [`calibration.md`](./calibration.md) — calibration gates
+Docs/quality/README.md	8	- [`benchmarks/`](./benchmarks/) — local benchmark baselines and point-in-time reports,
+Docs/quality/README.md	10	- [`season-run-corruption-audit.md`](./season-run-corruption-audit.md) — point-in-time Season Run corruption audit (2026-09-06) with repro patch
+Docs/quality/README.md	11	- [`havoc-audit-2026-10-11.md`](./havoc-audit-2026-10-11.md) — Hoop Havoc CLI audit summary (2026-10-11)
+Docs/quality/README.md	21	- `ratings-v6*` reviews and logs — the v6 → v6.6 rebuild trail; the current versions are recorded in [decisions.md](../decisions/decisions.md)
+Docs/quality/README.md	22	- [`performance-pass-2026-10-31.md`](./performance-pass-2026-10-31.md) — Challenge reveal pacing, Havoc bulk simulation, worker reuse, playback folding measurements
+Docs/quality/README.md	23	- [`performance-pass-2026-11-11.md`](./performance-pass-2026-11-11.md) — engine preparation caching, fixed-five batch simulation, Cap Rush commit/reload costs, catalog adaptation, roster and simcast rendering
+Docs/quality/season-run-corruption-audit.md	1	# Season Run corruption audit — 2026-09-06
+Docs/quality/testing.md	17	- `sim/game.test.ts` — v25 golden digests, seeded-batch invariants, overtime
+Docs/quality/testing.md	19	- `sim/wasm-game.test.ts` — production Rust/Wasm parity with the archived
+Docs/quality/testing.md	22	- `wasm-build.test.ts` — the bundled game module matches its Rust source and is
+Docs/quality/testing.md	24	- `sim/possession.test.ts` — `PossessionStepper` decomposition; `sim/offense.test.ts`,
+Docs/quality/testing.md	28	- `sim/rng.test.ts` — seeded RNG determinism.
+Docs/quality/testing.md	29	- `sim/facts.test.ts` — the fact builder that turns box scores into the
+Docs/quality/testing.md	34	- `challenge/commands.test.ts` — typed command transitions for challenge
+Docs/quality/testing.md	36	- `challenge/seeds.test.ts` — per-game seed derivation (`deriveGameSeed`).
+Docs/quality/testing.md	37	- `challenge/league.test.ts` — league/MVP aggregation.
+Docs/quality/testing.md	38	- `bracket/generator.test.ts` — `generateBracket (propose-review-freeze)`.
+Docs/quality/testing.md	40	- `domain/` — legal lineup validation and assignment, lineup repositioning.
+Docs/quality/testing.md	41	- `projection/` — base-five projection, ledger projection, cache fingerprints,
+Docs/quality/testing.md	43	- `modes/fixed-five/` — fixed-five seeds, the sandbox builder, the classic
+Docs/quality/testing.md	45	- `modes/havoc/` — the Havoc draft/offers, mutation catalog, runtime rules
+Docs/quality/testing.md	48	- `modes/havoc/multiplayer/` — Havoc multiplayer draft, series, and seed parity.
+Docs/quality/testing.md	49	- `modes/draft-duel/` — Draft Duel engine rules.
+Docs/quality/testing.md	50	- `modes/cap-rush/` — salary-cap draft/offers/spins, historical field and lock,
+Docs/quality/testing.md	69	- `repositories/dexie-active-run.test.ts` — the active-run append-only model
+Docs/quality/testing.md	71	- `repositories/havoc.test.ts` and `repositories/havoc-multiplayer.test.ts` —
+Docs/quality/testing.md	74	- `repositories/draft-duel.test.ts` — Draft Duel stores.
+Docs/quality/testing.md	76	  `repositories/cap-rush-multiplayer.test.ts` — Cap Rush solo/multiplayer
+Docs/quality/testing.md	78	- `repositories/profile.test.ts` — local profile and achievement records.
+Docs/quality/testing.md	79	- `repositories/storage-namespace.test.ts` — storage namespace handling.
+Docs/quality/testing.md	88	- `args.test.ts` — CLI arg parsing, two-word commands, and rejections.
+Docs/quality/testing.md	90	  `havoc-multiplayer-calibration.test.ts` — Havoc simulation/audit round-trips
+Docs/quality/testing.md	92	- `draft-duel-catalog.integration.test.ts` — draft-catalog loading
+Docs/quality/testing.md	99	- `features/fixed-five/` — room controller, transport, and sim-show presentation.
+Docs/quality/testing.md	100	- `features/draft-duel/` — controller, session, and transport.
+Docs/quality/testing.md	101	- `features/havoc/` — hub/result state and the runner.
+Docs/quality/testing.md	102	- `features/havoc-multiplayer/` — controller, playback, reveal, series stats,
+Docs/quality/testing.md	104	- `features/cap-rush/` and `features/cap-rush-multiplayer/` — season state,
+Docs/quality/testing.md	106	- `features/multiplayer/` — shared lobby helpers and context.
+Docs/quality/testing.md	107	- `features/challenge/league-precompute.test.ts` — league precompute worker input.
+Docs/quality/testing.md	108	- `gamecast/gamecast-multiplayer-ui.test.ts` — shared multiplayer gamecast UI.
+Docs/quality/testing.md	109	- `modes/catalog.test.ts` — the web mode catalog.
+Docs/quality/testing.md	110	- `workers/one-shot-worker.test.ts` and `workers/worker-bundling.test.ts` —
+Docs/quality/verification.md	6	is no pnpm and no Vitest — package tests run with `bun test`.
+Docs/reference/README.md	5	- [`authority.md`](./authority.md) — spec vs docs vs code authority map
+Docs/Update.md	2	move, or modify this file when performing the task below — it is excluded from
+Docs/web/development.md	38	- [`interface/current-routes.md`](../interface/current-routes.md) — route map
+Docs/web/development.md	39	- [`persistence/indexeddb.md`](../persistence/indexeddb.md) — saves
+Docs/web/development.md	40	- [`interface/screens.md`](../interface/screens.md) — screen behavior
+Docs/web/README.md	5	- [`development.md`](./development.md) — dev server, `check:watch:web`, Bun test
+Docs/web/README.md	6	- [`workers.md`](./workers.md) — eight Web Workers and runner contracts
+Docs/web/workers.md	79	- **League precompute:** ephemeral; no IndexedDB commit — feeds the setup UI
+Docs/web/workers.md	105	- [`interface/current-routes.md`](../interface/current-routes.md) — which routes
+Docs/web/workers.md	107	- [`persistence/indexeddb.md`](../persistence/indexeddb.md) — what gets saved
+Guide/Typescript-Best-Practices.md	49	Avoid optional-field bags (`{ a?: X; b?: Y }`) where only one of `a` or `b` should be set — that encodes invalid combinations the type system will not catch.
+Guide/Typescript-Best-Practices.md	91	Hand-written guards are for truly internal, already-typed shapes — not for wire format.
+Guide/Typescript-Best-Practices.md	109	A guard that returns `true` without checking is worse than `as` — the name promises safety. Implement real checks; name guards `isSeasonState`, `hasCompletedBlock`, etc.
+Guide/Typescript-Best-Practices.md	134	Parse where data crosses in: HTTP, worker messages, import pipelines, multiplayer commands, save migration. Stop carrying `Record<string, unknown>` past the parse layer — produce a named domain type and trust it inside `packages/engine`.
+packages/importer/BRIEFS.md	1	# Wave 1 Task Briefs — Import Pipeline Port to TypeScript
+packages/importer/BRIEFS.md	43	## Agent A — ratings port (`scripts/import-nba/compute_ratings.py`)
+packages/importer/BRIEFS.md	52	- `computeOverall(ratings, position)` — includes `_isBigProfile`
+packages/importer/BRIEFS.md	53	- `computeSummaryRatings(ratings, tendencies)` — offense/defense/overall weights
+packages/importer/BRIEFS.md	55	  — port EVERY floor/cap branch exactly (big-man caps, high-usage non-big caps,
+packages/importer/BRIEFS.md	57	- `deriveRatings(stats, position, season, rng)` — 23 ratings + potential +
+packages/importer/BRIEFS.md	59	- `deriveTendencies(stats, ratings, position, rng)` — 24 tendencies, `round2` at
+packages/importer/BRIEFS.md	62	- `deriveTraits(ratings, stats, position, rng)` — 9 traits
+packages/importer/BRIEFS.md	63	- `deriveContract(overall, age, rng)` — salary tiers, years logic, option,
+packages/importer/BRIEFS.md	65	- `computeForSeason(season, force = false)` — reads
+packages/importer/BRIEFS.md	75	- `run(seasons = DEFAULT_SEASONS, force = false)` — loop seasons
+packages/importer/BRIEFS.md	89	## Agent B — pools port (`scripts/import-nba/compute_pools.py`)
+packages/importer/BRIEFS.md	96	- `loadCareerPositionLabels()` — scans all packaged rosters under `NBA_ROOT`,
+packages/importer/BRIEFS.md	102	- `buildStats(seasonStats)` — key mapping incl. `per/boxPlusMinus/usageRate/
+packages/importer/BRIEFS.md	104	- `selectionScore(summary, usageRate, teamMinutes, teamGames)` — exact formula:
+packages/importer/BRIEFS.md	108	- `computePool(franchiseId, eraId, manifest, bbrefIds)` — lineage/era lookup
+packages/importer/BRIEFS.md	120	- `writePool(pool)` — write `PUBLIC_DATA/pools/{franchise}-{era}.json`,
+packages/importer/BRIEFS.md	121	  compute sha256 digest (`sha256File`), log; `updateManifest(entries)` —
+packages/importer/BRIEFS.md	128	  union non-empty; Python emits `canonical`/`known` — keep behavior aligned
+packages/importer/BRIEFS.md	129	  (schema applies `.min(1)` — check against real data; if a player's label set
+packages/importer/BRIEFS.md	130	  is empty Python emits `[]` — then that pool row will fail parsePool; keep
+packages/importer/BRIEFS.md	145	## Agent C — era + glue ports
+packages/importer/BRIEFS.md	154	   - `deriveLeagueAggregates(seasons)` — sum stint totals (stream mentally; just
+packages/importer/BRIEFS.md	157	   - `poolShotMixAndAnchors(eraId, leagueThreeRate)` — reads
+packages/importer/BRIEFS.md	160	   - `computeEraProfile(era)` — all parameter/target formulas exactly as written
+packages/importer/BRIEFS.md	161	   - `run(eras?)` — writes `PUBLIC_DATA/era-sim/{era}.json` (trailing newline)
+packages/importer/BRIEFS.md	164	2. `compute_era_config.py` → `era-config/` — `computeForSeason(season)` +
+packages/importer/BRIEFS.md	167	3. `fetch_career_stats.py` → `careers/` — `computeCareerStats(seasons)` +
+packages/importer/BRIEFS.md	169	4. `update_manifest.py` → `manifest/` — recompute sha256 content hashes for
+packages/importer/BRIEFS.md	172	5. `author_opening_opponent.py` → `opponent/` — reads
+packages/importer/BRIEFS.md	178	   opponent file — report whether the schema covers it).
+packages/importer/BRIEFS.md	179	6. `freeze_calibration_targets.py` → `freeze/` — `freezeTargets(reportPath)`:
+packages/importer/BRIEFS.md	197	## Agent D — Python fetch layer refactor
+packages/importer/BRIEFS.md	212	  2. `fetch_stints.compute_for_season(season, force=args.force_stints)` — note
+packages/importer/BRIEFS.md	214	  3. `fetch_season_stats.run(season, roster)` — reload `roster.json` after the
+packages/importer/BRIEFS.md	218	- Do NOT call compute_era_config, compute_ratings, compute_pools, careers —
+packages/importer/BRIEFS.md	230	   (`git status`/`git diff` on `raw-data/`) — the refactor must not alter any
+spec/1.0/01-product.md	7	defense, rebounding, and era-specific styles—not from managing a franchise.
+spec/1.0/01-product.md	87	  comes from the packaged manifest matrix — an unavailable combination (for
+spec/1.0/01-product.md	235	23rd–60th percentiles while the league median remains in the 40th–52nd
+spec/1.0/01-product.md	240	span approximately the 20th–55th percentiles while the league median remains
+spec/1.0/01-product.md	241	in the 38th–50th percentile. Sandbox and Classic expose the choice explicitly
+spec/1.0/05-build-plan.md	7	## M0 — Rebrand and contracts
+spec/1.0/05-build-plan.md	20	## M1 — One franchise-era pool
+spec/1.0/05-build-plan.md	31	## M2 — Credible single game
+spec/1.0/05-build-plan.md	41	thresholds pass—not when one box score merely looks plausible.
+spec/1.0/05-build-plan.md	43	## M3 — Fixed opponents and complete Sandbox
+spec/1.0/05-build-plan.md	69	## M3.5 — Historical coverage and franchise lineages
+spec/1.0/05-build-plan.md	90	## M4 — Classic and Ball Knowledge
+spec/1.0/05-build-plan.md	126	## M5 — Breadth and polish
+spec/1.0/06-testing-and-calibration.md	67	run unless `--allow-skipped` is given) measured the pool-extreme fixture — the
+spec/1.0/06-testing-and-calibration.md	70	- **strongVsWeakWinRate: 0.9925 — FAIL** against the frozen 0.88 ± 0.07 gate
+spec/1.0/06-testing-and-calibration.md	71	  (81–95%). The 500-sample probe measured 0.9920, so the extreme separation is
+spec/1.0/06-testing-and-calibration.md	79	separate tuning workstream with its own calibration loop — either soften the
+spec/1.0/06-testing-and-calibration.md	89	1980s profile additionally shows drift on `fieldGoalPct` (0.4590 vs 0.4653–0.5053),
+spec/1.0/06-testing-and-calibration.md	107	  configured 40th–52nd percentile band;
+spec/1.0/06-testing-and-calibration.md	120	- **m3-medium-v3 (bracket-m3-v2):** balance floor 55, team band 25th–65th, median
+spec/1.0/06-testing-and-calibration.md	121	  band 40th–55th, measured against the m1.9 rating scale.
+spec/1.0/06-testing-and-calibration.md	123	  ratings (m1.9-era values reached 100; m3.5 spans roughly 40–85), so the balance
+spec/1.0/06-testing-and-calibration.md	125	  proposal. Bands narrowed to 23rd–60th (teams) and 40th–52nd (median), which
+spec/1.0/06-testing-and-calibration.md	126	  lowers opponent benchmark win rates by roughly 0.04–0.08.
+spec/1.0/06-testing-and-calibration.md	128	  schedule shape, and engine as `m3-medium-v4`; bands narrowed to 20th–55th
+spec/1.0/06-testing-and-calibration.md	129	  (teams) and 38th–50th (median) for a moderate explicit easing. Same seed,
+spec/1.0/06-testing-and-calibration.md	130	  super-five probe: medium 72–10 vs casual 78–4.
+spec/1.0/06-testing-and-calibration.md	135	  unchanged at 300 seeds and at calibrate-level samples. The 1960s–2020s era
+spec/1.0/06-testing-and-calibration.md	145	  adjustments — no generic historical penalty term and no established `.32/.34`
+spec/1.0/09-cli-tooling.md	100	gate below its documented minimum sample is reported as skipped — never as a
+spec/1.0/09-cli-tooling.md	101	vacuous pass — and a skipped required gate fails the run unless
+spec/1.0/11-ratings-and-historical-derivation.md	6	three summaries on a 0–100 scale:
+spec/1.0/11-ratings-and-historical-derivation.md	153	   top 0.5% → 95–99, next 4.5% → 90–94, next 14% → 85–89, next 61% → 72–84,
+spec/1.0/11-ratings-and-historical-derivation.md	154	   bottom 20% → 40–71. `overallPercentile` and
+spec/1.0/11-ratings-and-historical-derivation.md	174	Accepted decision (2026-08-04): the gate is 0.92 — a regression check that
+spec/1.0/11-ratings-and-historical-derivation.md	175	documents the expected ceiling of an honest defensive summary — and the hard
+spec/1.0/11-ratings-and-historical-derivation.md	213	  position norms (G ~0.30, F ~0.20, C ~0.08). Accuracy is never translated —
+spec/1.0/12-milestone-3-5-historical-coverage.md	1	# Milestone 3.5 — Historical Coverage and Franchise Lineages
+spec/1.0/12-milestone-3-5-historical-coverage.md	67	### `advanced-supported` — 1996-97 onward
+spec/1.0/12-milestone-3-5-historical-coverage.md	73	### `complete-box-derived` — 1979-80 through 1995-96
+spec/1.0/12-milestone-3-5-historical-coverage.md	79	### `late-historical` — 1973-74 through 1978-79
+spec/1.0/12-milestone-3-5-historical-coverage.md	86	### `reconstructed` — 1951-52 through 1972-73
+spec/1.0/12-milestone-3-5-historical-coverage.md	93	### `archival-limited` — 1946-47 through 1950-51
+spec/1.0/12-milestone-3-5-historical-coverage.md	188	means unavailable (pre-1979 or genuinely missing records — never an observed
+spec/2.0/02-league-and-postseason.md	79	legal next game can begin—for example, injuries leave fewer than five available
+spec/2.0/02-league-and-postseason.md	105	The regular season qualifies seeds 1–6 in each conference directly for the NBA
+spec/2.0/02-league-and-postseason.md	106	Playoffs. Seeds 7–10 enter the Play-In Tournament:
+spec/2.0/02-league-and-postseason.md	136	result is `2–0`, counts in the standings, produces no player statistics, and is
+spec/2.0/03-draft-and-rosters.md	99	only remaining player-season versions — the catalog minus every exact version
+spec/2.0/03-draft-and-rosters.md	100	the human selected — and fills all remaining franchise slots. Before selecting
+spec/2.0/03-draft-and-rosters.md	256	  development saves — run and draft records outside the current save-schema
+spec/2.0/03-draft-and-rosters.md	257	  family — as disposable and clears them automatically at load.)
+spec/2.0/05-season-systems.md	150	variable range of approximately 8–15 completed AI-to-AI trades per season;
+spec/2.0/06-multiplayer.md	10	(`17-season-run-multiplayer.md` — archived). Classic/Sandbox Shared 82 and Duel
+spec/2.0/06-multiplayer.md	49	### Shared 82-Game Season (M2.8A) — `classic-shared-82` / `sandbox-shared-82`
+spec/2.0/06-multiplayer.md	54	`schedule-v1` (`22×3 + 8×2`, `spec/1.0/01-product.md:240`) is unchanged — both
+spec/2.0/06-multiplayer.md	59	attempt selection — one world, one seed.
+spec/2.0/06-multiplayer.md	63	  **Pools are independent** — same `playerId` may be drafted by both
+spec/2.0/06-multiplayer.md	77	### 1v1 Duel — Best of 7 (M2.8B)
+spec/2.0/06-multiplayer.md	97	## Season Run multiplayer — ARCHIVED
+spec/2.0/10-milestones.md	13	## M2.0 — Contracts and executable league skeleton
+spec/2.0/10-milestones.md	36	## M2.1 — Ten-player draft and AI league generation
+spec/2.0/10-milestones.md	128	  nodes, and the last repair state — rules are never relaxed.
+spec/2.0/10-milestones.md	144	  (p1–p99 of the calibration cohort), above the frozen 95% gate.
+spec/2.0/10-milestones.md	153	  `10ea4b28b32bdacc6b974886a0a09f98` for the draft commands — the latter
+spec/2.0/10-milestones.md	156	## M2.2 — Rotation-capable single games
+spec/2.0/10-milestones.md	204	## M2.3 — Full league blocks and local persistence
+spec/2.0/10-milestones.md	314	## M2.3.5 record (shipped) — Global eight-card draft and seasonal shell
+spec/2.0/10-milestones.md	364	feasibility-aware human can always complete) — reported as a finding, not a
+spec/2.0/10-milestones.md	373	## M2.4 — Stamina and chemistry
+spec/2.0/10-milestones.md	492	`new Worker(new URL(...))` with a statically visible URL literal — a variable
+spec/2.0/10-milestones.md	500	## M2.5 — Injuries and generated trades
+spec/2.0/10-milestones.md	534	  `checkpointState`, `stateRevision`/`stateDigest`, and — LEAD DECISIONS —
+spec/2.0/10-milestones.md	576	  inputs are only minutes, fatigue, workload, durability, and prior injury —
+spec/2.0/10-milestones.md	648	  hook exists — assert zero code paths).
+spec/2.0/10-milestones.md	665	  gate (window minus non-window gap >= 15 bp; documented choice — see
+spec/2.0/10-milestones.md	676	  when no spends occur — the cohort's human never spends), debt frequency
+spec/2.0/10-milestones.md	690	## M2.6 — Play-In, playoffs, awards, and completed history
+spec/2.0/10-milestones.md	754	  completes — BEFORE the state digest is recomputed, so the digest and the
+spec/2.0/10-milestones.md	782	## M2.6.5 — Roster depth and in-season free agency
+spec/2.0/10-milestones.md	844	  (10–15 roster capacity, rotation scoping, free-agency state on the run);
+spec/2.0/10-milestones.md	856	- draft stays exactly ten rounds; rosters grow only through free agency to 10–15;
+spec/2.0/10-milestones.md	874	(see `16-objectives-and-trades-v2.md`). Delivered after M2.6.5 — numbered
+spec/2.0/10-milestones.md	875	M2.5.5 as a v2 revision of the M2.5 economy — and inherits its roster semantics
+spec/2.0/10-milestones.md	927	  negotiations, cash consideration caps); Influence debt removed — minimum balance
+spec/2.0/10-milestones.md	935	  blocks 0–7; one midseason evolution choice; evaluation records
+spec/2.0/10-milestones.md	938	  negotiation, at most three exchanges, Influence cash 1–2 per package with
+spec/2.0/10-milestones.md	955	envelopes — `postseason-targets-v1` remains unfrozen until that cohort is tuned or
+spec/2.0/10-milestones.md	958	## M2.7 — Season Run multiplayer foundation — ARCHIVED (2026-09-03)
+spec/2.0/10-milestones.md	962	[`17-season-run-multiplayer.md`](./17-season-run-multiplayer.md) — **archived, code kept, UI hidden**.
+spec/2.0/10-milestones.md	995	## M2.8 — Classic and Sandbox Multiplayer: Shared Season and Duel
+spec/2.0/10-milestones.md	1001	### M2.8A — Shared 82-Game Season (Classic + Sandbox)
+spec/2.0/10-milestones.md	1019	    (`spec/1.0/01-product.md:102`). **Pools are independent** — the same
+spec/2.0/10-milestones.md	1043	  (`spec/1.0/03-simulation.md:32`) — one world, one seed, one 82-game run.
+spec/2.0/10-milestones.md	1077	### M2.8B — 1v1 Duel (Best-of-7 Series)
+spec/2.0/10-milestones.md	1089	  mutually exclusive** — if P1 claims `1990s CHI`, P2 cannot claim `1990s CHI`,
+spec/2.0/10-milestones.md	1105	  `season-home-court-v1` advantage** (`Docs/decisions/decisions.md:315`) —
+spec/2.0/10-milestones.md	1126	## M2.9 — Possession projection and roster autofill
+spec/2.0/10-milestones.md	1134	and, in shadow mode, AI generation summaries — never changing selection until
+spec/2.0/10-milestones.md	1184	## M2.10 — Franchise Evolution
+spec/2.0/10-milestones.md	1220	## M2.11 — Release hardening
+spec/2.0/11-interface-and-history.md	16	destinations — Hub, Team, Schedule, League, and Leaders — under a franchise
+spec/2.0/11-interface-and-history.md	44	  team rows with logo, W–L, point differential, and expandable splits; desktop
+spec/2.0/11-interface-and-history.md	49	  ten player-season versions joined to its locked rotation — starters in slot
+spec/2.0/11-interface-and-history.md	51	  closing five — plus folded per-player season rates (MPG, PPG, RPG, APG, SPG,
+spec/2.0/11-interface-and-history.md	81	draft offer load eagerly. Franchise colors are never invented — the current data
+spec/2.0/11-interface-and-history.md	82	contract provides no authoritative palette — so Hoop Rush orange/gold carry the
+spec/2.0/12-performance-framework.md	56	dependencies—fatigue, recovery, injuries, ownership, and standings—advance in
+spec/2.0/13-franchise-evolution.md	88	1. **Deep Four** — made field goals from the recorded deep-four zone score four
+spec/2.0/13-franchise-evolution.md	93	2. **Twenty-Second Clock** — every normal possession uses a 20-second shot clock.
+spec/2.0/13-franchise-evolution.md	96	3. **First to Seven Overtime** — regulation ties enter an untimed overtime race;
+spec/2.0/17-season-run-multiplayer.md	1	# Season Run Multiplayer — Complete Two-Human Implementation (M2.7) — ARCHIVED
+spec/2.0/17-season-run-multiplayer.md	3	> **ARCHIVED (2026-09-03):** Season Run multiplayer is archived. Solo Season Run remains the active product. All M2.7 code — `packages/data-contracts/src/season-multiplayer-protocol.ts`, `packages/test-fixtures/src/season-multiplayer-in-memory.ts`, `supabase/migrations/*season_multiplayer*`, `supabase/functions/season-room-*`, `apps/web/src/routes/multiplayer/**`, `apps/web/src/lib/season/*coordinator*/*transport*/*room*` — is **kept as-is** for a future return. The UI no longer exposes Season Run multiplayer (see `apps/web/src/routes/multiplayer/+page.svelte` Season Run (Archived) and `apps/web/src/routes/season/+page.svelte` hidden Play with a Friend card). To restore, revert those two UI guards and remove this banner; no protocol or DB rollback is needed.
+spec/2.0/17-season-run-multiplayer.md	7	**Archived** — was **Accepted** as authoritative M2.7 implementation specification. This document supersedes the foundation sketch in `10-milestones.md` M2.7 and the multiplayer sketch in `06-multiplayer.md` for Season Run, and is the source of truth for version freezes, domain reshaping, the multiplayer protocol, Supabase authority, room/draft/bootstrap, realtime orchestration, timeout policy, block coordination, direct human trade negotiation, postseason, history, and replay for a complete two-human Season Run.
+spec/2.0/17-season-run-multiplayer.md	9	> While archived, treat this spec as **frozen reference** — do not delete or repurpose its tables/functions. Solo Season Run behavior is unchanged.
+spec/2.0/17-season-run-multiplayer.md	11	M2.7 delivers **the complete current Season Run** — the existing GM Campaign, objectives, Influence, injuries, free agency, Trade Board, regular season (9 blocks), Play-In, playoffs, awards, history, and replay — as a **two-human, deterministically verified league** with minimal Supabase coordination. Simulation and completed history remain local. Supabase owns only anonymous identity, room discovery, membership, command ordering, private decision locks, deadlines, presence hints, and checkpoint attestations.
+spec/2.0/17-season-run-multiplayer.md	36	Retire the M2.5.5 code-wins callout in `Docs/decisions/decisions.md:115` when bumping `SEASON_RUN_SAVE_SCHEMA_VERSION` to 9. Keep the draft, game, possession, standings, free-agency, Influence, and seed-derivation versions unchanged unless implementation proves their deterministic rules changed — then bump and remeasure.
+spec/2.0/17-season-run-multiplayer.md	113	| Draft offers, picks, rosters, health, completed transactions, Influence balances, results | Public — both participants and any preview caller |
+spec/2.0/17-season-run-multiplayer.md	114	| Unsubmitted rotations, free-agent declarations, campaign choices, optional spending, trade packages | Private — actor only until lock |
+spec/2.0/17-season-run-multiplayer.md	138	- H2H games use the existing game seed and possession rules. Control type must never enter game probabilities — property test `H2H solo vs multiplayer authority byte-identical`.
+spec/2.0/18-franchise-evolution-implementation.md	1	# M2.10 — Franchise Evolution implementation guide
+spec/2.0/18-franchise-evolution-implementation.md	31	| **Morgan Vale — Deal Maker** | Four base Trade Board inquiries per window instead of three. | Risky rehabilitation costs one additional Influence. |
+spec/2.0/18-franchise-evolution-implementation.md	32	| **Alex Chen — Recovery Director** | Risky rehabilitation costs one less Influence, with a minimum price of one. | Purchased Trade Board inquiries cost two Influence instead of one. |
+spec/2.0/18-franchise-evolution-implementation.md	33	| **Jordan Ellis — Campaign Director** | Each successful Campaign opportunity that grants Influence receives one additional Influence in total. | Risky rehabilitation costs one additional Influence. |
+spec/2.0/README.md	37	1. [`01-product.md`](./01-product.md) — promise, loop, boundaries, and terminology
+spec/2.0/README.md	38	2. [`02-league-and-postseason.md`](./02-league-and-postseason.md) — 30-team world,
+spec/2.0/README.md	40	3. [`03-draft-and-rosters.md`](./03-draft-and-rosters.md) — turn-based pool draft,
+spec/2.0/README.md	42	4. [`04-rotations-and-simulation.md`](./04-rotations-and-simulation.md) — minutes,
+spec/2.0/README.md	44	5. [`05-season-systems.md`](./05-season-systems.md) — injuries, trades, checkpoints,
+spec/2.0/README.md	46	6. [`06-multiplayer.md`](./06-multiplayer.md) — Classic and Season Run multiplayer
+spec/2.0/README.md	47	7. [`07-architecture-and-data.md`](./07-architecture-and-data.md) — boundaries,
+spec/2.0/README.md	49	8. [`08-quality-and-calibration.md`](./08-quality-and-calibration.md) — invariants,
+spec/2.0/README.md	51	9. [`09-open-decisions.md`](./09-open-decisions.md) — unresolved product questions
+spec/2.0/README.md	52	10. [`10-milestones.md`](./10-milestones.md) — ordered vertical delivery plan and
+spec/2.0/README.md	54	11. [`11-interface-and-history.md`](./11-interface-and-history.md) — draft board,
+spec/2.0/README.md	56	12. [`12-performance-framework.md`](./12-performance-framework.md) — simulation,
+spec/2.0/README.md	58	13. [`13-franchise-evolution.md`](./13-franchise-evolution.md) — Front Offices,
+spec/2.0/README.md	60	14. [`14-projection.md`](./14-projection.md) — possession projection and roster
+spec/2.0/README.md	62	15. [`15-roster-depth-and-free-agency.md`](./15-roster-depth-and-free-agency.md) —
+spec/2.0/README.md	64	16. [`16-objectives-and-trades-v2.md`](./16-objectives-and-trades-v2.md) —
+spec/2.0/README.md	66	17. [`17-season-run-multiplayer.md`](./17-season-run-multiplayer.md) — **ARCHIVED** complete
+spec/2.0/README.md	68	      authority (M2.7) — UI hidden, code kept
+spec/2.0/README.md	69	18. [`18-franchise-evolution-implementation.md`](./18-franchise-evolution-implementation.md) — M2.10
+spec/3.0/01-cleanup-log.md	1	# M3 — Cleanup & Codebase / UI/UX Improvement Log
+spec/3.0/01-cleanup-log.md	5	**Living document — Accepted.** M3 is not a milestone-gated delivery plan like `spec/2.0/10-milestones.md`. It tracks continuous cleanup, codebase health, and UI/UX polish as it happens.
+spec/3.0/01-cleanup-log.md	20	1. **One authoritative path** — do not add a second implementation of a rule that already exists. Web and CLI call the same engine functions.
+spec/3.0/01-cleanup-log.md	21	2. **Explicit transitions** — keep typed command boundaries for draft picks, lineup changes, block submissions, trades, free agency, and playoff advancement.
+spec/3.0/01-cleanup-log.md	22	3. **Determinism** — `packages/engine/src` never uses `Math.random()` or `Date.now()`; use injected `createRng` and named seed derivation (`src/challenge/seeds.ts`).
+spec/3.0/01-cleanup-log.md	23	4. **Dependency direction** — `Svelte UI -> application commands -> mode/league orchestration -> game/possession engines -> domain models` (see `AGENTS.md`). Engine stays independent of Svelte, Dexie, browser APIs, and Supabase.
+spec/3.0/01-cleanup-log.md	24	5. **Validate boundaries** — Zod at every trust boundary (packaged data, manifests, IndexedDB, worker messages, imports/exports, multiplayer payloads).
+spec/3.0/01-cleanup-log.md	25	6. **Explain from facts** — UI explanations come from recorded facts (shot profile, usage, rebounds, fouls, stamina/chemistry, injuries, transactions). No fake precision or scripted narrative.
+spec/3.0/01-cleanup-log.md	26	7. **Verify with evidence** — each entry cites the checks that stayed green (typecheck, lint, relevant Vitest projects, `pnpm hoop-rush data validate` if data changed, build, Playwright journeys).
+spec/3.0/01-cleanup-log.md	30	Copy the template below as a new dated section at the top of `## Log` (newest first). Keep entries scannable — facts over prose.
+spec/3.0/01-cleanup-log.md	48	Seed ideas — prune or promote as work starts. Not exit gates.
+spec/3.0/01-cleanup-log.md	52	- **Performance:** keep simulation off the UI thread, bound worker messages, checkpoint commits atomic — profile before optimizing (see `spec/2.0/12-performance-framework.md`).
+spec/3.0/01-cleanup-log.md	57	### 2026-09-05 — M3.10 post-M3 hardening sweep (area: engine | web | persistence | data-contracts | tooling | ci)
+spec/3.0/01-cleanup-log.md	59	Split into standalone file: **[`m3.10-post-m3-hardening-sweep.md`](./m3.10-post-m3-hardening-sweep.md)** — range `7bb8725..3b7457d2` leftovers not in M3.8/M3.9 (postseason-legacy deletion, rotation collapse, `season-multiplayer-in-memory` deletion, branded-ID propagation, DraftRoundCard/RollReel/Results/Report rework, memorable-games picker, block-runner prefetch cache, test deletions, CI gate deletions), `no change` in this file (versioned changes live in M3.8/M3.9). See that file for full Scope / Change / Risk / Verification / Follow-ups.
+spec/3.0/01-cleanup-log.md	61	### 2026-09-05 — M3.9 simulation retune v14 + ratings v3.9 / derive v10 (area: engine | importer | data)
+spec/3.0/01-cleanup-log.md	63	Split into standalone file: **[`m3.9-simulation-ratings-v14-v39.md`](./m3.9-simulation-ratings-v14-v39.md)** — VERSIONED CHANGE `m3-engine-v13 → v14` (`usageExponent 1.35 → 1.45`, creation/usage/pull reweights), `derive-v9 → v10`, `ratings-v3.8 → v3.9`, `overall-cohort-v2 → v3` + full `pools/players-index` regen, v14 goldens. Committed HEAD is `v14`; uncommitted working-tree `v15` explicitly out of scope. Calibration evidence still required per `spec/2.0/08-quality-and-calibration.md`. See that file for full Scope / Verification / Follow-ups.
+spec/3.0/01-cleanup-log.md	65	### 2026-09-05 — M3.8 Fixed-Five multiplayer / M2.8 delivery (area: engine | web | supabase)
+spec/3.0/01-cleanup-log.md	67	Split into standalone file: **[`m3.8-fixed-five-m2.8-delivery.md`](./m3.8-fixed-five-m2.8-delivery.md)** — range `7bb8725..3b7457d2`: new `engine/src/modes/fixed-five/` (duel, shared82, sandbox-duel/builder, timeout, digest, results), Fixed-Five contracts/worker/transport, 8 Supabase migrations + RPC/RLS hardening, legacy season-multiplayer stack deleted, DraftPanel/room-state/SimShow/Results/sim-gate/resync/autopick UI. New capability (not `no change`); Supabase stays temporary coordination. See that file for full Scope / Risk / Verification / Follow-ups.
+spec/3.0/01-cleanup-log.md	69	### 2026-09-04 — M3.7 performance pass (area: engine | web)
+spec/3.0/01-cleanup-log.md	71	Split into standalone file: **[`m3.7-performance-pass.md`](./m3.7-performance-pass.md)** — `7` files, single-fold block aggregates, allocation-free possession picks, effects unit pair-key cache, Zod parses out of fold/render loops, direct single-player stat scan, `no change` behavior, no version bump, block-0 digest identical across runs (`dd014bad…`, 0 audit failures). See that file for full Motivation / Change / Verification / Kept-deliberately / Files.
+spec/3.0/01-cleanup-log.md	73	### 2026-09-03 — M3.4 UI consistency pass (area: web | ui/ux)
+spec/3.0/01-cleanup-log.md	75	Split into standalone file: **[`m3.4-ui-consistency-pass.md`](./m3.4-ui-consistency-pass.md)** — `33` files + `ui/` primitives (`Button`/`Card`/`Badge`), tokens `radius-sm/md/lg/xl` + `tracking-eyebrow/label/badge` + `warning`, shell `px-4 py-6`/`gap-6`/`rounded-xl border` unified, `no change` behavior, `m3-engine-v13` kept, `pnpm --filter @hoop-rush/web build` passes. See that file for full Motivation / Scope / Change (tokens, primitives, shells, typography, buttons, cards, inputs, dialogs, tables, states, navigation, mobile, a11y) / Behavior / Risk / Verification.
+spec/3.0/01-cleanup-log.md	77	### 2026-09-03 — M3.3 test suite trim (area: engine | web | persistence | data-contracts | tooling)
+spec/3.0/01-cleanup-log.md	79	Split into standalone file: **[`m3.3-test-suite-trim.md`](./m3.3-test-suite-trim.md)** — `31` files (`9` deleted, `22` trimmed), `~2269` test deletions, `127` files / `1530` tests in `test:quick` (was `~138` / `~1700`), `no change` behavior, `m3-engine-v13` kept, `78` engine+data-contracts files / `1024` tests pass. See that file for full Motivation / Scope / Change (sim / health / AI / persistence / web / CLI) / Behavior / Risk / Verification.
+spec/3.0/01-cleanup-log.md	81	### 2026-09-03 — M3.2 presentation pass (area: web | ui/ux)
+spec/3.0/01-cleanup-log.md	83	Split into standalone file: **[`02-m3.2-presentation-pass.md`](./02-m3.2-presentation-pass.md)** — 36 files, 228+/1137- (net -909 lines), copy-only, no engine/version bump, `pnpm --filter @hoop-rush/web build` passes. See that file for full Motivation / Scope / Change (Home/Roster, Classic/Sandbox, Shared, Season Run, Multiplayer) / Behavior / Risk / Verification.
+spec/3.0/01-cleanup-log.md	85	### 2026-09-03 — M3.1 dedup & dead-code sweep (area: engine | web | persistence | data-contracts)
+spec/3.0/01-cleanup-log.md	87	Split into standalone file: **[`m3.1-dedup-dead-code-sweep.md`](./m3.1-dedup-dead-code-sweep.md)** — full Motivation / Scope / Change / Behavior / Risk / Verification there. Summary: ~110 LOC removed (helpers `deriveSeed`, `sortedParticipantIds`/`buildMap`, `collectRotationIssues`, `cloneForWorker`/`clonePlain`, `cachedLoad`, `crypto.randomUUID`), `no change` behavior, `m3-engine-v13` kept, 65/65 engine tests pass.
+spec/3.0/01-cleanup-log.md	89	### 2026-09-02 — M3 scaffold (spec)
+spec/3.0/01-cleanup-log.md	91	- **Motivation:** create the M3 container requested — a single-file living log for cleanup and UI/UX polish with no milestone goals.
+spec/3.0/02-m3.2-presentation-pass.md	1	# M3.2 — Player-Facing UI Presentation Pass (2026-09-03)
+spec/3.0/02-m3.2-presentation-pass.md	7	Screens mixed gameplay copy with implementation detail and repeated the same info in 2–3 places. Home showed `01`/`Available` pills and `82 games` legends that duplicated the hero. Classic/Sandbox repeated engine rules (`Each round rolls a franchise...`, `The variant is fixed...`). Shared components used storage/engine terms (`committed`, `thresholded`, `FGA + 0.44×FTA`, `Preparing the player index…`). Season Run mixed `checkpoint`/`Block`/`league games` and explained persistence (`Nothing saved until the block...`, `local storage — nothing leaves...`, `Folded from accepted game summaries`). Multiplayer leaked `seed`/`digest`/`rev`/`cursor`/`heartbeat`/`presence`/`DUO_BAND_QUOTAS`/`drawGlobalOffer` and showed 5× `Coming in next update` cards plus duplicate `TradeOffersPanel` in the Hub.
+spec/3.0/02-m3.2-presentation-pass.md	21	Docs updated: `README.md:62` (`## M3 — What shipped`), `Docs/decisions/decisions.md:283` (`### M3 UI presentation pass`), `Docs/interface/screens.md:10`, `current-routes.md:13` (local, `Docs/` is gitignored per `Docs/README.md`).
+spec/3.0/02-m3.2-presentation-pass.md	32	- `routes/+page.svelte:134,150` shortened `Continue: game 23 of 82 · 22-0` → `Continue · Game 23 · 22–0`; `Continue season · 12–8 · through 4 rounds` → `Continue season · 12–8 · Round 4`.
+spec/3.0/02-m3.2-presentation-pass.md	33	- `roster/+page.svelte:236,242` removed `Roster` kicker, shortened `Every eligible peak player-season in the league. Browse by franchise, decade, rating, and stats — then take your favorites to the sandbox.` (28 words) → `Browse every peak season by team, decade and stats.`
+spec/3.0/02-m3.2-presentation-pass.md	42	- `sandbox/+page.svelte:276` shortened hero `Five players, any franchise, any era. Build a lineup from every peak player-season and take it 82-0.` → `Five players, any team, any era. Build your five and chase 82–0.` (removes `peak player-season` jargon).
+spec/3.0/02-m3.2-presentation-pass.md	44	- `ChallengeOverlay.svelte:170` `42/82 committed` → `42/82`; `ChallengeOverlay.svelte:54` `Playing the season`/`Challenge paused`/`Challenge stopped` → `Playing`/`Paused`/`Something went wrong`; `Game 23 · final · 12-4` → `Game 23 · 12–4`; `ChallengeOverlay.svelte:143` removed `Win`/`Loss`/`First loss` legend row (render only after loss, strip colors are self-explanatory); `ChallengeOverlay.svelte:215` raw `{error}` → `Couldn’t finish the run. Try again.`
+spec/3.0/02-m3.2-presentation-pass.md	54	- `SeasonReport.svelte:711` deleted `Season facts` `<dl>` (Field goal / Three-point / Free throws / Turnovers / Rebounds / Assists / Possessions) — duplicates `Season snapshot` above it.
+spec/3.0/02-m3.2-presentation-pass.md	62	- `season/+page.svelte:497` removed `Generating the league — the board stays responsive while it works.`; `508` `Try regenerating — it may succeed.`; `540` `The draft record stays intact; retry promotion.`
+spec/3.0/02-m3.2-presentation-pass.md	65	- `season/+page.svelte:412` shortened `Your draft saves automatically in this browser — close the tab and pick up right where you left off.` → `Draft auto-saves.`
+spec/3.0/02-m3.2-presentation-pass.md	72	- `season/run/+page.svelte:687` shortened `Submitting locks the rotation set for 7 games (rounds 41–50).` → `Locks rotation for the next 7 games.`
+spec/3.0/02-m3.2-presentation-pass.md	76	- `season/run/history/+page.svelte:67,129` removed `A stored completed season failed validation. It stays on this device; nothing was deleted.` and `Completed seasons live in this browser's local storage — nothing leaves this device.`; `Every promoted champion run saved on this device` → `Champions on this device`; removed `seed abc123…` chip per row.
+spec/3.0/02-m3.2-presentation-pass.md	77	- `season/run/postseason/+page.svelte:99` removed `Facts come from the saved postseason state — no predictions.`
+spec/3.0/02-m3.2-presentation-pass.md	84	- `BlockProgress.svelte:73` removed `Nothing saved is lost — you can run the block again.`; `100` removed `({block.error.code})`; `113` removed `Block complete. Standings and summaries are updated.`; `42` shortened `4 / 45 league games` → `4 / 45 games`; `82` shortened `The block didn't finish. Retry runs it again from your last checkpoint.` → `Cancelled. Retry from last block.`; `58` removed live ticker `Latest: OKC 120 – LAL 118`.
+spec/3.0/02-m3.2-presentation-pass.md	85	- `CheckpointRecap.svelte:23,345,385,303` shortened `3 injuries across the league · 1 same-game return · 2 returned · 4 still out at block end. Trades accepted this block: 2 · your Influence delta: +1 · balance at block end: 3` → `Injuries: 3 this block (1 returned). Influence +1 (now 3). Trades: 2`; collapsed `Window 1 resolved with 3 signings — Lakers (band) …` detail; `How your 3 games this block went for stamina and chemistry.` → `Stamina & chemistry this block`.
+spec/3.0/02-m3.2-presentation-pass.md	87	- `InfluencePanel.svelte:69,78,107` removed `cap 8 · floor 0` badge and `at the +8 cap — grants apply 0` / `Floor 0 — spends reject, never clamp.`; shortened `Generates a fourth human offer... Risky rehab: 60% cuts one game off absence... +60 bp rehab premium for 10 games...` → `Extra trade offer: Get a 4th offer this window.` / `Risky rehab (2 Influence): 60% chance to return 1 game early. Success gives a 10-game boost.`
+spec/3.0/02-m3.2-presentation-pass.md	88	- `RotationEditor.svelte:302,350` shortened `Only the active 10 enter games. Inactive depth stays rostered...` → `Only 10 play. Inactives can be swapped in.`; `Target minutes 240 of 240 — 5 to assign · Starters are ordered PG, SG, SF, PF, C...` → `240 min total · 5 left` + tooltip.
+spec/3.0/02-m3.2-presentation-pass.md	92	- `multiplayer/+page.svelte:57,110,247` shortened `Season Run (Archived) / Archived — solo Season Run still available via /season / Season Run multiplayer is archived for now. Code is kept and will return.` → `Season Run — Solo only`; `Season Run multiplayer is archived... Please choose Classic or Sandbox.` → `Season Run is solo-only. Choose Classic or Sandbox.`; `Rooms are temporary — code, presence, and checkpoint hashes only. Simulation stays local.` → removed (hero `Two humans. One league.` is enough).
+spec/3.0/02-m3.2-presentation-pass.md	95	- `multiplayer/room/[roomId]/+page.svelte:428` removed `This room was created with an old protocol (v1).`; `659` removed `Settings rev 2`; `699` `Heartbeat fresh` / `No heartbeat — 30s offline` → `Online`/`Offline`; `781` shortened `Opponent disconnected — presence offline after 30s without heartbeat. Preserving membership; Start unavailable until reconnection.` → `Opponent disconnected — waiting to reconnect.`; `929` `Integrity failed — hashes diverged twice. Room frozen.` → `Something went wrong — please create a new room.`; `939` `Expired — 24h grace without verified fallback.` → `Expired — please create a new room.`; `1000` deleted diagnostics block `revision ... · digest ... cursor ... protocol v2 · multiplayer season-multiplayer-v2 ... presence {"p1"...} ... seed ...`; `588` removed Mode/Pace/You 3-card grid (repeats hero); `971` removed Room fact summary table; `998` removed `<details> Diagnostics`/`Details`.
+spec/3.0/02-m3.2-presentation-pass.md	96	- `multiplayer/room/[roomId]/draft/+page.svelte:671,726,764,770,801,852,951,1172` removed `Digest a1b2c3… · rev 12 · turn p1 · locked/your turn · 42s remaining` + `roomId.slice(0,8)`, `Opponent online · both clients replay log on reconnect` → `Opponent online`, `Replay integrity issue ... Skipped 2 invalid` → `Something went wrong with the draft. Reload.`, `Reloading this tab keeps the same start time (session storage).`, `Deterministic via room seed + settingsRevision + draft cursor. Offers drawn via drawGlobalOffer...` (full paragraph), `Size 8 · Safe min 3 · Seed a1b2… · cursor draft-3 · digest a1b2…`, `Seed a1b2… · rev 12 · 90s per pick` + `lastSeen 14:32:10` → `Live · 90s per pick`, `Both clients independently derived 28 AI teams (DUO_BAND_QUOTAS) and attested league digest...` → `Draft complete — league ready. Enter Season Hub.`, `Finalize checks 4G/4F/3C and legalFiveAfterAnyRemoval.` → `Finalize checks 4G/4F/3C and valid rosters.`, entire `Authoritative facts — replayable · Room a1b2… · Mode Season · Seed ... · Rev ...` footer.
+spec/3.0/02-m3.2-presentation-pass.md	97	- `multiplayer/room/[roomId]/run/+page.svelte:394,535,865` removed `This room is Season Run ... Room lobby works now (code, presence, Ready/Start). Season Hub is Season-only and stays archived.` → `This is a Season Run room. Solo Classic/Sandbox at /classic · /sandbox.`; collapsed 5× `Coming in next update` disabled cards → single banner `Rotation, objective, campaign & free agency tools ship next update.` + primary `Lock for Block 1 — coming soon`; collapsed 3× `Lock / Simulate / Results` duplicate paragraphs → single stepper `1. Lock → 2. Simulate → 3. Verify`; deleted `Debug — digests & transport details` panel; deduped hero `Atlanta (10 players) vs Boston ... · 0–0 provisional · Next opponent: Chicago` 3× → once.
+spec/3.0/02-m3.2-presentation-pass.md	105	Low. All edits are in `apps/web` Svelte routes/components; engine, persistence, and data-contracts untouched. Risk is missing copy (empty heading, truncated error) — covered by Playwright smoke (draft → overlay → report → history) and manual check of Home, Roster, Classic/Sandbox drafts, Season Hub tabs, and Multiplayer lobby/draft. Rollback: `git revert 7bb8725` (single commit) restores 36 files; `Docs/` is local and not versioned.
+spec/3.0/02-m3.2-presentation-pass.md	109	- `pnpm --filter @hoop-rush/web build` — `✓ built in 12.17s` (5214 SSR / 5250 client), no `vite` error. Sub-agents: Group A (Home/Classic/Sandbox/Shared), Group B (Season Run), Group C (Multiplayer lobby/draft/run) — 3 agents, partitioned by route, called sequentially (tool serialization); work is independently reviewable per area.
+spec/3.0/02-m3.2-presentation-pass.md	110	- `svelte-check` — 27 errors in `RotationEditor.svelte`/`ClassicRollReel.svelte`/`season-campaign-trade.test.ts` — pre-existing on clean `HEAD` (stashed vs unstashed identical), 0 new errors from this pass.
+spec/3.0/02-m3.2-presentation-pass.md	111	- `grep -r "checkpoint hashes|digest|DUO_BAND|drawGlobalOffer|heartbeat.*presence|VITE_SUPABASE"` — 0 hits in player-visible strings post-pass.
+spec/3.0/02-m3.2-presentation-pass.md	112	- `pnpm exec vitest run --project @hoop-rush/web --project web-jsdom <path>` — component tests for `season-block-runner` and `ChallengeOverlay` remain green (fake runners unchanged).
+spec/3.0/02-m3.2-presentation-pass.md	117	- Queue `M3.3` — hub dispatch `season-hub-state.ts:535-841` 16× `dispatch` → `buildRunCommand` (~130 LOC), shell literal `season-shell-context.ts:143-230` vs `season-shell-state.svelte.ts:1-229` 80 LOC, `season-presentation.ts:1-1309` god-file split.
+spec/3.0/02-m3.2-presentation-pass.md	119	- Deferred `dexie.ts:195-241` v11/13 collapse (VersionError if shipped) and `constants.ts:28,127` dead until version bump with calibration — not in M3.2 scope.
+spec/3.0/02-m3.2-presentation-pass.md	123	- `spec/3.0/01-cleanup-log.md` — M3 template and principles.
+spec/3.0/02-m3.2-presentation-pass.md	124	- `README.md:62` — `## M3 — What shipped` (tracked).
+spec/3.0/02-m3.2-presentation-pass.md	125	- `Docs/decisions/decisions.md:283` — `### M3 UI presentation pass` (local).
+spec/3.0/m3.1-dedup-dead-code-sweep.md	1	# M3.1 — Dedup & Dead-Code Sweep (2026-09-03)
+spec/3.0/m3.1-dedup-dead-code-sweep.md	5	> Split from `spec/3.0/01-cleanup-log.md` — standalone file for M3.1. The log at `01-cleanup-log.md:57` now links here.
+spec/3.0/m3.1-dedup-dead-code-sweep.md	33	Low. All changes mechanical inlines or helper extractions. `sortedParticipantIds` fixes `completeSeasonBlockCommit:1085` primaryFranchiseId nondeterminism for duo runs — revert would restore bug. `collectRotationIssues` order matches original `validateSeasonRotation` push order; first mismatch would surface as `season-rotation-v2.test.ts:29` rejection-code mismatch. Rollback: `git revert` single commit, no migration.
+spec/3.0/m3.1-dedup-dead-code-sweep.md	37	`pnpm --filter @hoop-rush/engine check` pass, `pnpm --filter @hoop-rush/persistence check` pass, `pnpm --filter @hoop-rush/data-contracts check` pass; `pnpm exec vitest run --project @hoop-rush/engine --exclude src/sim/slot-permutations.test.ts` **65/65, 790 tests** pass (73s) — `slot-permutations.test.ts:105,216` 2 failures reproduce on clean `HEAD` (flaky, not introduced); `packages/engine/src/challenge/seeds.test.ts:6` 6 tests pass; `season/rotation-v2.test.ts:29` green; no data artifact change → `pnpm hoop-rush data validate` not required (no `apps/web/static/data/` edit in this batch).
+spec/3.0/m3.1-dedup-dead-code-sweep.md	41	Queue `M3.2` — hub dispatch `season-hub-state.ts:535-841` 16× `dispatch` → `buildRunCommand` (~130 LOC), shell literal `season-shell-context.ts:143-230` vs `season-shell-state.svelte.ts:1-229` 80 LOC, `season-presentation.ts:1-1309` god-file split; roster DP `ai-generation.ts:590-743` + `roster-rules.ts:117` 2-helper extraction (~150 LOC) gated on `ai-generation-v2.test.ts` pool determinism; CLI cohort `season-game/effects/home-court.ts` 16-line template → `season-cohort.ts` (~70 LOC). Deferred `dexie.ts:195-241` v11/13 collapse (VersionError if shipped) and `constants.ts:28,127` dead until version bump with calibration.
+spec/3.0/m3.1-dedup-dead-code-sweep.md	45	- `spec/3.0/01-cleanup-log.md` — M3 template, principles, backlog.
+spec/3.0/m3.1-dedup-dead-code-sweep.md	46	- `spec/3.0/02-m3.2-presentation-pass.md` — next batch (presentation-only, 2026-09-03).
+spec/3.0/m3.10-post-m3-hardening-sweep.md	1	# M3.10 — Post-M3 Hardening: Types, UI, Perf, Contracts (2026-09-03/04)
+spec/3.0/m3.10-post-m3-hardening-sweep.md	11	M3.1–M3.7 left known remainders (typed-command exhaustiveness, hub
+spec/3.0/m3.10-post-m3-hardening-sweep.md	41	  `engine-seam.ts` re-export, `supabase/_shared` preamble module —
+spec/3.0/m3.10-post-m3-hardening-sweep.md	50	  (`season-run-fixture.ts:14-30` — `franchiseIdSchema.parse`,
+spec/3.0/m3.10-post-m3-hardening-sweep.md	77	  `NAIL_BITER=5/BLOWOUT=20` — first-loss + OT → nail-biters → blowouts
+spec/3.0/m3.10-post-m3-hardening-sweep.md	84	  `DialogShell`, `Table`, `Tabs`, `no-restricted-syntax` lint guard) —
+spec/3.0/m3.10-post-m3-hardening-sweep.md	99	  projection-beam profiling) — still untouched, do not "finish" without
+spec/3.0/m3.10-post-m3-hardening-sweep.md	106	  `fixed-five-forensics.test.ts:319` new — formatting churn + coverage,
+spec/3.0/m3.10-post-m3-hardening-sweep.md	113	  extraction, CLI parametric wire tests) — still open.
+spec/3.0/m3.10-post-m3-hardening-sweep.md	125	(`96d6d8d7`) — stale `catalogInflight` could serve a prior block's
+spec/3.0/m3.10-post-m3-hardening-sweep.md	133	  (M3.5 invariant — confirm no regression from `0628e3e5/0b474614`).
+spec/3.0/m3.10-post-m3-hardening-sweep.md	141	* Deleted CI gates (`nightly-gates`, `supabase-migrate`, Pages) — confirm
+spec/3.0/m3.10-post-m3-hardening-sweep.md	155	  (`many changes`, `more fixes`, …) — enforce conventional commits so the
+spec/3.0/m3.11-implementation-guide.md	1	# M3.11 — Implementation Guide (Rotation + Full Auto + Identity Removal + Block Challenges)
+spec/3.0/m3.11-implementation-guide.md	36	| Challenge calibration targets | — | 1 | `SEASON_CHALLENGE_TARGETS_VERSION` (`challenge-targets-v1`) |
+spec/3.0/m3.11-implementation-guide.md	80	## 2. Contract boundary — checklist
+spec/3.0/m3.11-implementation-guide.md	155	- [x] One canonical fold of human summaries: games, wins, losses, 3PM/3PA, rebound margin, turnovers, wins by opponent. Forfeits contribute official W/L only, no fabricated boxes. 3P% with < 20 attempts is a miss with attempt count recorded. Canonical order; attached to checkpoint, recap (`challengeEvidence`), replay, digest. Explanations/recap derive from stored facts (e.g. `6–4, .600`, `3P 34.1% (need 35%)`).
+spec/3.0/m3.11-implementation-guide.md	163	- [x] Read-only `ChallengesPanel`: dealt/live/completed/missed, name, one-line goal with named opponent (`Beat the conference leader — Celtics, Fri R44`), reward chip (`+1` / `+2 hard`), fact line post-block. No picker, no command errors, no busy/disabled. Hub `This block`: `Challenges: 3 live` pre-block, `Challenges: 2/3 (+3)` post-block; Influence delta cites grant vs challenges vs campaign. Lock preview objective line removed. Mobile stacks 3 cards with chip visible.
+spec/3.0/m3.11-implementation-guide.md	217	- `pnpm verify:quick`: engine stale-objective failures fixed (4); remaining failures are persistence stub-seam drift vs v14 digests (`season-run.test.ts` stale `expectedStateDigest`, postseason suites) — stub `buildFullSeasonDataset`/`buildStubSeasonEngineSeam` still compute pre-challenge digests while `promoteSeasonDraftToRun` now deals block-zero challenges. Tracked as follow-up; no bypass (failures left red, not skipped).
+spec/3.0/m3.11-season-run-rotation-and-auto.md	1	# M3.11 — Season Run Rotation + Auto + Identity Removal + Block Challenges
+spec/3.0/m3.11-season-run-rotation-and-auto.md	18	1. **Same player rendered 2–4× on one scroll.** `RotationEditor.svelte`
+spec/3.0/m3.11-season-run-rotation-and-auto.md	23	   era label. The page then renders the same 10–15 players a third
+spec/3.0/m3.11-season-run-rotation-and-auto.md	55	   spinner — the returned `MinutePlanOptimizationResult` is never
+spec/3.0/m3.11-season-run-rotation-and-auto.md	72	   — its only mechanical effect is `+1.5` offer weight when
+spec/3.0/m3.11-season-run-rotation-and-auto.md	88	   yet the choice has no basketball meaning — form-filling before
+spec/3.0/m3.11-season-run-rotation-and-auto.md	98	   active-10 — deterministically, with a human-readable diff +
+spec/3.0/m3.11-season-run-rotation-and-auto.md	133	overview) with **one `Active 10` section** ordered starters 1–5 then
+spec/3.0/m3.11-season-run-rotation-and-auto.md	134	bench 6–10. Each row owns, in one place:
+spec/3.0/m3.11-season-run-rotation-and-auto.md	147	order) that scrolls to / highlights the row on click — not a second
+spec/3.0/m3.11-season-run-rotation-and-auto.md	170	- Closing five: `Preferred in the versioned late-game window when the score and availability permit — not forced in blowouts or when a member is unavailable, fouled out, or over the safety threshold.`
+spec/3.0/m3.11-season-run-rotation-and-auto.md	202	`Lineup needs work — N issues` + `Play Block N`) and extend it as
+spec/3.0/m3.11-season-run-rotation-and-auto.md	210	  includes name + role + minutes (already partially done — extend
+spec/3.0/m3.11-season-run-rotation-and-auto.md	234	e.g. `recommendFullRotation`) alongside — never inside — the sim:
+spec/3.0/m3.11-season-run-rotation-and-auto.md	290	Versioning: this is a new helper, not a sim-rule change — **no
+spec/3.0/m3.11-season-run-rotation-and-auto.md	317	   add `auto-rotation` — keep request/response Zod-validated both
+spec/3.0/m3.11-season-run-rotation-and-auto.md	320	   `IN: L. James (Bench 3 → Starter SF) — legal SF, best wing quality
+spec/3.0/m3.11-season-run-rotation-and-auto.md	347	breaks a high-shared-play pair,	if the data is available — otherwise
+spec/3.0/m3.11-season-run-rotation-and-auto.md	361	- All identity copy: `Choose your GM identity`, `Front Office Memo —
+spec/3.0/m3.11-season-run-rotation-and-auto.md	368	  `roster-response`) may still show — it describes what the task
+spec/3.0/m3.11-season-run-rotation-and-auto.md	447	  bump, no Dexie migration — this is a behavior deletion, not a
+spec/3.0/m3.11-season-run-rotation-and-auto.md	452	  the null values. Do not remove fields from the digest — that would
+spec/3.0/m3.11-season-run-rotation-and-auto.md	470	Each block 0–7 auto-deals exactly **3 challenges**, all live at once.
+spec/3.0/m3.11-season-run-rotation-and-auto.md	474	all 3 — payouts stack. Block 8 (final 2-game block) stays
+spec/3.0/m3.11-season-run-rotation-and-auto.md	485	Hub copy must keep that distinction visible: `Challenges — all 3
+spec/3.0/m3.11-season-run-rotation-and-auto.md	486	live` vs `Opportunity — pick 1`.
+spec/3.0/m3.11-season-run-rotation-and-auto.md	494	option; otherwise it goes too — absolute-margin counters do not read
+spec/3.0/m3.11-season-run-rotation-and-auto.md	497	Replacement catalog (8–10 entries so the dealt 3 vary; thresholds
+spec/3.0/m3.11-season-run-rotation-and-auto.md	502	- `winning-block` — finish the block over .500
+spec/3.0/m3.11-season-run-rotation-and-auto.md	504	- `win-six` (kept, rescaled) — win at least 6 of the block's team
+spec/3.0/m3.11-season-run-rotation-and-auto.md	507	- `three-point-mark` — shoot ≥ 35% from three across the block
+spec/3.0/m3.11-season-run-rotation-and-auto.md	509	- `protect-glass` — finish the block with a positive total rebound
+spec/3.0/m3.11-season-run-rotation-and-auto.md	511	- `take-care` — average ≤ 13.0 turnovers per team game. (Keeps a
+spec/3.0/m3.11-season-run-rotation-and-auto.md	517	- `beat-leader` — beat the conference leader in this block. Requires
+spec/3.0/m3.11-season-run-rotation-and-auto.md	520	- `beat-higher` — beat a team with a better record at tipoff.
+spec/3.0/m3.11-season-run-rotation-and-auto.md	522	- `statement-block` — win every team game in the block (min 4
+spec/3.0/m3.11-season-run-rotation-and-auto.md	528	fact the summaries do not record today (e.g. team 3PA/3PM splits —
+spec/3.0/m3.11-season-run-rotation-and-auto.md	544	  scheduled. Feasibility uses schedule + standings only — never
+spec/3.0/m3.11-season-run-rotation-and-auto.md	563	object for all 3 (one fold, three predicates — no triple scan).
+spec/3.0/m3.11-season-run-rotation-and-auto.md	569	`appliedDelta: 0 at cap` explanation — a 2-Influence hard challenge
+spec/3.0/m3.11-season-run-rotation-and-auto.md	581	  each showing name, one-line goal (`Beat the conference leader —
+spec/3.0/m3.11-season-run-rotation-and-auto.md	584	  deciding fact, e.g. `6–4, .600` or `3P 34.1% (need 35%)`).
+spec/3.0/m3.11-season-run-rotation-and-auto.md	653	  for (slot swaps on every block) — mitigated by continuity tie-breaks,
+spec/3.0/m3.11-season-run-rotation-and-auto.md	657	  fields) — mitigated by shared Zod wire types, no re-declared
+spec/3.0/m3.11-season-run-rotation-and-auto.md	677	  <rotation|minute-plan|recommend-rotation>` — new tests: seeded
+spec/3.0/m3.11-season-run-rotation-and-auto.md	685	  — dedup (each name once), humanized failures, preview/apply/undo,
+spec/3.0/m3.11-season-run-rotation-and-auto.md	720	- M3.11a — editor dedup + copy + error-surface collapse (web only).
+spec/3.0/m3.11-season-run-rotation-and-auto.md	721	- M3.11b — `recommendRotation` engine helper + worker envelope +
+spec/3.0/m3.11-season-run-rotation-and-auto.md	723	- M3.11c — Auto preview/apply/undo + scope radio + old
+spec/3.0/m3.11-season-run-rotation-and-auto.md	725	- M3.11d — GM identity + evolution deletion (engine gates + web
+spec/3.0/m3.11-season-run-rotation-and-auto.md	727	- M3.11e — objectives → block challenges (v3 catalog + seeded
+spec/3.0/m3.11-season-run-rotation-and-auto.md	733	  (`PostseasonRotationPanel` reuses the same unified editor —
+spec/3.0/m3.11-season-run-rotation-and-auto.md	737	  from M3.12 — that number now belongs to the player sponsorship gear
+spec/3.0/m3.11.1-full-mode-ux-audit.md	1	# M3.11.1 — Season Run Full-Mode UX Audit + Block Sim Liveness
+spec/3.0/m3.11.1-full-mode-ux-audit.md	9	**UX: 4/10 — UI: 5/10**
+spec/3.0/m3.11.1-full-mode-ux-audit.md	19	### 1. Critical — Team trade card is an unreadable dossier, not a target
+spec/3.0/m3.11.1-full-mode-ux-audit.md	25	### 2. Critical — No clear primary action or flow in trades + hub
+spec/3.0/m3.11.1-full-mode-ux-audit.md	27	- What: trades shows Teams | Build | Negotiation all at once with two empties (`Pick a team` + `No active inquiry — pick a team`). Hub shows `Play Block X of 9` heading but button is last after 3 cards + Campaign + alerts, while blocker `before next block can submit` lives below button in FA CTA `run/+page.svelte:860-863`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	31	### 3. Critical — Developer accounting leaked as UI
+spec/3.0/m3.11.1-full-mode-ux-audit.md	33	- What: `X/Y used · 3 base + Z extra (purchased A/1 · earned B/1)`, `this proposal will consume 1 inquiry`, `Fingerprint ab12… · at revision 3`, `proposalId`, `atStateRevision`, `45 active pairs (1,350)`, `Floor 0 — spends reject instead of clamping`, `5% per point (10% max)`, `branchId.slice(0,8)`, `Rewards: +1 bounded cap 8`, `adapter xyz`, `+60bp rehab premium`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	37	### 4. High — Rulebook instead of prevention
+spec/3.0/m3.11.1-full-mode-ux-audit.md	39	- What: `Pick 1–2 from each side. Optionally add 1–2 Influence from one side — never both, never alone. Rosters must stay 10–15…` + 5-row facts box. Hub says `Your lineup needs a fix — see Rotation tab` without details. Rotation shows 3 surfaces for one failed edit with raw `playerVersionId` from `packages/engine/src/season/rotation.ts:142/148/164/182/188`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	43	### 5. High — Same player rendered 2–4x, Auto invisible
+spec/3.0/m3.11.1-full-mode-ux-audit.md	47	- Fix: per `m3.11` — single player row model, explain what each list does in sim, make Auto fix structure or remove spinner.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	64	| Load | `Before submission — deterministic facts` 5 rows + `Never shows Overall…` | High | Explains engine | Delete. Keep 1 live line `10→10 · legal · rotation auto-fixes`. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	74	| Cards | 3 empties for one state (`No trades…` left + center + `No active inquiry` right) | High | Teaches edge before action | Single center empty `Choose a team — browsing free.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	80	| Interaction | Purchase label flips 3x, disabled 40% only | Medium | Unclear why disabled | One label `Get +1 talk (1◆)` + `◆5→◆4` preview + `Need 1◆ — earn via goals`. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	83	| Feedback | sr-only `— announced, focus stays` | Low | Focus note leaked to AT | `Trade accepted. Roster updated.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	84	| Error | Can pick 2 OUT + illegal sizes, told `ILLEGAL — must stay 10–15` after | High | Build invalid then scold | Block 3rd, warn OUT inline, disable Submit with reason. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	94	| Trust | Good: `Who's rising — not exact score`, `Never shows Overall…` | Keep | Honest | Keep shortened `Trends hint, not a grade.` Do not add fake odds. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	110	| `branchId.slice`, `Applied ids`, `Bounded 0–5`, `ledger requested/applied` | Critical | Delete from UI. Log only. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	111	| `Block X rounds A–B` mono + `N of 9 played` duplicate heading+meta | Low | One line `Block 4 of 9 · Rds 28–36 · 3–0 so far`. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	115	| `No games for you` twice with no guidance what Play does | Medium | `No games for you — Play sims league + earns Influence.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	116	| Missing record/seed/health/fatigue on hub (only postseason has `HealthStrip`) | High | Add compact `12–8 · 4th East · 2 OUT` strip under tape. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	119	| No per-opponent record/home-rule beyond `RuleBadge compact` | Medium | `vs BOS (14–6) · Home: Pace+` on tap. |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	123	Confirmed m3.11 claims: 2–4x render (`RotationEditor:394/524/659/498` + `SeasonRosterList:64`), 4 identical lists, 3 error surfaces + raw IDs (`rotation.ts:142`), Auto fire-and-forget (`RotationEditor:253-271`).
+spec/3.0/m3.11.1-full-mode-ux-audit.md	125	Add: promote/demote 2-step picker (`853-923`) is correct for touch but slow; keep but add `SwapNotice X for Y` already at `883-885` — good, promote it. Minutes stepper `h-11 w-11` good for touch — keep. `10/10 Active` vs `Ten active…` vs `Inactive depth` triple header — dedup to one.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	134	| `hasDraft` vs UI-only `started` vs `board.status` triple source, `complete without generation` empty | High | Single derived `draftStage`. Add final else `Something stalled — Retry build.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	137	| `Disabled · {coverageReason}` verbatim `:257` | Medium | `Not available — breaks coverage (need 2 bigs).` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	139	| `Your ten` only if picks>0, `No draft yet :357` unreachable | Low | Empty `No picks yet — Draw to see 8.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	150	- Delete `+60bp (100bp total)`, `5% per point`, `45 pairs`, `Base 4 Deal Maker cap 5` from visible UI. Keep in `title`? No — delete, use `Need ◆` + short hint.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	151	- FA skip helper `Skipping…free, no Influence, can still resolve :172-174` — good, keep. Promote unresolved banner `declare or skip — nothing saved until submit :324-332` to hub blocker.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	159	- `Last Block recap → ?block=8` hardcoded (`run/+page:550-555`) — derive `acceptedBlocks.length-1`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	160	- `CompletedSeasonResult:283` exposes `runId · seed[0:16] · date` — move to `Export` details, show `Champion + 58–24` hero.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	161	- `Trade grades score M[· limited sample]` — keep only if engine provides; else delete to preserve trust rule.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	162	- Shell empties good (`No active Run — Create…`, `old rules schema N cannot continue`) — keep.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	166	`inquiryCounterLabel` full string; fingerprints / proposalIds / revisions / exchange counts / `atStateRevision`; `Before submission — deterministic facts` box + `Never shows Overall…` footnote; `Hard constraints` per-team boxes; `Listed/Discussable/Protected` dumps; duplicate needs line; competitor pills from board; `45 pairs`, `Floor 0…`, `5% per point`, `Duplicate fingerprints…`, `3 exchanges: 1 initial…`; hero gradient + dots + stripes; duplicate `Browsing free` x3 + `One deal at a time` x2; `Past windows` mini-cards from board; `title=` tooltips; `Announcement does not move focus`; Campaign `branchId.slice`, `Applied ids`, `Bounded`, `cap 8 ledger`, `canonical order`, `adapter xyz`; draft mojibake `A�`; `Disabled · {coverageReason}` raw; `+60bp`, `Base 4 Deal Maker`; completed-run `seed[0:16]` hero.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	174	Talks pips hero; `YOU vs THEM` matchup strip; faces + minutes in builder (reuse `TradeOffersPanel`); live `You send A for B · 10→10 ✓ · Uses 1 talk (2→1)`; `They asked` + `Offer X of 3` top; sticky `Send to [Team]` / `Play Block`; window urgency `closes when next block locks`; hub `12–8 · 4th East · 2 OUT` strip; FA unresolved + goal-needed blockers above Play; first rotation failure inline + Fix.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	178	Protected/off-limits until attempt/expand; rationale/needs/competitor detail until team selected; Influence sweetener collapsed until 1+1 picked; past windows / trends / ledger Recent / transactions last-12 into History disclosure; `How trades work` full rules collapsed to 2 sentences; `They like / Rejected` only inside active negotiation; purchase cap details into popover; Campaign evidence/rewards/branch state collapsed; box-score full tables lazy (already `openedBoxScores` gate — keep).
+spec/3.0/m3.11.1-full-mode-ux-audit.md	184	| `No active inquiry — pick a team to start` | `Pick a team to start talks.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	187	| `at cap — purchase or earned credit needed` | `No talks left — +1 for 1◆ or wait.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	193	| `Before submission — deterministic facts` | Delete (or `Check before send`) |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	194	| `You 10→11 · ILLEGAL — must stay 10–15` | `Must stay 10–15. This makes you 16 — drop 1.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	197	| `3 exchanges: 1 initial, 2 counter…` | `Offer 2 of 3 — one more back-and-forth max.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	200	| `Draft — submit first proposal above. That consumes inquiry.` | `Send first offer to start talk.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	203	| `Accepted — ownership will transfer… Announcement does not move focus.` | `Deal accepted — rosters update after window.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	205	| `Choose front office — executive sticks…` + `separate from GM identity…` | `Stays all season.` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	212	| `Your lineup needs fix — see Rotation tab.` | `Lineup: C can't play G — Fix` |
+spec/3.0/m3.11.1-full-mode-ux-audit.md	218	1. Land `Trades — Window 1 of 3 · closes after Block 3` with `●●○ 2 left` + compact list (logo, name, wants, open-to).
+spec/3.0/m3.11.1-full-mode-ux-audit.md	220	3. Pick `You send (0/2)` then `You get (0/2)` — faces, minutes, OUT badges. 3rd / protected blocked inline.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	224	7. Right becomes `Talking to [Team] — Offer 1 of 3` with `They asked:` + Accept/Revise/Walk-free.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	226	9. Second team while active → `Finish or walk away from [Team] first — 1 at a time.` + shortcut.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	228	11. Window closes → `No trades — play Block 4` + `Past talks` link. No triple empties.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	232	Desktop trades: slim header (title + urgency + pips + ◆) → 2 cols (280px list dividers, no cards-in-cards; flexible workspace with matchup strip + build + sticky footer). 3rd col only when negotiating. Hub: tape → `12–8 · 4th East` strip → next-decision (Up next + Lineup + This block as inset `bg-surface-2`, not triple borders) → blockers above Play → thin progress underneath when running → FA/Trade CTAs compact → Influence collapsed → Recent blocks. Team: single player row component reused everywhere (kills 2–4x). Mobile: wizard (Team → Deal → Track, Back/Continue) + sticky deal bar + full-width Send/Play safe-area padded. Empty: one centered empty with picker shortcut.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	234	## 10. M3.11.2 — Block Sim Liveness (replaces progress-bar-only)
+spec/3.0/m3.11.1-full-mode-ux-audit.md	239	- Your-games strip: pre-known `humanUpcomingGamesFromGames()` chips flip `vs BOS → W 112-104 / L 98-101` as partial summaries arrive. Header `You're 2–1 in Block 4`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	241	- Thin bar underneath, not hero. Keep `Cancel`. `aria-live polite` only for your games. `motion-reduce:transition-none` already present — keep.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	245	- Add `isHumanGame`, `humanRecordInBlock {w,l}` to progress event. Enables round dots `R28–36` filling, `Streak W3` flash.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	246	- Do NOT emit possession feed — violates `Keep compact summaries` rule in `AGENTS.md`.
+spec/3.0/m3.11.1-full-mode-ux-audit.md	254	P0 — directly damages usability:
+spec/3.0/m3.11.1-full-mode-ux-audit.md	266	P1 — large clarity / feel:
+spec/3.0/m3.11.1-full-mode-ux-audit.md	274	- FA unresolved banner to hub, numeric budget already good — expose in hub CTA
+spec/3.0/m3.11.1-full-mode-ux-audit.md	277	P2 — polish:
+spec/3.0/m3.11.1-implementation-guide.md	1	# M3.11.1 — Implementation Guide (Full Season Run UX + Truthful Block Liveness)
+spec/3.0/m3.11.1-implementation-guide.md	66	## 2. Slice A — Shared UX foundation
+spec/3.0/m3.11.1-implementation-guide.md	71	- [x] Standardize team/player identity around existing logos, faces, display names, safe fallbacks (`Unknown player`). Fix mojibake (`A· your franchise`, `—` decoding) and eliminate raw `executiveId`, `playerVersionId`, `seasonKey`/`eraId`/`franchiseId` fallbacks from rendered copy.
+spec/3.0/m3.11.1-implementation-guide.md	79	## 3. Slice B — Trade workspace
+spec/3.0/m3.11.1-implementation-guide.md	87	- [x] Asset rules enforced inline via engine helper: protected shows `Off limits` and cannot be selected; availability-risk shows engine-provided reason; max two assets per side (block third pick); live roster sizes `10 → 10` via shared `SEASON_ROSTER_MIN_SIZE`/`MAX_SIZE`; disabled Send always shows concrete unmet requirement (`Pick 1 to get`, `Must stay 10–15. This makes you 16 — drop 1`, `Need 2◆`).
+spec/3.0/m3.11.1-implementation-guide.md	88	- [x] Influence chips replace five radios: None, You +1, You +2, Them +1, Them +2. Section collapsed until at least one asset per side selected. `Small boost, won't save bad offer.` Purchase is one label `Get +1 talk (1◆)` + `◆5→◆4` preview + `Need 1◆ — earn via goals`.
+spec/3.0/m3.11.1-implementation-guide.md	90	- [x] Slim header: title left, `Window 1 of 3 · closes after Block X` + `closes when next block locks` urgency, talks pips `●●○ (2 left)` + `◆ N` right. Single center empty `Choose a team — browsing free.` No triple empties. `Sends Offer 1 of 3 to [Team]. They counter/accept. Walk away free.` under Submit.
+spec/3.0/m3.11.1-implementation-guide.md	91	- [x] Active/past talks reliable: click activates/previews (dim past, banner active); active counter shows plain `They asked` banner + `Offer X of 3` top + `Offer 2 of 3 — one more back-and-forth max.`; `Revise` pre-fills last in-session package and allows another `submit-trade-proposal`; after reload no reconstruction (counter context remains, fresh revised package); `Walk away` requires confirmation (`No penalty. Keep X talks.`); prior windows, trends, Influence history in collapsed History disclosures. Second team while active → `Finish or walk away from [Team] first — 1 at a time.` + shortcut.
+spec/3.0/m3.11.1-implementation-guide.md	97	## 4. Slice C — Hub and required decisions
+spec/3.0/m3.11.1-implementation-guide.md	102	- [x] Play Block is dominant hub action (sticky). Compress secondary info into Up next (`+N more` + schedule link), Lineup, This block. Humanize schedule (`vs BOS (14–6) · Home: Pace+` on tap; `Rd 12`; `G 24→28 min`; `+2 more changes`). Compact status strip `record · conference rank · OUT count` (e.g. `12–8 · 4th East · 2 OUT`) under tape.
+spec/3.0/m3.11.1-implementation-guide.md	103	- [x] One line `Block 4 of 9 · Rds 28–36 · 3–0 so far`. `Plays N games with this lineup.` Skeleton `Loading your matchups…` when preview null. `No games for you — Play sims league + earns Influence.` Ghost container for `BlockProgress` to avoid double border.
+spec/3.0/m3.11.1-implementation-guide.md	104	- [x] Campaign flattened to single Opportunity decision: plain target, condition, reward, selected state. Prior results in collapsed History disclosure. Remove `branchId.slice`, entitlement IDs, `Applied ids`, `Bounded 0–5`, ledger requested/applied, canonical ordering, cap calculations, feasibility key/value, adapter metadata.
+spec/3.0/m3.11.1-implementation-guide.md	107	- [x] First rotation failure inline + Fix link (`Lineup: C can't play G — Fix`). Style `Change lineup` as secondary button when failures exist.
+spec/3.0/m3.11.1-implementation-guide.md	111	## 5. Slice D — Draft setup and resume + free agency, health, Influence, rotation
+spec/3.0/m3.11.1-implementation-guide.md	116	- [x] One exhaustively rendered `DraftStage` replaces independent `hasDraft`, local `started`, status, phase branches. Stalled-generation state has humanized explanation + Retry (`Your draft is saved — try again.`). Empty `No picks yet — Draw to see 8.`
+spec/3.0/m3.11.1-implementation-guide.md	117	- [x] Explain overlapping coverage: one versatile player may satisfy more than one group (clarify 4/4/3 = 11 slots for 10 picks overlap). Humanize coverage disabled reasons (`Not available — breaks coverage (need 2 bigs).`) and async errors (`Try again (draft saved).`).
+spec/3.0/m3.11.1-implementation-guide.md	125	## 6. Slice E — Postseason, recaps, navigation
+spec/3.0/m3.11.1-implementation-guide.md	138	## 7. Slice F — Truthful block-simulation liveness (wire v10)
+spec/3.0/m3.11.1-implementation-guide.md	147	- [x] Display replaces percentage-only: header `You’re W–L in Block N`; human-game chips flip `vs BOS` → `W/L score`; prominent ticker for latest human game, otherwise latest league final + next human opponent + `X/Y`; league pulse Closest / Blowout / Highest-scoring; round dots + thin progress bar below coverage; Cancel / failed / cancelled / retry states.
+spec/3.0/m3.11.1-implementation-guide.md	153	## 8. Slice G — P2 polish
+spec/3.0/m3.12-player-sponsorship-gear.md	1	# M3.12 — Player Sponsorship Gear (roguelike equipment rework)
+spec/3.0/m3.12-player-sponsorship-gear.md	34	1. **Themed slots**: every player has exactly 3 slots — `shoe` /
+spec/3.0/m3.12-player-sponsorship-gear.md	56	3. Sponsor boosts feed the sim through the existing ratings path —
+spec/3.0/m3.12-player-sponsorship-gear.md	72	- No tendencies/anchors/chemistry/fatigue effects in v1 — ratings
+spec/3.0/m3.12-player-sponsorship-gear.md	88	- `shoe` — movement and shot creation (speed, ballHandling,
+spec/3.0/m3.12-player-sponsorship-gear.md	90	- `apparel` — shooting and defense craft (threePoint, midrange,
+spec/3.0/m3.12-player-sponsorship-gear.md	92	- `fuel` — body and engine (strength, stamina-adjacent strength,
+spec/3.0/m3.12-player-sponsorship-gear.md	96	ratings keys plus brand-flavor weights — never fixed numbers. The
+spec/3.0/m3.12-player-sponsorship-gear.md	102	`min(100, base + sum(boosts))` — cap clamps, never errors.
+spec/3.0/m3.12-player-sponsorship-gear.md	108	| T1 | `BUZZ` | 1 | 5–8 | 1–2 stats | +6 | 55% |
+spec/3.0/m3.12-player-sponsorship-gear.md	109	| T2 | `PRIME` | 2 | 9–13 | 1–3 stats | +9 | 32% |
+spec/3.0/m3.12-player-sponsorship-gear.md	110	| T3 | `ICON` | 3 | 14–18 | 1–3 stats | +12 | 13% |
+spec/3.0/m3.12-player-sponsorship-gear.md	115	to 8 + 13 + 18 = 39 pool points (minus spread tax below) — this is
+spec/3.0/m3.12-player-sponsorship-gear.md	125	overflow flows to the next chosen key, ties broken by seed order) —
+spec/3.0/m3.12-player-sponsorship-gear.md	137	Shoe (10 — eligible keys: speed, ballHandling, vertical, steal):
+spec/3.0/m3.12-player-sponsorship-gear.md	138	Nike (heavy speed/vertical), Jordan (speed/midrange-crossover —
+spec/3.0/m3.12-player-sponsorship-gear.md	144	Apparel (10 — eligible keys: threePoint, midrange, perimeterDefense,
+spec/3.0/m3.12-player-sponsorship-gear.md	152	Fuel (10 — eligible keys: strength, offensiveRebound,
+spec/3.0/m3.12-player-sponsorship-gear.md	154	(vertical/speed-crossover — fuel-theme exception), Monster
+spec/3.0/m3.12-player-sponsorship-gear.md	164	lines from one block's 5 offers target the same player — never as a
+spec/3.0/m3.12-player-sponsorship-gear.md	168	calibration starting points, not final — see §8. The catalog is data
+spec/3.0/m3.12-player-sponsorship-gear.md	175	path. Missing asset falls back to a monogram tile — never a broken
+spec/3.0/m3.12-player-sponsorship-gear.md	183	- inputs: `rootSeed`, `blockIndex` (0–7; block 8 deals nothing, same
+spec/3.0/m3.12-player-sponsorship-gear.md	193	  catalog(slot, tier) entries — then the random stat roll: pool in
+spec/3.0/m3.12-player-sponsorship-gear.md	204	  are allowed (two Nike shoes can appear with different rolls) — the
+spec/3.0/m3.12-player-sponsorship-gear.md	245	  player slot. **Irreversible — no unapply, no swap, no refund.**
+spec/3.0/m3.12-player-sponsorship-gear.md	256	Pricing is flat by tier (1/2/3, §1.2) in v1 — no haggling, no
+spec/3.0/m3.12-player-sponsorship-gear.md	269	  engine sees ratings — the sim never knows sponsors exist;
+spec/3.0/m3.12-player-sponsorship-gear.md	270	- boosts from all 3 filled slots sum per key, then clamp 0–100.
+spec/3.0/m3.12-player-sponsorship-gear.md	272	  fully kitted star +25 to +35 effective points across their card —
+spec/3.0/m3.12-player-sponsorship-gear.md	304	  derivations — no second stats computation).
+spec/3.0/m3.12-player-sponsorship-gear.md	306	  logo + tier + boosts; empty shows `Empty — pick from vault`.
+spec/3.0/m3.12-player-sponsorship-gear.md	316	- Occupied slot: picker hidden, chip shows `Filled — permanent`.
+spec/3.0/m3.12-player-sponsorship-gear.md	336	  balance shown (`Influence 2/8 — need 3`).
+spec/3.0/m3.12-player-sponsorship-gear.md	374	  Dexie shape break beyond an additive store/field — migrations stay
+spec/3.0/m3.12-player-sponsorship-gear.md	384	  construction — expected, document in release notes).
+spec/3.0/m3.12-player-sponsorship-gear.md	410	permanence (bad fits are forever — choice has cost), AI kit mirroring,
+spec/3.0/m3.12-player-sponsorship-gear.md	413	Second risk is scope bleed into sim formulas — mitigated by the
+spec/3.0/m3.12-player-sponsorship-gear.md	422	noted). No IndexedDB downgrade needed — additive fields read as
+spec/3.0/m3.12-player-sponsorship-gear.md	428	  <sponsor-gear|season-game|block|influence|state-digest>` — new
+spec/3.0/m3.12-player-sponsorship-gear.md	435	  dupe-brand, off-roster, irreversibility — no unapply path exists);
+spec/3.0/m3.12-player-sponsorship-gear.md	445	  web-jsdom <player-sponsor-card|sponsor-shop|season-roster-list>` —
+spec/3.0/m3.12-player-sponsorship-gear.md	462	- M3.12a — contracts + catalog + assets (  `season-sponsor-gear-v1`,
+spec/3.0/m3.12-player-sponsorship-gear.md	464	- M3.12b — engine generation + vault/commands + sim hookup
+spec/3.0/m3.12-player-sponsorship-gear.md	467	- M3.12c — persistence + worker envelopes + digest/audit
+spec/3.0/m3.12-player-sponsorship-gear.md	469	- M3.12d — web shop + player card + recap (clickable roster,
+spec/3.0/m3.12-player-sponsorship-gear.md	471	- M3.12e — calibration + hardening (economy/spend-rate note,
+spec/3.0/m3.12-player-sponsorship-gear.md	477	  (`wrapSponsorshipsForBlock`, `SPONSOR_WRAP_PROBABILITY` — retired
+spec/3.0/m3.12-player-sponsorship-gear.md	480	  (`SEASON_SPONSOR_CATALOG`, `seasonSponsorWrapperSchema` — compat
+spec/3.0/m3.12-player-sponsorship-gear.md	483	  (`REQUIRED_RATING_KEYS`, `simulationRatingsSchema` — boostable keys).
+spec/3.0/m3.12-player-sponsorship-gear.md	485	  (`SEASON_INFLUENCE_CAP = 8`, ledger sources — add
+spec/3.0/m3.15-season-free-agency-quality.md	1	# M3.15 — Season Free Agency Quality: Elite Enters the Pool
+spec/3.0/m3.15-season-free-agency-quality.md	5	> Status: spec only, not yet implemented. Queued after M3.12–M3.14.
+spec/3.0/m3.15-season-free-agency-quality.md	21	free agency — the market's ceiling is fixed one rung below the
+spec/3.0/m3.15-season-free-agency-quality.md	39	  price point, within the existing schema `min(1).max(3)` — no
+spec/3.0/m3.15-season-free-agency-quality.md	40	  schema shape change). `strong` featured stays 2–3 by the current
+spec/3.0/m3.15-season-free-agency-quality.md	41	  multi-role rule; role stays 1–2; development/emergency stay 1.
+spec/3.0/m3.15-season-free-agency-quality.md	52	  with margin after roster/ownership exclusions — else the
+spec/3.0/m3.15-season-free-agency-quality.md	63	upward — the voted pricing pressure without repricing every band.
+spec/3.0/m3.15-season-free-agency-quality.md	78	  unchanged — they are the anti-superteam brakes that make elite
+spec/3.0/m3.15-season-free-agency-quality.md	120	- `pnpm hoop-rush data validate` — must report OK (index v2 hash,
+spec/3.0/m3.15-season-free-agency-quality.md	125	  — updated: elite no longer excluded; one-featured-per-identity
+spec/3.0/m3.15-season-free-agency-quality.md	129	  web-jsdom <season-free-agency>` — 2 featured cards, 3-cost
+spec/3.0/m3.15-season-free-agency-quality.md	141	  target slots) over re-excluding elite — decided only with
+spec/3.0/m3.15-season-free-agency-quality.md	156	  versions), `season-free-agency-index.ts` (entry schema, cost 1–3).
+spec/3.0/m3.3-test-suite-trim.md	1	# M3.3 — Test Suite Trim (2026-09-03)
+spec/3.0/m3.3-test-suite-trim.md	5	> Aggressive reduction of the test suite. Only test files and test fixtures changed — no production code, game behavior, APIs, or `*_VERSION` bump.
+spec/3.0/m3.3-test-suite-trim.md	9	Test suite had grown to `~138` project test files with significant duplication across packages and levels. Same accounting invariants were asserted in 3–4 places (fixed fixtures + fast-check + season wrapper), white-box `toBeCloseTo(12)` locks broke on any re-balance, and 12 CLI spawn tests re-tested `report-schemas.ts` JSON wiring. Cost: `~65s` `pnpm test:quick`, `~120s` benchmark file, flaky `slot-permutations.test.ts:105,193` (`0.125 > 0.06`), and high maintenance on every version bump (`z.literal` rejects). Goal: optimize for signal / reliability / cost, not coverage %.
+spec/3.0/m3.3-test-suite-trim.md	17	**Deleted entirely (9):** `packages/engine/src/bracket/generator-regeneration.test.ts:1` (16), `packages/engine/src/season/season-game-properties.test.ts:1` (177), `packages/engine/src/season/transactions.test.ts:1` (41), `packages/engine/src/season/ai-projection.test.ts:1` (191), `packages/engine/src/season/alignment-parity.test.ts:1` (34), `packages/persistence/src/benchmark/season-run.test.ts:1` (42), `apps/web/src/lib/season/season-hub-state.perf.test.ts:1` (297), `apps/web/src/lib/season/supabase-migrations.test.ts:1` (16), `tools/cli/src/cli-args.test.ts:1` (14) — duplicate of `args.test.ts:1`.
+spec/3.0/m3.3-test-suite-trim.md	27	### Engine sim / challenge / bracket / domain — redundant → stronger test wins
+spec/3.0/m3.3-test-suite-trim.md	29	- `sim/game.test.ts:57-76` deleted `satisfies every exact invariant across 200 seeded games` + `strong-vs-weak/medium` loops — subsumed by `sim/properties.test.ts:92` fast-check `60` arbitrary teams (`ratingArb 40-95` + `tendencyArb 0-45`) which is strict superset of fixed `buildLegalSimulationTeam()` fixtures. Kept `game.test.ts:19` golden digests `162770398/4074642603`, mirror accounting, OT fact, and `lineup strength` (`sw 200` / `mm 150`).
+spec/3.0/m3.3-test-suite-trim.md	30	- `sim/game.test.ts:176-185` deleted `produces sane per-game totals 40-160 pts / 60-140 poss` — duplicate of `properties.test.ts:127` bounds `50-150 poss / 30-180 pts` on arbitrary teams.
+spec/3.0/m3.3-test-suite-trim.md	31	- `sim/properties.test.ts:161-191` deleted `high-zone-skill teams make more shots` (`45 vs 90` 3P, `120` seeds) — duplicate of `sensitivity.test.ts:85-91` `threePoint → threePct` (`200` seeds, `±15%` delta).
+spec/3.0/m3.3-test-suite-trim.md	32	- `domain/lineup.test.ts:13-32` deleted `slotRequirement G,G,F,F,C` + `canFillSlot` examples (`5` its) — strict subset of `domain/lineup-properties.test.ts:39` fast-check `50` random `normalizePositionUnion` + `assignLineup always legal`.
+spec/3.0/m3.3-test-suite-trim.md	34	- `sim/reconstructed-three-point.test.ts:72-106` deleted `3` of `4` `threePointTarget` resolution tests (kept `conservative` path); `108-168` deleted `3` of `5` `makeProbability` pins (kept `floors at zone floor` + `stays sensitive to defender contest`). Removed `pins to accuracyConservative` / `applies each zone floor` / `no era penalty` — covered by `reconstructed team end-to-end:170` honest accounting `60` games.
+spec/3.0/m3.3-test-suite-trim.md	36	- `sim/slot-permutations.test.ts:178-217` deleted `keeps team-level scoring within 3%` (duplicate of `keeps win-rate within 6pp`); then deleted `2` brittle failing tests `shifts usage...:89` (`7091 > 7070`) and `keeps win-rate:178` (`0.125 > 0.06`) — threshold `±200`/`6pp` flaky on `200` seeds, already covered by `position-responsibilities:36` directionality. Kept `keeps creator as primary initiator` + `preserves shooter shot profile`.
+spec/3.0/m3.3-test-suite-trim.md	39	- `challenge/mvp.test.ts:122-316` trimmed `does not add a three-point term` + `returns unrounded` + `returns null for no games` + `records all 82 appearances` (4 its) — trivial wiring vs `computes exact formula` + `ranks by avg` kept.
+spec/3.0/m3.3-test-suite-trim.md	40	- `modes/classic/draft.test.ts:190-240` deleted `classicRollSeed` concat `toBe(\`\${seed}:classic-roll:v1:initial:3\`)` + `sorts catalog canonically` — subsumed by final property `preserves draft invariants through any bounded command sequence` (`50` runs × `30` commands).
+spec/3.0/m3.3-test-suite-trim.md	42	### Engine season — block pipeline / health / AI deduplication
+spec/3.0/m3.3-test-suite-trim.md	44	- `season-game-properties.test.ts:1` deleted file (`5× fc.assert 30` `audit` / `byte-identical` / `seconds+deviations` / `subs+stints` / `every player >0`) — each repeats single-seed assert in `season-game.test.ts:97,102,108,168,124`.
+spec/3.0/m3.3-test-suite-trim.md	45	- `alignment-parity.test.ts:1` (34) + `transactions.test.ts:1` (41) deleted — `ALL_FRANCHISES === SEASON_ALIGNMENT` + `txn-[0-9a-f]{32}` hash helper covered by `season-presentation` + `influence.test.ts:149` ledger.
+spec/3.0/m3.3-test-suite-trim.md	46	- `checkpoint.test.ts:137-188` deleted `4` digest tests `is deterministic regardless of array order` / `sorts recap arrays` / `excludes digest field` / `stable across parsing` — duplicate of `block.test.ts:26` `digest Match /^[0-9a-f]{32}$/` + `state-digest.test.ts:40` canonical order.
+spec/3.0/m3.3-test-suite-trim.md	47	- `block-determinism.test.ts:9-68` deleted `reproduces block 3 identically across repeated and interrupted runs` (`cancelAfterGames:75`) + `reconciles aggregates and standings with summaries after every block` (`foldSeasonTeamAggregates`/`reduceSeasonStandings` JSON compare) — pure folding already in `aggregates.test.ts:192` + `standings.test.ts:50`; keep `produces identical per-block digests across two full-season runs:30` canonical `9`-block digest equality.
+spec/3.0/m3.3-test-suite-trim.md	48	- `recap.test.ts:86-128` deleted `lists exactly the next block human games from schedule` + `reports no upcoming at season end` second block — shape `upcomingHumanGames === blockRoundRange(1)` trivial. Keep `builds a recap whose every claim derives from saved facts:62` + `keeps streak facts consistent:129`.
+spec/3.0/m3.3-test-suite-trim.md	49	- `aggregates.test.ts:223-247` deleted `flags tampered aggregates` `wins+1` / `pointsFor+5` — duplicate of `block.test.ts:52` tamper.
+spec/3.0/m3.3-test-suite-trim.md	51	- `ai-projection.test.ts:1` deleted file (191) — shadow projection `tinyModel()` `digest==base.digest` + `pools 20` already in `ai.test.ts:131` generation + `ai-generation-v2.test.ts:204` determinism.
+spec/3.0/m3.3-test-suite-trim.md	52	- `ai.test.ts:9-512` removed `season AI targets validation` (`3` cases) + `never crashes on random seeds` (`3` seeds) — covered by `ai-generation-v2.test.ts:375` null/mismatch + determinism `203`.
+spec/3.0/m3.3-test-suite-trim.md	54	### Data-contracts / persistence — literal rejects and enumeration
+spec/3.0/m3.3-test-suite-trim.md	56	- `season-postseason-bracket-contract.test.ts:424` deleted `represents every legal result combination in both conferences` `64` combos × `2` conf (`128` parses) — generative property belongs in engine property suite, duplicates `season-schemas.test.ts:181` corrupt-states. Keep `builds a full 16-team bracket with exactly 15 series` + `series length enumeration`.
+spec/3.0/m3.3-test-suite-trim.md	57	- `persistence/src/benchmark/season-run.test.ts:1` deleted — `120s` `HOOP_RUSH_PERF_STRICT` conditional `commit p95 / reload p95` budgets, non-conditional asserts (`1230/82/9`, `samples 18/2`, `totalBytes>0`) duplicated in `season-run.test.ts:378` full reload.
+spec/3.0/m3.3-test-suite-trim.md	58	- `persistence` and `data-contracts` literal `z.literal` version rejects (`season-schemas.test.ts:27-50` `14` cases) kept as `no change` — too brittle to expand here; note for future `M3.4`.
+spec/3.0/m3.3-test-suite-trim.md	60	### Web / CLI — wiring vs behavior
+spec/3.0/m3.3-test-suite-trim.md	62	- `fake-season-block-runner.test.ts:77-92` deleted `stalls on the first startBlock when the e2e flag is set` (`window.__HOOP_RUSH_E2E_STALL_ONCE__`) — e2e scaffolding, not product behavior. Keep `streams progress to completion with no tied finals:60`.
+spec/3.0/m3.3-test-suite-trim.md	63	- `season-hub-state.perf.test.ts:1` deleted file (297) — `applies the runner complete snapshot directly` merged into `season-hub-state.test.ts`, remainder (`cold refresh` / `external commit/clear`) duplicated in `season-cross-tab.test.ts:4` + `season-block-runner.test.ts:638`.
+spec/3.0/m3.3-test-suite-trim.md	64	- `supabase-migrations.test.ts:1` deleted — filesystem `readdirSync(migrations)` string check, belongs in `pnpm verify` script.
+spec/3.0/m3.3-test-suite-trim.md	65	- `season-views.test.ts:157-193` deleted `renders every ranked row with rank 60` + `shows the compact primary stats with no full columns, then expands` (`getAllByText('Alpha').length===3`, `details hasAttribute('open')`) — brittle DOM, covered by `season-presentation.test.ts:145` pure `provisionalRanking` + `boxScoreFromSummary`.
+spec/3.0/m3.3-test-suite-trim.md	66	- `season-rotation-editor.test.ts:372-515` deleted `4` strategy fallback tests (`falls back to fixed preset when optimization fails` / `when plan missing` / `shows projection error` / `disables strategy buttons while disabled`) — re-test `season-projection-runner` via DOM. Keep `strategy buttons apply their projection plan automatically:372`.
+spec/3.0/m3.3-test-suite-trim.md	67	- `season-free-agency.test.ts:405-790` deleted `adds a target via Target button` + `keeps at most one first/second` + `keyboard-accessible declaration` + `clamps typed influence` + `recap evidence` (`4` its, `141` lines) — picker logic already in `season-free-agency-commands.test.ts:560` rejection mapping.
+spec/3.0/m3.3-test-suite-trim.md	68	- `cli-args.test.ts:1` deleted — duplicate of `args.test.ts:1` (`parseArgs` `UsageError`).
+spec/3.0/m3.3-test-suite-trim.md	69	- `cli-season-block.test.ts:34-85` deleted `accepts explicit --block and rejects out-of-range` + `audits a saved candidate checkpoint with digest verification` + helper `produceBlockZeroCheckpoint` — arg validation already in `args.test.ts`, digest already in `season-block-runner.test.ts:734`. Keep `simulates block 0 over committed fixture` + `runs all nine blocks`.
+spec/3.0/m3.3-test-suite-trim.md	82	Low. All deletions are of strictly subsumed or white-box tests; stronger `fast-check` / pure-view-model / engine integration tests remain as subsumers (see Change). Flaky `slot-permutations:105,193` `7091>7070` / `0.125>0.06` removed — was failing on clean `HEAD` before trim (see `m3.1: Verification`). Risk is losing a narrow regression signal (e.g., `threePointTarget` observed-zero path) — mitigated by `reconstructed team end-to-end:170` honest accounting. Rollback: `git revert <this commit>` restores `31` files; or `git checkout HEAD -- <path>` per file. No migration.
+spec/3.0/m3.3-test-suite-trim.md	86	- `pnpm --filter @hoop-rush/engine check` pass — fixed `position-responsibilities.test.ts:7` `buildSlotPermutationTeams` / `SimulationTeam` imports after trim.
+spec/3.0/m3.3-test-suite-trim.md	87	- `pnpm exec vitest run --project @hoop-rush/engine --project @hoop-rush/data-contracts` **78 files, 1024 tests** pass (58s) — vs `66` files `793` before; `slot-permutations.test.ts:89` now `2/2` pass (was `2/4` flaky).
+spec/3.0/m3.3-test-suite-trim.md	88	- `pnpm exec vitest run --project @hoop-rush/web --project web-jsdom` **33 files, 290 tests** pass (7.5s) — `season-views` `2` smoke tests remain.
+spec/3.0/m3.3-test-suite-trim.md	89	- `pnpm test:quick` **127 files, 1530 tests** pass (64s) — previously `~138` files, `~1700` tests; `-11` files, `-170` tests, `~35%` wall-time on `sensitivity`/`slot-permutations`/`properties` heavy suites.
+spec/3.0/m3.3-test-suite-trim.md	90	- `pnpm --filter @hoop-rush/engine lint` — `142` prettier warnings remain pre-existing (not introduced), `0` `eslint` errors from trim.
+spec/3.0/m3.3-test-suite-trim.md	91	- `pnpm hoop-rush data validate` not required — no `apps/web/static/data/**` edit; `apps/web: prettier --write` formatting only.
+spec/3.0/m3.3-test-suite-trim.md	95	- Queue `M3.4` — remaining literal `z.literal` rejects in `season-schemas.test.ts:27-50` (`14` cases) → single `unknown version rejected` helper; `persistence` `season-run` vs `season-run-free-agency` vs `season-completed-listing` shared `makeAdapters` / `commitInputFor` / `tiebreakResolutions: tie-resolve-1` fixture extraction to `persistence/src/testing/season-fixture-helpers.ts`; CLI `cli-season-block` / `cli-season-game` / `cli-sim-*` spawn matrix → single parametric wire test per command.
+spec/3.0/m3.3-test-suite-trim.md	96	- Deferred `slot-permutations` full removal — keep `2` behavioral gates until `position-responsibilities` calibration stabilizes, then delete file and rely on `roles.test.ts:126`.
+spec/3.0/m3.3-test-suite-trim.md	97	- Consider `spec/3.0/01-cleanup-log.md:57` linking to this file and `README.md:62` `## M3 — What shipped` update (tracked).
+spec/3.0/m3.3-test-suite-trim.md	101	- `spec/3.0/01-cleanup-log.md` — M3 principles, entry template.
+spec/3.0/m3.3-test-suite-trim.md	102	- `spec/3.0/m3.1-dedup-dead-code-sweep.md` — `~110` LOC dedup, `m3-engine-v13` kept.
+spec/3.0/m3.3-test-suite-trim.md	103	- `spec/3.0/02-m3.2-presentation-pass.md` — `36` files `-909` lines UI copy.
+spec/3.0/m3.3-test-suite-trim.md	104	- `packages/engine/src/sim/invariants.ts:1` / `packages/engine/src/season/season-game-audit.ts:1` — kept accounting invariants.
+spec/3.0/m3.3-test-suite-trim.md	105	- `packages/engine/src/challenge/seeds.ts:1` / `packages/engine/src/sim/rng.ts:1` — kept determinism seeds.
+spec/3.0/m3.4-ui-consistency-pass.md	1	# M3.4 — UI Consistency Pass (2026-09-03)
+spec/3.0/m3.4-ui-consistency-pass.md	5	> Aggressive consistency sweep across Sandbox, Classic, Season Run, Roster, Results, History, dialogs, and navigation. Only UI/styling/layout/presentation components and shared tokens changed — no game logic, simulation behavior, data-contracts, persistence, or feature scope.
+spec/3.0/m3.4-ui-consistency-pass.md	14	* Cards: `rounded-none bg-surface-1 sm:rounded-xl` (no border) vs `rounded-xl border bg-card` vs `rounded-2xl border-line-strong shadow-[0_0_24px]` vs `rounded-lg bg-card` — same elevation, 5 spellings.
+spec/3.0/m3.4-ui-consistency-pass.md	38	### Tokens — `apps/web/src/app.css:3`
+spec/3.0/m3.4-ui-consistency-pass.md	41	* Added `.text-eyebrow` (`0.625rem 0.16em`), `.text-badge` (`0.625rem 0.12em`) alongside existing `.text-label` (`0.6875rem 0.14em`) — replaces 40+ ad-hoc `text-[10px]/[11px]/xs` + `tracking-[0.16/0.14/0.12]`.
+spec/3.0/m3.4-ui-consistency-pass.md	42	* Added `.page-shell`/`.section-card`/`.inset-card`/`.pill-active`/`.table-head` helpers (documented, not yet migrated everywhere — next step).
+spec/3.0/m3.4-ui-consistency-pass.md	45	### Primitives — `apps/web/src/lib/components/ui/`
+spec/3.0/m3.4-ui-consistency-pass.md	47	* `Button.svelte` — single `base` (`rounded-lg font-semibold focus-visible:ring-2 disabled:opacity-40`) + `variants` (`primary bg-primary/90`, `secondary border bg-surface-1 hover:border-line-strong`, `ghost`, `destructive`) + `sizes` (`sm px-3 py-1.5 xs`, `md px-4 py-2 sm`, `lg px-5 py-3`). Used as reference for manual `px-5 py-3` / `px-4 py-2` normalization where not yet migrated.
+spec/3.0/m3.4-ui-consistency-pass.md	48	* `Card.svelte` — `variant default(border bg-surface-1) | muted | inset(bg-surface-2) | ghost` + `padding sm|default|lg` + `radius` (`rounded-xl` vs `rounded-none sm:rounded-xl` flush). Codifies outer `rounded-xl border p-4 sm:p-5` vs inset `rounded-lg bg-surface-2 p-3`.
+spec/3.0/m3.4-ui-consistency-pass.md	49	* `Badge.svelte` — `variant primary/accent/positive/destructive/warning/neutral` (`bg-*/15` + `border-*/30` where needed), `size default(px-2 py-0.5 text-[10px] tracking 0.12) | sm`. Replaces 6 `rounded-full px-2 py-0.5 text-[10px]` spellings (`SeasonReport:195`, `CheckpointRecap:161`, `HealthStrip:30` etc).
+spec/3.0/m3.4-ui-consistency-pass.md	53	* `classic/+page.svelte:295-310` — `mx-auto max-w-6xl px-0 py-4 sm:px-6 sm:py-10` → `px-4 py-6 sm:px-6 sm:py-10` (now matches Sandbox/History/Result/Roster: `spec/2.0` shell). `flex items-start gap-3 px-3` → `items-end gap-4 px-0`; `font-mono text-[10px] sm:text-xs` → `text-xs` (kicker single size); `h1 text-2xl sm:text-4xl` → `text-3xl sm:text-4xl` (all `h1` now `text-3xl sm:text-4xl md:text-5xl`, `h2` `text-lg`/`text-xl` hero only). `Choose a variant` `h2 text-[11px]` → `span.text-label` (fixes 4× `h2` siblings where 2 were labels).
+spec/3.0/m3.4-ui-consistency-pass.md	54	* `sandbox/+page.svelte:319,418` and `roster/+page.svelte:269,371` — same `h2`→`span.text-label` for `Team/Decade/Franchise`.
+spec/3.0/m3.4-ui-consistency-pass.md	69	* Inset: `rounded-lg bg-surface-2 p-3` (no border) — `BlockProgress:75`, `RotationEditor:100`, `SeasonReport:287` kept.
+spec/3.0/m3.4-ui-consistency-pass.md	82	* Header `+layout.svelte:39` `border-b border-border/70 h-16 px-3 sm:px-6` + `font-display text-2xl` + `md:flex gap-1 rounded-xl px-4 py-2 active:bg-primary` kept; `BottomNav` `fixed bottom-0 border-t bg-background/90 backdrop-blur p-1` + `rounded-xl px-1 py-2 text-[10px]` + `pb-[max(0.5rem,safe-area)]` vs page `pb-32`/`pb-40 md:pb-10` (`roster:231`) vs `season/run/+layout:809` `pb-[max(6.5rem,safe-area)] md:pb-14` — page `pb` now `pb-[max(6.5rem,safe-area)]` single value (season `teams/+page:42` `5.25rem` → `6.5rem`).
+spec/3.0/m3.4-ui-consistency-pass.md	92	Low. All edits are in `apps/web` Svelte/TS/CSS; engine/persistence/data-contracts/tests untouched except `src/lib/components/ui/` additions. Risk is visual regression (missing border, wrong radius, focus invisible) — covered by `pnpm --filter @hoop-rush/web build` + manual desktop (`1280`) / mobile (`390`) / keyboard-tab / reduced-motion smoke on Home, Roster (`sm:hidden`↔`sm:block`), Sandbox/Classic drafts (`DraftPoolBrowser` pills, `LineupCourt` court), Season Hub tabs (`Hub/Team/Schedule/League/Leaders` + `BottomNav`), `ResultPage`/`HistoryPage`/`ChallengeOverlay`. Rollback: `git revert <this commit>` restores 33 files + `ui/`; or `git checkout HEAD -- apps/web/src/app.css apps/web/src/lib/components/ui/` per file. No migration.
+spec/3.0/m3.4-ui-consistency-pass.md	96	* `pnpm --filter @hoop-rush/web build` — `✓ built in 14.24s` (5213 SSR / 5249 client), `svelte-kit sync` ok (pre-existing `svelte-check` 27 errors in `RotationEditor`/`ClassicRollReel` remain on clean `HEAD`, 0 new from this pass).
+spec/3.0/m3.4-ui-consistency-pass.md	97	* `pnpm --filter @hoop-rush/web exec prettier --write` on 28 modified files — `app.css` unchanged, `Button/Card/Badge` formatted.
+spec/3.0/m3.4-ui-consistency-pass.md	98	* `grep -r "rounded-\[3px\]|gap-\[3px\]|hsl\(13|hsl\(42|text-rose|text-emerald|text-amber.*500/15"` — 0 hits in `apps/web/src` player-visible strings post-pass (only `app.css` token `hsl` and `warning` token).
+spec/3.0/m3.4-ui-consistency-pass.md	99	* `grep -r "disabled:opacity-50"` — 0 hits (was 8).
+spec/3.0/m3.4-ui-consistency-pass.md	100	* `grep -r "px-0 py-4 sm:px-6 sm:py-10"` — 0 hits (Classic shell normalized).
+spec/3.0/m3.4-ui-consistency-pass.md	101	* `pnpm exec vitest run --project @hoop-rush/web --project web-jsdom` — `47 passed / 4 failed (427/434)` jsdom vs `48/53 (442/451)` on clean stash — 2 fewer failures, 0 new; remaining 4 are pre-existing (`season-views` “M2.6 tiebreak” copy, `season-rotation-editor` strategy fallback, `draft-components` slot-permutation).
+spec/3.0/m3.4-ui-consistency-pass.md	107	* Migrate remaining `rounded-none bg-surface-1 sm:rounded-xl` (7 season cards), `text-[10px]/[11px]` (40+), `border-border/40/60/70` drift, and `hover:bg-surface-2` vs `hover:bg-surface-3` vs `hover:accent/20` to `Card`/`Badge`/`Button` primitives — this pass normalized values but did not yet replace every call site with `<Card>`/`<Button>`/`<Badge>` (next: `ui/DialogShell` for 5 dialog copies, `ui/Table` for `px-2` vs `px-3` density, `ui/Tabs` for `Per game/Totals` vs `All/PG/SG…` segmented controls).
+spec/3.0/m3.4-ui-consistency-pass.md	109	* Consider `spec/3.0/01-cleanup-log.md:57` linking here and `README.md:62` `## M3 — What shipped` update (tracked). `Docs/interface/screens.md` and `current-routes.md` already updated to match `M3.2` copy — no change needed for `M3.4` (no copy change).
+spec/3.0/m3.4-ui-consistency-pass.md	113	* `spec/3.0/01-cleanup-log.md` — M3 template, principles, backlog.
+spec/3.0/m3.4-ui-consistency-pass.md	114	* `spec/3.0/02-m3.2-presentation-pass.md` — 36-file copy pass (net -909 lines).
+spec/3.0/m3.4-ui-consistency-pass.md	115	* `spec/3.0/m3.3-test-suite-trim.md` — 31-file test trim (no behavior change).
+spec/3.0/m3.4-ui-consistency-pass.md	116	* `apps/web/src/app.css:3` — authoritative `@theme` (tokens) and `text-label` source.
+spec/3.0/m3.4-ui-consistency-pass.md	117	* `apps/web/src/lib/components/ui/Button.svelte:1` / `Card.svelte:1` / `Badge.svelte:1` — new primitives.
+spec/3.0/m3.4-ui-consistency-pass.md	118	* `packages/engine/src/index.ts:1` — engine exports (unchanged).
+spec/3.0/m3.4-ui-consistency-pass.md	119	* `packages/engine/src/sim/rng.ts:1` / `packages/engine/src/challenge/seeds.ts:1` — determinism (unchanged).
+spec/3.0/m3.5-type-system-discipline-sweep.md	1	# M3.5 — Type-System Discipline Sweep (2026-09-04)
+spec/3.0/m3.5-type-system-discipline-sweep.md	5	> Full-repo TypeScript type-discipline pass: branded IDs, `as`-cast removal, exhaustiveness arms, boundary validation, honest guards, object args, real-engine tests. No simulation behavior, game accounting, APIs, or `*_VERSION` bump — `parse` only validates already-valid values, so seeded results are unchanged.
+spec/3.0/m3.5-type-system-discipline-sweep.md	15	`~556` files `413aa5b0..bed41ffb` (`132378+/113145-`, heavily inflated by a repo-wide prettier pass running concurrently — content work is the `Schema.parse` branding migration + cast removal below):
+spec/3.0/m3.5-type-system-discipline-sweep.md	20	*Boundaries:* web edge transport `safeParse`-before-`as T` + `isDraftCommand` delegating to `seasonDraftCommandSchema` (both files later deleted as dead code in `4ea2094` — debt removed with the code, no dangling imports); `fixed-five-identity.ts:40` / `season-room-identity.ts:24` `safeParse` + room match; importer `RosterPlayer extends Record<string,unknown>` (`ratings/compute.ts:15`), `Manifest = Record<string,unknown>` (`manifest/index.ts:9`), `targets: Record<string,unknown>` (`freeze/index.ts:59`) replaced with `z.object` + `z.infer`; `data-derive.ts:67-76` / `projection.ts:151,155` casts replaced with `safeParse` + `Pick`.
+spec/3.0/m3.5-type-system-discipline-sweep.md	21	*Tests/fakes:* `vi.mock('@hoop-rush/engine')` removed (`season-m25.test.ts:24`, `season-block-runner.test.ts`, `season-influence-view.test.ts`) — real engine, same as CLI; `normalize-mutable-state.ts:59` sole prod `as any` removed; in-memory transports take injected `seed/clock/rng` (no `Math.random`/`Date.now`); fake↔engine `Parameters/ReturnType` parity types added.
+spec/3.0/m3.5-type-system-discipline-sweep.md	22	*Production bug found by the sweep:* `validateSeasonRosterTargets` (`season/ai-generation.ts:121`) dereferenced `targets.schemaVersion` with no null guard — `undefined` threw `TypeError` instead of typed `SeasonAiTargetsError`. One-line early-throw fix, valid flows unchanged.
+spec/3.0/m3.5-type-system-discipline-sweep.md	28	### Branded IDs — `data-contracts/src/ids.ts:1`, `season-seeds.ts:22`
+spec/3.0/m3.5-type-system-discipline-sweep.md	30	* 9 schemas branded via native `.brand<>()` (Zod `^4.4.3`): `Id`, `CommandId`, `SeasonGameId` (`/^s[0-9]{6}$/`), `PlayerId`, `FranchiseId`, `EraId`, `SeasonKey`, `Seed` (`/^[0-9a-f]{16,64}$/`), `ContentHash`. Runtime regexes byte-identical — zero runtime overhead, brands erased.
+spec/3.0/m3.5-type-system-discipline-sweep.md	31	* `seasonNamespaceSeed(rootSeed: string, …): Seed` — accepts any string (it hashes), returns validated `Seed`. This single widening fixed all seed-derivation callers (`campaign.ts:66`, `free-agency.ts:71`, …).
+spec/3.0/m3.5-type-system-discipline-sweep.md	33	* Key narrowing fact used throughout: branded strings are still assignable to `string`, so `seed: string` / `franchiseId: string` helpers never broke — only `string → branded` positions needed `parse`.
+spec/3.0/m3.5-type-system-discipline-sweep.md	35	### Casts + exhaustiveness — `engine/src/season/`
+spec/3.0/m3.5-type-system-discipline-sweep.md	37	* `season-commands.ts`: 55 `as` / 38 double-casts → 0 in owned ranges; 27-case dispatch gets `default: assertNever`. Two `as SeasonRunCommandResult` kept (generic→specific, needs per-command discriminant — noted follow-up).
+spec/3.0/m3.5-type-system-discipline-sweep.md	41	### Fixtures/tests migration pattern — `test-fixtures/src/`, `season-schemas-fixtures.ts`
+spec/3.0/m3.5-type-system-discipline-sweep.md	43	* Whole-object `schema.parse` per builder (`peakPlayerSeasonSchema`, `classicDraftCatalogSchema`, `seasonLeagueSchema`, `seasonRosterSchema`, `challengeRunSchema`, `projectionModelArtifactSchema`) — one wrapper per builder fixes dozens of literal errors; `parse` takes `unknown` so plain-string literals typecheck and the return is branded. `Record<EraId>` keys use computed parsed keys (`const era1990s = eraIdSchema.parse('1990s'); { [era1990s]: … }`).
+spec/3.0/m3.5-type-system-discipline-sweep.md	49	* Determinism preserved: `block-determinism.test.ts` identical per-block digests pass; seed-derivation vectors (`season-schemas.test.ts` 86/86, `historical-identity.test.ts` 16/16) pass — `parse` wrappers are behavior-preserving.
+spec/3.0/m3.5-type-system-discipline-sweep.md	55	* `svelte-check` crashes with `MagicString: Cannot split a chunk that has already been edited` on dirty `routes/*.svelte` pages (tooling bug, other editors' files) — `tsc` itself is clean.
+spec/3.0/m3.5-type-system-discipline-sweep.md	56	* `draft-components.test.ts` (4) + `season-history-route.test.ts` (1) fail identically on stashed original code (split-span text, en-dash expectations) — pre-existing, unrelated to this sweep.
+spec/3.0/m3.6-architecture-simplification.md	1	# M3.6 — Architecture Simplification (2026-09-04)
+spec/3.0/m3.6-architecture-simplification.md	5	> Collapse duplicated validators, solvers, digests, seams, and worker-protocol state into single authorities. No simulation behavior, game accounting, seeded results, APIs, or `*_VERSION` bump — every item is a deletion or a mechanical delegation whose before/after is pinned by existing digest, command, and determinism suites.
+spec/3.0/m3.6-architecture-simplification.md	9	The debt audit found the dependency direction clean (`web -> engine`, engine pure) but authority split: three rotation validators, two trade-band systems, three digest canonicalizers, two health seams, a stateful worker protocol with two fingerprint functions, four command entry points, and two asset-loader stacks. Each pair agrees today and can diverge tomorrow — the postseason-legacy fork (deleted: `postseason-legacy.ts` 955L + test 576L + contract 152L) proved forks do diverge. Prior passes in this milestone already removed the `pick*` one-line forwarders, `prepareTeamCached`, the `firstRotationRejection` fork (now a mapper over `validateSeasonRotation`), and the classic triple-export.
+spec/3.0/m3.6-architecture-simplification.md	15	Non-goals (explicitly out, decided 2026-09-04): rating-composite unification, H2H mirror re-simulation, projection reference-model move (all change seeded results — separate versioned calibration); version-union collapse / Dexie squash / multiplayer-v1 enforcement (save/room-breaking — separate bump); Supabase `_shared`/auth hardening (separate remote PR); persistence load-mutation + engine-seam shadows (files under active concurrent edits — coordinate first).
+spec/3.0/m3.6-architecture-simplification.md	24	### 1. Rotation solving — `engine/src/season/rotation.ts`, `rotation-planner.ts`
+spec/3.0/m3.6-architecture-simplification.md	27	* ~~Keep one planner cache: delete `plannerStateCache` or `cachedCandidates`, not both. Enumeration order is the determinism contract — `rotation-planner.test.ts` + `season-game-properties` pin it.~~ Investigated: caches serve different levels, both kept (see §0).
+spec/3.0/m3.6-architecture-simplification.md	29	### 2. Trade bands + offer assembly — `engine/src/season/trades.ts`, `trade-board.ts`
+spec/3.0/m3.6-architecture-simplification.md	32	* Done: dead `rawRatio < TRADE_EXTENDED_RATIO` branch + `TRADE_EXTENDED_RATIO` const deleted (unreachable — anything `< 750` already returns at the `< 800` gate); band bounds shared as exported `TRADE_BAND_1V1` / `TRADE_BAND_DEFAULT` from `trades.ts`, used by both the engine offer path and the board's `evaluateTradeProposal` (numbers can no longer drift); hardcoded `800` in the board's reason string uses the constant. Pinned by `trades` (24), `season-commands` (37), `block` + `block-determinism`.
+spec/3.0/m3.6-architecture-simplification.md	33	* Kept distinct: routing the board through `seasonTradeValueBandFor.qualified` / `ratioMutuallyWithinBand` would CHANGE accept/reject behavior — the engine path clamps raw into `[800,1200]` (a raw-700 non-1v1 qualifies there but the board rejects) and adds a reciprocal check the board lacks, while the board applies Influence cash adjustment the engine path doesn't. The two evaluators answer different questions (AI offer legality vs human proposal + cash). Do not merge without a product decision + calibration.
+spec/3.0/m3.6-architecture-simplification.md	35	* Assembler merge investigated, **kept as two paths**. The field mapping is mirrored, not shared: the AI assembler swaps `outgoing`/`incoming` relative to candidate fields, evaluates value/health/roles/depth from the other franchise's perspective, emits different `projectedRotationChanges`/`roleFit` text, and sets `status: 'accepted'` vs `'open'`. A unified assembler needs a direction-mapping layer plus text branches — same line count, more indirection, over user-visible text covered by checkpoint digests. The probing loops (`humanOfferCandidate` vs `aiTradeCandidate`) differ the same way (franchise selection, seed paths, protected-players, schema-bounds vs reciprocal gates). Revisit only if a third offer path appears.
+spec/3.0/m3.6-architecture-simplification.md	37	### 3. Digests + facts builders — `engine/src/season/checkpoint.ts`, `state-digest.ts`, `rotation.ts`, `block.ts`, `season-commands.ts`
+spec/3.0/m3.6-architecture-simplification.md	40	* `seasonRotationSetDigest` (`rotation.ts:81`) vs `rotationCanonical` (`digest.ts:31`): investigated, **kept as distinct**. Shapes differ deliberately — the set digest includes `minutePolicy` + `rotationVersion`, the generation canonical excludes them (generation digest carries top-level `rotationVersion`; policy doesn't exist at generation time). Unifying either shape changes stored fingerprints. Do not merge.
+spec/3.0/m3.6-architecture-simplification.md	43	### 4. Health seam — `engine/src/season/health.ts`, `postseason.ts`
+spec/3.0/m3.6-architecture-simplification.md	45	* ~~Parameterize `seasonGameHealthSeam(run, health, { injuryRoll })`; delete `postseasonGameHealthSeam:1198`; unify `rollSeasonInjuryForPlayer` / `rollPostseasonInjuryForPlayer` with a `namespace` arg.~~ Done by a concurrent pass: single `seasonGameHealthSeam` (`health.ts:86`) consumed by `block.ts`; postseason fork and postseason injury-roll duplicate gone (`rollPostseasonRehabOutcome` retained — distinct rehab path, still covered by `postseason.test.ts` + `season-commands.ts:2546`). Engine `tsc` clean.
+spec/3.0/m3.6-architecture-simplification.md	47	### 5. Worker protocol — `apps/web/src/lib/season/season-block-runner.ts`, `workers/season-block-worker.ts`
+spec/3.0/m3.6-architecture-simplification.md	49	* Done: deleted `cloneForWorker` pre-clones (11 call sites) + `clonePlain` Map/Set/Date fallback (35 lines). `postMessage` was already the second clone, and the Zod `.parse` between build and post constructs detached output synchronously — the pre-clone changed nothing. `postMessage` is now the only clone. Pinned by `season-block-runner.test.ts` (16 wire/digest/commit cases green).
+spec/3.0/m3.6-architecture-simplification.md	50	* Deferred: stateless-worker conversion (`continue` path, `synthesizeStart`, dual fingerprint tracking) and gate/re-derivation collapse. These change resume-after-restart semantics on the hot path owned with the E2E suite — needs a dedicated pass with `e2e:smoke`, not a drive-by.
+spec/3.0/m3.6-architecture-simplification.md	52	### 6. Command entry — `engine/src/season/season-commands.ts`, `block.ts`, `rotation.ts`, `draft.ts`, `index.ts`
+spec/3.0/m3.6-architecture-simplification.md	54	* ~~Keep `handleSeasonRunCommand` as the sole public command entry; demote `handleSubmitSeasonBlockCommand` / `handleSetSeasonRotationCommand` / `applySeasonDraftCommand` to internal (remove from `index.ts`, keep direct unit-test imports). Zero behavior change — `season-commands.test.ts` pins the dispatcher.~~ Investigated, **kept public**. All three have production consumers outside engine tests importing from `@hoop-rush/engine`: CLI (`season-reproduce`, `season-draft`, `season-draft-calibrate`, `season-block`, `gen-season-assets`) and web (`season-draft-flow`, draft-board test). Demoting them forces deep relative imports at 8+ call sites — worse than the current explicit surface. The "which entry" question is answered by use-site (block submit / rotation set / draft apply are different commands, not rivals of the mega-dispatcher).
+spec/3.0/m3.6-architecture-simplification.md	56	### 7. Asset loading — `apps/web/src/lib/season/season-assets.ts`, `season-block-runner.ts:207`
+spec/3.0/m3.6-architecture-simplification.md	60	### 8. Fixed-five engine vs worker — needs seed-parity sweep first
+spec/3.0/m3.6-architecture-simplification.md	62	* `fixed-five-worker.ts:79-227` inlines the 82-game + duel loops plus local `weakestOpponentId` instead of calling engine `simulateShared82` / `simulateDuelSeries` / `findWeakestOpponent`. Preferred: worker calls engine. Blocked on proving seeded-result parity (`fixed-five.test.ts` vectors + a seed sweep) — do not collapse on assertion alone.
+spec/3.0/m3.6-architecture-simplification.md	67	* Determinism: `block-determinism.test.ts` per-block digests + `game.test.ts` golden hashes unchanged (any digest change fails closed here — that is the point).
+spec/3.0/m3.7-performance-pass.md	1	# M3.7 — Performance Pass (2026-09-04)
+spec/3.0/m3.7-performance-pass.md	5	> Practical, low-risk speedups in the simulation hot loop, block pipeline, effects buffer, and season views. No simulation behavior, game accounting, seeded results, APIs, or `*_VERSION` bump — every item preserves RNG draw count/order and canonical digest bytes, pinned by existing determinism, audit, and digest suites.
+spec/3.0/m3.7-performance-pass.md	15	### 1. Single-fold aggregates — `engine/src/season/aggregates.ts`, `block.ts`
+spec/3.0/m3.7-performance-pass.md	21	### 2. Allocation-free possession picks — `engine/src/sim/usage.ts`
+spec/3.0/m3.7-performance-pass.md	25	* `pickZone`: no `base.slice()`; `scaledZoneWeight` replicates `applyZonePulls` multiply order exactly (`applyZonePulls` itself kept — still used by `expected-ledger`).
+spec/3.0/m3.7-performance-pass.md	26	* `pickAssister`: single candidate filter (was two — `pickAssister` filtered, then `assisterWeights` filtered again) via shared `assisterWeightOf`. `assisterWeights` export unchanged.
+spec/3.0/m3.7-performance-pass.md	28	### 3. Effects unit cache — `engine/src/season/effects.ts`
+spec/3.0/m3.7-performance-pass.md	34	### 4. Web hot-loop cleanup — `season-presentation.ts`, `season-player-stats-view.ts`, `season-team-detail-view.ts`
+spec/3.0/m3.7-performance-pass.md	44	* Engine suites green: `possession` (4), `game` (7, 1 skipped), `season-game` (26), `aggregates` (4), `effects` (16), `block-effects` (2) — 54 passed, 1 skipped.
+spec/3.0/m3.7-performance-pass.md	51	* `auditSeasonBlock` still re-folds after `assembleSeasonBlockCandidate` — passing the candidate as its own fresh input would make the second audit tautological. The remaining duplicate fold is the cost of independent verification.
+spec/3.0/m3.7-performance-pass.md	53	* `unitPairs` validation (`new Set` per call) kept — now runs only on substitution, not per trip.
+spec/3.0/m3.7-performance-pass.md	58	* `packages/engine/src/season/aggregates.ts` — optional fresh inputs, `Set` lookup.
+spec/3.0/m3.7-performance-pass.md	59	* `packages/engine/src/season/block.ts` — pre-folded audit args, `push` append.
+spec/3.0/m3.7-performance-pass.md	60	* `packages/engine/src/sim/usage.ts` — allocation-free `pickAction`/`pickDefender`/`pickZone`, single-filter `pickAssister`.
+spec/3.0/m3.7-performance-pass.md	61	* `packages/engine/src/season/effects.ts` — unit pair-key cache, scan-based stint update.
+spec/3.0/m3.7-performance-pass.md	62	* `apps/web/src/lib/season/season-presentation.ts` — schema-parse removal, conference pre-sort.
+spec/3.0/m3.7-performance-pass.md	63	* `apps/web/src/lib/season/season-player-stats-view.ts` — direct single-player scan, optional aggregates.
+spec/3.0/m3.7-performance-pass.md	64	* `apps/web/src/lib/season/season-team-detail-view.ts` — optional aggregates.
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	1	# M3.8 — Fixed-Five Multiplayer Delivery / M2.8 (2026-09-03/04)
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	6	> (`b6fc02d6`, `d21c4774`, `9834d2ab`, `3b7457d2` — Prettier 4sp→2sp,
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	20	* Engine: `engine/src/modes/fixed-five/` new — `duel.ts:265`,
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	67	  inspection — see Follow-ups re M3.6 §8).
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	70	  `digest.ts:17-55` — fixes prod room `d71f` mismatch (`e7825043`).
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	85	No Season Run / Classic / Sandbox simulation rule change in this file —
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	103	  `e2e/fixed-five-join.spec.ts:90` — added in range; run
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	117	* Two-client digest-agreement CI (prod `d71f` class) — promote the
+spec/3.0/m3.8-fixed-five-m2.8-delivery.md	131	* `spec/3.0/01-cleanup-log.md` — M3 principles (Supabase temporary only).
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	1	# M3.9 — Simulation Retune v14 + Ratings v3.9 / Derive v10 (2026-09-03/04)
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	21	  `sim/usage.ts:46,77,119` — `creationMod 0.75+0.5 → 0.65+0.7`,
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	27	  (`0de8abd0` — same draw count/order, allocation-free per M3.7);
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	34	  — `productionEvidence` weights `ppg 0.85 → 0.6`, `bpm 1.15 → 1.3`,
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	50	  Manual-roll rewrite preserves RNG draw count/order — perf only.
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	56	  but uncalibrated in commit messages — treat as versioned behavior
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	72	Do NOT hand-edit `apps/web/static/data/` or `raw-data/` — regenerate.
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	76	* `pnpm hoop-rush data validate` — must report OK
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	80	  sensitivity, `checkGameResult` / `checkSeasonGameResult` accounting —
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	86	  (working tree shows uncommitted `v15` — do not ship mixed).
+spec/3.0/m3.9-simulation-ratings-v14-v39.md	106	* `spec/2.0/08-quality-and-calibration.md` — calibration gates.
+spec/3.0/README.md	1	# M3 — cleanup and vertical slices
+spec/3.0/README.md	3	`spec/3.0/` records post–2.0 hygiene work and named deliveries. It does not
+spec/3.0/README.md	9	1. [`01-cleanup-log.md`](./01-cleanup-log.md) — living dedup and consistency log
+spec/3.0/README.md	10	2. [`02-m3.2-presentation-pass.md`](./02-m3.2-presentation-pass.md) — UI presentation pass
+spec/4.0/02-cards-and-rarity.md	29	Example: the first special is `Heat Check` — six specific players, each
+spec/4.0/02-cards-and-rarity.md	56	- Stephen Curry — Heat Check Stephen Curry
+spec/4.0/02-cards-and-rarity.md	57	- Klay Thompson — Heat Check Klay Thompson
+spec/4.0/02-cards-and-rarity.md	58	- Damian Lillard — Heat Check Damian Lillard
+spec/4.0/02-cards-and-rarity.md	59	- Devin Booker — Heat Check Devin Booker
+spec/4.0/02-cards-and-rarity.md	60	- Jamal Murray — Heat Check Jamal Murray
+spec/4.0/02-cards-and-rarity.md	61	- Reggie Miller — Heat Check Reggie Miller
+spec/4.0/10-implementation-bridge.md	27	require engine, rules, or schema code changes — only a content-table entry
+spec/4.0/11-milestones.md	21	## M4.0 — Contracts and seed tree
+spec/4.0/11-milestones.md	47	## M4.1 — Starter, packs, and collection book
+spec/4.0/11-milestones.md	77	## M4.2 — Team building and the basic game
+spec/4.0/11-milestones.md	100	## M4.3 — Difficulty, objectives, and rewards
+spec/4.0/11-milestones.md	104	Status (recorded 2026-09-12): **implemented, calibration freeze pending** —
+spec/4.0/11-milestones.md	146	## M4.4 — Challenges, targeting, and sets
+spec/4.0/11-milestones.md	159	pending** — not shipped. Contracts, engine, persistence (Dexie v20), the
+spec/4.0/11-milestones.md	180	## M4.5 — Ultimate Run hub and visual system
+spec/4.0/11-milestones.md	186	(`pack-targets-v1`) and all M4.2–M4.4 rules stay frozen. Display names and art
+spec/4.0/12-reuse.md	8	## M4.0 — Contracts and seed tree
+spec/4.0/12-reuse.md	17	  `AutopickSeed`, `TiebreakWinner` — it has no
+spec/4.0/12-reuse.md	30	  (zero hits) — add them in the style of `ids.ts`; digests from
+spec/4.0/12-reuse.md	42	  `seasonCommandLogDigest` — not pull-specific),
+spec/4.0/12-reuse.md	53	  plus rarity — rarity and the card schema do not exist yet. The
+spec/4.0/12-reuse.md	72	  is mixed strict plus legacy loose — do not copy those styles. Web has no
+spec/4.0/12-reuse.md	78	## M4.1 — Packs and collection book
+spec/4.0/12-reuse.md	93	  `version(15)`; no `collection` store yet — add collection stores as a new
+spec/4.0/12-reuse.md	99	  `auditCollectionState` does not exist yet — new work),
+spec/4.0/12-reuse.md	125	## M4.2 — Team editor and basic game
+spec/4.0/12-reuse.md	134	  `ILLEGAL_STARTERS` / `INVALID_TARGETS` / `ROSTER_MISMATCH` — currently
+spec/4.0/12-reuse.md	164	## M4.3 — Difficulty, objectives, rewards
+spec/4.0/12-reuse.md	196	  a rename of `FrontOfficePicker` — GM identity is the distinct
+spec/4.0/12-reuse.md	220	  the Season Run player-team rotation uses —
+spec/4.0/12-reuse.md	248	## M4.4 — Challenges, targeting, sets
+spec/4.0/12-reuse.md	273	## M4.5 — Presentation
+spec/4.0/12-reuse.md	277	  `start` / `cancel` — there are no `pause()` / `resume()` methods),
+spec/4.0/12-reuse.md	291	  worker with no odds-preview API — the single-pack draw assembly and odds
+spec/4.0/12-reuse.md	306	   exists — pack bands, odds, and guarantees are still new).
+spec/4.0/m4.1-implementation-guide.md	1	# M4.1 implementation guide — checklist, verification, evidence
+spec/4.0/m4.1-implementation-guide.md	11	## Phase 1 — Foundation (M4.0 contracts) ✅
+spec/4.0/m4.1-implementation-guide.md	22	  `resolveCollectionCard` (overlay → engine inputs, 0–100 clamp only),
+spec/4.0/m4.1-implementation-guide.md	35	## Phase 2 — Content ✅
+spec/4.0/m4.1-implementation-guide.md	56	## Phase 3 — Pack engine ✅
+spec/4.0/m4.1-implementation-guide.md	80	## Phase 4 — Persistence ✅
+spec/4.0/m4.1-implementation-guide.md	85	  `DexieCollectionRepository` — validate-then-load with reconciliation audit,
+spec/4.0/m4.1-implementation-guide.md	97	## Phase 5 — Web ✅
+spec/4.0/m4.1-implementation-guide.md	122	## Phase 6 — Calibration and release ✅ (this file's evidence)
+spec/4.0/m4.1-implementation-guide.md	172	2–4 after that work lands. No M4.1 gate was bypassed or deferred.
+spec/4.0/m4.1-starter-packs-collection.md	1	# M4.1 — Starter, Packs, and Collection Book (authoritative behavior)
+spec/4.0/m4.1-starter-packs-collection.md	4	packs, duplicates, and the collection book. The `spec/4.0/01–09` outline files
+spec/4.0/m4.1-starter-packs-collection.md	95	| 72–84 | Eruption |
+spec/4.0/m4.1-starter-packs-collection.md	96	| 85–89 | Apex |
+spec/4.0/m4.1-starter-packs-collection.md	97	| 90–94 | Titan |
+spec/4.0/m4.1-starter-packs-collection.md	98	| 95–98 | Eclipse |
+spec/4.0/m4.1-starter-packs-collection.md	99	| 99–100 | Immortal |
+spec/4.0/m4.1-starter-packs-collection.md	111	| Sharpshooter | Ben Simmons 2017–18 `pv-00b6…4d78` | Kyle Korver 2014–15 `pv-c14b…46fa` | Ray Allen 2000–01 `pv-1103…0c8c` | Stephen Curry 2015–16 `pv-b1ea…0853` |
+spec/4.0/m4.1-starter-packs-collection.md	112	| Lockdown | Dennis Rodman 1991–92 `pv-fdf9…e991` | Gary Payton 1999–00 `pv-0556…e826` | Scottie Pippen 1994–95 `pv-0677…6403` | Kawhi Leonard 2019–20 `pv-a696…1f90` |
+spec/4.0/m4.1-starter-packs-collection.md	113	| Floor General | Jason Kidd 1998–99 `pv-a16d…c846` | John Stockton 1991–92 `pv-6145…ef06` | Steve Nash 2006–07 `pv-cd80…4f7d` | Chris Paul 2008–09 `pv-23a7…f830` |
+spec/4.0/m4.1-starter-packs-collection.md	115	Family templates (clamped only at the engine 0–100 bounds; everything else
+spec/4.0/m4.1-starter-packs-collection.md	153	by the engine's eligibility — a legal G/G/F/F/C five of distinct players —
+spec/4.0/m4.1-starter-packs-collection.md	157	## 8. Pack catalog (initial values — calibration-frozen, see §11)
+spec/4.0/m4.2-implementation-guide.md	1	# M4.2 implementation guide — checklist, verification, evidence
+spec/4.0/m4.2-implementation-guide.md	17	## Phase 1 — Contracts (game domain) ✅
+spec/4.0/m4.2-implementation-guide.md	20	  literals — `collection-team-v1`, `collection-game-v1`,
+spec/4.0/m4.2-implementation-guide.md	29	  `collectionActiveTeamSchema` (5–12 cards, ordered G/G/F/F/C starters,
+spec/4.0/m4.2-implementation-guide.md	30	  ordered bench, 0–48 minutes each totaling exactly 240, starters ≥ 1).
+spec/4.0/m4.2-implementation-guide.md	52	  literals — team, game, game-rules, reward, game-replay, play-save,
+spec/4.0/m4.2-implementation-guide.md	57	  `collectionActiveTeamSchema` (5–12 owned card IDs, ordered G/G/F/F/C
+spec/4.0/m4.2-implementation-guide.md	58	  starters, ordered bench, 0–48 minutes each totaling exactly 240, starters
+spec/4.0/m4.2-implementation-guide.md	83	## Phase 2 — Content (game rules) ✅
+spec/4.0/m4.2-implementation-guide.md	102	## Phase 3 — Team and CPU engine ✅
+spec/4.0/m4.2-implementation-guide.md	107	  0–48 minutes totaling exactly 240 with starters ≥ 1),
+spec/4.0/m4.2-implementation-guide.md	117	  `generateCollectionCpuTeam` — per-card weight = rarity weight / eligible
+spec/4.0/m4.2-implementation-guide.md	125	src/collection/` — 44 tests green: legal/default teams for every roster
+spec/4.0/m4.2-implementation-guide.md	126	size 5–12, every invalid-team rejection code, deterministic 12-card CPU
+spec/4.0/m4.2-implementation-guide.md	130	## Phase 4 — Shared rotation simulation ✅
+spec/4.0/m4.2-implementation-guide.md	151	  `checkCollectionGameResult` — re-simulation determinism, exact
+spec/4.0/m4.2-implementation-guide.md	158	  `applyCollectionGameCommand` — pure set/prepare/abandon/accept
+spec/4.0/m4.2-implementation-guide.md	172	exactly-once reward mapping) — all green.
+spec/4.0/m4.2-implementation-guide.md	174	## Phase 5 — Persistence and worker ✅
+spec/4.0/m4.2-implementation-guide.md	207	## Phase 6 — Web ✅
+spec/4.0/m4.2-implementation-guide.md	241	## Phase 7 — Game audit CLI and release ✅ (implementation; ship-gates pending)
+spec/4.0/m4.2-implementation-guide.md	246	  roster size 5–12, full game audits, 100/10 reward mapping with
+spec/4.0/m4.2-implementation-guide.md	260	  implementation status, module map, and version decisions — NOT done yet
+spec/4.0/m4.2-implementation-guide.md	283	2. ✅ `pnpm hoop-rush data validate` — OK, incl.
+spec/4.0/m4.2-implementation-guide.md	288	3. ✅ `pnpm hoop-rush collection game-audit` — 48 games, zero failures
+spec/4.0/m4.2-implementation-guide.md	290	4. ⚠️ `pnpm verify:quick` — NOT green repo-wide: `check`/`lint` fail on
+spec/4.0/m4.2-implementation-guide.md	312	6. ⚠️ `pnpm verify` — blocked by the same pre-existing build breakage.
+spec/4.0/m4.2-implementation-guide.md	316	M4.2 ships when gates 4–6 go green after the concurrent season work lands
+spec/4.0/m4.2-team-building-basic-game.md	1	# M4.2 — Team building and the basic game (authoritative behavior)
+spec/4.0/m4.2-team-building-basic-game.md	5	recorded gamecast playback, and game rewards. The `spec/4.0/01–09` outline
+spec/4.0/m4.2-team-building-basic-game.md	9	Scope: one saved 5–12-card active team per collection, deterministic 12-card
+spec/4.0/m4.2-team-building-basic-game.md	43	| Active team | `collectionActiveTeamSchema` | 5–12 owned exact card IDs; ordered G/G/F/F/C starters; ordered bench; one 0–48 target-minute entry per card totaling exactly 240; every starter at least one minute |
+spec/4.0/m4.2-team-building-basic-game.md	106	- Minutes: one integer 0–48 target-minute entry per card, summing to
+spec/4.0/m4.2-team-building-basic-game.md	184	  (`resolveCollectionCard` → simulation inputs, 0–100 clamp only) before
+spec/4.0/m4.2-team-building-basic-game.md	239	- `set-active-team`: validate and persist a 5–12-card team with minutes.
+spec/4.0/m4.2-team-building-basic-game.md	282	  command receipt — in one transaction.
+spec/4.0/m4.2-team-building-basic-game.md	321	- Every roster size 5–12 builds a legal default team; every invalid team
+spec/4.0/m4.2-team-building-basic-game.md	326	- Five-card heavy-minute games, 6–12-card rotations, the foul-limit
+spec/4.0/m4.3-difficulty-objectives-rewards.md	1	# M4.3 — Difficulty, objectives, and rewards (implementation specification)
+spec/4.0/m4.3-difficulty-objectives-rewards.md	110	| Profile | Rarity floor–ceiling | Rarity weights inside band | Candidate teams | Special weight | CPU rating shift | Reward multiplier |
+spec/4.0/m4.3-difficulty-objectives-rewards.md	112	| Street | Ember–Apex | 76% / 22% / 2% | 1 | 0.50× | −2 | 1.00× |
+spec/4.0/m4.3-difficulty-objectives-rewards.md	113	| Pro | Eruption–Titan | 52% / 35% / 13% | 4 | 1.25× | 0 | 1.35× |
+spec/4.0/m4.3-difficulty-objectives-rewards.md	114	| Legend | Apex–Immortal | 42% / 40% / 16% / 2% | 8 | 2.00× | +2 | 1.75× |
+spec/4.0/m4.3-difficulty-objectives-rewards.md	179	integer shift to every simulation rating, clamped only to the engine's 0–100
+spec/4.0/m4.3-implementation-guide.md	1	# M4.3 implementation guide — difficulty, objectives, and rewards
+spec/4.0/m4.3-implementation-guide.md	8	## Phase 0 — Establish the M4.2 baseline
+spec/4.0/m4.3-implementation-guide.md	44	- M4.2 legacy v1 game/reward records remain parseable and reproduce with their original v1 math; no M4.2 golden was rewritten. Reuse: the still-present radio-card pattern in `FrontOfficePicker.svelte` plus Collection route/theme primitives, per the corrected map in `12-reuse.md` — deleted Season UI components were NOT restored.
+spec/4.0/m4.3-implementation-guide.md	47	## Phase 1 — Versioned contracts and compatibility
+spec/4.0/m4.3-implementation-guide.md	102	## Phase 2 — Named seeds and CPU difficulty engine
+spec/4.0/m4.3-implementation-guide.md	159	## Phase 3 — Static pre-game adjustment seam
+spec/4.0/m4.3-implementation-guide.md	189	  to the engine 0–100 bounds; per-card before/after values and reached bounds
+spec/4.0/m4.3-implementation-guide.md	203	## Phase 4 — Objective offers, evaluation, and reward engine
+spec/4.0/m4.3-implementation-guide.md	252	## Phase 5 — Persistence and migration
+spec/4.0/m4.3-implementation-guide.md	312	## Phase 6 — Rules artifact, CLI, and calibration freeze
+spec/4.0/m4.3-implementation-guide.md	342	**Evidence (recorded 2026-09-12) — artifact/validate/audit done; calibration
+spec/4.0/m4.3-implementation-guide.md	356	  112 v2; invariance/receipt/reward checks as recorded in Phases 2–4).
+spec/4.0/m4.3-implementation-guide.md	370	## Phase 7 — Worker and web flow
+spec/4.0/m4.3-implementation-guide.md	407	**Evidence (recorded 2026-09-12) — worker + web unit green; production e2e
+spec/4.0/m4.3-implementation-guide.md	412	  version; the main thread keeps authority — the worker never chooses
+spec/4.0/m4.3-implementation-guide.md	432	## Phase 8 — Release evidence and documentation
+spec/4.0/m4.3-implementation-guide.md	435	> **implemented, calibration freeze pending** — not shipped. The docs below
+spec/4.0/m4.4-challenges-targeting-sets.md	1	# M4.4 — Challenges, targeting, and sets (implementation specification)
+spec/4.0/m4.4-implementation-guide.md	1	# M4.4 implementation guide — challenges, targeting, and sets
+spec/4.0/m4.4-implementation-guide.md	10	## Phase 0 — Freeze the M4.3 baseline
+spec/4.0/m4.4-implementation-guide.md	45	## Phase 1 — Contracts, versions, and progression artifact
+spec/4.0/m4.4-implementation-guide.md	100	## Phase 2 — Pure challenge definitions and validation
+spec/4.0/m4.4-implementation-guide.md	142	## Phase 3 — Targeting odds and deterministic pack selection
+spec/4.0/m4.4-implementation-guide.md	194	## Phase 4 — Collection commands for target and set claims
+spec/4.0/m4.4-implementation-guide.md	234	- set progress 0–4, exact completion, unrelated special, and wrong set;
+spec/4.0/m4.4-implementation-guide.md	243	## Phase 5 — Challenge preparation, game record, and rewards
+spec/4.0/m4.4-implementation-guide.md	302	## Phase 6 — Append-only persistence and recovery
+spec/4.0/m4.4-implementation-guide.md	353	## Phase 7 — CLI, artifacts, and calibration freeze
+spec/4.0/m4.4-implementation-guide.md	407	## Phase 8 — Web flow
+spec/4.0/m4.4-implementation-guide.md	443	   identity and snapshotted facts from the pending/record—not the current
+spec/4.0/m4.4-implementation-guide.md	485	## Phase 9 — Release evidence and documentation
+spec/4.0/m4.4-implementation-guide.md	583	- **Legacy compatibility**: `collection game-audit` OK — 24 fixed + 24
+spec/4.0/m4.4-implementation-guide.md	591	- **Progression audit**: `pnpm hoop-rush collection progression-audit` OK — all
+spec/4.0/m4.4-implementation-guide.md	598	- **Browser journeys (production build, `e2e:managed`)**: 7/7 — existing
+spec/4.0/m4.5-implementation-guide.md	1	# M4.5 implementation guide — Ultimate Run hub and visual system
+spec/4.0/m4.5-implementation-guide.md	7	M4.5 is complete only when the entire shipped Ultimate loop—not just Collection
+spec/4.0/m4.5-implementation-guide.md	8	and Packs—uses the new system without changing any deterministic behavior or
+spec/4.0/m4.5-implementation-guide.md	15	- Treat M4.1–M4.4 commands, records, seeds, rules artifacts, and ledgers as
+spec/4.0/m4.5-implementation-guide.md	30	## Phase 0 — Freeze the real baseline
+spec/4.0/m4.5-implementation-guide.md	64	## Phase 1 — Canonical routes and shared shell
+spec/4.0/m4.5-implementation-guide.md	127	## Phase 2 — Tokens and visual primitives
+spec/4.0/m4.5-implementation-guide.md	163	## Phase 3 — Card identity system
+spec/4.0/m4.5-implementation-guide.md	214	## Phase 4 — Collection book and Hub
+spec/4.0/m4.5-implementation-guide.md	258	## Phase 5 — Pack shelf
+spec/4.0/m4.5-implementation-guide.md	290	## Phase 6 — Pack-open theater
+spec/4.0/m4.5-implementation-guide.md	336	## Phase 7 — Team visual composition
+spec/4.0/m4.5-implementation-guide.md	367	## Phase 8 — Play and broadcast composition
+spec/4.0/m4.5-implementation-guide.md	401	## Phase 9 — Accessibility, performance, and release evidence
+spec/4.0/m4.5-implementation-guide.md	434	recorded, deterministic evidence matches Phase 0, and no M4.1–M4.4 version was
+spec/4.0/m4.5-ultimate-hub-visuals.md	1	# M4.5 — Ultimate Run hub and visual system (implementation specification)
+spec/4.0/m4.5-ultimate-hub-visuals.md	110	  - `/ultimate/run` — mode home;
+spec/4.0/m4.5-ultimate-hub-visuals.md	111	  - `/ultimate/run/collection` — collection book;
+spec/4.0/m4.5-ultimate-hub-visuals.md	112	  - `/ultimate/run/packs` — pack store and receipt recovery;
+spec/4.0/m4.5-ultimate-hub-visuals.md	113	  - `/ultimate/run/team` — active-team editor;
+spec/4.0/m4.5-ultimate-hub-visuals.md	114	  - `/ultimate/run/play` — setup, matchup, gamecast, result, and rewards.
+spec/4.0/m4.5-ultimate-hub-visuals.md	163	earned reward, or active navigation—not every border and heading.
+spec/4.0/m4.5-ultimate-hub-visuals.md	183	- Use a 4/8 px spacing rhythm with page gaps of 24–40 px.
+spec/4.0/m4.5-ultimate-hub-visuals.md	184	- Controls may use 8–12 px radii. Working surfaces use 8–16 px selectively.
+spec/4.0/m4.5-ultimate-hub-visuals.md	211	- Collection: two portrait cards at 360–479 px, three at 480–767 px, four at
+spec/4.0/m4.5-ultimate-hub-visuals.md	212	  768–1099 px, and five or six at wider sizes based on the content width.
+spec/4.0/m4.5-ultimate-hub-visuals.md	227	- Hero status: current loop state and one primary next action—Claim starter,
+spec/4.0/README.md	1	# Hoop Rush Ultimate Run — Outline Spec
+spec/4.0/README.md	5	The numbered `01–12` files record the broad Ultimate Run design discussed so
+spec/4.0/README.md	45	- `m4.1-starter-packs-collection.md` — M4.1 authoritative behavior (starter,
+spec/4.0/README.md	47	- `m4.1-implementation-guide.md` — M4.1 ordered checklist, verification
+spec/4.0/README.md	49	- `m4.2-team-building-basic-game.md` — M4.2 authoritative behavior (active
+spec/4.0/README.md	51	- `m4.2-implementation-guide.md` — M4.2 ordered checklist, verification, and
+spec/4.0/README.md	53	- `m4.3-difficulty-objectives-rewards.md` — M4.3 implementation specification
+spec/4.0/README.md	55	- `m4.3-implementation-guide.md` — M4.3 dependency-ordered implementation and
+spec/4.0/README.md	57	- `m4.4-challenges-targeting-sets.md` — M4.4 authoritative implementation
+spec/4.0/README.md	60	- `m4.4-implementation-guide.md` — M4.4 dependency-ordered contracts, engine,
+spec/4.0/README.md	62	- `m4.5-ultimate-hub-visuals.md` — M4.5 authoritative implementation
+spec/4.0/README.md	65	  asset budgets. Presentation only; M4.1–M4.4 behavior stays frozen.
+spec/4.0/README.md	66	- `m4.5-implementation-guide.md` — M4.5 dependency-ordered delivery plan,
+spec/cap-rush/CapRush-Multiplayer.md	82	| Elite | 95–99 | 2 |
+spec/cap-rush/CapRush-Multiplayer.md	83	| Star | 90–99 | 2 |
+spec/cap-rush/CapRush-Multiplayer.md	84	| Strong | 80–89 | 2 |
+spec/cap-rush/CapRush-Multiplayer.md	85	| Rotation | 75–79 | 2 |
+spec/cap-rush/CapRush-Multiplayer.md	86	| Budget | 60–74 | 2 |
+spec/cap-rush/CapRush-Multiplayer.md	87	| Wildcard | 40–99 | 2 |
+spec/cap-rush/custom-field-and-simcast-implementation-spec.md	91	The target is approximately **five 82–0 seasons per 1,000 independent attempts**
+spec/cap-rush/custom-field-and-simcast-implementation-spec.md	115	   differential, 82–0 frequency, playoff qualification and championship rates
+spec/cap-rush/custom-field-and-simcast-implementation-spec.md	124	field's observed undefeated rate to be 0.3%–0.7% (30–70 per 10,000); report a
+spec/cap-rush/custom-field-and-simcast-implementation-spec.md	131	rare 82–0 outcomes.
+spec/cap-rush/implementation-spec.md	15	the championship is the main goal; 82–0 is a separate regular-season bonus.
+spec/cap-rush/implementation-spec.md	67	must have integer Overall in 60–99 inclusive. Do not clamp catalog players above
+spec/cap-rush/implementation-spec.md	76	| 60               | $3M (proposed default, extending the 65–70 segment downward) |
+spec/cap-rush/implementation-spec.md	142	| Star              | 1      | 90–99            |
+spec/cap-rush/implementation-spec.md	143	| Strong            | 2      | 80–89            |
+spec/cap-rush/implementation-spec.md	144	| Rotation          | 2      | 75–79            |
+spec/cap-rush/implementation-spec.md	145	| Budget            | 2      | 60–74            |
+spec/cap-rush/implementation-spec.md	146	| Wildcard          | 1      | 60–99            |
+spec/cap-rush/implementation-spec.md	151	**Proposed default:** the wildcard samples from eligible people in 60–99 using
+spec/cap-rush/implementation-spec.md	370	- Final W–L, 82–0 result, box scores, season player statistics and league MVP.
+spec/cap-rush/implementation-spec.md	550	82–0 probability. Tune only through an explicit rules revision and rerun holdout
+spec/cap-rush/league-and-ui-overhaul-implementation-spec.md	119	Seeds 1–8 qualify; 9–15 do not. No play-in, reseeding or cross-conference matchup
+spec/cap-rush/league-and-ui-overhaul-implementation-spec.md	120	before the Finals. Opening matchups in each half are 1–8, 4–5, 3–6, 2–7;
+spec/cap-rush/league-and-ui-overhaul-implementation-spec.md	139	Finals MVP selection and evidence rules, championship objective, separate 82–0
+spec/cap-rush/league-and-ui-overhaul-implementation-spec.md	260	Use short transforms/opacity transitions: roughly 150–250 ms for controls and
+spec/cap-rush/league-and-ui-overhaul-implementation-spec.md	261	250–450 ms for results/advancement. Keep the title celebration under two seconds
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	95	| Player selection | Shared selected border and detail-panel crossfade; avoid market reflow | 120–180ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	96	| Accepted bid | Brief price emphasis and leader badge transition | 150–220ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	97	| Local lead lost | Persistent “Opponent leads” state plus one short local notice | 180–240ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	98	| Deadline extension | Update the specific lot clock and show a brief extension label | 150–220ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	99	| Confirmed signing | Mark sold, then emphasize the corresponding roster slot with player and salary | 250–400ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	100	| Position change | Brief position transition while the new controls become immediately usable | 200–300ms |
+spec/cap-rush/multiplayer-ux-and-visual-overhaul-spec.md	101	| Sheet/dialog open | Short transform and opacity transition | 160–220ms |
+spec/cap-rush/playoffs-implementation-spec.md	32	- The championship is the main goal. An 82–0 regular season is a separate bonus
+spec/cap-rush/playoffs-implementation-spec.md	56	names, locale-dependent ordering, ratings or a random draw. Assign seeds 1–31;
+spec/cap-rush/playoffs-implementation-spec.md	57	seeds 1–16 qualify and seeds 17–31 do not.
+spec/cap-rush/playoffs-implementation-spec.md	263	- Target roughly 150–250 ms for control feedback, 250–450 ms for score/bracket
+spec/cap-rush/playoffs-implementation-spec.md	295	   no postseason contamination of regular-season MVP, 82–0 or regular-season
+spec/full-court/05-release/roulette-and-history.md	17	Start achievements with facts already available from trusted results. Bench Mob uses bench points in a completed game. The Chess Match uses a series won after a 3–1 deficit. System Over Stars needs a pinned definition of starter across the championship run. Gate custom-strategy, budget, postseason, and Finals MVP achievements on explicit versioned criteria. Completion and rewards commit idempotently.
+spec/README.md	9	| [`1.0/`](./1.0/README.md) | Sandbox and Classic — core product, data, simulation, architecture, UI, CLI |
+spec/README.md	10	| [`2.0/`](./2.0/README.md) | Season Run — **removed 2026-10-14** (historical) |
+spec/README.md	12	| [`4.0/`](./4.0/README.md) | Ultimate Run / Collection — mode **removed 2026-10-22**; catalog data retained |

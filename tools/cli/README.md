@@ -2,26 +2,26 @@
 
 The developer CLI (`bun run hoop-rush <command>`) for simulation, audits,
 calibration, data tools, and artifact generation. It calls the same engine,
-contracts, and importer packages the web app uses; there is no second
+contracts, and importer packages the web app uses. There is no second
 simulation implementation.
 
 ## Structure
 
-- `src/index.ts` — dispatch and reporting only: resolves the command key,
+- `src/index.ts`: dispatch and reporting only. It resolves the command key,
   parses args through the registry, validates `--format`, and renders text or
   JSON (`report.ts`, exit codes 0/1/2).
-- `src/registry/` — the typed command registry. `core.ts` owns option kinds,
+- `src/registry/`: the typed command registry. `core.ts` owns option kinds,
   common options (`--format`, `--verbose`), arg accessors, usage errors, and
-  help rendering; one module per area (`data.ts`, `sim.ts`, `calibrate.ts`,
-  `havoc.ts`, `cap-rush.ts`, `projection.ts`, `import.ts`,
-  `docs.ts`) declares each command's name, options, help text, and handler.
-  `index.ts` fixes the help order.
-- `src/commands/` — the handlers and their basketball metrics. Calibration
+  help rendering. One module per area (`data.ts`, `sim.ts`, `calibrate.ts`,
+  `havoc.ts`, `cap-rush.ts`, `projection.ts`, `import.ts`, `docs.ts`) declares
+  each command's name, options, help text, and handler. `index.ts` fixes the
+  help order.
+- `src/commands/`: the handlers and their basketball metrics. Calibration
   gates, cohort definitions, and artifact schemas stay with each command.
-- `src/gen-*.ts` — standalone generators run through package scripts
-  (`gen-fixtures`, `gen-collection-catalog` for
-  `static/data/collection/` player catalog artifacts, ...), not through the
-  command registry.
+- `src/gen-*.ts`: standalone generators run through package scripts
+  (`gen-fixtures`, and `gen-collection-catalog` for the
+  `static/data/collection/` player catalog artifacts), not through the command
+  registry.
 
 ## Adding a command
 

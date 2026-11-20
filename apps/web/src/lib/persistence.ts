@@ -4,10 +4,13 @@ import {
   DexieChallengeRepository,
   DexieDraftDuelRepository,
   DexieFixedFiveRepository,
+  DexieFullCourtDraftRepository,
   DexieHavocMultiplayerRepository,
   DexieHavocRepository,
   DexieProfileRepository,
   HoopRushDatabase,
+  createFullCourtPlayoffRepository,
+  createFullCourtSeasonRepository,
 } from '@hoop-rush/persistence';
 
 export interface Persistence {
@@ -19,6 +22,9 @@ export interface Persistence {
   havocMultiplayerRepository: DexieHavocMultiplayerRepository;
   capRushRepository: DexieCapRushRepository;
   capRushMultiplayerRepository: DexieCapRushMultiplayerRepository;
+  fullCourtDraftRepository: DexieFullCourtDraftRepository;
+  fullCourtSeasonRepository: ReturnType<typeof createFullCourtSeasonRepository>;
+  fullCourtPlayoffRepository: ReturnType<typeof createFullCourtPlayoffRepository>;
   profileRepository: DexieProfileRepository;
 }
 
@@ -36,6 +42,9 @@ export function getPersistence(): Persistence {
       havocMultiplayerRepository: new DexieHavocMultiplayerRepository(db),
       capRushRepository: new DexieCapRushRepository(db),
       capRushMultiplayerRepository: new DexieCapRushMultiplayerRepository(db),
+      fullCourtDraftRepository: new DexieFullCourtDraftRepository(db),
+      fullCourtSeasonRepository: createFullCourtSeasonRepository(db),
+      fullCourtPlayoffRepository: createFullCourtPlayoffRepository(db),
       profileRepository: new DexieProfileRepository(db),
     };
   }

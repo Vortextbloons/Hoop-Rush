@@ -16,40 +16,39 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
   Shared room and lobby infrastructure lives in
   `src/lib/features/multiplayer/`.
 - `src/lib/modes/catalog.ts` registers discovery, formats, preserved routes,
-  and lazy settings/room adapters. Add modes through this catalog and their
+  and lazy settings and room adapters. Add modes through this catalog and their
   validated data-contracts settings; shared lobby and shell views stay generic.
 - The root layout owns one lobby coordinator. It consumes application lobby
-  snapshots/navigation intents, polls through one non-overlapping scheduler,
-  and refreshes on focus/reconnection. Room layouts scope mode sessions.
+  snapshots and navigation intents, polls through one non-overlapping scheduler,
+  and refreshes on focus or reconnection. Room layouts scope mode sessions.
 - Mode sessions (`ChallengeSession`, `CapRushSession`,
   `CapRushMultiplayerSession`, `HavocSession`, `DraftDuelSession`,
   `FixedFiveRoomSession`, `HavocMultiplayerSession`) live in
   `@hoop-rush/application` behind ports. Web composes them with browser
-  adapters; do not reintroduce Dexie, workers, or localStorage into the
+  adapters. Do not reintroduce Dexie, workers, or localStorage into the
   application package.
-- Shared UI primitives stay in `src/lib/components/`; shared helpers (ids, data,
-  player refs, draft presentation/fit/slots, supabase runtime, membership) stay
-  in `src/lib/`. Use the primitives in `src/lib/components/ui/` and the shared
-  basketball presentation in `src/lib/components/basketball/`; see
+- Shared UI primitives stay in `src/lib/components/`, and shared helpers (ids,
+  data, player refs, draft presentation/fit/slots, supabase runtime, membership)
+  stay in `src/lib/`. Use the primitives in `src/lib/components/ui/` and the
+  shared basketball presentation in `src/lib/components/basketball/`. See
   `src/lib/components/ui/README.md` for usage and mode-theme examples.
-- Workers live in `src/workers/`; their messages are validated with Zod at both
-  ends and must match `@hoop-rush/data-contracts` worker schemas.
+- Workers live in `src/workers/`. Both ends validate messages with Zod, and the
+  messages must match `@hoop-rush/data-contracts` worker schemas.
   `src/lib/workers/one-shot-worker.ts` handles single-result requests. Havoc and
-  Cap Rush compose `streaming-worker.ts` for serial result handlers, worker reuse,
-  cancellation, and guarded settlement. Mode adapters specify concurrency,
-  malformed-message, and error-draining policies.
+  Cap Rush compose `streaming-worker.ts` for serial result handlers, worker
+  reuse, cancellation, and guarded settlement. Mode adapters specify
+  concurrency, malformed-message, and error-draining policies.
 - Test doubles stay under `testing/` directories (`src/lib/testing/`,
-  `src/lib/features/havoc/testing/`) and are
-  imported only by tests.
+  `src/lib/features/havoc/testing/`) and only tests import them.
 
 ## Persistence and data
 
 - Saves go through `@hoop-rush/persistence` repositories composed by
   `getPersistence()` in `src/lib/persistence.ts`, one `HoopRushDatabase` on the
-  `hoop-rush-saves-v2` namespace. The only other direct Dexie use is the
+  `hoop-rush-saves-v2` namespace. The only other direct Dexie uses are the
   content-addressed asset cache (`src/lib/pool-cache.ts`) and the `liveQuery`
   subscription in `src/lib/features/profile/AchievementReveal.svelte`.
-- `static/data/**` is generated. Never edit it by hand; regenerate with the CLI
+- `static/data/**` is generated. Never edit it by hand. Regenerate with the CLI
   (`bun run hoop-rush import ...`, package `gen-*` scripts) and run
   `bun run hoop-rush data validate`. `static/data/collection/` is the packaged
   **player catalog** (`collection*` schemas in data-contracts), not the removed
@@ -66,5 +65,4 @@ bun run build
 ```
 
 Journeys that need a browser (classic draft into a run, havoc run, multiplayer
-room) are manual smoke
-checks; browser automation has been removed.
+room) are manual smoke checks. Browser automation was removed.

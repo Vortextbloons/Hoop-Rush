@@ -111,6 +111,14 @@ export const modeCatalog: readonly ModeDefinition[] = [
     },
   },
   {
+    id: 'full-court',
+    label: 'Full Court',
+    description:
+      'Draft six to twelve historical players and put your bench to work across an 82-game season and four playoff rounds.',
+    discovery: { homeOrder: 5, navigationOrder: 5, cta: 'Start Full Court' },
+    solo: { href: '/full-court' },
+  },
+  {
     id: 'draft-duel',
     label: 'Draft Duel',
     description:

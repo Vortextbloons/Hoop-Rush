@@ -1,0 +1,169 @@
+{
+  "Docs/engine/havoc.md": [
+    [
+      "- `havoc-versions.ts` — schema 1, `havoc-rules-v7`, `havoc-mutations-v6`,",
+      "- `havoc-versions.ts`: schema 1, `havoc-rules-v7`, `havoc-mutations-v6`,"
+    ],
+    [
+      "- `havoc-mutations.ts` — 39 mutation ids (19 tier-1, 12 tier-2, 8 tier-3;",
+      "- `havoc-mutations.ts`: 39 mutation ids (19 tier-1, 12 tier-2, 8 tier-3;"
+    ],
+    [
+      "- `havoc-profile.ts` — `hvi-` instance ids, source/effective profiles, effective\n  physical (baseline 60–96, effective 50–108, wingspan delta, reach units),",
+      "- `havoc-profile.ts`: `hvi-` instance ids, source and effective profiles,\n  effective physical (baseline 60-96, effective 50-108, wingspan delta, reach\n  units),"
+    ],
+    [
+      "- `havoc-draft.ts` — adapted catalog, cards (tier, package, effective profile,",
+      "- `havoc-draft.ts`: adapted catalog, cards (tier, package, effective profile,"
+    ],
+    [
+      "- `havoc-game.ts` — participants (starter/replacement/clone), team inputs,",
+      "- `havoc-game.ts`: participants (starter, replacement, clone), team inputs,"
+    ],
+    [
+      "- `havoc-run.ts` — schedule, frozen opponents, locked inputs, aggregates, run",
+      "- `havoc-run.ts`: schedule, frozen opponents, locked inputs, aggregates, run"
+    ],
+    [
+      "- `havoc-commands.ts` — 8 revisioned commands, 18 rejection codes, command result.",
+      "- `havoc-commands.ts`: 8 revisioned commands, 18 rejection codes, command result."
+    ],
+    [
+      "- `havoc-worker.ts` — wire v1: simulate/tape/cancel requests; game/progress/",
+      "- `havoc-worker.ts`: wire v1 with simulate, tape, and cancel requests; game,\n  progress,"
+    ],
+    [
+      "- `havoc-comparison.ts` — matched games, slot sides/deltas, mutation stats,",
+      "- `havoc-comparison.ts`: matched games, slot sides and deltas, mutation stats,"
+    ],
+    [
+      "  80–89, two below-80) across each participant's five positions, then restricts",
+      "  80-89, two below-80) across each participant's five positions, then restricts"
+    ],
+    [
+      "  Havoc; standard modes keep their identity behavior. Human teams field 5–10\n  active actors (clones), opponents stay at five with unmutated replacements.",
+      "  Havoc; standard modes keep their identity behavior. Human teams field 5 to 10\n  active actors (clones), and opponents stay at five with unmutated\n  replacements."
+    ],
+    [
+      "(paired 128-seed seasons: havoc 8,810–1,686 vs matched normal 5,149–5,347, +3,661\nwins; ordinary holdout 83.5%, risky 99.85%, extreme lineups reported honestly;",
+      "(paired 128-seed seasons: havoc 8,810-1,686 vs matched normal 5,149-5,347, +3,661\nwins; ordinary holdout 83.5%, risky 99.85%, extreme lineups reported honestly;"
+    ]
+  ],
+  "Docs/engine/fixed-five.md": [
+    ["# Engine — fixed-five multiplayer", "# Engine: fixed-five multiplayer"],
+    [
+      "- **classic-shared-82** — both players share one Classic-style draft, then play\n  the 82-game challenge together.",
+      "- **classic-shared-82.** Both players share one Classic-style draft, then play\n  the 82-game challenge together."
+    ],
+    [
+      "- **sandbox-shared-82** — both players place into one Sandbox lineup, then play\n  82 games.",
+      "- **sandbox-shared-82.** Both players place into one Sandbox lineup, then play\n  82 games."
+    ],
+    [
+      "- **Shared-82 head-to-head games** — the three scheduled matchups use the shared\n  Gamecast broadcast.",
+      "- **Shared-82 head-to-head games.** The three scheduled matchups use the shared\n  Gamecast broadcast."
+    ],
+    [
+      "- **duel** — coordinated picks feed a best-of-seven series (first to four wins)",
+      "- **duel.** Coordinated picks feed a best-of-seven series (first to four wins)"
+    ],
+    [
+      "- [`web/workers.md`](../web/workers.md) — fixed-five worker contract\n- [`engine/challenge.md`](./challenge.md) — underlying 82-game aggregate\n- [`engine/classic.md`](./classic.md) — Classic draft the shared-82 mode reuses",
+      "- [`web/workers.md`](../web/workers.md): fixed-five worker contract\n- [`engine/challenge.md`](./challenge.md): the 82-game aggregate underneath\n- [`engine/classic.md`](./classic.md): the Classic draft that shared-82 reuses"
+    ]
+  ],
+  "Docs/engine/classic.md": [
+    ["# Engine — Classic mode draft", "# Engine: Classic mode draft"],
+    [
+      "  draft** — each can be spent once (`rerolls.franchiseSpent` /\n  `rerolls.eraSpent`).",
+      "  draft**, and each can be spent once (`rerolls.franchiseSpent` /\n  `rerolls.eraSpent`)."
+    ],
+    [
+      "they can play (matching sandbox displacement — the occupant is moved out of the\nway before the subject is placed).",
+      "they can play, matching sandbox displacement: the occupant moves out of the way\nbefore the subject is placed."
+    ],
+    [
+      "- **Variant** — Classic is played as **Ratings** (ratings visible, sorted by",
+      "- **Variant.** Classic is played as **Ratings** (ratings visible, sorted by"
+    ],
+    [
+      "- **Position rules** — every lineup is the fixed `G, G, F, F, C` structure",
+      "- **Position rules.** Every lineup is the fixed `G, G, F, F, C` structure"
+    ],
+    [
+      "uses — the build-time franchise-era pool artifacts under",
+      "uses: the build-time franchise-era pool artifacts under"
+    ]
+  ],
+  "Docs/engine/cap-rush.md": [
+    ["# Engine — Cap Rush", "# Engine: Cap Rush"],
+    [
+      "| Domain | `packages/engine/src/modes/cap-rush/` — draft, league sim, standings, playoffs, apron runtime, reports |",
+      "| Domain | `packages/engine/src/modes/cap-rush/`: draft, league sim, standings, playoffs, apron runtime, reports |"
+    ],
+    [
+      "| Application | `packages/application/src/cap-rush/` — session, commands, worker port |",
+      "| Application | `packages/application/src/cap-rush/`: session, commands, worker port |"
+    ],
+    [
+      "- [challenge.md](./challenge.md) — shared 82-game challenge machinery\n- [bracket.md](./bracket.md) — frozen opponent field (Classic/Sandbox)\n- [possession.md](./possession.md) — trip pipeline\n- [interface/current-routes.md](../interface/current-routes.md) — routes and UI state",
+      "- [challenge.md](./challenge.md): shared 82-game challenge machinery\n- [bracket.md](./bracket.md): frozen opponent field (Classic and Sandbox)\n- [possession.md](./possession.md): trip pipeline\n- [interface/current-routes.md](../interface/current-routes.md): routes and UI state"
+    ]
+  ],
+  "Docs/engine/draft-duel.md": [
+    ["# Engine — Draft Duel", "# Engine: Draft Duel"],
+    [
+      "- [`fixed-five.md`](./fixed-five.md) — shared-82 and duel patterns\n- [`web/workers.md`](../web/workers.md) — worker inventory\n- [`persistence/indexeddb.md`](../persistence/indexeddb.md) — Dexie stores",
+      "- [`fixed-five.md`](./fixed-five.md): shared-82 and duel patterns\n- [`web/workers.md`](../web/workers.md): worker inventory\n- [`persistence/indexeddb.md`](../persistence/indexeddb.md): Dexie stores"
+    ]
+  ],
+  "Docs/engine/wasm-kernel.md": [
+    ["# Engine — Rust/Wasm standard-game kernel", "# Engine: Rust/Wasm standard-game kernel"],
+    [
+      "recording, auditing, and verification — not networking, full seasons, draft UI,",
+      "recording, auditing, and verification, not networking, full seasons, draft UI,"
+    ]
+  ],
+  "Docs/engine/collection.md": [
+    [
+      "# Engine — Collection / Ultimate Run (removed)",
+      "# Engine: Collection and Ultimate Run (removed)"
+    ],
+    [
+      "- **Player catalog data** — `apps/web/static/data/collection/` and",
+      "- **Player catalog data.** `apps/web/static/data/collection/` and"
+    ],
+    [
+      "- **Historical specs** — `spec/4.0/` (M4.x milestones).",
+      "- **Historical specs.** `spec/4.0/` (M4.x milestones)."
+    ]
+  ],
+  "Docs/engine/season-run.md": [
+    ["# Engine — Season Run (removed)", "# Engine: Season Run (removed)"],
+    [
+      "- **Standard five-on-five games** — `packages/engine/src/sim/game.ts`",
+      "- **Standard five-on-five games.** `packages/engine/src/sim/game.ts`"
+    ],
+    [
+      "- **Optional possession hooks** — `packages/engine/src/game/effects.ts` and",
+      "- **Optional possession hooks.** `packages/engine/src/game/effects.ts` and"
+    ],
+    [
+      "- **Packaged draft catalog** — `apps/web/static/data/draft-catalog.json` (Havoc draft pool).",
+      "- **Packaged draft catalog.** `apps/web/static/data/draft-catalog.json` (Havoc draft pool)."
+    ],
+    [
+      "- **Retained `season-*` data-contract modules** — version pins and schemas still loaded",
+      "- **Retained `season-*` data-contract modules.** Version pins and schemas still loaded"
+    ]
+  ],
+  "Docs/engine/franchise-evolution.md": [
+    ["# Engine — Franchise Evolution (removed)", "# Engine: Franchise Evolution (removed)"]
+  ],
+  "Docs/engine/bracket.md": [
+    ["# Engine — the frozen 30-team bracket", "# Engine: the frozen 30-team bracket"]
+  ],
+  "Docs/engine/cap-rush-multiplayer.md": [
+    ["# Cap Rush multiplayer — implementation", "# Cap Rush multiplayer: implementation"]
+  ]
+}
