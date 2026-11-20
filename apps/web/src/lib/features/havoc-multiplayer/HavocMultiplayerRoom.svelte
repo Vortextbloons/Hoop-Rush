@@ -39,7 +39,11 @@
   import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
 
   const REACTIONS: { key: ReactionKey; label: string; glyph: string }[] = [
@@ -229,7 +233,7 @@
   <title>Havoc room · Hoop Rush</title>
 </svelte:head>
 
-<section class="h-shell hm-room">
+<PageShell as="section" width="full" padding="lg" class="hm-room">
   <div class="hm-nav">
     <a href={resolve('/multiplayer')}><ArrowLeft size={15} aria-hidden="true" /> Multiplayer</a>
   </div>
@@ -237,19 +241,26 @@
   {#if !controller.snapshot && !controller.error}
     <div class="hm-empty" role="status">
       <Users size={28} aria-hidden="true" />
-      <h1 class="h-title">Opening your room</h1>
-      <p class="h-copy">Loading the Havoc catalog and room settings…</p>
+      <PageHeader
+        eyebrow="Havoc room"
+        title="Opening your room"
+        description="Loading the Havoc catalog and room settings…"
+      />
     </div>
   {:else if !controller.snapshot}
     <div class="hm-empty">
-      <h1 class="h-title">Couldn’t open this room</h1>
+      <PageHeader eyebrow="Havoc room" title="Couldn’t open this room" />
       <Alert tone="danger">{controller.error}</Alert>
-      <div class="h-actions">
-        <Button type="button" onclick={() => void controller.retryAttach()}>Try again</Button>
-        <ActionLink href={resolve('/multiplayer')} tone="secondary"
-          >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></ActionLink
-        >
-      </div>
+      <ActionRow>
+        {#snippet primary()}
+          <Button type="button" onclick={() => void controller.retryAttach()}>Try again</Button>
+        {/snippet}
+        {#snippet tertiary()}
+          <ActionLink href={resolve('/multiplayer')} tone="secondary"
+            >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></ActionLink
+          >
+        {/snippet}
+      </ActionRow>
     </div>
   {:else}
     <RoomShell
@@ -296,9 +307,13 @@
     {#if phase === 'lobby'}
       <div class="hm-lobby">
         <Panel padding="md" class="hm-invite">
-          <p class="h-eyebrow">{isHost ? 'Bring your opponent' : 'You’re in'}</p>
-          <h2 class="h-subtitle">{isHost ? 'Your room. Your invite.' : 'The matchup is set.'}</h2>
-          <p class="h-copy">
+          <p class="ui-label">{isHost ? 'Bring your opponent' : 'You’re in'}</p>
+          <SectionHeading
+            title={isHost ? 'Your room. Your invite.' : 'The matchup is set.'}
+            level={2}
+            size="lg"
+          />
+          <p class="text-sm leading-relaxed text-muted-foreground">
             {isHost
               ? 'Share the room code or invite link from the header. Start the draft once your opponent is online.'
               : 'Stay in this room. The host starts the draft once both players are online.'}
@@ -307,8 +322,8 @@
 
         <Panel padding="md" class="hm-seats">
           <div class="hm-seats-head">
-            <h2 class="h-subtitle">Players</h2>
-            <span>{onlineCount}/2 online</span>
+            <SectionHeading title="Players" level={2} size="md" />
+            <span class="ui-label" data-tone="muted">{onlineCount}/2 online</span>
           </div>
           <ul class="hm-seat-list">
             {#each controller.members as member (member.participantId)}
@@ -370,16 +385,22 @@
       </div>
     {:else if phase === 'expired'}
       <div class="hm-empty">
-        <h1 class="h-title">Room expired</h1>
-        <p class="h-copy">Your local saves are kept. Create a new room to play again.</p>
+        <PageHeader
+          eyebrow="Havoc room"
+          title="Room expired"
+          description="Your local saves are kept. Create a new room to play again."
+        />
         <ActionLink href={resolve('/multiplayer')}
           >New Havoc room <ArrowRight size={16} aria-hidden="true" /></ActionLink
         >
       </div>
     {:else if phase === 'integrity-failed'}
       <div class="hm-empty">
-        <h1 class="h-title">Results could not be verified</h1>
-        <p class="h-copy">The two simulations disagreed. Neither result has been accepted.</p>
+        <PageHeader
+          eyebrow="Havoc room"
+          title="Results could not be verified"
+          description="The two simulations disagreed. Neither result has been accepted."
+        />
         <ActionLink href={resolve('/multiplayer')}
           >New Havoc room <ArrowRight size={16} aria-hidden="true" /></ActionLink
         >
@@ -412,12 +433,12 @@
             <Panel as="section" padding="md" class="hm-draft" aria-label="Draft stage">
               <header class="hm-draft-head">
                 <div>
-                  <p class="h-eyebrow">
-                    Round {offer?.round ?? '—'} of 5 · {offer?.slot ?? '—'}
-                  </p>
-                  <h2 class="h-subtitle">
-                    {controller.activeTurn ? 'Your pick' : 'Opponent picking'}
-                  </h2>
+                  <p class="ui-label">Round {offer?.round ?? '—'} of 5 · {offer?.slot ?? '—'}</p>
+                  <SectionHeading
+                    title={controller.activeTurn ? 'Your pick' : 'Opponent picking'}
+                    level={2}
+                    size="md"
+                  />
                 </div>
                 <div class="hm-clock" class:urgent={urgentPick} aria-label="Pick timer">
                   {pickSecondsLeft === null ? '—' : `${pickSecondsLeft}s`}
@@ -450,7 +471,7 @@
                   Press <kbd>1</kbd>–<kbd>3</kbd> to choose a card, <kbd>Enter</kbd> to draft it.
                 </p>
               {:else}
-                <p class="h-copy">Preparing the next offer…</p>
+                <p class="text-sm text-muted-foreground">Preparing the next offer…</p>
               {/if}
 
               <div class="hm-draft-actions">
@@ -490,8 +511,8 @@
             <Panel as="section" padding="md" class="hm-draft" aria-label="Lineup showdown">
               <header class="hm-draft-head">
                 <div>
-                  <p class="h-eyebrow">Lineup showdown</p>
-                  <h2 class="h-subtitle">The fives are locked</h2>
+                  <p class="ui-label">Lineup showdown</p>
+                  <SectionHeading title="The fives are locked" level={2} size="md" />
                 </div>
               </header>
               {#if !showdownReady}
@@ -518,12 +539,14 @@
             <Panel as="section" padding="md" class="hm-draft" aria-label="Preparing game">
               <header class="hm-draft-head">
                 <div>
-                  <p class="h-eyebrow">Game {controller.currentGameNumber ?? '—'} ready check</p>
-                  <h2 class="h-subtitle">
-                    {controller.localReady && controller.opponentReady
+                  <p class="ui-label">Game {controller.currentGameNumber ?? '—'} ready check</p>
+                  <SectionHeading
+                    title={controller.localReady && controller.opponentReady
                       ? 'Starting the broadcast'
                       : 'Ready up'}
-                  </h2>
+                    level={2}
+                    size="md"
+                  />
                 </div>
                 {#if controller.readyCountdownMs !== null}
                   <div class="hm-clock" aria-label="Auto-start countdown">
@@ -531,7 +554,7 @@
                   </div>
                 {/if}
               </header>
-              <p class="h-copy">
+              <p class="text-sm leading-relaxed text-muted-foreground">
                 {#if controller.opponentReady && controller.localReady}
                   Both players are ready. Starting Game {controller.currentGameNumber ?? 1}…
                 {:else if controller.opponentReady}
@@ -578,11 +601,13 @@
             />
           {:else if phase === 'broadcasting'}
             <Panel as="section" padding="md" class="hm-wait" aria-label="Broadcast loading">
-              <p class="h-eyebrow">Broadcast</p>
-              <h2 class="h-subtitle">
-                Simulating Game {controller.currentBroadcast?.gameNumber ?? '—'}…
-              </h2>
-              <p class="h-copy" role="status">
+              <p class="ui-label">Broadcast</p>
+              <SectionHeading
+                title={`Simulating Game ${controller.currentBroadcast?.gameNumber ?? '—'}…`}
+                level={2}
+                size="md"
+              />
+              <p class="text-sm leading-relaxed text-muted-foreground" role="status">
                 Both sides run the same game locally. The tape starts as soon as your simulation
                 lands.
               </p>
@@ -609,7 +634,7 @@
               />
             {:else}
               <Panel as="section" padding="md" class="hm-wait" aria-label="Game results loading">
-                <p class="h-copy" role="status">Loading the game result…</p>
+                <p class="text-sm text-muted-foreground" role="status">Loading the game result…</p>
                 {#if controller.error}
                   <Alert tone="danger">{controller.error}</Alert>
                   <Button type="button" onclick={() => void controller.refresh()}>
@@ -637,7 +662,7 @@
               />
             {:else}
               <Panel as="section" padding="md" class="hm-wait" aria-label="Championship loading">
-                <p class="h-copy" role="status">Loading the series…</p>
+                <p class="text-sm text-muted-foreground" role="status">Loading the series…</p>
               </Panel>
             {/if}
           {/if}
@@ -663,7 +688,7 @@
       </footer>
     {/if}
   {/if}
-</section>
+</PageShell>
 
 <style>
   .hm-arena[data-phase='lineup-showdown'],
@@ -674,7 +699,7 @@
   .hm-arena[data-phase='championship'] > .hm-rail-col {
     display: none;
   }
-  .h-shell.hm-room {
+  :global(.hm-room) {
     width: 100%;
     max-width: none;
     min-width: 0;
@@ -749,7 +774,7 @@
     gap: 14px;
     padding: 48px 0;
   }
-  .hm-empty .h-title {
+  .hm-empty :global(.ui-page-title) {
     font-size: clamp(2.2rem, 5vw, 3.4rem);
   }
   .hm-lobby {
@@ -783,7 +808,7 @@
     justify-content: space-between;
     gap: 10px;
   }
-  .hm-seats-head .h-subtitle {
+  .hm-seats-head :global(.ui-section-title) {
     font-size: 1.4rem;
   }
   .hm-seats-head span {
@@ -902,7 +927,7 @@
     justify-content: space-between;
     gap: 12px;
   }
-  .hm-draft-head .h-subtitle {
+  .hm-draft-head :global(.ui-section-title) {
     font-size: 1.5rem;
   }
   .hm-clock {

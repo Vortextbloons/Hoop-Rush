@@ -13,7 +13,11 @@
     mutationEntriesSummary,
   } from './havoc-presentation';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
@@ -28,7 +32,7 @@
   const comparisonComplete = $derived(run?.comparisonStatus === 'complete' && comparison !== null);
 </script>
 
-<section class="h-shell" data-havoc-run-detail>
+<PageShell as="section" width="xl" padding="lg" data-havoc-run-detail>
   <a
     href={resolve('havoc/history/')}
     class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
@@ -43,28 +47,21 @@
       {state.error ?? `No completed Havoc run with id ${runId} was found on this device.`}
     </Alert>
   {:else}
-    <header class="mt-4">
-      <SectionHeading eyebrow="Hoop Havoc · Saved season" level={1} size="lg" align="start">
-        {#snippet title()}
-          {havocRecordLabel(run.havocWins, run.havocLosses)}
-          {#if run.perfectSeason}
-            <span class="text-primary">· 82–0</span>
-          {/if}
+    <div class="mt-4">
+      <PageHeader
+        eyebrow="Hoop Havoc · Saved season"
+        title={`${havocRecordLabel(run.havocWins, run.havocLosses)}${run.perfectSeason ? ' · 82–0' : ''}`}
+      >
+        {#snippet actions()}
+          {#if run.completionState === 'abandoned'}<Badge tone="neutral"
+              >Unsuccessful run preserved</Badge
+            >{/if}
         {/snippet}
-        <p class="mt-1 text-sm text-muted-foreground" data-havoc-detail-comparison-status>
-          Comparison: {havocComparisonStatusLabel(run.comparisonStatus)}
-        </p>
-        {#if run.completionState === 'abandoned'}
-          {#snippet actions()}
-            <span
-              class="rounded-full border border-border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-            >
-              Unsuccessful run preserved
-            </span>
-          {/snippet}
-        {/if}
-      </SectionHeading>
-    </header>
+      </PageHeader>
+      <p class="mt-1 text-sm text-muted-foreground" data-havoc-detail-comparison-status>
+        Comparison: {havocComparisonStatusLabel(run.comparisonStatus)}
+      </p>
+    </div>
 
     {#if comparisonComplete && comparison !== null}
       <HavocSquadReport {comparison} lineup={run.lineup} />
@@ -72,9 +69,8 @@
       <div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>
     {/if}
 
-    <details class="ui-panel mt-6" data-padding="md">
-      <summary>Full season report & game details</summary>
-      <div class="mt-4 grid gap-4 lg:grid-cols-2">
+    <Disclosure class="mt-6" summary="Full season report & game details">
+      <div class="grid gap-4 lg:grid-cols-2">
         <Panel as="section" padding="md">
           <SectionHeading title="Record" level={2} size="sm" />
           <StatGrid class="mt-3" columns={2} mobile={2} gap="md">
@@ -98,13 +94,8 @@
             </StatTile>
           </StatGrid>
           {#if report !== null}
-            <details class="mt-3">
-              <summary
-                class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >Seed & version identifiers</summary
-              >
-
-              <dl class="mt-2 grid gap-1 font-mono text-[11px] text-muted-foreground">
+            <Disclosure class="mt-3" summary="Seed & version identifiers">
+              <dl class="grid gap-1 font-mono text-[11px] text-muted-foreground">
                 <div class="flex flex-wrap gap-x-2">
                   <dt class="font-bold uppercase">Run</dt>
                   <dd class="break-all">{run.runId}</dd>
@@ -138,7 +129,7 @@
                   <dd class="break-all">{report.versions.catalogVersion}</dd>
                 </div>
               </dl>
-            </details>
+            </Disclosure>
           {/if}
         </Panel>
 
@@ -189,6 +180,6 @@
           </Panel>
         {/if}
       </div>
-    </details>
+    </Disclosure>
   {/if}
-</section>
+</PageShell>

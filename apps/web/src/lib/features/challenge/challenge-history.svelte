@@ -6,8 +6,8 @@
   import { errorMessageOf } from '#lib/errors.js';
   import { clearDataLoaderCaches, getManifest } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
-  import AsyncState from '#lib/components/AsyncState.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import HistoryList from './challenge-history-list.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
@@ -63,8 +63,12 @@
   const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
 </script>
 
-<PageShell as="section" width="xl" padding="lg">
-  <PageHeader {eyebrow} title="Challenge history">
+<PageShell as="section" width="lg" padding="md">
+  <PageHeader
+    {eyebrow}
+    title="Challenge history"
+    description="Every completed run with its final record and lineup."
+  >
     {#snippet actions()}
       <ActionLink href={resolve('/')} tone="ghost" size="sm">Back</ActionLink>
     {/snippet}
@@ -72,7 +76,7 @@
 
   {#if error}
     <div class="mt-8">
-      <AsyncState
+      <EmptyState
         kind="error"
         title="History unavailable"
         message={`Failed to load challenge history: ${error}`}
@@ -81,7 +85,7 @@
     </div>
   {:else if loading}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading history" message="Reading completed runs…" />
+      <EmptyState kind="loading" title="Loading history" message="Reading completed runs…" />
     </div>
   {:else}
     <HistoryList

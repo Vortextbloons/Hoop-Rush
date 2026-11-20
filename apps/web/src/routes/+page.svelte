@@ -16,6 +16,9 @@
   import { variantLabel } from '#lib/draft-presentation.js';
   import { eraName } from '#lib/branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+  import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ModeCard from '#lib/components/ui/ModeCard.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import { FULL_COURT_ACTIVE_RUN_KEY } from '#lib/features/full-court/full-court-active-run.js';
 
@@ -201,74 +204,36 @@
       {#if mode.solo}
         {@const saved = savedEntries[mode.id]}
         {@const history = historyLinks[mode.id]}
-        <div
-          class="flex flex-col rounded-xl bg-card {mode.discovery.accent
-            ? 'border border-accent/60'
-            : ''}"
-        >
-          <a
+        <div class="flex flex-col">
+          <ModeCard
             href={saved ? resolve(saved.href) : resolve(mode.solo.href)}
+            imageSrc={mode.discovery.artwork ? staticAsset(`/${mode.discovery.artwork}`) : null}
+            title={mode.label}
+            description={mode.description}
+            cta={saved?.label ?? mode.discovery.cta ?? mode.label}
+            progress={saved?.progress ?? null}
+            class="flex-1 {mode.discovery.accent ? 'border-accent/60' : ''}"
             data-sveltekit-preload-code="hover"
             onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
             onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
-            class="group flex flex-1 flex-col rounded-xl p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
-          >
-            {#if mode.discovery.artwork}
-              <img
-                src={staticAsset(`/${mode.discovery.artwork!}`)}
-                alt=""
-                aria-hidden="true"
-                class="h-10 w-10 rounded-lg"
-                width="40"
-                height="40"
-                loading="lazy"
-                decoding="async"
-                fetchpriority="low"
-              />
-            {/if}
-            <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
-              {mode.label}
-            </h2>
-            <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-              {mode.description}
-            </p>
-            <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-              {saved?.label ?? mode.discovery.cta}
-              <span
-                aria-hidden="true"
-                class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                >→</span
-              >
-            </span>
-            {#if saved?.progress}
-              <span class="mt-1 text-xs text-muted-foreground">{saved.progress}</span>
-            {/if}
-          </a>
+          />
           {#if history}
-            <a
+            <ActionLink
               href={resolve(history)}
               aria-label={`${mode.label} run history`}
-              class="mx-6 mb-5 inline-flex min-h-11 self-start items-center rounded-lg text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-7"
-              >Run history</a
+              tone="ghost"
+              size="sm"
+              class="mt-1 self-start">Run history</ActionLink
             >
           {/if}
         </div>
       {:else}
-        <div class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7" aria-disabled="true">
-          <h2
-            class="font-display mt-5 text-4xl font-extrabold tracking-tight text-muted-foreground uppercase"
-          >
-            {mode.label}
-          </h2>
-          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground/80">
-            {mode.description}
-          </p>
-          <span
-            class="mt-6 inline-flex items-center gap-2 font-mono text-xs font-semibold text-muted-foreground"
-          >
-            {mode.discovery.cta}
-          </span>
-        </div>
+        <ModeCard
+          title={mode.label}
+          description={mode.description}
+          cta={mode.discovery.cta ?? mode.label}
+          disabled
+        />
       {/if}
     {/each}
   </div>
@@ -285,38 +250,39 @@
       </div>
       <ul class="mt-4 flex flex-col gap-3">
         {#each recent as row (row.runId)}
-          <li>
-            <a
-              href={row.mode === 'classic'
-                ? resolve(`classic/result/?runId=${encodeURIComponent(row.runId)}`)
-                : resolve(`sandbox/result/?runId=${encodeURIComponent(row.runId)}`)}
-              class="scoreboard-panel flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-surface-2"
-            >
-              <span class="min-w-0 flex-1">
-                <span
-                  class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
-                >
-                  {#if row.mode === 'classic'}
-                    Classic · {variantLabel(row.variant ?? 'ratings')}
-                  {:else if row.franchiseId !== null}
-                    {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
-                  {:else}
-                    {eraName(manifest, row.eraId)} · 5-player lineup
-                  {/if}
-                </span>
-                <span class="mt-0.5 block text-xs text-muted-foreground">
-                  {#if row.franchiseId !== null}{franchiseAbbreviation(row.franchiseId)} ·
-                  {/if}completed {new Date(row.completedAtIso).toLocaleDateString()}
-                </span>
+          <HistoryEntryCard
+            href={row.mode === 'classic'
+              ? resolve(`classic/result/?runId=${encodeURIComponent(row.runId)}`)
+              : resolve(`sandbox/result/?runId=${encodeURIComponent(row.runId)}`)}
+          >
+            {#snippet title()}
+              <span
+                class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
+              >
+                {#if row.mode === 'classic'}
+                  Classic · {variantLabel(row.variant ?? 'ratings')}
+                {:else if row.franchiseId !== null}
+                  {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
+                {:else}
+                  {eraName(manifest, row.eraId)} · 5-player lineup
+                {/if}
               </span>
+            {/snippet}
+            {#snippet meta()}
+              <span class="mt-0.5 block text-xs text-muted-foreground">
+                {#if row.franchiseId !== null}{franchiseAbbreviation(row.franchiseId)} ·
+                {/if}completed {new Date(row.completedAtIso).toLocaleDateString()}
+              </span>
+            {/snippet}
+            {#snippet trailing()}
               <span class="flex shrink-0 flex-col items-end gap-1">
                 <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
                 <TierBadge wins={row.wins} />
-              </span></a
-            >
-          </li>
+              </span>
+            {/snippet}
+          </HistoryEntryCard>
         {/each}
       </ul>
     </section>

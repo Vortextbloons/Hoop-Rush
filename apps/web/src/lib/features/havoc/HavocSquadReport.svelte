@@ -19,6 +19,7 @@
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   let {
     comparison,
     lineup,
@@ -178,12 +179,14 @@
   aria-labelledby="h-squad-report"
   data-havoc-squad-report
 >
-  <h2 id="h-squad-report" class="h-subtitle">Season box score</h2>
-  <p class="h-copy text-xs mt-2">
+  <SectionHeading title="Season box score" headingId="h-squad-report" level={2} size="md" />
+  <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
     Per-game Havoc stats. The signed value below is the change from Normal. Select a player for both
     lines and their powers. Each position includes replacements and clones.
   </p>
-  <p class="h-mobile-hint h-copy text-xs mt-2">Swipe the stats to see every column.</p>
+  <p class="h-mobile-hint mt-2 text-xs text-muted-foreground">
+    Swipe the stats to see every column.
+  </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex (The scrollable box score needs keyboard access.) -->
   <div
     class="h-box-score ui-stats-scroll mt-4"
@@ -241,16 +244,18 @@
     <Dialog.Content class="havoc-world h-result-dialog">
       {#if selectedPlayer !== undefined}
         {@const player = selectedPlayer}
-        <header class="h-header">
+        <header class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p class="h-eyebrow">{player.slot} / Season comparison</p>
-            <Dialog.Title class="h-subtitle mt-2">{player.displayName}</Dialog.Title>
+            <p class="ui-label">{player.slot} / Season comparison</p>
+            <Dialog.Title class="mt-2 font-display text-2xl font-extrabold tracking-tight uppercase"
+              >{player.displayName}</Dialog.Title
+            >
           </div>
           <Dialog.Close class="ui-btn" data-tone="secondary" aria-label="Close player details"
             >Close</Dialog.Close
           >
         </header>
-        <Dialog.Description class="h-copy text-xs"
+        <Dialog.Description class="mt-2 text-xs text-muted-foreground"
           >Per-game averages over 82 games, including this position's replacements and clones.</Dialog.Description
         >
         <div class="h-stat-columns" aria-hidden="true">
@@ -303,8 +308,8 @@
           </div>
         </dl>
 
-        <h3 class="h-subtitle mt-6">Player powers</h3>
-        <p class="h-copy text-xs mt-2">
+        <SectionHeading class="mt-6" title="Player powers" level={3} size="sm" />
+        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
           Direct power points count recorded score adjustments. Shared abilities show totals across
           their owners.
         </p>
@@ -319,28 +324,36 @@
                   >{mutationNameOf(
                     entry.mutationId,
                   )}{#if power !== undefined && mutationTierOf(entry.mutationId) !== 1}<span
-                      class="h-copy text-xs"
+                      class="text-xs leading-relaxed text-muted-foreground"
                     >
                       · {formatSignedPoints(power.pointsDelta)} direct pts{power.ownerCount > 1
                         ? ' across all owners'
                         : ''}</span
                     >{/if}</summary
                 >
-                <p class="h-copy text-xs">{mutationDescriptionOf(entry.mutationId)}</p>
-                {#if mutationDownsideOf(entry.mutationId)}<p class="h-copy text-xs">
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                  {mutationDescriptionOf(entry.mutationId)}
+                </p>
+                {#if mutationDownsideOf(entry.mutationId)}<p
+                    class="text-xs leading-relaxed text-muted-foreground"
+                  >
                     Tradeoff: {mutationDownsideOf(entry.mutationId)}
                   </p>{/if}
                 {#if power !== undefined && mutationTierOf(entry.mutationId) !== 1}
-                  <p class="h-copy text-xs mt-2">
+                  <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
                     {power.triggers} activations · {power.freeThrowsGranted} bonus free throws · {power.turnoversCancelled}
                     turnovers saved · {power.extraPossessionsUsed}/{power.extraPossessionsEarned} extra
                     possessions used · {power.extraPossessionsExpired} expired · {power.swapSeconds}s
                     ratings swapped · {power.capSeconds}s ratings capped.
                   </p>
-                  {#if power.swapPoints !== 0}<p class="h-copy text-xs">
+                  {#if power.swapPoints !== 0}<p
+                      class="text-xs leading-relaxed text-muted-foreground"
+                    >
                       {formatSignedPoints(power.swapPoints)} points scored in the stolen body.
                     </p>{/if}
-                  {#if power.ownerCount > 1}<p class="h-copy text-xs">
+                  {#if power.ownerCount > 1}<p
+                      class="text-xs leading-relaxed text-muted-foreground"
+                    >
                       Shared ability: these are combined totals for all {power.ownerCount} owners.
                     </p>{/if}
                 {/if}
@@ -352,11 +365,11 @@
         {#if comparison.mvp.slot === player.slot}
           <details class="mt-2">
             <summary>How the MVP was chosen</summary>
-            <p class="h-copy text-xs">
+            <p class="text-xs leading-relaxed text-muted-foreground">
               Production index: {comparison.mvp.havocIndex} with powers / {comparison.mvp
                 .normalIndex} without powers ({formatSignedPoints(comparison.mvp.gain)} gain).
             </p>
-            <p class="h-copy text-xs">
+            <p class="text-xs leading-relaxed text-muted-foreground">
               {havocMvpFormulaLabel(comparison.mvpIndexWeights)}. Highest gain wins; ties use the
               Havoc index, then draft order. Includes replacements and clones.
             </p>

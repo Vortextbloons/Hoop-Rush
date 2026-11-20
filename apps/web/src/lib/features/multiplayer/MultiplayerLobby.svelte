@@ -4,15 +4,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { staticAsset } from '#lib/asset-url.js';
-  import {
-    LogIn,
-    ArrowRight,
-    Users,
-    CalendarDays,
-    Clock,
-    Check,
-    LockKeyhole,
-  } from '@lucide/svelte';
+  import { LogIn, ArrowRight, Users, CalendarDays, Clock, LockKeyhole } from '@lucide/svelte';
   import type { MultiplayerFormatId, MultiplayerSetup } from '@hoop-rush/data-contracts';
   import { isMultiplayerConfigured } from '#lib/supabase-runtime.js';
   import {
@@ -28,6 +20,8 @@
   import SettingsChoices from '#lib/modes/SettingsChoices.svelte';
   import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import ModeCard from '#lib/components/ui/ModeCard.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   let {
     initialFormat,
     showChooser = true,
@@ -179,34 +173,37 @@
   <title>Multiplayer — Hoop Rush</title>
 </svelte:head>
 
+{#snippet usersFactIcon()}<Users size={14} aria-hidden="true" />{/snippet}
+{#snippet calendarFactIcon()}<CalendarDays size={14} aria-hidden="true" />{/snippet}
+
 <section class="match-page">
-  <header class="match-header">
-    <div>
-      <p class="eyebrow">Multiplayer · Live rooms</p>
-      <h1>
-        {lobby
-          ? 'Your lobby'
-          : view === 'choose'
-            ? 'Play together'
-            : view === 'join'
-              ? 'Join a room'
-              : 'Choose your match'}
-      </h1>
-      <p class="intro">One room. Every mode. Play again with the same opponent.</p>
-    </div>
-    {#if lastRoomId || lastLobbyId}
-      <div class="resume-room">
-        <Users size={24} aria-hidden="true" />
-        <div>
-          <span class="eyebrow">Your last room</span>
-          <p>Get back in the game</p>
+  <PageHeader
+    class="mb-7 md:mb-10"
+    eyebrow="Multiplayer · Live rooms"
+    title={lobby
+      ? 'Your lobby'
+      : view === 'choose'
+        ? 'Play together'
+        : view === 'join'
+          ? 'Join a room'
+          : 'Choose your match'}
+    description="One room. Every mode. Play again with the same opponent."
+  >
+    {#snippet actions()}
+      {#if lastRoomId || lastLobbyId}
+        <div class="resume-room">
+          <Users size={24} aria-hidden="true" />
+          <div>
+            <p class="ui-label">Your last room</p>
+            <p>Get back in the game</p>
+          </div>
+          <button type="button" onclick={resumeLast} class="resume-button"
+            >Resume <ArrowRight size={16} /></button
+          >
         </div>
-        <button type="button" onclick={resumeLast} class="resume-button"
-          >Resume <ArrowRight size={16} /></button
-        >
-      </div>
-    {/if}
-  </header>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   {#if lobby}
     <RoomShell
@@ -248,41 +245,21 @@
         </div>
         <div class="mode-grid">
           {#each formats as item (item.id)}
-            <button
-              type="button"
-              class={['mode-card', { selected: matchFormat === item.id }]}
-              aria-pressed={matchFormat === item.id}
+            <ModeCard
+              imageSrc={staticAsset(
+                typeof item.image === 'function' ? item.image(settings) : item.image,
+              )}
+              title={item.name}
+              description={item.description}
+              facts={[
+                { label: '1v1', icon: usersFactIcon },
+                { label: item.format, icon: calendarFactIcon },
+              ]}
+              cta={matchFormat === item.id ? 'Selected' : 'Choose format'}
+              selected={matchFormat === item.id}
               disabled={busy || (lobby !== null && !lobby.canStart)}
               onclick={() => selectFormat(item.id)}
-            >
-              <img
-                src={staticAsset(
-                  typeof item.image === 'function' ? item.image(settings) : item.image,
-                )}
-                alt=""
-                width="1536"
-                height="1024"
-                class="mode-image"
-              />
-              <div class="card-top">
-                <span class="mode-tag"
-                  ><item.icon size={14} aria-hidden="true" /> {item.category}</span
-                >
-                {#if matchFormat === item.id}<span class="selection-check"
-                    ><Check size={16} aria-hidden="true" /><span class="sr-only">Selected</span
-                    ></span
-                  >{/if}
-              </div>
-              <div class="card-copy">
-                <h3>{item.name}</h3>
-                <p>{item.description}</p>
-                <div class="card-facts">
-                  <span><Users size={14} aria-hidden="true" /> 1v1</span><span
-                    ><CalendarDays size={14} aria-hidden="true" /> {item.format}</span
-                  >
-                </div>
-              </div>
-            </button>
+            />
           {/each}
         </div>
         <div class="court-note">
@@ -313,7 +290,7 @@
       {/if}
       <div class="panel-body">
         {#if view === 'choose'}
-          <p class="eyebrow">Multiplayer</p>
+          <p class="ui-label">Multiplayer</p>
           <h2>Meet in the lobby</h2>
           <p class="join-description">
             Create a room to choose a game, or join any mode with your opponent’s code.
@@ -327,13 +304,13 @@
             >
           </div>
         {:else if lobby?.participantId === 'p2'}
-          <p class="eyebrow">Same room · Next match</p>
+          <p class="ui-label">Same room · Next match</p>
           <h2>Waiting for your host</h2>
           <p class="join-description">
             Your host chooses the next match. You’ll enter the next match together.
           </p>
         {:else if view === 'create'}
-          <p class="eyebrow">Configure your match</p>
+          <p class="ui-label">Configure your match</p>
           <div class="selected-summary">
             <span class="summary-icon"><selectedFormat.icon size={25} aria-hidden="true" /></span>
             <div>
@@ -388,7 +365,7 @@
               : 'Keep this room code to play every mode with the same opponent.'}
           </p>
         {:else}
-          <p class="eyebrow">Meet on the court</p>
+          <p class="ui-label">Meet on the court</p>
           <h2 class="join-title">Join your opponent</h2>
           <p class="join-description">
             Enter your host’s 4-digit code. The game mode is picked automatically.
@@ -444,39 +421,9 @@
     margin: 0 auto;
     padding: 48px 32px 80px;
   }
-  .match-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 32px;
-    margin-bottom: 40px;
-  }
-  .eyebrow {
-    color: var(--color-primary);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-  h1,
-  h2,
-  h3 {
+  h2 {
     font-family: var(--font-display);
     font-weight: 800;
-  }
-  h1 {
-    margin: 6px 0 10px;
-    font-size: clamp(40px, 4.5vw, 68px);
-    line-height: 1;
-    letter-spacing: -0.015em;
-    text-transform: uppercase;
-  }
-  .intro {
-    color: var(--color-muted-foreground);
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 580px;
   }
   .resume-room {
     display: flex;
@@ -491,10 +438,7 @@
     color: var(--color-muted-foreground);
     flex-shrink: 0;
   }
-  .resume-room .eyebrow {
-    font-size: 9px;
-  }
-  .resume-room p {
+  .resume-room p:not(.ui-label) {
     font-size: 14px;
     font-weight: 600;
     white-space: nowrap;
@@ -554,114 +498,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
-  .mode-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 430px;
-    isolation: isolate;
-    overflow: hidden;
-    padding: 17px;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 12px;
-    text-align: left;
-    color: #f5f3ef;
-    background: #0d1118;
-    transition:
-      border-color 160ms,
-      transform 160ms;
-  }
-  .mode-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(
-      180deg,
-      rgb(8 12 17 / 12%) 0%,
-      rgb(8 12 17 / 8%) 24%,
-      rgb(8 12 17 / 85%) 56%,
-      #0b1017 86%
-    );
-  }
-  .mode-image {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 68%;
-    z-index: -2;
-    object-fit: cover;
-    object-position: 50% 25%;
-  }
-  .mode-card:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    transform: translateY(-3px);
-  }
-  .mode-card.selected {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-primary);
-  }
-  .card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-  }
-  .mode-tag {
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    padding: 5px 9px;
-    border: 1px solid rgb(255 255 255 / 25%);
-    border-radius: 5px;
-    background: rgb(9 13 18 / 65%);
-    font-family: var(--font-display);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .selected .mode-tag,
-  .selection-check {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-    border-color: transparent;
-  }
-  .selection-check {
-    display: grid;
-    place-items: center;
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .card-copy h3 {
-    font-size: 30px;
-    line-height: 1.1;
-    margin-bottom: 10px;
-  }
-  .card-copy > p {
-    color: #b9bec8;
-    font-size: 12px;
-    line-height: 1.65;
-    min-height: 80px;
-  }
-  .card-facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid rgb(255 255 255 / 12%);
-  }
-  .card-facts span {
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    font-size: 10px;
-    color: #b9bec8;
-  }
   .court-note {
     display: flex;
     align-items: center;
@@ -704,10 +540,6 @@
   }
   .panel-body {
     padding: 22px;
-  }
-  .panel-body > .eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.08em;
   }
   .selected-summary {
     display: flex;
@@ -870,27 +702,6 @@
     .mode-grid {
       grid-template-columns: 1fr;
     }
-    .mode-card {
-      min-height: 220px;
-      padding-left: 45%;
-    }
-    .mode-image {
-      width: 55%;
-      height: 100%;
-      object-position: 40% 30%;
-    }
-    .mode-card::after {
-      background: linear-gradient(90deg, transparent, #0b1017 52%);
-    }
-    .card-copy > p {
-      min-height: 0;
-    }
-    .card-top {
-      margin-bottom: 16px;
-    }
-    .card-copy h3 {
-      font-size: 27px;
-    }
     .resume-room p {
       white-space: normal;
     }
@@ -902,12 +713,6 @@
     .match-page {
       padding: 28px 18px 88px;
     }
-    .match-header {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 22px;
-      margin-bottom: 28px;
-    }
     .resume-room {
       padding: 14px;
     }
@@ -918,22 +723,11 @@
       grid-template-columns: 1fr;
       gap: 8px;
     }
-    .mode-card {
-      min-height: 210px;
-    }
     .section-heading > span {
       font-size: 10px;
     }
     .panel-body {
       padding: 22px;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .mode-card {
-      transition: none;
-    }
-    .mode-card:hover:not(:disabled) {
-      transform: none;
     }
   }
 </style>

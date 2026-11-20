@@ -4,6 +4,8 @@
   import Button from '#lib/components/ui/Button.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
@@ -37,9 +39,7 @@
 
 <PageShell as="section" width="xl" padding="xl">
   {#if draft?.stage !== 'drafting'}
-    <h1 class="font-display mb-6 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl">
-      Full Court
-    </h1>
+    <PageHeader class="mb-6" eyebrow="Full Court" title="Full Court" />
   {/if}
   {#if startupError !== null}
     <ServiceErrorPanel title="Full Court could not start" message={startupError} homeLink />
@@ -101,7 +101,7 @@
       <p role="status" class="text-sm text-muted-foreground">Opening Full Court…</p>
     {:else if current.index !== null && draft == null}
       <Panel padding="lg" class="max-w-lg">
-        <h2 class="font-display text-2xl font-bold">Build your roster</h2>
+        <SectionHeading title="Build your roster" level={2} size="sm" align="start" />
         <p class="mt-2 text-sm text-muted-foreground">
           Sign 6–12 historical player seasons, manage your payroll, and face 29 historical teams
           across a full regular season and playoffs.

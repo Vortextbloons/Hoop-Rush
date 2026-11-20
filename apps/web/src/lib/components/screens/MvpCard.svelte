@@ -20,7 +20,7 @@
     stats?: readonly { label: string; value: string | number }[];
     portrait?: Snippet | null;
     emptyCopy?: string;
-  } & HTMLAttributes<HTMLElement> = $props();
+  } & Omit<HTMLAttributes<HTMLElement>, 'slot'> = $props();
 
   const visibleStats = $derived(stats.slice(0, 4));
   const metaLine = $derived(

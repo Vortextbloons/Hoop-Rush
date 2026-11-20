@@ -4,12 +4,54 @@
   import HavocComparisonTable from './HavocComparisonTable.svelte';
   import HavocGameDetail from './HavocGameDetail.svelte';
   import { havocRecordLabel, mutationNameOf } from './havoc-presentation';
+  import type { ComparisonRow } from '#lib/components/ui/types.js';
+  import ComparisonTable from '#lib/components/screens/ComparisonTable.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let { comparison, showChart = true }: { comparison: HavocComparison; showChart?: boolean } =
     $props();
   let selectedGame = $state<number | null>(null);
   const activeGame = $derived(selectedGame ?? comparison.games[0]?.gameNumber ?? 1);
+  const seasonRows = $derived<readonly ComparisonRow[]>([
+    {
+      label: 'Record',
+      left: havocRecordLabel(comparison.havoc.wins, comparison.havoc.losses),
+      right: havocRecordLabel(comparison.normal.wins, comparison.normal.losses),
+    },
+    { label: 'Points for', left: comparison.havoc.pointsFor, right: comparison.normal.pointsFor },
+    {
+      label: 'Points against',
+      left: comparison.havoc.pointsAgainst,
+      right: comparison.normal.pointsAgainst,
+    },
+    {
+      label: 'Differential',
+      left: comparison.havoc.differential,
+      right: comparison.normal.differential,
+    },
+    {
+      label: 'Avg for',
+      left: formatAverage(comparison.havoc.averagePointsFor),
+      right: formatAverage(comparison.normal.averagePointsFor),
+    },
+    {
+      label: 'Avg against',
+      left: formatAverage(comparison.havoc.averagePointsAgainst),
+      right: formatAverage(comparison.normal.averagePointsAgainst),
+    },
+    {
+      label: 'Largest',
+      left: `${comparison.havoc.largestPointsFor}/${comparison.havoc.largestPointsAgainst}`,
+      right: `${comparison.normal.largestPointsFor}/${comparison.normal.largestPointsAgainst}`,
+    },
+    {
+      label: 'Adjustments',
+      left: comparison.havoc.adjustments,
+      right: comparison.normal.adjustments,
+    },
+  ]);
 
   function formatAverage(value: number): string {
     return value.toFixed(1);
@@ -17,92 +59,34 @@
 </script>
 
 <div class="flex min-w-0 flex-col gap-4" data-havoc-comparison>
-  <section aria-labelledby="havoc-comparison-totals" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <h2
-      id="havoc-comparison-totals"
-      class="font-display text-lg font-extrabold tracking-tight uppercase"
-    >
-      Normal / Havoc season comparison
-    </h2>
+  <Panel as="section" padding="md" aria-labelledby="havoc-comparison-totals">
+    <SectionHeading
+      title="Normal / Havoc season comparison"
+      headingId="havoc-comparison-totals"
+      level={2}
+      size="md"
+    />
     <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
       Two matched seeded seasons: the same 82 opponents, schedule, profiles, and game seeds. Game
       paths can still diverge, so a delta is not exact causal attribution to one mutation. "Direct
       mutation points" only count ledger adjustments.
     </p>
     <div class="havoc-scroll-x mt-3 overflow-x-auto">
-      <table class="w-full min-w-[30rem] text-xs">
-        <thead>
-          <tr
-            class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
-          >
-            <th scope="col" class="px-2 py-1.5 text-left font-medium">Season</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Record</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Points for</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Points against</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Differential</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Avg for</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Avg against</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Largest</th>
-            <th scope="col" class="px-2 py-1.5 text-right font-medium">Adjustments</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="border-b border-border/40">
-            <th scope="row" class="px-2 py-1.5 text-left font-semibold text-[#37B7CC]">Havoc</th>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {havocRecordLabel(comparison.havoc.wins, comparison.havoc.losses)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.havoc.pointsFor}</td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.havoc.pointsAgainst}</td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.havoc.differential}</td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {formatAverage(comparison.havoc.averagePointsFor)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {formatAverage(comparison.havoc.averagePointsAgainst)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {comparison.havoc.largestPointsFor}/{comparison.havoc.largestPointsAgainst}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.havoc.adjustments}</td>
-          </tr>
-          <tr class="border-b border-border/40">
-            <th scope="row" class="px-2 py-1.5 text-left font-semibold text-muted-foreground">
-              Normal
-            </th>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.normal.pointsFor}</td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.normal.pointsAgainst}</td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.normal.differential}</td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {formatAverage(comparison.normal.averagePointsFor)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {formatAverage(comparison.normal.averagePointsAgainst)}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">
-              {comparison.normal.largestPointsFor}/{comparison.normal.largestPointsAgainst}
-            </td>
-            <td class="px-2 py-1.5 text-right font-mono">{comparison.normal.adjustments}</td>
-          </tr>
-        </tbody>
-      </table>
+      <ComparisonTable rows={seasonRows} leftLabel="Havoc" rightLabel="Normal" />
     </div>
     <p class="mt-3 text-sm font-semibold" data-havoc-comparison-deltas>
       Wins gained: {comparison.winsGained >= 0 ? '+' : ''}{comparison.winsGained} · Differential delta:
       {comparison.differentialDelta >= 0 ? '+' : ''}{comparison.differentialDelta}
     </p>
-  </section>
+  </Panel>
 
-  <section aria-labelledby="havoc-comparison-mutations" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <h2
-      id="havoc-comparison-mutations"
-      class="font-display text-lg font-extrabold tracking-tight uppercase"
-    >
-      Mutation statistics
-    </h2>
+  <Panel as="section" padding="md" aria-labelledby="havoc-comparison-mutations">
+    <SectionHeading
+      title="Mutation statistics"
+      headingId="havoc-comparison-mutations"
+      level={2}
+      size="md"
+    />
     <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
       Direct ledger effects across the 82-game run: score adjustments, free throws granted, canceled
       turnovers, and earned or used extra possessions.
@@ -147,15 +131,15 @@
         </table>
       </div>
     {/if}
-  </section>
+  </Panel>
 
-  <section aria-labelledby="havoc-comparison-games" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <h2
-      id="havoc-comparison-games"
-      class="font-display text-lg font-extrabold tracking-tight uppercase"
-    >
-      Every matched game
-    </h2>
+  <Panel as="section" padding="md" aria-labelledby="havoc-comparison-games">
+    <SectionHeading
+      title="Every matched game"
+      headingId="havoc-comparison-games"
+      level={2}
+      size="md"
+    />
     <div class="mt-3">
       {#if showChart}
         <HavocComparisonChart
@@ -174,5 +158,5 @@
     <div class="mt-4">
       <HavocGameDetail {comparison} gameNumber={activeGame} />
     </div>
-  </section>
+  </Panel>
 </div>

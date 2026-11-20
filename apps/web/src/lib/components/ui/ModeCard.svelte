@@ -7,6 +7,7 @@
     title,
     description,
     imageSrc = null,
+    icon = null,
     facts = [],
     cta,
     progress = null,
@@ -20,6 +21,7 @@
     title: string;
     description: string;
     imageSrc?: string | null;
+    icon?: Snippet | null;
     facts?: readonly { label: string; icon?: Snippet }[];
     cta: string;
     progress?: string | null;
@@ -34,6 +36,9 @@
     <span class="ui-mode-card-media">
       <img src={imageSrc} alt="" loading="lazy" />
     </span>
+  {/if}
+  {#if icon !== null}
+    <span class="ui-mode-card-icon">{@render icon()}</span>
   {/if}
   <span class="ui-mode-card-body">
     <span class="ui-mode-card-title">{title}</span>

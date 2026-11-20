@@ -14,6 +14,8 @@
   } from './havoc-multiplayer-room-view';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import Button from '#lib/components/ui/Button.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
 
   let {
     output,
@@ -91,35 +93,17 @@
   });
 </script>
 
-<section class="hm-results" data-verification={verification}>
-  <header class="hm-results-head">
-    <p class="h-eyebrow">
-      Game {output.gameNumber} · {verification === 'verified' ? 'verified result' : 'provisional'}
-    </p>
-    <h2 class="hm-headline">
-      {#if verification === 'mismatch'}
-        Simulations disagree
-      {:else if localWon}
-        You win Game {output.gameNumber}
-      {:else}
-        Opponent wins Game {output.gameNumber}
-      {/if}
-    </h2>
-    <p class="hm-final-score">
-      <span data-side="local" data-negative={(localBox?.score ?? 0) < 0}
-        >{localBox?.score ?? 0}</span
-      >
-      <span class="hm-dash" aria-hidden="true">–</span>
-      <span data-side="opponent" data-negative={(opponentBox?.score ?? 0) < 0}
-        >{opponentBox?.score ?? 0}</span
-      >
-    </p>
-    <p class="hm-series-line">
-      Series: You {localParticipantId === 'p1' ? series.wins.p1 : series.wins.p2}
-      <span aria-hidden="true">–</span>
-      {localParticipantId === 'p1' ? series.wins.p2 : series.wins.p1} Opp · {seriesMessage}
-    </p>
-    <div class="hm-badge" data-tone={verificationView.tone}>
+<ResultScreen
+  eyebrow={`Game ${output.gameNumber} · ${verification === 'verified' ? 'verified result' : 'provisional'}`}
+  title={verification === 'mismatch'
+    ? 'Simulations disagree'
+    : localWon
+      ? `You win Game ${output.gameNumber}`
+      : `Opponent wins Game ${output.gameNumber}`}
+  data-verification={verification}
+>
+  {#snippet badges()}
+    <span class="hm-badge" data-tone={verificationView.tone}>
       {#if verificationView.tone === 'verified'}
         <ShieldCheck size={14} aria-hidden="true" />
       {:else if verificationView.tone === 'mismatch'}
@@ -128,105 +112,69 @@
         <Clock size={14} aria-hidden="true" />
       {/if}
       <span>{verificationView.label}</span>
-    </div>
-    <p class="hm-badge-detail">{verificationView.detail}</p>
-  </header>
+    </span>
+  {/snippet}
+  {#snippet hero()}
+    <ResultHero
+      score={`${localBox?.score ?? 0}–${opponentBox?.score ?? 0}`}
+      caption={`Series: You ${
+        localParticipantId === 'p1' ? series.wins.p1 : series.wins.p2
+      }–${localParticipantId === 'p1' ? series.wins.p2 : series.wins.p1} Opp`}
+      meta={seriesMessage}
+      secondary={verificationView.detail}
+      scoreLabel="Final score"
+    />
+  {/snippet}
 
-  <GamecastBattleBox {boxes} {localSide} />
-
-  <footer class="hm-results-footer">
-    {#if awaitingContinue}
-      <p class="hm-ready-line">Review the box score, then continue when ready.</p>
-      <Button type="button" data-havoc-multiplayer-continue onclick={oncontinue}>Continue</Button>
-    {:else if seriesOver}
-      <p class="hm-ready-line">Series complete.</p>
-    {:else if nextGameNumber !== null}
-      <div class="hm-ready-copy">
-        <p class="hm-ready-line">
-          {#if localReady && opponentReady}
-            Both players are ready. Starting Game {nextGameNumber}…
-          {:else if localReady}
-            You're ready. Waiting for your opponent.
-          {:else if opponentReady}
-            Your opponent is ready. Ready up to start Game {nextGameNumber}.
-          {:else}
-            Ready for Game {nextGameNumber}?
-          {/if}
-        </p>
-        {#if countdown !== null}
-          <p class="hm-countdown">
-            <Clock size={13} aria-hidden="true" />
-            Auto-start in <strong>{countdown}s</strong>
+  {#snippet footer()}
+    <footer class="hm-results-footer">
+      {#if awaitingContinue}
+        <p class="hm-ready-line">Review the box score, then continue when ready.</p>
+        <Button type="button" data-havoc-multiplayer-continue onclick={oncontinue}>Continue</Button>
+      {:else if seriesOver}
+        <p class="hm-ready-line">Series complete.</p>
+      {:else if nextGameNumber !== null}
+        <div class="hm-ready-copy">
+          <p class="hm-ready-line">
+            {#if localReady && opponentReady}
+              Both players are ready. Starting Game {nextGameNumber}…
+            {:else if localReady}
+              You're ready. Waiting for your opponent.
+            {:else if opponentReady}
+              Your opponent is ready. Ready up to start Game {nextGameNumber}.
+            {:else}
+              Ready for Game {nextGameNumber}?
+            {/if}
           </p>
-        {/if}
-      </div>
-      <Button type="button" data-havoc-multiplayer-ready disabled={localReady} onclick={onready}>
-        {localReady ? 'Ready' : `Ready for Game ${nextGameNumber}`}
-      </Button>
-    {:else}
-      <p class="hm-ready-line">The next game opens once this result is accepted.</p>
-    {/if}
-  </footer>
-</section>
+          {#if countdown !== null}
+            <p class="hm-countdown">
+              <Clock size={13} aria-hidden="true" />
+              Auto-start in <strong>{countdown}s</strong>
+            </p>
+          {/if}
+        </div>
+        <Button type="button" data-havoc-multiplayer-ready disabled={localReady} onclick={onready}>
+          {localReady ? 'Ready' : `Ready for Game ${nextGameNumber}`}
+        </Button>
+      {:else}
+        <p class="hm-ready-line">The next game opens once this result is accepted.</p>
+      {/if}
+    </footer>
+  {/snippet}
+
+  <div class="hm-results-boxes">
+    <GamecastBattleBox {boxes} {localSide} />
+  </div>
+</ResultScreen>
 
 <style>
-  .hm-results {
-    display: grid;
-    overflow: clip;
-    border: 1px solid #465273;
-    border-radius: 18px;
-    background: #20294c;
-  }
-  .hm-results-head {
-    display: grid;
-    justify-items: center;
-    gap: 6px;
-    padding: 18px 16px 14px;
-    text-align: center;
-    background: linear-gradient(180deg, rgb(103 157 255 / 10%), transparent);
-  }
-  .hm-headline {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: clamp(1.6rem, 6vw, 2.4rem);
-    font-weight: 900;
-    letter-spacing: -0.01em;
-    text-transform: uppercase;
-  }
-  .hm-final-score {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    margin: 2px 0 0;
-    font-family: var(--font-display);
-    font-size: clamp(2.2rem, 10vw, 3.4rem);
-    font-weight: 900;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .hm-final-score [data-side='local'] {
-    color: #ffd782;
-  }
-  .hm-final-score [data-side='opponent'] {
-    color: #f2f4ff;
-  }
-  .hm-final-score [data-negative='true'] {
-    color: #f290c5;
-  }
-  .hm-dash {
-    color: #aab9db;
-    font-size: 0.55em;
-  }
-  .hm-series-line {
-    margin: 2px 0 0;
-    font-size: 0.85rem;
-    color: #c1cae4;
+  .hm-results-boxes {
+    padding: 0 4px;
   }
   .hm-badge {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    margin-top: 8px;
     padding: 5px 12px;
     border: 1px solid #465273;
     border-radius: 999px;
@@ -251,15 +199,6 @@
     background: rgb(242 144 197 / 10%);
     color: #f290c5;
   }
-  .hm-badge-detail {
-    max-width: 30rem;
-    margin: 0;
-    font-size: 11px;
-    color: #c1cae4;
-  }
-  .hm-results :global(.hm-boxes) {
-    padding: 14px;
-  }
   .hm-results-footer {
     display: flex;
     flex-wrap: wrap;
@@ -267,7 +206,8 @@
     justify-content: space-between;
     gap: 10px 16px;
     padding: 14px;
-    border-top: 1px solid #3c486b;
+    border: 1px solid #465273;
+    border-radius: 16px;
     background: #141b39;
   }
   .hm-ready-copy {

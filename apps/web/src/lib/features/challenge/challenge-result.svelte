@@ -15,7 +15,9 @@
   import { loadRunPlayersById } from './sandbox-lineup';
   import { arenaBlockComplete } from '#lib/arena-sound.js';
   import ChallengeReport from '#lib/components/ChallengeReport.svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   let {
     mode,
@@ -168,19 +170,19 @@
   <p class="ui-label">{eyebrow}</p>
 
   {#if error}
-    <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      <AsyncState kind="error" title="Result unavailable" message={error} retry={retryResult} />
-      <a
-        href={resolve(`${mode}/history/`)}
-        class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
-      >
-        Challenge history
-      </a>
-    </div>
+    <EmptyState class="mt-8" kind="error" title="Result unavailable" message={error}>
+      {#snippet actions()}
+        <Button size="sm" onclick={retryResult}>Try again</Button>
+        <ActionLink href={resolve(`${mode}/history/`)} tone="primary">Challenge history</ActionLink>
+      {/snippet}
+    </EmptyState>
   {:else if loading || !run}
-    <div class="mt-8">
-      <AsyncState kind="loading" title="Loading result" message="Reading the completed run…" />
-    </div>
+    <EmptyState
+      class="mt-8"
+      kind="loading"
+      title="Loading result"
+      message="Reading the completed run…"
+    />
   {:else}
     <ChallengeReport
       {manifest}

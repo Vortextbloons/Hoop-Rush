@@ -2,8 +2,12 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import AsyncState from '#lib/components/AsyncState.svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import LoadingState from '#lib/components/ui/LoadingState.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushReportView from '#lib/features/cap-rush/CapRushReportView.svelte';
@@ -40,78 +44,55 @@
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
   {:else if resultState !== null}
     {#if resultState.loading}
-      <div class="flex flex-col gap-2">
-        <div
-          class="h-3 w-40 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
-        ></div>
-        <div
-          class="h-3 w-64 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
-        ></div>
-      </div>
+      <LoadingState variant="skeleton" lines={2} />
     {:else if resultState.report !== null}
-      <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <a
-            href={resolve('cap-rush/history/')}
-            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Run history
-          </a>
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-            disabled={resultState.busy}
-            onclick={() => void startNewRun()}
-          >
-            {resultState.busy ? 'Starting another run…' : 'Start another run'}
-          </button>
-        </div>
+      <header class="mb-4">
+        <ActionRow>
+          {#snippet secondary()}
+            <ActionLink href={resolve('cap-rush/history/')}>Run history</ActionLink>
+          {/snippet}
+          {#snippet primary()}
+            <Button
+              tone="primary"
+              loading={resultState?.busy ?? false}
+              onclick={() => void startNewRun()}
+            >
+              {resultState?.busy ? 'Starting another run…' : 'Start another run'}
+            </Button>
+          {/snippet}
+        </ActionRow>
       </header>
       <CapRushReportView report={resultState.report} />
     {:else if resultState.postseasonInProgress}
-      <AsyncState
+      <EmptyState
         kind="empty"
         title="The postseason is still running"
         message="Finish the bracket to unlock the champion, Finals MVP and final report."
       >
         {#snippet actions()}
-          <a
-            href={resolve('cap-rush/run/')}
-            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Continue the postseason
-          </a>
+          <ActionLink href={resolve('cap-rush/run/')}>Continue the postseason</ActionLink>
         {/snippet}
-      </AsyncState>
+      </EmptyState>
     {:else if resultState.seasonInProgress}
-      <AsyncState
+      <EmptyState
         kind="empty"
         title="The season is not finished"
         message="Finish all 82 games to unlock the final report."
       >
         {#snippet actions()}
-          <a
-            href={resolve('cap-rush/run/')}
-            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Continue the season
-          </a>
+          <ActionLink href={resolve('cap-rush/run/')}>Continue the season</ActionLink>
         {/snippet}
-      </AsyncState>
+      </EmptyState>
     {:else}
-      <AsyncState
+      <EmptyState
         kind="empty"
         title="No completed Cap Rush run"
         message={resultState.error ?? 'Finish an 82-game season to see its report here.'}
       >
         {#snippet actions()}
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-            onclick={() => void goto(resolve('cap-rush/'))}>Start a Cap Rush run</button
-          >
+          <Button onclick={() => void goto(resolve('cap-rush/'))}>Start a Cap Rush run</Button>
         {/snippet}
-      </AsyncState>
+      </EmptyState>
     {/if}
   {/if}
 </PageShell>

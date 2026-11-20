@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { HavocComparison } from '@hoop-rush/data-contracts';
   import { havocPeriodLabel, mutationNameOf } from './havoc-presentation';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
 
@@ -30,17 +31,15 @@
     class="rounded-xl bg-surface-2 p-4"
     data-havoc-game-detail={game.gameNumber}
   >
-    <h3
-      id="havoc-game-detail-heading"
-      class="font-display text-base font-extrabold tracking-tight uppercase"
-    >
-      Game {game.gameNumber} · {game.humanHome ? 'Home' : 'Away'} vs {game.opponentId}
-    </h3>
+    <SectionHeading
+      title={`Game ${game.gameNumber} · ${game.humanHome ? 'Home' : 'Away'} vs ${game.opponentId}`}
+      headingId="havoc-game-detail-heading"
+      level={3}
+      size="sm"
+    />
     <div class="mt-2 grid gap-3 sm:grid-cols-2">
       <div class="rounded-lg bg-surface-1 p-3">
-        <p class="font-mono text-[10px] font-bold tracking-[0.12em] text-[#37B7CC] uppercase">
-          Havoc
-        </p>
+        <p class="ui-label" style:color="#37B7CC">Havoc</p>
         <p class="font-display text-2xl font-black tabular-nums">
           {game.havoc.humanScore}–{game.havoc.opponentScore}
           <span class="font-mono text-xs font-bold text-muted-foreground">
@@ -49,11 +48,7 @@
         </p>
       </div>
       <div class="rounded-lg bg-surface-1 p-3">
-        <p
-          class="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Normal
-        </p>
+        <p class="ui-label" data-tone="muted">Normal</p>
         <p class="font-display text-2xl font-black tabular-nums">
           {game.normal.humanScore}–{game.normal.opponentScore}
           <span class="font-mono text-xs font-bold text-muted-foreground">
@@ -92,9 +87,7 @@
       </p>
     {/if}
     <div class="mt-3">
-      <h4 class="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-        Recorded mutation highlights
-      </h4>
+      <p class="ui-label" data-tone="muted">Recorded mutation highlights</p>
       {#if game.highlights.length === 0}
         <p class="mt-1 text-xs text-muted-foreground">
           No mutation highlights recorded for this game.

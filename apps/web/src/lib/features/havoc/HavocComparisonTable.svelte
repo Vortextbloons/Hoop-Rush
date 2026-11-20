@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HavocComparison } from '@hoop-rush/data-contracts';
+  import Button from '#lib/components/ui/Button.svelte';
 
   let {
     comparison,
@@ -52,15 +53,17 @@
             {/if}
           </span>
         </p>
-        <button
+        <Button
           type="button"
+          size="sm"
+          tone="secondary"
+          class="mt-2 min-h-11 w-full"
           aria-pressed={selectedGame === game.gameNumber}
           aria-label="View game {game.gameNumber} details"
           onclick={() => onSelect(game.gameNumber)}
-          class="mt-2 inline-flex min-h-11 w-full touch-manipulation items-center justify-center rounded-lg border border-border px-3 py-2 font-mono text-[11px] font-bold uppercase outline-none hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring"
         >
           View
-        </button>
+        </Button>
       </li>
     {/each}
   </ul>
@@ -114,15 +117,17 @@
               {/if}
             </td>
             <td class="px-2 py-1.5 text-right">
-              <button
+              <Button
                 type="button"
+                size="sm"
+                tone="secondary"
+                class="min-h-11 min-w-11"
                 aria-pressed={selectedGame === game.gameNumber}
                 aria-label="View game {game.gameNumber} details"
                 onclick={() => onSelect(game.gameNumber)}
-                class="min-h-11 min-w-11 touch-manipulation rounded border border-border px-3 py-2 font-mono text-[10px] font-bold uppercase outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 View
-              </button>
+              </Button>
             </td>
           </tr>
         {/each}

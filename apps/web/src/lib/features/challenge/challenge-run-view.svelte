@@ -15,7 +15,7 @@
   import { loadRunPlayersById } from './sandbox-lineup';
   import { ChallengeRunPresenter } from './challenge-session.svelte.js';
   import ChallengeOverlay from './challenge-overlay.svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   let {
     mode,
@@ -166,7 +166,7 @@
 <PageShell as="section" width="xl" padding="lg">
   {#if loadError}
     <div class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      <AsyncState
+      <EmptyState
         kind="error"
         title="Challenge unavailable"
         message={loadError}
@@ -181,11 +181,11 @@
     </div>
   {:else if !presenter.run}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading season…" message="Getting your run ready." />
+      <EmptyState kind="loading" title="Loading season…" message="Getting your run ready." />
     </div>
   {:else if presenter.phase === 'starting' || presenter.phase === 'idle'}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Warming up…" message="Simulating games." />
+      <EmptyState kind="loading" title="Warming up…" message="Simulating games." />
     </div>
   {:else}
     <ChallengeOverlay

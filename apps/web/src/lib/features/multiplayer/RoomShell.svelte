@@ -8,6 +8,9 @@
   import RoomProfiles from '#lib/features/profile/RoomProfiles.svelte';
   import type { PublicProfile } from '@hoop-rush/data-contracts';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   let {
     roomId,
     compactMobile = false,
@@ -78,40 +81,51 @@
   }
 </script>
 
-<header class="room-shell" class:compact-mobile={compactMobile}>
-  <div class="heading">
-    <div>
-      <p class="eyebrow">Multiplayer · {phase}</p>
-      <h1>{title}</h1>
-      <p class="summary">{summary}</p>
-    </div>
-    {#if roomCode}
-      <div class="invite">
-        <span>Room code</span><strong>{roomCode}</strong>
-        <div class="actions">
-          <button
-            type="button"
-            onclick={() => copy('code')}
-            aria-label={copied === 'code' ? 'Room code copied' : 'Copy room code'}
-            >{#if copied === 'code'}<Check size={15} />{:else}<Copy size={15} />{/if}
-            <span class="code-label">{copied === 'code' ? 'Copied' : 'Copy code'}</span><span
-              class="mobile-code">{roomCode}</span
-            ></button
-          >
-          <button
-            type="button"
-            onclick={() => copy('link')}
-            aria-label={copied === 'link' ? 'Invite link copied' : 'Copy invite link'}
-            >{#if copied === 'link'}<Check size={15} />{:else}<Link size={15} />{/if}
-            {copied === 'link' ? 'Copied' : 'Copy invite link'}</button
-          >
+<section class="room-shell" class:compact-mobile={compactMobile}>
+  <PageHeader
+    eyebrow={`Multiplayer · ${phase}`}
+    {title}
+    description={compactMobile ? null : summary}
+  >
+    {#snippet actions()}
+      {#if roomCode}
+        <div class="invite">
+          <p class="ui-micro">Room code</p>
+          <p class="room-code">{roomCode}</p>
+          <ActionRow>
+            {#snippet primary()}
+              <Button
+                tone="secondary"
+                size="sm"
+                class="min-h-11 md:min-h-9"
+                onclick={() => copy('code')}
+                aria-label={copied === 'code' ? 'Room code copied' : 'Copy room code'}
+              >
+                {#if copied === 'code'}<Check size={15} />{:else}<Copy size={15} />{/if}
+                <span class="code-label">{copied === 'code' ? 'Copied' : 'Copy code'}</span>
+                <span class="mobile-code">{roomCode}</span>
+              </Button>
+            {/snippet}
+            {#snippet secondary()}
+              <Button
+                tone="secondary"
+                size="sm"
+                class="min-h-11 md:min-h-9"
+                onclick={() => copy('link')}
+                aria-label={copied === 'link' ? 'Invite link copied' : 'Copy invite link'}
+              >
+                {#if copied === 'link'}<Check size={15} />{:else}<Link size={15} />{/if}
+                {copied === 'link' ? 'Copied' : 'Copy invite link'}
+              </Button>
+            {/snippet}
+          </ActionRow>
+          {#if !lobbyId}
+            <p class="expiry ui-micro">Room codes expire after 15 minutes.</p>
+          {/if}
         </div>
-        {#if !lobbyId}
-          <p class="expiry">Room codes expire after 15 minutes.</p>
-        {/if}
-      </div>
-    {/if}
-  </div>
+      {/if}
+    {/snippet}
+  </PageHeader>
   <div class="room-footer">
     <div class="seats" aria-label="Room participants">
       {#each ['p1', 'p2'] as seat (seat)}
@@ -164,25 +178,12 @@
       {onProfilesChange}
     />
   {/if}
-</header>
+</section>
 
 <style>
   .room-content {
     min-width: 0;
     margin-top: 16px;
-  }
-  @media (min-width: 768px) {
-    .compact-mobile .summary {
-      display: none;
-    }
-    .compact-mobile.room-shell {
-      padding: 20px;
-      margin-block: 12px 16px;
-    }
-    .compact-mobile .room-footer {
-      margin-top: 12px;
-      padding-top: 10px;
-    }
   }
   .mobile-code {
     display: none;
@@ -195,90 +196,40 @@
     border-radius: 12px;
     background: var(--color-card);
   }
-  .heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 24px;
-  }
-  .eyebrow {
-    color: var(--color-primary);
-    font: 700 10px var(--font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-  h1 {
-    margin-block: 7px;
-    font: 800 clamp(27px, 4vw, 42px)/1.1 var(--font-display);
-  }
-  .summary,
-  .connection {
-    color: var(--color-muted-foreground);
-    font-size: 12px;
-    line-height: 1.6;
-  }
   .invite {
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
     flex-shrink: 0;
     text-align: center;
   }
-  .invite > span {
-    color: var(--color-muted-foreground);
-    font-size: 10px;
-  }
-  .invite > strong {
-    display: block;
+  .room-code {
     font: 800 30px var(--font-mono);
     letter-spacing: 0.2em;
     padding-left: 0.2em;
   }
   .expiry {
     margin-top: 6px;
-    color: var(--color-muted-foreground);
-    font-size: 10px;
   }
-  .actions,
-  .seats,
-  .seat,
   .room-footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-  }
-  .actions {
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  button {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    padding: 7px 9px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  button:hover,
-  a:hover {
-    color: var(--color-primary);
-  }
-  button:focus-visible,
-  a:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 4px;
-  }
-  .room-footer {
-    flex-wrap: wrap;
     margin-top: 20px;
     padding-top: 16px;
     border-top: 1px solid var(--color-border);
   }
   .seats {
+    display: flex;
+    align-items: center;
     flex: 1;
     flex-wrap: wrap;
+    gap: 12px;
   }
   .seat {
+    display: flex;
+    align-items: center;
     gap: 7px;
     font-size: 11px;
   }
@@ -288,31 +239,30 @@
   .seat.online > :global(svg) {
     color: var(--color-positive);
   }
+  .connection {
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    line-height: 1.6;
+  }
   a {
     font-size: 12px;
     font-weight: 700;
   }
-  @media (max-width: 560px) {
-    .room-shell {
-      padding: 18px;
+  a:hover {
+    color: var(--color-primary);
+  }
+  a:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 4px;
+  }
+  @media (min-width: 768px) {
+    .compact-mobile.room-shell {
+      padding: 20px;
+      margin-block: 12px 16px;
     }
-    .heading {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 18px;
-    }
-    .invite {
-      text-align: left;
-    }
-    .invite > strong {
-      padding-left: 0;
-    }
-    .actions {
-      justify-content: flex-start;
-    }
-    .seats {
-      flex-basis: 100%;
-      gap: 16px;
+    .compact-mobile .room-footer {
+      margin-top: 12px;
+      padding-top: 10px;
     }
   }
   @media (max-width: 767px) {
@@ -320,26 +270,19 @@
       margin-block: 8px 12px;
       padding: 10px;
     }
-    .compact-mobile .heading {
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
-    }
-    .compact-mobile .heading > div:first-child {
-      min-width: 0;
-      flex: 1;
-    }
-    .compact-mobile h1 {
-      margin-block: 3px 0;
+    .compact-mobile :global(.ui-page-title) {
       font-size: 23px;
+      margin-block: 3px 0;
     }
-    .compact-mobile .eyebrow {
+    .compact-mobile :global(.ui-page-eyebrow) {
       font-size: 8px;
       letter-spacing: 0.04em;
     }
-    .compact-mobile .summary,
-    .compact-mobile .invite > span,
-    .compact-mobile .invite > strong,
+    .compact-mobile .invite {
+      justify-items: flex-start;
+      text-align: left;
+    }
+    .compact-mobile .room-code,
     .compact-mobile .expiry,
     .compact-mobile .code-label {
       display: none;
@@ -349,13 +292,6 @@
       font-family: var(--font-mono);
       font-weight: 800;
       letter-spacing: 0.08em;
-    }
-    .compact-mobile .actions {
-      gap: 4px;
-    }
-    .compact-mobile button {
-      min-height: 44px;
-      padding-inline: 8px;
     }
     .compact-mobile .room-footer {
       margin-top: 8px;
@@ -380,6 +316,19 @@
       min-height: 44px;
       display: inline-flex;
       align-items: center;
+    }
+  }
+  @media (max-width: 560px) {
+    .room-shell {
+      padding: 18px;
+    }
+    .invite {
+      justify-items: flex-start;
+      text-align: left;
+    }
+    .seats {
+      flex-basis: 100%;
+      gap: 16px;
     }
   }
 </style>

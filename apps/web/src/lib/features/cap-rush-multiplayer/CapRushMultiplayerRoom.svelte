@@ -22,6 +22,8 @@
   import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import Panel from '#lib/components/ui/Panel.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let { roomId }: { roomId: string } = $props();
   const controller = new CapRushMultiplayerController(untrack(() => roomId));
@@ -162,7 +164,7 @@
         />
       {:else if game === null && controller.error}
         <Panel as="section" padding="none" class="p-4">
-          <h2 class="font-display text-xl font-bold">Room unavailable</h2>
+          <SectionHeading title="Room unavailable" level={2} />
           <Alert class="mt-1" tone="danger">{controller.error}</Alert>
           <div class="mt-3 flex flex-wrap items-center gap-3">
             <button
@@ -191,19 +193,17 @@
         </div>
       {:else if game.phase === 'lobby'}
         <Panel as="section" padding="none" class="flex flex-col gap-4 p-4 sm:p-5">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="ui-label text-muted-foreground">Lobby</p>
-              <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
-                {bothOnline ? 'Both seats are in' : 'Waiting for your opponent'}
-              </h2>
-            </div>
-            <span
-              class="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase text-primary"
-            >
-              {variantLabel(variant)}
-            </span>
-          </div>
+          <SectionHeading
+            eyebrow="Lobby"
+            eyebrowTone="muted"
+            title={bothOnline ? 'Both seats are in' : 'Waiting for your opponent'}
+            level={2}
+            align="start"
+          >
+            {#snippet actions()}
+              <Badge tone="primary">{variantLabel(variant)}</Badge>
+            {/snippet}
+          </SectionHeading>
 
           <div class="grid gap-2 sm:grid-cols-2">
             {#each seatOrder(seat) as entry (entry)}
@@ -215,15 +215,11 @@
                 data-seat={entry}
               >
                 <div class="flex items-center justify-between gap-2">
-                  <p
-                    class="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                  >
+                  <p class="ui-micro">
                     {entry === seat ? 'You' : 'Opponent'} · {seatLabel(entry)}
                   </p>
                   <span
-                    class="font-mono text-[9px] font-bold uppercase {member?.online
-                      ? 'text-positive'
-                      : 'text-muted-foreground'}"
+                    class="ui-micro {member?.online ? 'text-positive' : 'text-muted-foreground'}"
                   >
                     {member === null
                       ? 'Open seat'
@@ -368,9 +364,7 @@
         </div>
       {:else}
         <Panel as="section" padding="none" class="p-5">
-          <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
-            This room is closed
-          </h2>
+          <SectionHeading title="This room is closed" level={2} />
           <p class="mt-1 text-sm text-muted-foreground">
             The room ended with phase {game.phase}. Start a new room from the multiplayer lobby.
           </p>

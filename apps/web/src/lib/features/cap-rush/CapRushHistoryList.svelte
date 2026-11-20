@@ -1,9 +1,9 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import AsyncState from '#lib/components/AsyncState.svelte';
   import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import type { CapRushHistoryState } from './cap-rush-history-state.svelte.js';
@@ -33,11 +33,11 @@
 
   <div class="mt-4">
     {#if state.loading}
-      <AsyncState kind="loading" title="Loading history" message="Reading your Cap Rush runs…" />
+      <EmptyState kind="loading" title="Loading history" message="Reading your Cap Rush runs…" />
     {:else if state.error !== null && state.entries.length === 0}
-      <AsyncState kind="error" title="History unavailable" message={state.error} />
+      <EmptyState kind="error" title="History unavailable" message={state.error} />
     {:else if state.entries.length === 0}
-      <AsyncState
+      <EmptyState
         kind="empty"
         title="No completed runs yet"
         message="Draft five players, lock the lineup, and play the 82-game season."
@@ -45,7 +45,7 @@
         {#snippet actions()}
           <ActionLink href={resolve('cap-rush/')}>Start a Cap Rush run</ActionLink>
         {/snippet}
-      </AsyncState>
+      </EmptyState>
     {:else}
       <ul class="flex flex-col gap-2">
         {#each state.entries as entry (entry.runId)}

@@ -12,6 +12,8 @@
     havocRecordLabel,
     mutationNameOf,
   } from './havoc-presentation';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
@@ -226,14 +228,9 @@
         {/if}
       {/snippet}
       {#snippet actions()}
-        <span
-          class="rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {report.status ===
-          'complete'
-            ? 'border-primary text-primary'
-            : 'border-border text-muted-foreground'}"
-        >
+        <Badge tone={report.status === 'complete' ? 'primary' : 'neutral'}>
           {report.status === 'complete' ? 'Comparison complete' : 'Comparison pending'}
-        </span>
+        </Badge>
       {/snippet}
     </SectionHeading>
     <StatGrid class="mt-3" columns={4} mobile={2} gap="md">
@@ -263,13 +260,8 @@
         data-havoc-direct-mutation-points
       />
     </StatGrid>
-    <details class="mt-3">
-      <summary
-        class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Version identifiers
-      </summary>
-      <dl class="mt-2 grid gap-1 font-mono text-[11px] text-muted-foreground sm:grid-cols-2">
+    <Disclosure class="mt-3" summary="Version identifiers">
+      <dl class="grid gap-1 font-mono text-[11px] text-muted-foreground sm:grid-cols-2">
         <div class="flex gap-2">
           <dt class="font-bold uppercase">Schema</dt>
           <dd>{report.versions.schemaVersion}</dd>
@@ -303,7 +295,7 @@
           <dd class="break-all">{report.versions.catalogVersion}</dd>
         </div>
       </dl>
-    </details>
+    </Disclosure>
   </Panel>
 
   <Panel as="section" padding="md" aria-labelledby="havoc-report-lineup">

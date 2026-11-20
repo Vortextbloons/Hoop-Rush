@@ -17,12 +17,15 @@
   import { fullCourtStandings, type FullCourtSeasonLock } from '@hoop-rush/engine';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
+  import ScheduleGrid from '#lib/components/screens/ScheduleGrid.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import type { ScheduleCell } from '#lib/components/ui/types.js';
   import {
     fullCourtPlayoffRounds,
     fullCourtPlayoffStatus,
@@ -56,6 +59,31 @@
   let selectedRound = $state<number | null>(null);
 
   const schedule = $derived(fullCourtUserSchedule(lock, scores));
+  const scheduleCells = $derived(
+    schedule.map((cell): ScheduleCell => {
+      const result = cell.result;
+      const homeAway = cell.userHome ? 'vs' : 'at';
+      return {
+        key: String(cell.slot),
+        label: `${cell.slot} ${cell.opponentAbbreviation}`,
+        sublabel:
+          result === null
+            ? cell.userHome
+              ? 'vs'
+              : '@'
+            : `${result.won ? 'W' : 'L'} ${result.compactLabel}`,
+        state: result === null ? 'upcoming' : result.won ? 'win' : 'loss',
+        ariaLabel:
+          result === null
+            ? `Game ${cell.slot} ${homeAway} ${cell.opponentName}, not played`
+            : `Game ${cell.slot} ${homeAway} ${cell.opponentName}, ${result.won ? 'win' : 'loss'} ${result.scoreLabel}`,
+        title:
+          result === null
+            ? `Game ${cell.slot} ${homeAway} ${cell.opponentAbbreviation} · not played`
+            : `Game ${cell.slot} ${homeAway} ${cell.opponentAbbreviation} · ${result.won ? 'W' : 'L'} ${result.compactLabel}`,
+      };
+    }),
+  );
   const standings = $derived(fullCourtStandings(lock.season.teams, scores));
   const userTeamId = $derived(lock.season.userTeamId);
   const teamsById = $derived(new Map(lock.season.teams.map((team) => [team.teamId, team])));
@@ -148,7 +176,7 @@
 </script>
 
 {#snippet latestStatus()}
-  <span class="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+  <span class="ui-micro font-bold">
     {#if latestResult?.forfeit}
       {latestResult.scoreLabel}
     {:else}
@@ -225,12 +253,7 @@
 {/snippet}
 
 <div class="flex flex-col gap-3">
-  <Panel
-    as="section"
-    padding="none"
-    class="full-court-scoreboard p-5 sm:p-7"
-    aria-label="Full Court season progress"
-  >
+  <Panel as="section" padding="md" aria-label="Full Court season progress">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="min-w-0">
         <p class="ui-label">
@@ -242,7 +265,7 @@
         >
           {recordLabel(userRow?.wins ?? 0, userRow?.losses ?? 0)}
         </h2>
-        <p class="mt-2 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+        <p class="ui-micro mt-2 text-muted-foreground">
           {played} of {CAP_RUSH_CONFERENCE_GAMES_PER_TEAM} games played
         </p>
         <p class="mt-1 text-xs text-muted-foreground">
@@ -276,18 +299,14 @@
     </div>
 
     {#if latestCell !== null && latestResult !== null}
-      <div class="mt-5 rounded-xl border border-line-strong bg-surface-1/60 p-4">
+      <Panel padding="sm" class="mt-5 border-line-strong">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <p class="ui-label" data-tone="muted">
             {playoff === null ? 'Latest result' : 'Latest regular-season result'} · Game {latestCell.slot}
           </p>
-          <span
-            class="rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold uppercase {latestResult.won
-              ? 'border-positive/40 bg-positive/10 text-positive'
-              : 'border-negative/40 bg-negative/10 text-negative'}"
-          >
+          <Badge tone={latestResult.won ? 'positive' : 'negative'}>
             {latestResult.doubleForfeit ? 'Double forfeit' : latestResult.won ? 'Win' : 'Loss'}
-          </span>
+          </Badge>
         </div>
         <GameScoreboard
           teams={[
@@ -308,7 +327,7 @@
           label={`Game ${String(latestCell.slot)} result`}
           class="mt-2"
         />
-      </div>
+      </Panel>
     {:else}
       <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
         No Full Court games have been played yet. Your first result lands here.
@@ -436,11 +455,9 @@
     <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Full Court postseason status">
       <SectionHeading eyebrow="Postseason" title={postseasonStatus.headline} level={2} size="md">
         {#snippet actions()}
-          <span
-            class="rounded-full border border-line-strong bg-surface-2 px-3 py-1 font-mono text-[10px] font-bold text-muted-foreground uppercase"
-          >
+          <Badge tone="neutral">
             {championId === null ? 'Bracket in progress' : 'Final'}
-          </span>
+          </Badge>
         {/snippet}
       </SectionHeading>
       <p class="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
@@ -609,50 +626,13 @@
       size="sm"
     >
       {#snippet actions()}
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
+        <p class="ui-micro">
           {played} played · {remaining} remaining
         </p>
       {/snippet}
     </SectionHeading>
 
-    <ol
-      class="mt-3 grid grid-cols-4 gap-1 sm:grid-cols-6 lg:grid-cols-8"
-      aria-label="Full Court game results"
-    >
-      {#each schedule as cell (cell.slot)}
-        {@const result = cell.result}
-        <li class="min-w-0">
-          <div
-            class="flex min-h-12 w-full min-w-0 flex-col justify-center rounded-lg border px-1.5 py-1 text-left {result ===
-            null
-              ? 'border-dashed border-line-soft bg-background/40 text-muted-foreground'
-              : result.won
-                ? 'border-positive/40 bg-positive/10 text-foreground'
-                : 'border-negative/40 bg-negative/10 text-foreground'}"
-            title={result === null
-              ? `Game ${String(cell.slot)} ${cell.userHome ? 'vs' : 'at'} ${cell.opponentName}, not played`
-              : `Game ${String(cell.slot)} ${cell.userHome ? 'vs' : 'at'} ${cell.opponentName}, ${result.won ? 'win' : 'loss'} ${result.scoreLabel}`}
-          >
-            <span class="flex items-baseline justify-between gap-1">
-              <span class="font-mono text-[9px] font-bold tabular-nums opacity-70">{cell.slot}</span
-              >
-              <span
-                class="font-mono text-[9px] font-extrabold uppercase {result === null
-                  ? ''
-                  : result.won
-                    ? 'text-positive'
-                    : 'text-negative'}">{result === null ? '·' : result.won ? 'W' : 'L'}</span
-              >
-            </span>
-            <span class="truncate font-mono text-[10px] font-bold">{cell.opponentAbbreviation}</span
-            >
-            <span class="truncate font-mono text-[9px] tabular-nums opacity-80">
-              {result === null ? (cell.userHome ? 'vs' : '@') : result.compactLabel}
-            </span>
-          </div>
-        </li>
-      {/each}
-    </ol>
+    <ScheduleGrid class="mt-3" cells={scheduleCells} columns={8} label="Full Court game results" />
   </Panel>
 
   <Panel as="section" padding="md" aria-label="Full Court standings">
@@ -664,11 +644,9 @@
     >
       {#snippet actions()}
         {#if userRow !== null}
-          <p
-            class="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-bold text-primary uppercase"
-          >
+          <Badge tone="primary">
             {userConferenceName ?? 'Your conference'} · Seed {userRow.seed}
-          </p>
+          </Badge>
         {/if}
       {/snippet}
     </SectionHeading>
@@ -693,14 +671,3 @@
     </div>
   </Panel>
 </div>
-
-<style>
-  :global(.full-court-scoreboard) {
-    border-top: 3px solid var(--color-accent);
-    background-image: radial-gradient(
-      ellipse at top left,
-      color-mix(in srgb, var(--color-accent) 12%, transparent),
-      transparent 55%
-    );
-  }
-</style>

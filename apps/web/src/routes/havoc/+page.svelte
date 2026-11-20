@@ -9,6 +9,7 @@
   import { HavocDraftController } from '#lib/features/havoc/havoc-draft-state.svelte.js';
   import { getHavocService } from '#lib/features/havoc/havoc-service.js';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
 
   let controller = $state<HavocDraftController | null>(null);
@@ -50,9 +51,13 @@
   </PageShell>
 {:else if controller !== null}
   <div class="multiplayer-entry">
-    <ActionLink tone="secondary" href={resolve('/multiplayer?format=havoc')}
-      >Play multiplayer</ActionLink
-    >
+    <ActionRow>
+      {#snippet secondary()}
+        <ActionLink tone="secondary" href={resolve('/multiplayer?format=havoc')}
+          >Play multiplayer</ActionLink
+        >
+      {/snippet}
+    </ActionRow>
   </div>
   <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('havoc/run/'))} />
 {:else}

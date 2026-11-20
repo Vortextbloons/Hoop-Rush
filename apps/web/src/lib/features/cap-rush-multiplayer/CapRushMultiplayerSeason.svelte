@@ -123,9 +123,7 @@
                 >
               {/if}
               <div class="min-w-0 flex-1">
-                <p
-                  class="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-                >
+                <p class="ui-micro">
                   {seatLabelFor(seat, localSeat)}
                 </p>
                 <p class="truncate font-display text-lg leading-tight font-extrabold uppercase">
@@ -150,11 +148,7 @@
           padding="none"
           class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3"
         >
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-          >
-            Standings
-          </p>
+          <p class="ui-label" data-tone="muted">Standings</p>
           <p class="text-sm text-muted-foreground">
             Final standings unlock after slot 82. {season.games.length} of 1230 results accepted.
           </p>

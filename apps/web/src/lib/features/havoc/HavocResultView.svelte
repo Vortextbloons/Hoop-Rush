@@ -12,10 +12,16 @@
   import { havocRecordLabel, havocDeltaTitle, formatSignedPoints } from './havoc-presentation';
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
   let { state: resultState }: { state: HavocResultState } = $props();
   const run = $derived(resultState.run);
   const comparison = $derived(resultState.comparison);
@@ -28,27 +34,42 @@
   );
 </script>
 
-<section class="h-shell" data-havoc-result>
-  {#if resultState.loading}<p class="h-copy" aria-live="polite">Opening your season report…</p>
+<PageShell as="section" width="xl" padding="lg" data-havoc-result>
+  {#if resultState.loading}<p class="text-sm text-muted-foreground" aria-live="polite">
+      Opening your season report…
+    </p>
   {:else if run === null || run.phase === 'draft'}<Panel padding="md">
-      <h1 class="h-title">Your story starts here.</h1>
-      <ActionLink class="mt-6" href={resolve('havoc/')}>Draft your squad</ActionLink>
+      <SectionHeading title="Your story starts here." level={1} size="lg" align="start" />
+      <ActionRow class="mt-6">
+        {#snippet primary()}
+          <ActionLink href={resolve('havoc/')}>Draft your squad</ActionLink>
+        {/snippet}
+      </ActionRow>
     </Panel>
   {:else if !resultState.havocSeasonComplete}<Panel padding="md">
-      <h1 class="h-title">Season in progress.</h1>
-      <p class="h-copy mt-4">
-        Your report arrives after both 82-game seasons: with powers, then the same schedule without
-        them.
-      </p>
-      <ActionLink class="mt-6" href={resolve('havoc/run/')}>Resume season</ActionLink>
+      <SectionHeading
+        title="Season in progress."
+        description="Your report arrives after both 82-game seasons: with powers, then the same schedule without them."
+        level={1}
+        size="lg"
+        align="start"
+      />
+      <ActionRow class="mt-6">
+        {#snippet primary()}
+          <ActionLink href={resolve('havoc/run/')}>Resume season</ActionLink>
+        {/snippet}
+      </ActionRow>
     </Panel>
   {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
     <Panel padding="md" data-havoc-comparison-pending>
-      <p class="h-eyebrow">One last thing</p>
-      <h1 class="h-title mt-3">The powers. The proof.</h1>
-      <p class="h-copy mt-4">
-        We're playing the same season without powers. Both results will be revealed together.
-      </p>
+      <SectionHeading
+        eyebrow="One last thing"
+        title="The powers. The proof."
+        description="We're playing the same season without powers. Both results will be revealed together."
+        level={1}
+        size="lg"
+        align="start"
+      />
       <div
         class="h-meter"
         role="progressbar"
@@ -60,57 +81,75 @@
         <div style:width={`${(completed / 82) * 100}%`}></div>
       </div>
 
-      <p class="h-copy" data-havoc-comparison-progress>{completed} / 82</p>
-      {#if !resultState.busy}<Button
-          class="mt-4"
-          data-havoc-run-normal
-          onclick={() => void resultState.runNormalSeason()}>Finish season report</Button
-        >{/if}
-      {#if resultState.busy}<Button
-          class="mt-4"
-          tone="secondary"
-          disabled={resultState.cancelling}
-          onclick={() => void resultState.cancelComparison()}
-          >{resultState.cancelling ? 'Pausing...' : 'Pause report preparation'}</Button
-        >{/if}
+      <p class="text-sm text-muted-foreground" data-havoc-comparison-progress>{completed} / 82</p>
+      <ActionRow class="mt-4">
+        {#snippet primary()}
+          {#if !resultState.busy}<Button
+              data-havoc-run-normal
+              onclick={() => void resultState.runNormalSeason()}>Finish season report</Button
+            >
+          {:else}<Button
+              tone="secondary"
+              disabled={resultState.cancelling}
+              onclick={() => void resultState.cancelComparison()}
+              >{resultState.cancelling ? 'Pausing...' : 'Pause report preparation'}</Button
+            >
+          {/if}
+        {/snippet}
+      </ActionRow>
     </Panel>
   {:else}
-    <header class="ui-panel h-result-hero" data-padding="md">
-      <p class="h-eyebrow">Hoop Havoc · Season report</p>
-      <h1 class="h-subtitle mt-2">
-        {comparison !== null && resultState.comparisonComplete
-          ? havocDeltaTitle(comparison.winsGained)
-          : 'Season complete'}
-      </h1>
-      <div class="h-record-comparison mt-4">
-        <div>
-          <p class="h-eyebrow">With powers</p>
-          <p class="h-result-record" data-havoc-final-record>
-            {havocRecordLabel(run.havocWins, run.havocLosses)}
-          </p>
-        </div>
-        {#if comparison !== null && resultState.comparisonComplete}
-          <div>
-            <p class="h-eyebrow">Without powers</p>
-            <p class="h-result-record">
-              {havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}
-            </p>
-          </div>
-          <div>
-            <p class="h-eyebrow">Wins delta</p>
-            <p class="h-result-record" class:h-negative={comparison.winsGained < 0}>
-              {formatSignedPoints(comparison.winsGained)}
-            </p>
-          </div>
-        {/if}
-      </div>
-      <p class="h-copy mt-3" data-havoc-result-objective>
-        {run.perfectSeason
-          ? '82 wins. Zero losses. Perfect season challenge cleared.'
-          : '82 games complete. See how your five finished.'}
-      </p>
+    <ResultScreen
+      eyebrow="Hoop Havoc · Season report"
+      title={comparison !== null && resultState.comparisonComplete
+        ? havocDeltaTitle(comparison.winsGained)
+        : 'Season complete'}
+    >
+      {#snippet hero()}
+        <ResultHero
+          score={havocRecordLabel(run.havocWins, run.havocLosses)}
+          caption="With powers"
+          meta={comparison !== null && resultState.comparisonComplete
+            ? `Without powers ${havocRecordLabel(
+                comparison.normal.wins,
+                comparison.normal.losses,
+              )} · Wins delta ${formatSignedPoints(comparison.winsGained)}`
+            : null}
+          secondary={run.perfectSeason
+            ? '82 wins. Zero losses. Perfect season challenge cleared.'
+            : '82 games complete. See how your five finished.'}
+          data-havoc-final-record
+          data-havoc-result-objective
+        />
+      {/snippet}
+
+      <AchievementReveal bindingId={`havoc:${run.runId}`} />
+
+      {#if run.comparisonStatus === 'unsupported'}
+        <Alert tone="warning" data-havoc-comparison-unsupported>
+          This saved season uses older rules. Its results are preserved, but a matching comparison
+          is unavailable.
+        </Alert>
+        {#if resultState.report !== null}<StatGrid class="mt-4" columns={4} mobile={2}>
+            <StatTile
+              label="Average score margin"
+              size="sm"
+              valueClass="font-sans text-base font-bold"
+              value={(
+                resultState.report.havoc.differential / resultState.report.havoc.games
+              ).toFixed(1)}
+            />
+            <StatTile
+              label="Direct power points"
+              size="sm"
+              valueClass="font-sans text-base font-bold"
+              value={resultState.report.directMutationPoints}
+            />
+          </StatGrid>{/if}
+      {/if}
+
       {#if comparison !== null && resultState.comparisonComplete}
-        <p class="h-copy text-xs mt-2">
+        <p class="text-xs text-muted-foreground">
           Same squad, opponents and seeds. Deltas compare the two seasons; individual abilities
           can't be isolated from them.
         </p>
@@ -144,77 +183,59 @@
             data-havoc-direct-mutation-points
           />
         </StatGrid>
+        <HavocSquadReport {comparison} lineup={run.lineup} />
+        <Disclosure summary="Your season, game by game · 82 matched results">
+          <HavocComparisonChart
+            {comparison}
+            {selectedGame}
+            onSelect={(gameNumber) => {
+              selectedGame = gameNumber;
+              gameDetailsOpen = true;
+            }}
+          />
+        </Disclosure>
+      {:else}
+        <HavocLineupLock slots={run.lineup} />
       {/if}
-      <AchievementReveal bindingId={`havoc:${run.runId}`} />
-    </header>
-    {#if run.comparisonStatus === 'unsupported'}
-      <Alert class="mt-4" tone="warning" data-havoc-comparison-unsupported>
-        This saved season uses older rules. Its results are preserved, but a matching comparison is
-        unavailable.
-      </Alert>
-      {#if resultState.report !== null}<StatGrid class="mt-4" columns={4} mobile={2}>
-          <StatTile
-            label="Average score margin"
-            size="sm"
-            valueClass="font-sans text-base font-bold"
-            value={(resultState.report.havoc.differential / resultState.report.havoc.games).toFixed(
-              1,
-            )}
-          />
-          <StatTile
-            label="Direct power points"
-            size="sm"
-            valueClass="font-sans text-base font-bold"
-            value={resultState.report.directMutationPoints}
-          />
-        </StatGrid>{/if}
-    {/if}
-    {#if comparison !== null && resultState.comparisonComplete}
-      <HavocSquadReport {comparison} lineup={run.lineup} />
-      <details class="ui-panel mt-4" data-padding="md">
-        <summary>Your season, game by game · 82 matched results</summary>
-        <HavocComparisonChart
-          {comparison}
-          {selectedGame}
-          onSelect={(gameNumber) => {
-            selectedGame = gameNumber;
-            gameDetailsOpen = true;
-          }}
-        />
-      </details>
-    {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
-    <div class="h-actions mt-6">
-      <ActionLink href={resolve('havoc/')}>Draft another squad <ArrowRight size={18} /></ActionLink>
-      <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
-    </div>
 
-    {#if comparison !== null && resultState.comparisonComplete}
-      <details class="ui-panel mt-8" data-padding="md">
-        <summary>Explore the box scores, powers & game-by-game comparison</summary>
-        <HavocComparisonView {comparison} showChart={false} />
-      </details>
-    {/if}
+      <ActionRow class="mt-2">
+        {#snippet primary()}
+          <ActionLink href={resolve('havoc/')}
+            >Draft another squad <ArrowRight size={18} /></ActionLink
+          >
+        {/snippet}
+        {#snippet tertiary()}
+          <ActionLink tone="ghost" href={resolve('havoc/history/')}>Run history</ActionLink>
+        {/snippet}
+      </ActionRow>
 
-    <a
-      class="h-link mt-6 inline-block"
-      href={resolve('/havoc/history/[runId]', { runId: run.runId })}>Open full saved report</a
-    >
+      {#if comparison !== null && resultState.comparisonComplete}
+        <Disclosure summary="Explore the box scores, powers & game-by-game comparison">
+          <HavocComparisonView {comparison} showChart={false} />
+        </Disclosure>
+      {/if}
+
+      <div>
+        <ActionLink tone="ghost" href={resolve('/havoc/history/[runId]', { runId: run.runId })}
+          >Open full saved report</ActionLink
+        >
+      </div>
+    </ResultScreen>
   {/if}
-  {#if resultState.error !== null}<Alert tone="danger">{resultState.error}</Alert>{/if}
-  {#if resultState.notice !== null}<Alert tone="info">{resultState.notice}</Alert>{/if}
-</section>
+  {#if resultState.error !== null}<Alert class="mt-4" tone="danger">{resultState.error}</Alert>{/if}
+  {#if resultState.notice !== null}<Alert class="mt-4" tone="info">{resultState.notice}</Alert>{/if}
+</PageShell>
 <Dialog.Root bind:open={gameDetailsOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class="h-result-overlay" />
     <Dialog.Content class="havoc-world h-result-dialog">
-      <header class="h-header">
-        <Dialog.Title class="h-subtitle">Game {selectedGame} comparison</Dialog.Title><Dialog.Close
-          class="ui-btn"
-          data-tone="secondary">Close</Dialog.Close
-        >
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <Dialog.Title class="font-display text-xl font-extrabold tracking-tight uppercase"
+          >Game {selectedGame} comparison</Dialog.Title
+        ><Dialog.Close class="ui-btn" data-tone="secondary">Close</Dialog.Close>
       </header>
 
-      <Dialog.Description class="h-copy text-xs"
+      <Dialog.Description class="mt-2 text-xs text-muted-foreground"
         >The same matchup, with and without powers.</Dialog.Description
       >
 
@@ -224,29 +245,3 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
-
-<style>
-  .h-result-hero {
-    border-top: 3px solid var(--h-gold);
-  }
-  .h-record-comparison {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    align-items: end;
-  }
-  .h-result-record {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 5vw, 3.5rem);
-    font-weight: 900;
-    color: var(--h-gold);
-  }
-  .h-result-record.h-negative {
-    color: var(--h-pink);
-  }
-  @media (max-width: 600px) {
-    .h-record-comparison {
-      gap: 8px;
-    }
-  }
-</style>

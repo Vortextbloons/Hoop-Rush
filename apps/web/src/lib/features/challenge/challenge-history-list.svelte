@@ -1,10 +1,11 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Trophy } from '@lucide/svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
   import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -61,13 +62,13 @@
 
 {#if rows.length === 0 && !active}
   <div class="mt-8">
-    <AsyncState kind="empty" title={emptyTitle}>
+    <EmptyState kind="empty" title={emptyTitle}>
       {#snippet actions()}
         <ActionLink href={emptyHrefResolved} size="sm" tone="primary">
           {emptyCta}
         </ActionLink>
       {/snippet}
-    </AsyncState>
+    </EmptyState>
   </div>
 {:else}
   {#if active && active.status === 'active' && continueHrefResolved !== null}
@@ -76,7 +77,7 @@
       class="mt-8 border-line-strong bg-surface-2"
       aria-label={`${modeLabel} active challenge`}
     >
-      <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
+      <SectionHeading title="Active challenge" level={2} size="sm" align="start" />
       <p class="mt-1 text-sm text-muted-foreground">
         {franchiseName(active.franchiseId)} · {eraName(manifest, active.eraId)} · game
         {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-

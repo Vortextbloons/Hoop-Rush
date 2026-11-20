@@ -14,6 +14,8 @@
   import Panel from '#lib/components/ui/Panel.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   type StepAction = 'watch-h2h' | null;
 
@@ -182,7 +184,7 @@
   >
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end">
       <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+        <p class="ui-label">
           Shared season · Through game {Math.floor(displayedSlot)} of {CAP_RUSH_GAME_COUNT}
         </p>
         <div class="mt-2 flex flex-wrap items-end gap-x-4 gap-y-1">
@@ -195,7 +197,7 @@
             <p class="truncate font-display text-2xl leading-tight font-extrabold uppercase">
               {localName}
             </p>
-            <p class="mt-1 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+            <p class="ui-micro">
               {played} played · {capStatusLabel(locked.seats[localSeat].payrollStatus)} · {remaining}
               left
             </p>
@@ -215,7 +217,7 @@
           ></div>
         </div>
         <div
-          class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground tabular-nums"
+          class="ui-micro mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 tabular-nums"
         >
           <span>{Math.floor(progress)}% of the shared season</span>
           <span>{visibleGames.length} / 1230 results</span>
@@ -248,7 +250,7 @@
             >
           {/if}
           <div class="min-w-0 flex-1">
-            <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
+            <p class="ui-micro">
               {seatLabelFor(otherSeat, localSeat)}
             </p>
             <p class="truncate text-sm font-bold">{otherName}</p>
@@ -263,28 +265,18 @@
     <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <Panel padding="none" class="min-w-0 border-line-strong p-4">
         {#if latest === null}
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-          >
-            Latest result
-          </p>
+          <p class="ui-label" data-tone="muted">Latest result</p>
           <p class="mt-2 text-sm text-muted-foreground">
             The first results will appear as the season advances.
           </p>
         {:else}
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
+            <p class="ui-label" data-tone="muted">
               Latest result · Game {latest.slot} · {latest.humanHome ? 'Home' : 'Away'}
             </p>
-            <span
-              class="rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase {latest.won
-                ? 'border-positive/40 bg-positive/10 text-positive'
-                : 'border-negative/40 bg-negative/10 text-negative'}"
-            >
+            <Badge tone={latest.won ? 'positive' : 'negative'}>
               {latest.won ? 'Win' : 'Loss'}
-            </span>
+            </Badge>
           </div>
           <GameScoreboard
             teams={latest.teams}
@@ -324,20 +316,16 @@
         role="status"
         data-step={nextStep.action ?? 'waiting'}
       >
-        <p
-          class="font-mono text-[10px] font-bold tracking-[0.14em] uppercase {nextStep.mine
-            ? 'text-primary'
-            : 'text-muted-foreground'}"
-        >
-          {nextStep.mine
+        <SectionHeading
+          eyebrow={nextStep.mine
             ? 'Your move'
             : h2h === null
               ? 'Season in progress'
               : 'Waiting for opponent'}
-        </p>
-        <p class="font-display text-2xl leading-tight font-extrabold tracking-tight uppercase">
-          {nextStep.title}
-        </p>
+          eyebrowTone={nextStep.mine ? 'primary' : 'muted'}
+          title={nextStep.title}
+          level={3}
+        />
         {#if h2hGame !== null && localH2HConfirmed}
           <p class="font-mono text-xs font-semibold tabular-nums">
             {teamName(h2hGame.homeTeamId)}

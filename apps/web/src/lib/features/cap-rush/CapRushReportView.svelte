@@ -2,19 +2,27 @@
   import { onMount } from 'svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import BoxScorePanel from '#lib/components/screens/BoxScorePanel.svelte';
+  import MvpCard from '#lib/components/screens/MvpCard.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import type { BadgeTone } from '#lib/components/ui/types.js';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
     POSITIONS,
     capRushConferenceRoundName,
+    type CapRushPayrollStatus,
     type CapRushPlayerSeasonLine,
     type CapRushReport,
   } from '@hoop-rush/data-contracts';
@@ -27,7 +35,6 @@
   import {
     apronPenaltyRows,
     apronPenaltyTitle,
-    capStatusClass,
     capStatusLabel,
     formatAverage,
     formatMillions,
@@ -67,6 +74,10 @@
   const mvp = $derived(report.mvp);
   const postseason = $derived(report.postseason ?? null);
   const roundName = capRushConferenceRoundName;
+  const seasonTeams = $derived([
+    { name: 'Your five', score: aggregate.pointsFor, isUser: true },
+    { name: 'Opponents', score: aggregate.pointsAgainst },
+  ]);
   const finalsMvpFace = $derived(
     postseason === null
       ? null
@@ -169,6 +180,13 @@
       : []),
   ]);
 
+  function capTone(status: CapRushPayrollStatus): BadgeTone {
+    if (status === 'under-cap') return 'positive';
+    if (status === 'first-apron') return 'accent';
+    if (status === 'second-apron') return 'primary';
+    return 'negative';
+  }
+
   function totalsFor(
     label: string,
     rows: readonly StatsRow[],
@@ -231,18 +249,51 @@
   }
 </script>
 
-<div class="flex flex-col gap-4" data-cap-rush-report>
+<ResultScreen
+  eyebrow={`${variantLabel(report.variant)} · Season report`}
+  title={report.postseason === undefined ? 'Regular-season report' : 'Championship report'}
+  data-cap-rush-report
+>
+  {#snippet badges()}
+    <Badge tone={capTone(report.payrollStatus)}>{capStatusLabel(report.payrollStatus)}</Badge>
+  {/snippet}
+
+  {#snippet hero()}
+    <ResultHero
+      score={recordLabel(aggregate.wins, aggregate.losses)}
+      meta={`${aggregate.games} games · ${aggregate.pointsFor} for · ${aggregate.pointsAgainst} against`}
+      tone={postseason?.isUserChampion === true ? 'champion' : 'default'}
+    />
+    <StatGrid class="mt-4" columns={3} mobile={3} gap="md">
+      <StatTile
+        label="Points / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsFor, aggregate.games)}
+      />
+      <StatTile
+        label="Allowed / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsAgainst, aggregate.games)}
+      />
+      <StatTile
+        label="Margin / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsFor - aggregate.pointsAgainst, aggregate.games)}
+      />
+    </StatGrid>
+  {/snippet}
+
   {#if aggregate.perfectSeason}
-    <Alert tone="warning" title="Perfect season &middot; 82&ndash;0" class="rounded-2xl p-4 sm:p-5">
+    <Alert tone="warning" title="Perfect season · 82–0">
       {#snippet icon()}<Trophy size={22} aria-hidden="true" />{/snippet}
     </Alert>
   {/if}
 
   {#if postseason !== null}
-    <section
-      class="rounded-2xl border p-5 sm:p-7 {postseason.isUserChampion
-        ? 'border-accent/50 bg-accent/10'
-        : 'border-border bg-card'}"
+    <Panel
+      as="section"
+      padding="md"
+      class={postseason.isUserChampion ? 'border-accent/50 bg-accent/10' : ''}
       aria-label="Postseason result"
     >
       <div class="flex flex-wrap items-center gap-4">
@@ -272,74 +323,61 @@
           </p>
         </div>
         {#if postseason.seed !== null}
-          <span
-            class="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[10px] font-bold text-primary uppercase"
-            >Your seed · {postseason.seed}</span
-          >
+          <Badge tone="primary">Your seed · {postseason.seed}</Badge>
         {/if}
       </div>
       {#if postseason.isUserChampion}
         <AchievementReveal bindingId={`cap-rush:${report.runId}`} />
       {/if}
-    </section>
-
-    <Panel as="section" padding="none" class="border-accent/40 p-5 sm:p-7" aria-label="Finals MVP">
-      <p class="ui-label text-accent">Finals MVP</p>
-      <div class="mt-3 flex flex-wrap items-center gap-4">
-        <div class="shrink-0">
-          {#if manifest && finalsMvpFace}
-            <PlayerFace
-              player={finalsMvpFace}
-              {manifest}
-              size="xl"
-              fallbackInitials={initialsOf(postseason.finalsMvp.displayName)}
-            />
-          {:else}
-            <span
-              class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-3 font-display text-xl font-extrabold"
-              aria-hidden="true">{initialsOf(postseason.finalsMvp.displayName)}</span
-            >
-          {/if}
-        </div>
-        <div class="min-w-0 flex-1">
-          <h3 class="font-display text-2xl font-extrabold tracking-tight uppercase">
-            {postseason.finalsMvp.displayName}
-          </h3>
-          <p class="font-mono text-[10px] text-muted-foreground uppercase">
-            {postseason.finalsMvp.slot} · {postseason.championName} · {postseason.finalsMvp.games}
-            Finals games
-          </p>
-          <StatGrid class="mt-3" columns={4} mobile={2}>
-            <StatTile
-              label="PTS"
-              size="sm"
-              value={formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games)}
-            />
-            <StatTile
-              label="REB"
-              size="sm"
-              value={formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games)}
-            />
-            <StatTile
-              label="AST"
-              size="sm"
-              value={formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games)}
-            />
-            <StatTile
-              label="Game score"
-              size="sm"
-              value={formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games)}
-            />
-          </StatGrid>
-        </div>
-      </div>
-      <p class="mt-3 text-[11px] text-muted-foreground">
-        Cumulative Finals game score
-        <strong class="text-foreground">{postseason.finalsMvp.totalGameScore.toFixed(1)}</strong>.
-        Ranked by cumulative Finals game score, then Finals points, assists, rebounds and stable
-        player ID.
-      </p>
     </Panel>
+
+    <MvpCard
+      label="Finals MVP"
+      name={postseason.finalsMvp.displayName}
+      team={postseason.championName}
+      slot={`${postseason.finalsMvp.slot} · ${postseason.finalsMvp.games} Finals games`}
+      stats={[
+        {
+          label: 'PTS',
+          value: formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games),
+        },
+        {
+          label: 'REB',
+          value: formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games),
+        },
+        {
+          label: 'AST',
+          value: formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games),
+        },
+        {
+          label: 'Game score',
+          value: formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games),
+        },
+      ]}
+      class="border-accent/40"
+    >
+      {#snippet portrait()}
+        {#if manifest && finalsMvpFace}
+          <PlayerFace
+            player={finalsMvpFace}
+            {manifest}
+            size="xl"
+            fallbackInitials={initialsOf(postseason.finalsMvp.displayName)}
+          />
+        {:else}
+          <span class="report-initials" aria-hidden="true"
+            >{initialsOf(postseason.finalsMvp.displayName)}</span
+          >
+        {/if}
+      {/snippet}
+    </MvpCard>
+
+    <p class="text-[11px] text-muted-foreground">
+      Cumulative Finals game score
+      <strong class="text-foreground">{postseason.finalsMvp.totalGameScore.toFixed(1)}</strong>.
+      Ranked by cumulative Finals game score, then Finals points, assists, rebounds and stable
+      player ID.
+    </p>
 
     <CapRushBracket
       series={postseason.series}
@@ -348,61 +386,14 @@
       userTeamId={report.franchise?.franchiseId ?? null}
     />
   {:else}
-    <Alert tone="info" class="rounded-2xl">
+    <Alert tone="info">
       This is a regular-season run. It was played before Cap Rush postseasons existed, so it has no
       bracket or Finals MVP.
     </Alert>
   {/if}
 
-  <Panel as="section" padding="none" class="report-hero p-5 sm:p-7" aria-label="Final report">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div class="min-w-0">
-        <p class="ui-label">
-          {variantLabel(report.variant)} &middot; Season report
-        </p>
-        <h2
-          class="font-display mt-2 text-7xl leading-none font-extrabold tracking-tight tabular-nums sm:text-8xl"
-        >
-          {recordLabel(aggregate.wins, aggregate.losses)}
-          {#if aggregate.perfectSeason}
-            <span class="text-accent">&middot; 82&ndash;0</span>
-          {/if}
-        </h2>
-        <p class="mt-3 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-          {aggregate.games} games &middot; {aggregate.pointsFor} for &middot; {aggregate.pointsAgainst}
-          against
-        </p>
-      </div>
-      <span
-        class="inline-flex items-center rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {capStatusClass(
-          report.payrollStatus,
-        )}">{capStatusLabel(report.payrollStatus)}</span
-      >
-    </div>
-
-    <StatGrid class="mt-6 border-t border-line-soft pt-5" columns={3} mobile={3} gap="md">
-      <StatTile
-        label="Points / game"
-        size="lg"
-        value={formatAverage(aggregate.pointsFor, aggregate.games)}
-      />
-      <StatTile
-        label="Allowed / game"
-        size="lg"
-        value={formatAverage(aggregate.pointsAgainst, aggregate.games)}
-      />
-      <StatTile
-        label="Margin / game"
-        size="lg"
-        value={formatAverage(aggregate.pointsFor - aggregate.pointsAgainst, aggregate.games)}
-      />
-    </StatGrid>
-    <StatGrid
-      class="mt-5 border-t border-line-soft pt-5"
-      columns={report.variant === 'roulette' ? 4 : 3}
-      mobile={2}
-      gap="md"
-    >
+  <Panel as="section" padding="md" aria-label="Season finances">
+    <StatGrid columns={report.variant === 'roulette' ? 4 : 3} mobile={2} gap="md">
       <StatTile
         label="Player payroll"
         size="md"
@@ -434,22 +425,20 @@
     </StatGrid>
 
     <div class="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line-soft pt-4">
-      <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-        Efficiency
-      </p>
+      <p class="ui-micro">Efficiency</p>
       <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
         {winsPerMillion === null ? '\u2014' : winsPerMillion.toFixed(2)}
       </p>
       <p class="mt-0.5 text-[11px] text-muted-foreground">
         wins per $1M of player payroll
         <span class="font-mono"
-          >&middot; {aggregate.wins} wins &divide; {formatMillions(report.payrollDollars)}</span
+          >· {aggregate.wins} wins ÷ {formatMillions(report.payrollDollars)}</span
         >
       </p>
     </div>
   </Panel>
 
-  <Panel as="section" class="p-5 sm:p-7" aria-label="Your five">
+  <Panel as="section" padding="md" aria-label="Your five">
     <SectionHeading eyebrow="The roster" title="Your starting five" level={3} size="lg">
       {#snippet actions()}
         <p class="text-xs text-muted-foreground">
@@ -482,7 +471,7 @@
           </div>
           <div class="report-player-info">
             <h4>{line.displayName}</h4>
-            <p>{formatMillions(line.salaryDollars)} &middot; {line.gamesPlayed} GP</p>
+            <p>{formatMillions(line.salaryDollars)} · {line.gamesPlayed} GP</p>
             <dl class="report-player-stats">
               <div>
                 <dt>PTS</dt>
@@ -523,20 +512,14 @@
   </Panel>
 
   <div class="grid gap-4">
-    <Panel as="section" class="p-5 sm:p-7" aria-label="Cap status and applied penalties">
+    <Panel as="section" padding="md" aria-label="Cap status and applied penalties">
       <SectionHeading eyebrow="Payroll impact" title="Cap status" level={3} align="start">
         {#snippet actions()}
-          <span
-            class="inline-flex rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.1em] uppercase {capStatusClass(
-              report.payrollStatus,
-            )}">{capStatusLabel(report.payrollStatus)}</span
-          >
+          <Badge tone={capTone(report.payrollStatus)}>{capStatusLabel(report.payrollStatus)}</Badge>
         {/snippet}
       </SectionHeading>
-      <Panel padding="none" class="mt-4 p-4">
-        <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-          Applied penalties
-        </p>
+      <Panel padding="sm" class="mt-4">
+        <p class="ui-micro font-bold">Applied penalties</p>
         <p class="mt-1 text-sm font-bold">{apronPenaltyTitle(report.payrollStatus)}</p>
         {#if report.payrollStatus === 'first-apron' || report.payrollStatus === 'second-apron'}
           <p class="mt-1 text-xs text-muted-foreground">
@@ -584,8 +567,7 @@
     </Panel>
 
     {#if report.variant === 'roulette'}
-      <Panel as="section" class="p-5 sm:p-7" aria-label="Cap Roulette spin">
-        <SectionHeading eyebrow="The wild card" title="Mutation spin" level={3} />
+      <Disclosure summary="Mutation spin" meta="The wild card" aria-label="Cap Roulette spin">
         {#if spins.length === 0}
           <EmptyState class="mt-4" title="No spin purchased" surface="none" />
         {:else}
@@ -594,76 +576,50 @@
               {@const mutation = havocMutationDefinitionOf(spin.mutationId)}
               {@const spinTarget =
                 players.find((line) => line.cardId === spin.targetCardId) ?? null}
-              <details class="ui-panel group min-w-0 p-3" data-padding="none">
-                <summary
-                  class="cursor-pointer list-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span class="flex items-start justify-between gap-2">
-                    <span class="min-w-0">
-                      <span class="block text-sm font-bold">{mutation.name}</span>
-                      <span class="mt-1 block text-xs text-muted-foreground"
-                        >{spinTarget === null
-                          ? spin.targetCardId
-                          : `${spinTarget.displayName} - ${spinTarget.slot}`}</span
-                      >
-                    </span>
-                    <HavocTierBadge tier={spin.tier} size="sm" />
-                  </span>
-                  <span
-                    class="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
-                  >
-                    <span
-                      ><span
-                        >{spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'}</span
-                      >
-                      &middot; {formatMillions(spin.priceDollars)}</span
-                    >
-                    <span class="font-semibold text-primary group-open:hidden">Show details</span>
-                    <span class="hidden font-semibold text-primary group-open:inline"
-                      >Hide details</span
-                    >
-                  </span>
-                </summary>
-                <div
-                  class="mt-3 border-t border-line-soft pt-3 text-xs leading-relaxed text-muted-foreground"
-                >
-                  {#if spinTarget !== null}
-                    <p class="mb-2 font-bold text-primary">
-                      {spinTarget.adjustments > 0 ? '+' : ''}{spinTarget.adjustments} direct mutation
-                      points
-                    </p>
-                    <p class="mb-2">
-                      Recorded scoring adjustments for this player across all their powers. Rating
-                      effects are described below.
-                    </p>
-                  {/if}
-                  <p>{mutation.description}</p>
-                  {#each spin.additionalMutationIds ?? [] as mutationId (mutationId)}
-                    {@const extra = havocMutationDefinitionOf(mutationId)}
-                    <p class="mt-2 font-bold">{extra.name}</p>
-                    <p>{extra.description}</p>
-                    {#if extra.downside}<p class="mt-2 text-destructive">
-                        Downside: {extra.downside}
-                      </p>{/if}
-                  {/each}
-                  {#if mutation.downside}<p class="mt-2 text-destructive">
-                      Downside: {mutation.downside}
+              <Disclosure
+                summary={mutation.name}
+                meta={`${
+                  spinTarget === null
+                    ? spin.targetCardId
+                    : `${spinTarget.displayName} - ${spinTarget.slot}`
+                } · ${
+                  spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'
+                } · ${formatMillions(spin.priceDollars)}`}
+              >
+                <HavocTierBadge tier={spin.tier} size="sm" />
+                {#if spinTarget !== null}
+                  <p class="mt-3 font-bold text-primary">
+                    {spinTarget.adjustments > 0 ? '+' : ''}{spinTarget.adjustments} direct mutation points
+                  </p>
+                  <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    Recorded scoring adjustments for this player across all their powers. Rating
+                    effects are described below.
+                  </p>
+                {/if}
+                <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {mutation.description}
+                </p>
+                {#each spin.additionalMutationIds ?? [] as mutationId (mutationId)}
+                  {@const extra = havocMutationDefinitionOf(mutationId)}
+                  <p class="mt-2 text-xs font-bold">{extra.name}</p>
+                  <p class="text-xs leading-relaxed text-muted-foreground">{extra.description}</p>
+                  {#if extra.downside}<p class="mt-2 text-xs text-destructive">
+                      Downside: {extra.downside}
                     </p>{/if}
-                </div>
-              </details>
+                {/each}
+                {#if mutation.downside}<p class="mt-2 text-xs text-destructive">
+                    Downside: {mutation.downside}
+                  </p>{/if}
+              </Disclosure>
             {/each}
           </div>
         {/if}
-      </Panel>
+      </Disclosure>
     {/if}
   </div>
 
-  <Panel as="section" padding="md" class="sm:p-7" aria-label="Season player statistics">
-    <SectionHeading eyebrow="The box score" title="Season statistics" level={3}>
-      <span class="text-sm text-muted-foreground">&middot; per game</span>
-    </SectionHeading>
+  <Disclosure summary="The box score" meta="Per game">
     <SegmentedControl
-      class="mt-4"
       options={statsOptions}
       value={statsView}
       onchange={(view) => (statsView = view)}
@@ -673,62 +629,64 @@
       <p class="mt-3 text-sm text-muted-foreground" role="status">{postseasonMessage}</p>
     {/if}
     {#if statRows.length > 0}
-      <Panel padding="none" class="mt-4 overflow-x-auto">
-        <PlayerStatsTable
-          columns={statColumns}
-          rows={statRows}
-          rowKey={(line) => `${line.slot}:${line.phase}`}
-          totals={statTotals}
-          caption={`${comparing ? 'Regular season and postseason' : statsView === 'postseason' ? 'Postseason' : 'Regular season'} totals and averages for the five signed slots`}
-          tableClass="min-w-[860px] text-xs"
-          headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-          rowClass={(line) => {
-            if (!comparing) return 'border-b border-border/40';
-            return line.phase === 'postseason' ? 'border-b border-border/60 bg-surface-2' : '';
-          }}
-          playerCellClass="px-3 py-2 text-left font-semibold"
-          playerHeadCellClass="px-2 py-1 text-left font-medium"
-          headCellClass="px-2 py-1 text-right font-medium"
-          statCellClass="px-2 py-1 text-right font-mono"
-          footClass="font-semibold"
-          playerTotalCellClass="px-2 py-1 text-left"
-          totalCellClass="px-2 py-1 text-right font-mono"
-        >
-          {#snippet identity(line)}
-            {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
-            {#if comparing && line.phase === 'postseason'}
-              <span class="sr-only">{line.displayName} {line.slot}</span>
-              <span class="pl-11 font-mono text-[9px] text-muted-foreground">Postseason</span>
-            {:else}
-              <div class="flex min-w-40 items-center gap-2">
-                {#if manifest && face}
-                  <PlayerFace
-                    player={face}
-                    {manifest}
-                    size="sm"
-                    fallbackInitials={initialsOf(line.displayName)}
-                  />
-                {:else}
+      <BoxScorePanel class="mt-4" label="Season statistics" teams={seasonTeams}>
+        <div class="overflow-x-auto">
+          <PlayerStatsTable
+            columns={statColumns}
+            rows={statRows}
+            rowKey={(line) => `${line.slot}:${line.phase}`}
+            totals={statTotals}
+            caption={`${comparing ? 'Regular season and postseason' : statsView === 'postseason' ? 'Postseason' : 'Regular season'} totals and averages for the five signed slots`}
+            tableClass="min-w-[860px] text-xs"
+            headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+            rowClass={(line) => {
+              if (!comparing) return 'border-b border-border/40';
+              return line.phase === 'postseason' ? 'border-b border-border/60 bg-surface-2' : '';
+            }}
+            playerCellClass="px-3 py-2 text-left font-semibold"
+            playerHeadCellClass="px-2 py-1 text-left font-medium"
+            headCellClass="px-2 py-1 text-right font-medium"
+            statCellClass="px-2 py-1 text-right font-mono"
+            footClass="font-semibold"
+            playerTotalCellClass="px-2 py-1 text-left"
+            totalCellClass="px-2 py-1 text-right font-mono"
+          >
+            {#snippet identity(line)}
+              {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
+              {#if comparing && line.phase === 'postseason'}
+                <span class="sr-only">{line.displayName} {line.slot}</span>
+                <span class="pl-11 font-mono text-[9px] text-muted-foreground">Postseason</span>
+              {:else}
+                <div class="flex min-w-40 items-center gap-2">
+                  {#if manifest && face}
+                    <PlayerFace
+                      player={face}
+                      {manifest}
+                      size="sm"
+                      fallbackInitials={initialsOf(line.displayName)}
+                    />
+                  {:else}
+                    <span
+                      class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
+                      >{initialsOf(line.displayName)}</span
+                    >
+                  {/if}
                   <span
-                    class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
-                    >{initialsOf(line.displayName)}</span
+                    ><span class="block">{line.displayName}</span><span
+                      class="font-mono text-[9px] text-muted-foreground"
+                      >{line.slot}{comparing ? ' · Regular season' : ''}</span
+                    ></span
                   >
-                {/if}
-                <span
-                  ><span class="block">{line.displayName}</span><span
-                    class="font-mono text-[9px] text-muted-foreground"
-                    >{line.slot}{comparing ? ' · Regular season' : ''}</span
-                  ></span
-                >
-              </div>
-            {/if}
-          {/snippet}
-        </PlayerStatsTable>
-      </Panel>
+                </div>
+              {/if}
+            {/snippet}
+          </PlayerStatsTable>
+        </div>
+      </BoxScorePanel>
     {/if}
-  </Panel>
+  </Disclosure>
 
-  <Panel as="section" padding="md" class="sm:p-7" aria-label="League MVP">
+  <Panel as="section" padding="md" aria-label="League MVP">
     <SectionHeading eyebrow="Season honors" title="League MVP" level={3} />
     {#if mvp === null}
       <EmptyState
@@ -739,8 +697,20 @@
       />
     {:else}
       {@const mvpFace = playerIndex?.players.find((entry) => entry.playerId === mvp.playerId)}
-      <div class="mvp-feature mt-4">
-        <div class="mvp-portrait">
+      <MvpCard
+        class="mt-4"
+        label={mvp.isUserTeam ? 'Your lineup' : 'Opponent'}
+        name={mvp.displayName}
+        team={mvp.teamName}
+        slot={`${mvp.slot ?? '—'} · ${mvp.appearances} GP`}
+        stats={[
+          { label: 'PTS', value: mvp.averagePoints.toFixed(1) },
+          { label: 'REB', value: mvp.averageRebounds.toFixed(1) },
+          { label: 'AST', value: mvp.averageAssists.toFixed(1) },
+          { label: 'MVP score', value: mvp.mvpScore.toFixed(2) },
+        ]}
+      >
+        {#snippet portrait()}
           {#if manifest && mvpFace}
             <PlayerFace
               player={mvpFace}
@@ -751,42 +721,9 @@
           {:else}
             <span class="report-initials" aria-hidden="true">{initialsOf(mvp.displayName)}</span>
           {/if}
-        </div>
-        <div class="min-w-0">
-          <p class="report-label">
-            {mvp.isUserTeam ? 'Your lineup' : 'Opponent'} &middot; {mvp.appearances} GP
-          </p>
-          <p class="font-display mt-1 text-3xl leading-tight font-extrabold tracking-tight">
-            {mvp.displayName}
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {mvp.teamName}{#if mvp.slot !== null}
-              &middot; {mvp.slot}{/if}
-          </p>
-        </div>
-        <dl class="mvp-production">
-          <div>
-            <dt>PTS</dt>
-            <dd>{mvp.averagePoints.toFixed(1)}</dd>
-          </div>
-          <div>
-            <dt>REB</dt>
-            <dd>{mvp.averageRebounds.toFixed(1)}</dd>
-          </div>
-          <div>
-            <dt>AST</dt>
-            <dd>{mvp.averageAssists.toFixed(1)}</dd>
-          </div>
-        </dl>
-      </div>
-      <StatGrid class="mt-4" columns={3} mobile={2}>
-        <StatTile
-          label="MVP score"
-          size="sm"
-          surface="tile"
-          valueClass="font-mono text-xs"
-          value={mvp.mvpScore.toFixed(2)}
-        />
+        {/snippet}
+      </MvpCard>
+      <StatGrid class="mt-4" columns={2} mobile={2}>
         <StatTile
           label="Game score"
           size="sm"
@@ -804,59 +741,18 @@
       </StatGrid>
     {/if}
   </Panel>
-</div>
+</ResultScreen>
 
 <style>
-  .report-label {
-    color: var(--color-primary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-  .mvp-feature {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1.25rem;
-    overflow: hidden;
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.75rem;
-    background:
-      radial-gradient(
-        ellipse at left,
-        color-mix(in srgb, var(--color-accent) 14%, transparent),
-        transparent 65%
-      ),
-      var(--color-surface-1);
-  }
-  .mvp-portrait :global(> div) {
-    background: transparent;
-  }
-  .mvp-production {
-    display: flex;
-    gap: 1.5rem;
-    margin-left: auto;
-  }
-  .mvp-production dt {
+  .report-initials {
+    display: grid;
+    width: 6rem;
+    height: 6rem;
+    place-items: center;
     color: var(--color-muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-  .mvp-production dd {
-    margin-top: 0.25rem;
     font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-  }
-  @media (max-width: 600px) {
-    .mvp-production {
-      width: 100%;
-      margin-left: 0;
-    }
+    font-size: 2rem;
+    font-weight: 900;
   }
 
   .report-player-grid {
@@ -902,16 +798,6 @@
   .report-portrait :global(> div) {
     background: transparent;
   }
-  .report-initials {
-    display: grid;
-    width: 6rem;
-    height: 6rem;
-    place-items: center;
-    color: var(--color-muted-foreground);
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 900;
-  }
   .report-player-info {
     padding: 0.75rem;
     border-top: 1px solid var(--color-line-soft);
@@ -951,13 +837,5 @@
     .report-player-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-  }
-  .report-hero {
-    border-top: 3px solid var(--color-primary);
-    background-image: radial-gradient(
-      ellipse at top right,
-      color-mix(in srgb, var(--color-primary) 12%, transparent),
-      transparent 55%
-    );
   }
 </style>

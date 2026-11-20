@@ -1,34 +1,39 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import AsyncState from '#lib/components/AsyncState.svelte';
   import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import type { HavocHistoryState } from './havoc-history-state.svelte.js';
   import { havocCompletionStateLabel, havocRecordLabel } from './havoc-presentation';
 
   let { state }: { state: HavocHistoryState } = $props();
 </script>
 
-<section class="h-shell" data-havoc-history>
+<PageShell as="section" width="lg" padding="md" data-havoc-history>
   <PageHeader
     eyebrow="Hoop Havoc · Hall of Freaks"
     title="Hall of Freaks"
     description="Every squad has a story. Revisit your seasons, wildest powers, and greatest runs."
-  />
+  >
+    {#snippet actions()}
+      <ActionLink href={resolve('havoc/')} tone="secondary">Back to Havoc</ActionLink>
+    {/snippet}
+  </PageHeader>
 
   {#if state.loading}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading history" message="Reading your Havoc runs…" />
+      <EmptyState kind="loading" title="Loading history" message="Reading your Havoc runs…" />
     </div>
   {:else if state.error !== null && state.entries.length === 0}
     <div class="mt-6">
-      <AsyncState kind="error" title="History unavailable" message={state.error} />
+      <EmptyState kind="error" title="History unavailable" message={state.error} />
     </div>
   {:else if state.entries.length === 0}
     <div class="mt-6">
-      <AsyncState
+      <EmptyState
         kind="empty"
         title="No Havoc runs yet"
         message="Draft a lineup and play the 82-game challenge."
@@ -36,7 +41,7 @@
         {#snippet actions()}
           <ActionLink href={resolve('havoc/')}>Start a Havoc run</ActionLink>
         {/snippet}
-      </AsyncState>
+      </EmptyState>
     </div>
   {:else}
     <ul class="mt-6 flex flex-col gap-3">
@@ -72,4 +77,4 @@
       {/each}
     </ul>
   {/if}
-</section>
+</PageShell>

@@ -11,6 +11,8 @@ export interface ScheduleCell {
   state: ScheduleCellState;
   selectable?: boolean;
   selected?: boolean;
+  title?: string | null;
+  ariaLabel?: string | null;
 }
 
 export interface ComparisonRow {
@@ -35,4 +37,5 @@ export interface SeriesRecapGame {
   score: string;
   overtime?: boolean;
   standout?: string | null;
+  note?: string | null;
 }

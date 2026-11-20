@@ -1,14 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import {
-    ArrowRight,
-    Calendar,
-    ChevronDown,
-    Clock,
-    Gamepad2,
-    ShieldCheck,
-    Trophy,
-  } from '@lucide/svelte';
+  import { ArrowRight, Calendar, Clock, Gamepad2, ShieldCheck, Trophy } from '@lucide/svelte';
   import type {
     FixedFiveCompetitionResult,
     FixedFiveRoomMode,
@@ -26,7 +18,19 @@
     FixedFivePlayerStats,
   } from '#lib/features/fixed-five/fixed-five-player-stats.js';
   import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import ComparisonTable from '#lib/components/screens/ComparisonTable.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import MvpCard from '#lib/components/screens/MvpCard.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
+  import SeriesRecap from '#lib/components/screens/SeriesRecap.svelte';
+  import type { ComparisonRow } from '#lib/components/ui/types.js';
   let {
     mode,
     result,
@@ -332,6 +336,54 @@
     const opp = totals(oppPid);
     return { games, you, opp };
   });
+  const comparisonRows = $derived.by((): ComparisonRow[] | null => {
+    const data = comparison;
+    if (!data) return null;
+    return [
+      {
+        label: 'Points per game',
+        left: perGameText(data.you.points, data.games),
+        right: perGameText(data.opp.points, data.games),
+      },
+      {
+        label: 'FG%',
+        left: pctStr(data.you.fgm, data.you.fga),
+        right: pctStr(data.opp.fgm, data.opp.fga),
+      },
+      {
+        label: '3P%',
+        left: pctStr(data.you.tpm, data.you.tpa),
+        right: pctStr(data.opp.tpm, data.opp.tpa),
+      },
+      {
+        label: 'TS%',
+        left: trueShootingPct(data.you.points, data.you.fga, data.you.fta),
+        right: trueShootingPct(data.opp.points, data.opp.fga, data.opp.fta),
+      },
+      {
+        label: 'Rebounds per game',
+        left: perGameText(data.you.reb, data.games),
+        right: perGameText(data.opp.reb, data.games),
+      },
+      {
+        label: 'Turnovers per game',
+        left: perGameText(data.you.tov, data.games),
+        right: perGameText(data.opp.tov, data.games),
+      },
+    ];
+  });
+  const seriesRecapGames = $derived(
+    duelScores.map((game) => ({
+      gameNumber: game.gameNumber,
+      won: game.won,
+      score:
+        game.youScore !== null && game.oppScore !== null
+          ? `${game.youScore}–${game.oppScore}`
+          : game.won
+            ? 'W'
+            : 'L',
+    })),
+  );
   const summaryDate = $derived.by(() => {
     if (!createdAt) return '—';
     const d = new Date(createdAt);
@@ -367,122 +419,58 @@
   }
 </script>
 
-{#snippet comparisonTable(data: NonNullable<typeof comparison>)}
-  <table class="mt-2 w-full text-sm">
-    <thead>
-      <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-        <th scope="col" class="py-1 text-left">You</th>
-        <th scope="col" class="py-1 text-center">Stat</th>
-        <th scope="col" class="py-1 text-right">Opponent</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-border/50 tabular-nums">
-      <tr>
-        <td class="py-2 text-left font-bold">{perGameText(data.you.points, data.games)}</td>
-        <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
-        <td class="py-2 text-right font-bold">{perGameText(data.opp.points, data.games)}</td>
-      </tr>
-      <tr>
-        <td class="py-2 text-left font-bold">{pctStr(data.you.fgm, data.you.fga)}</td>
-        <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
-        <td class="py-2 text-right font-bold">{pctStr(data.opp.fgm, data.opp.fga)}</td>
-      </tr>
-      <tr>
-        <td class="py-2 text-left font-bold">{pctStr(data.you.tpm, data.you.tpa)}</td>
-        <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
-        <td class="py-2 text-right font-bold">{pctStr(data.opp.tpm, data.opp.tpa)}</td>
-      </tr>
-      <tr>
-        <td class="py-2 text-left font-bold"
-          >{trueShootingPct(data.you.points, data.you.fga, data.you.fta)}</td
-        >
-        <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
-        <td class="py-2 text-right font-bold"
-          >{trueShootingPct(data.opp.points, data.opp.fga, data.opp.fta)}</td
-        >
-      </tr>
-      <tr>
-        <td class="py-2 text-left font-bold">{perGameText(data.you.reb, data.games)}</td>
-        <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
-        <td class="py-2 text-right font-bold">{perGameText(data.opp.reb, data.games)}</td>
-      </tr>
-      <tr>
-        <td class="py-2 text-left font-bold">{perGameText(data.you.tov, data.games)}</td>
-        <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
-        <td class="py-2 text-right font-bold">{perGameText(data.opp.tov, data.games)}</td>
-      </tr>
-    </tbody>
-  </table>
+{#snippet resultBadges()}
+  <Badge tone="positive">Verified locally</Badge>
 {/snippet}
 
-<div class="match-results">
-  <div class="result-hero">
-    <div
-      class="flex flex-wrap items-center justify-center gap-2 font-mono text-[11px] tracking-[0.18em] uppercase"
-    >
-      <span class="text-primary">{heroEyebrow}</span>
-      {#if verified}
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-2.5 py-0.5 text-[10px] font-bold text-positive"
-        >
-          <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
-          Verified locally
-        </span>
-      {/if}
-    </div>
-    <h2 class="font-display mt-3 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl">
-      {#if youWon}<span class="text-primary">You</span> <span>win</span>{:else}<span
-          class="text-primary">Opponent</span
-        >
-        <span>wins</span>{/if}
-    </h2>
-    <p
-      class="font-display mt-2 text-5xl font-extrabold tabular-nums sm:text-6xl"
-      aria-label={duel
-        ? `Series score ${youWins} to ${oppWins}`
-        : `Record ${youWins} wins to ${oppWins}`}
-    >
-      <span class={youWon ? 'text-primary' : ''}>{youWins}</span><span
-        class="mx-2 text-muted-foreground">-</span
-      ><span class={youWon ? '' : 'text-primary'}>{oppWins}</span>
-    </p>
-    <p class="mt-2 font-mono text-[11px] tracking-[0.3em] text-muted-foreground uppercase">
-      {seriesNote}
-    </p>
-    <p class="mt-1 text-sm text-muted-foreground">{gamesPlayedLabel}</p>
-    {#if roomCode}
-      <p class="mt-2 font-mono text-[11px] text-muted-foreground">
-        Room {roomCode} · {modeDetailLabel}
-      </p>
-    {:else}
-      <p class="mt-2 font-mono text-[11px] text-muted-foreground">{modeDetailLabel}</p>
-    {/if}
-  </div>
+{#snippet resultHero()}
+  <ResultHero
+    score={`${youWins}-${oppWins}`}
+    scoreLabel={duel
+      ? `Series score ${youWins} to ${oppWins}`
+      : `Record ${youWins} wins to ${oppWins}`}
+    caption={seriesNote}
+    secondary={gamesPlayedLabel}
+    meta={roomCode ? `Room ${roomCode} · ${modeDetailLabel}` : modeDetailLabel}
+    tone={youWon ? 'champion' : 'defeat'}
+  />
+{/snippet}
 
+{#snippet resultActions()}
+  <ActionRow>
+    {#snippet primary()}
+      <Button
+        tone="primary"
+        onclick={() => onRematch?.()}
+        disabled={rematchBusy || rematchWaiting}
+        loading={rematchBusy}
+      >
+        {rematchBusy ? 'Preparing rematch…' : rematchLabel}
+        <ArrowRight size={16} aria-hidden="true" />
+      </Button>
+    {/snippet}
+    {#snippet secondary()}
+      <ActionLink href={resolve('multiplayer/')}>Choose another match</ActionLink>
+    {/snippet}
+    {#snippet tertiary()}
+      <Button tone="ghost" onclick={viewMatchStats}>
+        View match stats
+        <ArrowRight size={14} aria-hidden="true" />
+      </Button>
+    {/snippet}
+  </ActionRow>
+{/snippet}
+
+<ResultScreen
+  eyebrow={heroEyebrow}
+  title={youWon ? 'You win' : 'Opponent wins'}
+  badges={verified ? resultBadges : null}
+  hero={resultHero}
+  actions={onRematch ? resultActions : null}
+>
   {#if duel}
-    <div class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6" aria-label="Series games">
-      {#each duelScores as g (g.gameNumber)}
-        <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
-          <div class="flex items-center justify-between">
-            <span class="font-mono text-[11px] text-muted-foreground">G{g.gameNumber}</span>
-
-            <span
-              class="font-mono text-[11px] font-bold tracking-widest uppercase {g.won
-                ? 'text-positive'
-                : 'text-primary'}">{g.won ? 'Win' : 'Loss'}</span
-            >
-          </div>
-          <p class="font-display mt-2 text-2xl font-extrabold tabular-nums">
-            {#if g.youScore !== null && g.oppScore !== null}
-              {g.youScore} <span class="text-muted-foreground">-</span> {g.oppScore}
-            {:else}
-              <span class={g.won ? 'text-positive' : 'text-primary'}>{g.won ? 'W' : 'L'}</span>
-            {/if}
-          </p>
-          <p class="mt-1 font-mono text-[10px] text-muted-foreground uppercase">You · Opp</p>
-          <p class="font-mono text-[10px] text-muted-foreground">Final</p>
-        </Panel>
-      {/each}
+    <div class="px-4 py-4 sm:px-6">
+      <SeriesRecap games={seriesRecapGames} label="Series games" />
     </div>
   {:else if shared && youShared && oppShared}
     <div
@@ -522,27 +510,6 @@
         <p class="mt-1 text-xs font-bold">Wins → diff → seed</p>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">H2H mirrored</p>
       </Panel>
-    </div>
-  {/if}
-
-  {#if onRematch}
-    <div class="rematch-strip">
-      <button
-        type="button"
-        onclick={onRematch}
-        disabled={rematchBusy || rematchWaiting}
-        class="rematch-main"
-      >
-        {rematchBusy ? 'Preparing rematch…' : rematchLabel}
-        <ArrowRight size={16} aria-hidden="true" />
-      </button>
-
-      <a href={resolve('multiplayer/')} class="new-match">Choose another match</a>
-
-      <button type="button" onclick={viewMatchStats} class="stats-shortcut">
-        View match stats
-        <ArrowRight size={14} aria-hidden="true" />
-      </button>
     </div>
   {/if}
 
@@ -654,67 +621,59 @@
       </div>
 
       <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
-        <Panel as="section" padding="none" aria-label="Series MVP" class="p-4 text-center">
-          <h3 class="ui-label text-left">Series MVP</h3>
-          {#if mvp && mvp.entry}
-            <div class="mx-auto mt-2 h-16 w-16 overflow-hidden rounded-full">
-              <PlayerFace
-                player={mvp.entry}
-                {manifest}
-                size="md"
-                fallbackInitials={mvp.entry.firstName[0]! + mvp.entry.lastName[0]!}
+        {#if mvp && mvp.entry}
+          <MvpCard
+            label="Series MVP"
+            aria-label="Series MVP"
+            name={mvp.entry.displayName}
+            team={formatPositions(mvp.entry.positionsPlayable)}
+            slot={mvp.pid === selfId ? 'You' : 'Opponent'}
+            stats={[
+              { label: 'PPG', value: perGameText(mvp.line.points, mvp.line.games) },
+              { label: 'REB', value: perGameText(mvp.line.rebounds, mvp.line.games) },
+              { label: 'AST', value: perGameText(mvp.line.assists, mvp.line.games) },
+            ]}
+          >
+            {#snippet portrait()}
+              {@const entry = mvp?.entry}
+              {#if entry}
+                <PlayerFace
+                  player={entry}
+                  {manifest}
+                  size="md"
+                  fallbackInitials={entry.firstName[0]! + entry.lastName[0]!}
+                />
+              {/if}
+            {/snippet}
+          </MvpCard>
+        {:else}
+          <Panel as="section" padding="none" aria-label="Series MVP" class="p-4">
+            <h3 class="ui-label">Series MVP</h3>
+            {#if statsState === 'building'}
+              <EmptyState
+                class="mt-3"
+                kind="loading"
+                surface="none"
+                title="Finding the series MVP…"
               />
-            </div>
-            <p class="font-display mt-2 text-xl font-extrabold">{mvp.entry.displayName}</p>
-            <p class="font-mono text-[11px] text-muted-foreground">
-              {formatPositions(mvp.entry.positionsPlayable)} · {mvp.pid === selfId
-                ? 'You'
-                : 'Opponent'}
-            </p>
-            <div class="mt-3 grid grid-cols-3 divide-x divide-border/60">
-              <div>
-                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGameText(mvp.line.points, mvp.line.games)}
-                </p>
-                <p class="font-mono text-[10px] text-muted-foreground uppercase">PPG</p>
-              </div>
-              <div>
-                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGameText(mvp.line.rebounds, mvp.line.games)}
-                </p>
-                <p class="font-mono text-[10px] text-muted-foreground uppercase">REB</p>
-              </div>
-              <div>
-                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGameText(mvp.line.assists, mvp.line.games)}
-                </p>
-                <p class="font-mono text-[10px] text-muted-foreground uppercase">AST</p>
-              </div>
-            </div>
-          {:else if statsState === 'building'}
-            <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
-              Finding the series MVP…
-            </p>
-          {:else}
-            <p class="mt-3 text-sm text-muted-foreground">MVP needs simulated games.</p>
-            {#if onRebuildStats}
-              <button
-                type="button"
-                onclick={onRebuildStats}
-                class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
-              >
-                Build player stats
-              </button>
+            {:else}
+              <EmptyState class="mt-3" surface="none" title="MVP needs simulated games.">
+                {#snippet actions()}
+                  {#if onRebuildStats}
+                    <Button size="sm" onclick={onRebuildStats}>Build player stats</Button>
+                  {/if}
+                {/snippet}
+              </EmptyState>
             {/if}
-          {/if}
-        </Panel>
+          </Panel>
+        {/if}
 
         <Panel as="section" padding="none" aria-label="Series comparison" class="p-4">
           <h3 class="ui-label">Series comparison</h3>
-          {#if comparison}
-            {@render comparisonTable(comparison)}
+          {#if comparisonRows}
+            <ComparisonTable class="mt-2" rows={comparisonRows} rightLabel="Opponent" />
           {:else}
-            <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
+            <EmptyState class="mt-3" surface="none" title="Comparison needs simulated games." />
           {/if}
         </Panel>
 
@@ -784,30 +743,20 @@
       </div>
 
       <div class="px-4 pb-4 sm:px-6 sm:pb-6">
-        <details class="ui-panel" data-padding="none">
-          <summary
-            class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
-          >
-            <ShieldCheck class="h-5 w-5 text-muted-foreground" />
-            <span class="font-mono text-xs font-bold tracking-widest uppercase">Match details</span>
-            <span class="text-xs text-muted-foreground">Click to view technical details</span>
-            <ChevronDown class="ml-auto h-4 w-4 text-muted-foreground" />
-          </summary>
-          <div class="border-t border-border/60 p-4">
-            {#if digest}
-              <p class="truncate font-mono text-[11px] text-muted-foreground" title={digest}>
-                Digest: {digest.slice(0, 16)}…{digest.slice(-8)}
-              </p>
-              <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{digest}</p>
-            {:else}
-              <p class="font-mono text-[11px] text-muted-foreground">No digest recorded yet.</p>
-            {/if}
-            <p class="mt-2 font-mono text-[11px] text-muted-foreground">
-              Wins → differential → seeded tie-break · both clients simulate locally and confirm the
-              digest.
+        <Disclosure summary="Match details" meta="Click to view technical details">
+          {#if digest}
+            <p class="truncate font-mono text-[11px] text-muted-foreground" title={digest}>
+              Digest: {digest.slice(0, 16)}…{digest.slice(-8)}
             </p>
-          </div>
-        </details>
+            <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{digest}</p>
+          {:else}
+            <p class="font-mono text-[11px] text-muted-foreground">No digest recorded yet.</p>
+          {/if}
+          <p class="mt-2 font-mono text-[11px] text-muted-foreground">
+            Wins → differential → seeded tie-break · both clients simulate locally and confirm the
+            digest.
+          </p>
+        </Disclosure>
       </div>
     {:else if tab === 'games'}
       <div class="p-4 sm:p-6">
@@ -1061,24 +1010,22 @@
           {/snippet}
           {#snippet empty()}
             {#if statsState === 'building'}
-              <p class="ui-stats-empty animate-pulse" role="status">
-                Building player stats from the simulated games…
-              </p>
+              <EmptyState
+                kind="loading"
+                surface="none"
+                title="Building player stats from the simulated games…"
+              />
             {:else}
-              <div class="flex flex-wrap items-center gap-3">
-                <p class="ui-stats-empty">
-                  Stats need the simulated games, which are not on this device.
-                </p>
-                {#if onRebuildStats}
-                  <button
-                    type="button"
-                    onclick={onRebuildStats}
-                    class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
-                  >
-                    Build player stats
-                  </button>
-                {/if}
-              </div>
+              <EmptyState
+                surface="none"
+                title="Stats need the simulated games, which are not on this device."
+              >
+                {#snippet actions()}
+                  {#if onRebuildStats}
+                    <Button size="sm" onclick={onRebuildStats}>Build player stats</Button>
+                  {/if}
+                {/snippet}
+              </EmptyState>
             {/if}
           {/snippet}
         </PlayerStatsSection>
@@ -1087,19 +1034,16 @@
       <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
         <Panel as="section" padding="none" aria-label="Team comparison detail" class="p-4">
           <h3 class="ui-label">Team comparison</h3>
-          {#if comparison}
-            {@render comparisonTable(comparison)}
+          {#if comparisonRows}
+            <ComparisonTable class="mt-2" rows={comparisonRows} rightLabel="Opponent" />
           {:else}
-            <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
-            {#if onRebuildStats}
-              <button
-                type="button"
-                onclick={onRebuildStats}
-                class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
-              >
-                Build player stats
-              </button>
-            {/if}
+            <EmptyState class="mt-3" surface="none" title="Comparison needs simulated games.">
+              {#snippet actions()}
+                {#if onRebuildStats}
+                  <Button size="sm" onclick={onRebuildStats}>Build player stats</Button>
+                {/if}
+              {/snippet}
+            </EmptyState>
           {/if}
         </Panel>
         <Panel as="section" padding="none" aria-label="Verification" class="p-4">
@@ -1132,85 +1076,4 @@
       </div>
     {/if}
   </div>
-</div>
-
-<style>
-  .match-results {
-    overflow: hidden;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 12px;
-    background: var(--color-card);
-  }
-  .result-hero {
-    position: relative;
-    border-bottom: 1px solid var(--color-line-soft);
-    border-top: 3px solid var(--color-primary);
-    padding: 36px 28px;
-    text-align: center;
-    background: var(--color-surface-2);
-  }
-  .rematch-strip {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    padding: 20px 24px;
-  }
-  .rematch-main {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    border-radius: 7px;
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-    padding: 12px 24px;
-    font-size: 13px;
-    font-weight: 700;
-  }
-  .new-match {
-    padding: 12px 18px;
-    font-size: 12px;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 7px;
-  }
-  .stats-shortcut {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-left: auto;
-    color: var(--color-muted-foreground);
-    font-size: 12px;
-    padding: 12px 0;
-  }
-  button,
-  a {
-    cursor: pointer;
-  }
-  button:disabled {
-    cursor: default;
-    opacity: 0.45;
-  }
-  button:focus-visible,
-  a:focus-visible,
-  [role='tabpanel']:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: -3px;
-  }
-  @media (max-width: 640px) {
-    .result-hero {
-      padding: 28px 18px;
-    }
-    .rematch-strip {
-      padding: 18px;
-    }
-    .rematch-main,
-    .new-match {
-      width: 100%;
-      text-align: center;
-    }
-    .stats-shortcut {
-      margin: 0 auto;
-    }
-  }
-</style>
+</ResultScreen>

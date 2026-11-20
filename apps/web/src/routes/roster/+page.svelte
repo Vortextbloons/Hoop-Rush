@@ -40,7 +40,7 @@
     type RosterSortId,
   } from '#lib/roster-browser.js';
   import RosterFilters from '#lib/components/RosterFilters.svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+
   import RosterComparison from '#lib/components/RosterComparison.svelte';
   import RosterTable from '#lib/components/RosterTable.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
@@ -400,7 +400,7 @@
 
   {#if manifestError}
     <div class="mt-8">
-      <AsyncState
+      <EmptyState
         kind="error"
         title="Data unavailable"
         message="Couldn’t load data. Try again."
@@ -409,7 +409,7 @@
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading…" message="Loading…" />
+      <EmptyState kind="loading" title="Loading…" message="Loading…" />
     </div>
   {:else}
     <div class="mt-8">
@@ -425,7 +425,7 @@
 
     {#if indexError || detailsError}
       <div class="mt-8">
-        <AsyncState
+        <EmptyState
           kind="error"
           title="Players unavailable"
           message={`Failed to load players: ${indexError ?? detailsError}`}
@@ -434,7 +434,7 @@
       </div>
     {:else if !index}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
+        <EmptyState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>
     {:else}
       <div class="mt-8 flex flex-col gap-4 rounded-xl bg-surface-1 p-2 sm:p-3">
@@ -536,13 +536,13 @@
         {#if sortNeedsDetails(sortId) && details === null}
           <div class="p-2">
             {#if detailsLoading}
-              <AsyncState
+              <EmptyState
                 kind="loading"
                 title="Loading player stats…"
                 message="This sort needs detailed stats."
               />
             {:else}
-              <AsyncState
+              <EmptyState
                 kind="error"
                 title="Player stats unavailable"
                 message={detailsError ?? 'Detailed stats could not load.'}

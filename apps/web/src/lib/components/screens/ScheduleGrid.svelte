@@ -14,7 +14,7 @@
     columns?: number;
     label?: string;
     onselect?: ((key: string) => void) | undefined;
-  } & HTMLAttributes<HTMLOListElement> = $props();
+  } & Omit<HTMLAttributes<HTMLOListElement>, 'onselect'> = $props();
 
   const columnCount = $derived(Math.max(1, Math.floor(columns)));
 </script>
@@ -37,6 +37,8 @@
           type="button"
           class="ui-schedule-button"
           aria-pressed={cell.selected === true}
+          aria-label={cell.ariaLabel ?? cell.title ?? undefined}
+          title={cell.title ?? undefined}
           onclick={() => onselect?.(cell.key)}
         >
           <span class="ui-schedule-label">{cell.label}</span>
@@ -45,7 +47,12 @@
           {/if}
         </button>
       {:else}
-        <span class="ui-schedule-button" data-static="true">
+        <span
+          class="ui-schedule-button"
+          data-static="true"
+          aria-label={cell.ariaLabel ?? cell.title ?? undefined}
+          title={cell.title ?? undefined}
+        >
           <span class="ui-schedule-label">{cell.label}</span>
           {#if cell.sublabel !== null && cell.sublabel !== undefined}
             <span class="ui-schedule-sublabel">{cell.sublabel}</span>

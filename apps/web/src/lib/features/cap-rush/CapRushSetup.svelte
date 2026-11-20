@@ -1,10 +1,13 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import type { CapRushDraftController } from './cap-rush-draft-state.svelte.js';
-  import { ArrowRight, Dices, Trophy } from '@lucide/svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import ModeCard from '#lib/components/ui/ModeCard.svelte';
+  import { Dices, Trophy } from '@lucide/svelte';
 
   let { controller }: { controller: CapRushDraftController } = $props();
 
@@ -14,16 +17,12 @@
       name: 'Cap Clash',
       description: 'Draft your five and manage the cap.',
       icon: Trophy,
-      accent: 'border-border hover:border-primary',
-      iconClass: 'bg-primary/10 text-primary',
     },
     {
       id: 'roulette' as const,
       name: 'Cap Roulette',
       description: 'Draft your five and buy mutation spins.',
       icon: Dices,
-      accent: 'border-border hover:border-accent',
-      iconClass: 'bg-accent/10 text-accent',
     },
   ];
 </script>
@@ -34,42 +33,33 @@
   padding="none"
   class="px-4 pt-10 pb-24 sm:px-6 md:pt-16 md:pb-12"
 >
-  <div class="max-w-3xl">
-    <p class="font-mono text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Cap Rush</p>
-    <h1
-      class="font-display mt-3 text-4xl leading-[0.92] font-extrabold tracking-tight uppercase sm:text-5xl md:text-6xl"
-    >
-      Build a contender.<br />
-      <span class="text-primary">Mind the apron.</span>
-    </h1>
-    <ActionLink class="mt-4" href={resolve('cap-rush/history/')} tone="secondary">
-      Run history
-    </ActionLink>
-  </div>
+  <PageHeader eyebrow="Cap Rush">
+    {#snippet title()}Build a contender.<br /><span class="text-primary">Mind the apron.</span
+      >{/snippet}
+    {#snippet actions()}
+      <ActionRow>
+        {#snippet secondary()}
+          <ActionLink href={resolve('cap-rush/history/')} tone="secondary">Run history</ActionLink>
+          <ActionLink href={resolve('/multiplayer?format=cap-rush')} tone="secondary"
+            >Play multiplayer</ActionLink
+          >
+        {/snippet}
+      </ActionRow>
+    {/snippet}
+  </PageHeader>
 
   <div class="mt-8 grid gap-4 md:grid-cols-2">
     {#each variants as variant (variant.id)}
       {@const Icon = variant.icon}
-      <div
-        class="mode-card group flex flex-col rounded-2xl border bg-card p-6 transition-colors {variant.accent}"
+      <ModeCard
+        title={variant.name}
+        description={variant.description}
+        cta={controller.busy ? 'Opening draft…' : `Start with ${variant.name}`}
+        disabled={controller.busy}
+        onclick={() => void controller.createDraft(variant.id)}
       >
-        <span class="grid h-12 w-12 place-items-center rounded-xl {variant.iconClass}">
-          <Icon size={22} aria-hidden="true" />
-        </span>
-        <h2 class="font-display mt-5 text-3xl font-extrabold tracking-tight uppercase">
-          {variant.name}
-        </h2>
-        <p class="mt-2 text-sm text-muted-foreground">{variant.description}</p>
-        <button
-          type="button"
-          class="mt-5 inline-flex min-h-12 items-center justify-between rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-          disabled={controller.busy}
-          onclick={() => void controller.createDraft(variant.id)}
-        >
-          {controller.busy ? 'Opening draft…' : `Start with ${variant.name}`}
-          <ArrowRight size={16} aria-hidden="true" />
-        </button>
-      </div>
+        {#snippet icon()}<Icon size={22} aria-hidden="true" />{/snippet}
+      </ModeCard>
     {/each}
   </div>
 
@@ -87,9 +77,3 @@
     </Alert>
   {/if}
 </PageShell>
-
-<style>
-  .mode-card {
-    border-top: 3px solid var(--color-primary);
-  }
-</style>

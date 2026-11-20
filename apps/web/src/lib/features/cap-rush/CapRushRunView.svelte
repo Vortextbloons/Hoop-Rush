@@ -4,7 +4,7 @@
     type CapRushBoxScore as CapRushBoxScoreData,
   } from '@hoop-rush/data-contracts';
   import { Play, SkipForward, X } from '@lucide/svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
@@ -93,7 +93,7 @@
   {:else if controller.playback !== null}
     <CapRushSimcast {controller} {art} />
   {:else if view === null}
-    <AsyncState
+    <EmptyState
       kind={controller.error === null ? 'empty' : 'error'}
       title={controller.unsupported
         ? 'This run needs an update'
@@ -110,9 +110,9 @@
           >{controller.unsupported ? 'Go to draft recovery' : 'Start a Cap Rush run'}</button
         >
       {/snippet}
-    </AsyncState>
+    </EmptyState>
   {:else if season === null}
-    <AsyncState
+    <EmptyState
       kind="empty"
       title="This run is still drafting"
       message="Lock your five to open the season."
@@ -124,7 +124,7 @@
           onclick={onNewRun}>Back to the draft</button
         >
       {/snippet}
-    </AsyncState>
+    </EmptyState>
   {:else if inPostseason && view.postseason !== null}
     <CapRushPostseasonView {controller} {view} {art} {onReport} />
   {:else}

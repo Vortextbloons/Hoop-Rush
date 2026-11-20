@@ -4,6 +4,7 @@
   import HavocTierBadge from './HavocTierBadge.svelte';
   import HavocMutationList from './HavocMutationList.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   let {
     slots,
     title = 'Your starting five',
@@ -19,7 +20,7 @@
   data-havoc-lineup
 >
   <header class="lineup-heading">
-    <h2 class="h-subtitle">{title}</h2>
+    <SectionHeading {title} level={2} size="md" />
     <span class="lineup-count">{slots.length}/5</span>
   </header>
   <ul class="lineup-list">
@@ -54,7 +55,7 @@
   </ul>
   <details class="lineup-rules">
     <summary>What happens if a player fouls out?</summary>
-    <p class="h-copy text-xs">
+    <p class="text-xs leading-relaxed text-muted-foreground">
       At six personal fouls, an unmutated copy of the same player-season takes over. The replacement
       has no powers and stays in the game through further fouls.
     </p>

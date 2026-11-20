@@ -1315,6 +1315,17 @@
     padding: 1rem 1rem 0.25rem;
   }
 
+  .ui-mode-card-icon {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: 1rem 1rem 0;
+    place-items: center;
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+  }
+
   .ui-mode-card-title {
     font-family: var(--font-display);
     font-size: 1.35rem;
@@ -1917,6 +1928,14 @@
     grid-column: 1 / -1;
     color: var(--color-muted-foreground);
     font-size: 0.72rem;
+    line-height: 1.5;
+  }
+
+  .ui-series-recap-note {
+    grid-column: 1 / -1;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
     line-height: 1.5;
   }
 

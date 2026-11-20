@@ -1,6 +1,8 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import LoadingState from '#lib/components/ui/LoadingState.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import CapRushReportView from './CapRushReportView.svelte';
   import type { CapRushResultState } from './cap-rush-result-state.svelte.js';
@@ -9,50 +11,25 @@
 </script>
 
 <PageShell as="section" width="lg" padding="md" aria-label="Saved Cap Rush run">
-  <a
-    href={resolve('cap-rush/history/')}
-    class="font-mono text-[11px] text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-  >
-    ← Run history
-  </a>
-
-  <div class="mt-4">
-    {#if state.loading}
-      <div class="flex flex-col gap-2">
-        <div
-          class="h-3 w-40 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
-        ></div>
-        <div
-          class="h-3 w-64 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
-        ></div>
-      </div>
-    {:else if state.report !== null}
-      <header class="mb-4">
-        <p class="ui-label">
-          Cap Rush ·
-          {state.report.postseason === undefined ? 'Regular-season run' : 'Saved postseason'}
-        </p>
-        <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
-          {state.report.postseason === undefined ? 'Regular-season report' : 'Championship report'}
-        </h1>
-        <p class="mt-1 font-mono text-[10px] break-all text-muted-foreground">{runId}</p>
-      </header>
-      <CapRushReportView report={state.report} />
-    {:else}
-      <AsyncState
-        kind="error"
-        title="Run unavailable"
-        message={state.error ?? `No completed Cap Rush run with id ${runId} was found.`}
-      >
-        {#snippet actions()}
-          <a
-            href={resolve('cap-rush/history/')}
-            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Back to history
-          </a>
-        {/snippet}
-      </AsyncState>
-    {/if}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <ActionLink href={resolve('cap-rush/history/')} tone="ghost" size="sm">← Run history</ActionLink
+    >
+    <p class="ui-micro break-all text-muted-foreground">{runId}</p>
   </div>
+
+  {#if state.loading}
+    <LoadingState variant="skeleton" lines={2} />
+  {:else if state.report !== null}
+    <CapRushReportView report={state.report} />
+  {:else}
+    <EmptyState
+      kind="error"
+      title="Run unavailable"
+      message={state.error ?? `No completed Cap Rush run with id ${runId} was found.`}
+    >
+      {#snippet actions()}
+        <ActionLink href={resolve('cap-rush/history/')}>Back to history</ActionLink>
+      {/snippet}
+    </EmptyState>
+  {/if}
 </PageShell>

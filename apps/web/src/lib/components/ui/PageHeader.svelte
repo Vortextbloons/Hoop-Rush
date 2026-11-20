@@ -9,7 +9,7 @@
     class: className = '',
   }: {
     eyebrow: string;
-    title: string;
+    title: string | Snippet;
     description?: string | null;
     actions?: Snippet | null;
     class?: string;
@@ -19,7 +19,9 @@
 <header class={['ui-page-header', className]}>
   <div class="ui-page-header-text">
     <p class="ui-page-eyebrow">{eyebrow}</p>
-    <h1 class="ui-page-title">{title}</h1>
+    <h1 class="ui-page-title">
+      {#if typeof title === 'function'}{@render title()}{:else}{title}{/if}
+    </h1>
     {#if description !== null}
       <p class="ui-page-description">{description}</p>
     {/if}

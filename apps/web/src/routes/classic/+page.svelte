@@ -52,9 +52,11 @@
   import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
   import DraftRoundCard from '#lib/components/draft/DraftRoundCard.svelte';
   import ClassicRollReel from '#lib/components/classic/ClassicRollReel.svelte';
-  import AsyncState from '#lib/components/AsyncState.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import { arenaDraftPick, arenaError } from '#lib/arena-sound.js';
   import { lazyModule } from '#lib/lazy-module.js';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   const loadSlotPickerDialog = lazyModule(
     () => import('#lib/components/draft/SlotPickerDialog.svelte'),
@@ -482,36 +484,18 @@
 </svelte:head>
 
 <PageShell as="section" width="xl" padding="lg">
-  <div class="flex items-end justify-between gap-4">
-    <div>
-      <p class="ui-label">Classic</p>
-      {#if draft}
-        <h1
-          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
-        >
-          Classic · {variantLabel(draft.variant)}
-        </h1>
-      {:else}
-        <h1
-          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
-        >
-          Five draft rounds
-        </h1>
-      {/if}
-    </div>
-    <div class="flex shrink-0 items-center gap-3">
-      <a
-        href={resolve('/')}
-        class="shrink-0 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
-      >
-        Back
-      </a>
-    </div>
-  </div>
+  <PageHeader
+    eyebrow="Classic"
+    title={draft ? `Classic · ${variantLabel(draft.variant)}` : 'Five draft rounds'}
+  >
+    {#snippet actions()}
+      <ActionLink href={resolve('/')} tone="ghost" size="sm">Back</ActionLink>
+    {/snippet}
+  </PageHeader>
 
   {#if manifestError}
     <div class="mt-8">
-      <AsyncState
+      <EmptyState
         kind="error"
         title="Data unavailable"
         message="Couldn’t load data. Try again."
@@ -520,12 +504,12 @@
     </div>
   {:else if !manifest}
     <div class="mt-8">
-      <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
+      <EmptyState kind="loading" title="Loading players…" message="Getting rosters ready." />
     </div>
   {:else}
     {#if indexError}
       <div class="mt-8">
-        <AsyncState
+        <EmptyState
           kind="error"
           title="Players unavailable"
           message="Couldn’t load data. Try again."
@@ -534,11 +518,11 @@
       </div>
     {:else if !index}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
+        <EmptyState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>
     {:else if draftError}
       <div class="mt-8">
-        <AsyncState
+        <EmptyState
           kind="error"
           title="Draft unavailable"
           message={draftError}
@@ -547,7 +531,7 @@
       </div>
     {:else if !draftLoaded}
       <div class="mt-8">
-        <AsyncState kind="loading" title="Loading draft…" message="Picking up your picks." />
+        <EmptyState kind="loading" title="Loading draft…" message="Picking up your picks." />
       </div>
     {:else if !draft}
       <div class="mt-10 flex flex-col gap-6 pb-32">

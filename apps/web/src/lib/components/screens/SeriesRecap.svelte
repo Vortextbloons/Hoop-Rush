@@ -12,7 +12,7 @@
     games: readonly SeriesRecapGame[];
     onselect?: ((gameNumber: number) => void) | undefined;
     label?: string;
-  } & HTMLAttributes<HTMLOListElement> = $props();
+  } & Omit<HTMLAttributes<HTMLOListElement>, 'onselect'> = $props();
 </script>
 
 {#snippet rowContent(game: SeriesRecapGame)}
@@ -24,6 +24,9 @@
   {/if}
   {#if game.standout !== null && game.standout !== undefined}
     <span class="ui-series-recap-standout">{game.standout}</span>
+  {/if}
+  {#if game.note !== null && game.note !== undefined}
+    <span class="ui-series-recap-note">{game.note}</span>
   {/if}
 {/snippet}
 

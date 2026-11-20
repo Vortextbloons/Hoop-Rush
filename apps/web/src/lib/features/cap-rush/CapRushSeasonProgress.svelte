@@ -15,7 +15,9 @@
   import { capRushPlayerSeasonLines } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
+  import ScheduleGrid from '#lib/components/screens/ScheduleGrid.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import type { ScheduleCell } from '#lib/components/ui/types.js';
   import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import type { CapRushArt } from './cap-rush-art.ts';
   import {
@@ -30,6 +32,7 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
 
   let {
     draft,
@@ -130,6 +133,33 @@
       };
     }),
   );
+  const scheduleCells = $derived(
+    cells.map((cell): ScheduleCell => {
+      const summary = cell.summary;
+      const resultText =
+        summary === null
+          ? 'not played'
+          : `${summary.won ? 'win' : 'loss'} ${summary.humanPoints} to ${summary.opponentPoints}`;
+      return {
+        key: String(cell.gameNumber),
+        label: `${cell.gameNumber} ${cell.opponentLabel}`,
+        sublabel:
+          summary === null
+            ? cell.humanHome
+              ? 'vs'
+              : '@'
+            : `${summary.won ? 'W' : 'L'} ${summary.humanPoints}–${summary.opponentPoints}`,
+        state: summary === null ? 'upcoming' : summary.won ? 'win' : 'loss',
+        selectable: cell.stored,
+        selected: cell.stored && selectedGameNumber === cell.gameNumber,
+        ariaLabel: `Game ${cell.gameNumber} vs ${cell.opponentName}, ${resultText}`,
+        title:
+          summary === null
+            ? `Game ${cell.gameNumber} vs ${cell.opponentLabel} · not played`
+            : `Game ${cell.gameNumber} vs ${cell.opponentLabel} · ${summary.won ? 'W' : 'L'} ${summary.humanPoints}–${summary.opponentPoints}`,
+      };
+    }),
+  );
 
   function participantKindLabel(kind: HavocParticipantLine['kind']): string {
     return kind === 'starter' ? 'Starter' : kind === 'replacement' ? 'Replacement' : 'Clone';
@@ -158,20 +188,16 @@
     return lines.reduce((total, line) => total + line[field], 0);
   }
 
-  function toggleGame(gameNumber: number, stored: boolean): void {
-    if (!stored) return;
+  function selectGame(key: string): void {
+    const gameNumber = Number(key);
+    if (!gamesByNumber.has(gameNumber)) return;
     selectedGameNumber = selectedGameNumber === gameNumber ? null : gameNumber;
   }
 </script>
 
 <div class="flex flex-col gap-3">
-  <Panel
-    as="section"
-    padding="none"
-    class="season-scoreboard p-5 sm:p-7"
-    aria-label="Season progress"
-  >
-    <div class="flex flex-wrap items-end justify-between gap-3">
+  <Panel as="section" padding="md" aria-label="Season progress">
+    <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="min-w-0">
         <p class="ui-label">
           {variantLabel(draft.variant)} ·
@@ -182,7 +208,7 @@
         >
           {recordLabel(season.aggregate.wins, season.aggregate.losses)}
         </h2>
-        <p class="mt-2 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+        <p class="ui-micro mt-2 text-muted-foreground">
           {played} of {CAP_RUSH_GAME_COUNT} games played
         </p>
       </div>
@@ -210,12 +236,8 @@
     </div>
 
     {#if latest !== null}
-      <Panel padding="none" class="mt-5 border-line-strong p-4">
-        <p
-          class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Latest ? Game {latest.gameNumber}
-        </p>
+      <Panel padding="sm" class="mt-5 border-line-strong">
+        <p class="ui-micro font-bold">Latest ? Game {latest.gameNumber}</p>
         <GameScoreboard
           teams={[
             { key: 'you', label: 'Your five', score: latest.humanPoints, winner: latest.won },
@@ -257,58 +279,19 @@
   <Panel as="section" padding="md" aria-label="Schedule results">
     <SectionHeading title="Schedule · 82 games" level={3} size="sm">
       {#snippet actions()}
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
+        <p class="ui-micro">
           {hasBoxScores ? 'Select a stored game for its box score' : 'Results only'}
         </p>
       {/snippet}
     </SectionHeading>
 
-    <ol class="mt-3 grid grid-cols-4 gap-1 sm:grid-cols-6 lg:grid-cols-8" aria-label="Game results">
-      {#each cells as cell (cell.gameNumber)}
-        {@const summary = cell.summary}
-        {@const active = cell.stored && selectedGameNumber === cell.gameNumber}
-        <li class="min-w-0">
-          <button
-            type="button"
-            aria-pressed={cell.stored ? active : undefined}
-            aria-label={summary === null
-              ? `Game ${cell.gameNumber} vs ${cell.opponentName}, not played`
-              : `Game ${cell.gameNumber} vs ${cell.opponentName}, ${summary.won ? 'win' : 'loss'} ${summary.humanPoints} to ${summary.opponentPoints}`}
-            disabled={!cell.stored}
-            onclick={() => toggleGame(cell.gameNumber, cell.stored)}
-            class="flex min-h-11 w-full min-w-0 flex-col justify-center rounded-lg border px-1.5 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring {summary ===
-            null
-              ? 'border-dashed border-line-soft bg-background/40 text-muted-foreground'
-              : summary.won
-                ? 'border-positive/40 bg-positive/10 text-foreground'
-                : 'border-negative/40 bg-negative/10 text-foreground'} {active
-              ? 'ring-2 ring-primary'
-              : ''} {cell.stored ? 'hover:border-primary' : 'cursor-default'}"
-          >
-            <span class="flex items-baseline justify-between gap-1">
-              <span class="font-mono text-[9px] font-bold tabular-nums opacity-70"
-                >{cell.gameNumber}</span
-              >
-              <span
-                class="font-mono text-[9px] font-extrabold uppercase {summary === null
-                  ? ''
-                  : summary.won
-                    ? 'text-positive'
-                    : 'text-negative'}">{summary === null ? '·' : summary.won ? 'W' : 'L'}</span
-              >
-            </span>
-            <span class="truncate font-mono text-[10px] font-bold">{cell.opponentLabel}</span>
-            <span class="truncate font-mono text-[9px] tabular-nums opacity-80">
-              {summary === null
-                ? cell.humanHome
-                  ? 'vs'
-                  : '@'
-                : `${summary.humanPoints}–${summary.opponentPoints}`}
-            </span>
-          </button>
-        </li>
-      {/each}
-    </ol>
+    <ScheduleGrid
+      class="mt-3"
+      cells={scheduleCells}
+      columns={8}
+      label="Game results"
+      onselect={selectGame}
+    />
   </Panel>
 
   {#if selectedSummary !== null}
@@ -342,10 +325,10 @@
             class="mt-2"
           />
         </div>
-        <button
-          type="button"
-          class="inline-flex min-h-9 items-center rounded-lg border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          onclick={() => (selectedGameNumber = null)}>Close box score</button
+        <Button
+          size="sm"
+          class="text-muted-foreground hover:text-foreground"
+          onclick={() => (selectedGameNumber = null)}>Close box score</Button
         >
       </div>
 
@@ -454,7 +437,7 @@
   <Panel as="section" padding="md" aria-label="Season player totals and averages">
     <SectionHeading title="Season averages" level={3} size="sm">
       {#snippet actions()}
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
+        <p class="ui-micro">
           {#if boxScoresComplete}
             {storedGames.length} stored {storedGames.length === 1 ? 'game' : 'games'}
           {:else if hasBoxScores}
@@ -626,14 +609,3 @@
     {/if}
   </Panel>
 </div>
-
-<style>
-  :global(.season-scoreboard) {
-    border-top: 3px solid var(--color-primary);
-    background-image: radial-gradient(
-      ellipse at top right,
-      color-mix(in srgb, var(--color-primary) 12%, transparent),
-      transparent 55%
-    );
-  }
-</style>

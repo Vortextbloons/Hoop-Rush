@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Repeat, Trophy } from '@lucide/svelte';
+  import { Repeat } from '@lucide/svelte';
   import type {
     DraftDuelCard,
     DraftDuelGameOutput,
@@ -13,6 +13,17 @@
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
+  import ComparisonTable from '#lib/components/screens/ComparisonTable.svelte';
+  import MvpCard from '#lib/components/screens/MvpCard.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import ResultScreen from '#lib/components/screens/ResultScreen.svelte';
+  import SeriesRecap from '#lib/components/screens/SeriesRecap.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import type { ComparisonRow, SeriesRecapGame } from '#lib/components/ui/types.js';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import { initialsOf } from '#lib/branding.js';
@@ -137,6 +148,25 @@
   const seriesDecided = $derived(series.champion !== null);
   const hasBoxScores = $derived(orderedGames.length > 0);
 
+  const title = $derived(
+    series.champion === null
+      ? 'Series in progress'
+      : championIsLocal
+        ? 'You are the champion'
+        : 'Opponent takes the series',
+  );
+  const championState = $derived(
+    championIsLocal ? 'local' : series.champion === null ? 'pending' : 'opponent',
+  );
+  const heroTone = $derived(
+    series.champion === null ? 'default' : championIsLocal ? 'champion' : 'defeat',
+  );
+  const heroMeta = $derived(
+    `${
+      localWins > opponentWins ? 'You win' : localWins < opponentWins ? 'Opponent wins' : 'Tied'
+    } the best-of-seven · first to four.`,
+  );
+
   function nameOf(playerId: string): string {
     return cards[playerId]?.displayName ?? playerId.replace(/^p-/, '#').slice(0, 7);
   }
@@ -200,6 +230,52 @@
     }
     return { local, opponent };
   });
+
+  const comparisonRows = $derived<ComparisonRow[]>([
+    {
+      label: 'Points per game',
+      left: perGameText(comparison.local.points, comparison.local.games),
+      right: perGameText(comparison.opponent.points, comparison.opponent.games),
+    },
+    {
+      label: 'FG%',
+      left: ratioPct(comparison.local.fieldGoalMakes, comparison.local.fieldGoalAttempts),
+      right: ratioPct(comparison.opponent.fieldGoalMakes, comparison.opponent.fieldGoalAttempts),
+    },
+    {
+      label: '3P%',
+      left: ratioPct(comparison.local.threeMakes, comparison.local.threeAttempts),
+      right: ratioPct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts),
+    },
+    {
+      label: 'TS%',
+      left: trueShootingPct(
+        comparison.local.points,
+        comparison.local.fieldGoalAttempts,
+        comparison.local.freeThrowAttempts,
+      ),
+      right: trueShootingPct(
+        comparison.opponent.points,
+        comparison.opponent.fieldGoalAttempts,
+        comparison.opponent.freeThrowAttempts,
+      ),
+    },
+    {
+      label: 'Rebounds per game',
+      left: perGameText(comparison.local.rebounds, comparison.local.games),
+      right: perGameText(comparison.opponent.rebounds, comparison.opponent.games),
+    },
+    {
+      label: 'Assists per game',
+      left: perGameText(comparison.local.assists, comparison.local.games),
+      right: perGameText(comparison.opponent.assists, comparison.opponent.games),
+    },
+    {
+      label: 'Turnovers per game',
+      left: perGameText(comparison.local.turnovers, comparison.local.games),
+      right: perGameText(comparison.opponent.turnovers, comparison.opponent.games),
+    },
+  ]);
 
   function collectLeaders(
     teamOf: (game: DraftDuelGameOutput) => TeamResult,
@@ -435,6 +511,26 @@
     });
   });
 
+  function standoutText(standout: DraftDuelStandout): string {
+    const side = standout.participantId === localParticipantId ? 'You' : 'Opp';
+    return `${standout.displayName} (${side}) · ${String(standout.points)} pts · ${String(
+      standout.rebounds,
+    )} reb · ${String(standout.assists)} ast`;
+  }
+
+  const recapRows = $derived<SeriesRecapGame[]>(
+    recap.map((game) => ({
+      gameNumber: game.gameNumber,
+      won: game.localWon,
+      score: `${String(game.localScore)}–${String(game.opponentScore)}`,
+      overtime: game.overtime,
+      standout: game.standouts.map(standoutText).join(' · '),
+      note: `${
+        game.localWon ? `Won by ${String(game.margin)}` : `Lost by ${String(-game.margin)}`
+      } · Series ${game.record}`,
+    })),
+  );
+
   const mvpIsLocal = $derived(mvp !== null && mvp.participantId === localParticipantId);
   const mvpLine = $derived(
     mvp === null
@@ -450,6 +546,15 @@
           gameScore: mvp.gameScoreSum.toFixed(1),
         },
   );
+  const mvpStats = $derived(
+    mvpLine === null
+      ? []
+      : [
+          { label: 'PPG', value: mvpLine.ppg },
+          { label: 'RPG', value: mvpLine.rpg },
+          { label: 'APG', value: mvpLine.apg },
+        ],
+  );
   const mvpEmptyCopy = $derived(
     seriesDecided
       ? 'The series MVP is not available on this device.'
@@ -462,209 +567,172 @@
   );
 </script>
 
-<section class="championship" aria-label="Series results and champion">
-  <header
-    class="hero"
-    data-champion={championIsLocal ? 'local' : series.champion === null ? 'pending' : 'opponent'}
-  >
-    <span class="hero-icon" aria-hidden="true"><Trophy size={28} /></span>
-    <p class="hero-eyebrow">Series complete</p>
-    <h2>
-      {#if series.champion === null}
-        Series in progress
-      {:else if championIsLocal}
-        You are the champion
-      {:else}
-        Opponent takes the series
-      {/if}
-    </h2>
-    <p
-      class="hero-score"
-      aria-label={`Series score you ${String(localWins)} to ${String(opponentWins)}`}
-    >
-      <span>{localWins}</span><span class="hero-dash" aria-hidden="true">–</span><span
-        >{opponentWins}</span
-      >
-    </p>
-    <p class="hero-sub">
-      {localWins > opponentWins ? 'You win' : localWins < opponentWins ? 'Opponent wins' : 'Tied'}
-      the best-of-seven · first to four.
-    </p>
-  </header>
-
-  <div class="top-grid">
-    <section class="mvp" aria-label="Series MVP">
-      <h3>Series MVP</h3>
-      {#if mvp !== null && mvpLine !== null}
-        <div class="mvp-body">
-          {#if manifest && cards[mvp.playerId]?.playerExternalId}
-            <PlayerFace
-              player={faceOf(mvp.playerId)}
-              {manifest}
-              size="md"
-              fallbackInitials={initialsOf(mvp.displayName)}
-            />
-          {:else}
-            <span class="player-fallback">{initialsOf(mvp.displayName)}</span>
-          {/if}
-          <div class="mvp-identity">
-            <p class="mvp-name">{mvp.displayName}</p>
-            <p class="mvp-team">
-              {mvpIsLocal ? 'Your roster' : 'Opponent roster'} · {mvpLine.games} games
+{#snippet rematchFooter()}
+  <Panel as="section" padding="sm" aria-label="Rematch">
+    <div class="rematch-row">
+      <ActionRow>
+        {#snippet primary()}
+          {#if onlobby}
+            <Button tone="primary" onclick={onlobby}>Back to lobby</Button>
+          {:else if rematchConfirmed}
+            <p class="rematch-state" data-state="confirmed">
+              Rematch confirmed — the new series is being prepared.
             </p>
-          </div>
-        </div>
-        <dl class="mvp-stats">
-          <div>
-            <dt>PPG</dt>
-            <dd>{mvpLine.ppg}</dd>
-          </div>
-          <div>
-            <dt>RPG</dt>
-            <dd>{mvpLine.rpg}</dd>
-          </div>
-          <div>
-            <dt>APG</dt>
-            <dd>{mvpLine.apg}</dd>
-          </div>
-        </dl>
+          {:else if rematchRequested}
+            <p class="rematch-state" data-state="requested">Your opponent requested a rematch.</p>
+          {:else if localRematchRequested}
+            <p class="rematch-state" data-state="waiting" role="status">
+              Waiting for your opponent to accept the rematch.
+            </p>
+          {:else}
+            <p class="rematch-state" data-state="idle">Run it back?</p>
+          {/if}
+        {/snippet}
+        {#snippet secondary()}
+          {#if !onlobby && !rematchConfirmed && rematchRequested}
+            <Button tone="primary" disabled={rematchBusy} onclick={onconfirmrematch}>
+              {rematchBusy ? 'Preparing rematch…' : 'Confirm rematch'}
+            </Button>
+          {:else if !onlobby && !rematchConfirmed && !rematchRequested && !localRematchRequested}
+            <Button tone="primary" disabled={rematchBusy} onclick={onrematch}>
+              <Repeat size={15} aria-hidden="true" />
+              {rematchBusy ? 'Requesting rematch…' : 'Request rematch'}
+            </Button>
+          {/if}
+        {/snippet}
+      </ActionRow>
+    </div>
+  </Panel>
+{/snippet}
+
+<ResultScreen
+  aria-label="Series results and champion"
+  eyebrow="Series complete"
+  {title}
+  footer={showRematch ? rematchFooter : null}
+>
+  {#snippet hero()}
+    <ResultHero
+      score={`${String(localWins)}–${String(opponentWins)}`}
+      scoreLabel={`Series score you ${String(localWins)} to ${String(opponentWins)}`}
+      tone={heroTone}
+      meta={heroMeta}
+      data-champion={championState}
+    />
+  {/snippet}
+
+  <div class="result-grid">
+    <div class="mvp-column">
+      <MvpCard
+        aria-label="Series MVP"
+        label="Series MVP"
+        name={mvp?.displayName ?? null}
+        team={mvp === null ? null : mvpIsLocal ? 'Your roster' : 'Opponent roster'}
+        slot={mvpLine === null ? null : `${String(mvpLine.games)} games`}
+        stats={mvpStats}
+        emptyCopy={mvpEmptyCopy}
+      >
+        {#snippet portrait()}
+          {#if mvp !== null}
+            {#if manifest && cards[mvp.playerId]?.playerExternalId}
+              <PlayerFace
+                player={faceOf(mvp.playerId)}
+                {manifest}
+                size="md"
+                fallbackInitials={initialsOf(mvp.displayName)}
+              />
+            {:else}
+              <span class="player-fallback">{initialsOf(mvp.displayName)}</span>
+            {/if}
+          {/if}
+        {/snippet}
+      </MvpCard>
+      {#if mvp !== null && mvpLine !== null}
         <p class="mvp-totals">
           Totals: {mvpLine.points} pts · {mvpLine.rebounds} reb · {mvpLine.assists} ast · series game
           score {mvpLine.gameScore}
         </p>
-      {:else}
-        <p class="mvp-empty">{mvpEmptyCopy}</p>
       {/if}
-    </section>
+    </div>
 
-    <section class="comparison" aria-label="Series comparison">
-      <h3>Series comparison</h3>
+    <Panel as="section" padding="md" aria-label="Series comparison">
+      <SectionHeading level={3} size="sm" align="start" title="Series comparison" />
       {#if hasBoxScores}
-        <table class="comparison-table">
-          <caption class="sr-only">Per-game team averages for the series</caption>
-          <thead>
-            <tr>
-              <th scope="col">You</th>
-              <th scope="col">Stat</th>
-              <th scope="col">Opp</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{perGameText(comparison.local.points, comparison.local.games)}</td>
-              <th scope="row">Points per game</th>
-              <td>{perGameText(comparison.opponent.points, comparison.opponent.games)}</td>
-            </tr>
-            <tr>
-              <td
-                >{ratioPct(comparison.local.fieldGoalMakes, comparison.local.fieldGoalAttempts)}</td
-              >
-              <th scope="row">FG%</th>
-              <td
-                >{ratioPct(
-                  comparison.opponent.fieldGoalMakes,
-                  comparison.opponent.fieldGoalAttempts,
-                )}</td
-              >
-            </tr>
-            <tr>
-              <td>{ratioPct(comparison.local.threeMakes, comparison.local.threeAttempts)}</td>
-              <th scope="row">3P%</th>
-              <td>{ratioPct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts)}</td>
-            </tr>
-            <tr>
-              <td
-                >{trueShootingPct(
-                  comparison.local.points,
-                  comparison.local.fieldGoalAttempts,
-                  comparison.local.freeThrowAttempts,
-                )}</td
-              >
-              <th scope="row">TS%</th>
-              <td
-                >{trueShootingPct(
-                  comparison.opponent.points,
-                  comparison.opponent.fieldGoalAttempts,
-                  comparison.opponent.freeThrowAttempts,
-                )}</td
-              >
-            </tr>
-            <tr>
-              <td>{perGameText(comparison.local.rebounds, comparison.local.games)}</td>
-              <th scope="row">Rebounds per game</th>
-              <td>{perGameText(comparison.opponent.rebounds, comparison.opponent.games)}</td>
-            </tr>
-            <tr>
-              <td>{perGameText(comparison.local.assists, comparison.local.games)}</td>
-              <th scope="row">Assists per game</th>
-              <td>{perGameText(comparison.opponent.assists, comparison.opponent.games)}</td>
-            </tr>
-            <tr>
-              <td>{perGameText(comparison.local.turnovers, comparison.local.games)}</td>
-              <th scope="row">Turnovers per game</th>
-              <td>{perGameText(comparison.opponent.turnovers, comparison.opponent.games)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <ComparisonTable
+          class="mt-3"
+          rows={comparisonRows}
+          rightLabel="Opp"
+          aria-label="Per-game team averages for the series"
+        />
         <p class="panel-note">
           {comparison.local.games} game{comparison.local.games === 1 ? '' : 's'} · per-game averages
         </p>
       {:else}
-        <p class="mvp-empty">Box scores are not available on this device.</p>
+        <EmptyState
+          class="mt-3"
+          title="Box scores are not available on this device."
+          surface="none"
+        />
       {/if}
-    </section>
+    </Panel>
   </div>
 
-  <section class="leaders" aria-label="Series leaders">
-    <h3>Series leaders</h3>
+  <Panel as="section" padding="md" aria-label="Series leaders">
+    <SectionHeading level={3} size="sm" align="start" title="Series leaders" />
     {#if hasBoxScores}
-      <table class="leaders-table">
-        <caption class="sr-only">Series leaders for both rosters</caption>
-        <thead>
-          <tr>
-            <th scope="col">Stat</th>
-            <th scope="col">Your five</th>
-            <th scope="col">Opponent five</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each leaderRows as row (row.key)}
+      <div class="table-scroll mt-3">
+        <table class="leaders-table">
+          <caption class="sr-only">Series leaders for both rosters</caption>
+          <thead>
             <tr>
-              <th scope="row">{row.label}</th>
-              {#each [leaders.local[row.key], leaders.opponent[row.key]] as leader, index (row.key + String(index))}
-                <td>
-                  {#if leader}
-                    <span class="leader-cell">
-                      {#if manifest && cards[leader.playerId]?.playerExternalId}
-                        <PlayerFace
-                          player={faceOf(leader.playerId)}
-                          {manifest}
-                          size="sm"
-                          fallbackInitials={initialsOf(leader.name)}
-                        />
-                      {:else}
-                        <span class="player-fallback sm">{initialsOf(leader.name)}</span>
-                      {/if}
-                      <span class="leader-text">
-                        <span class="leader-name">{leader.name}</span>
-                        <span class="leader-value"
-                          >{leader.perGame} <span class="leader-unit">{row.unit}</span></span
-                        >
-                      </span>
-                    </span>
-                  {:else}
-                    <span class="leader-empty">—</span>
-                  {/if}
-                </td>
-              {/each}
+              <th scope="col">Stat</th>
+              <th scope="col">Your five</th>
+              <th scope="col">Opponent five</th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {#each leaderRows as row (row.key)}
+              <tr>
+                <th scope="row">{row.label}</th>
+                {#each [leaders.local[row.key], leaders.opponent[row.key]] as leader, index (row.key + String(index))}
+                  <td>
+                    {#if leader}
+                      <span class="leader-cell">
+                        {#if manifest && cards[leader.playerId]?.playerExternalId}
+                          <PlayerFace
+                            player={faceOf(leader.playerId)}
+                            {manifest}
+                            size="sm"
+                            fallbackInitials={initialsOf(leader.name)}
+                          />
+                        {:else}
+                          <span class="player-fallback sm">{initialsOf(leader.name)}</span>
+                        {/if}
+                        <span class="leader-text">
+                          <span class="leader-name">{leader.name}</span>
+                          <span class="leader-value"
+                            >{leader.perGame} <span class="leader-unit">{row.unit}</span></span
+                          >
+                        </span>
+                      </span>
+                    {:else}
+                      <span class="leader-empty">—</span>
+                    {/if}
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {:else}
-      <p class="mvp-empty">Box scores are not available on this device.</p>
+      <EmptyState
+        class="mt-3"
+        title="Box scores are not available on this device."
+        surface="none"
+      />
     {/if}
-  </section>
+  </Panel>
 
   <PlayerStatsSection
     ariaLabel="Series player stats"
@@ -703,223 +771,35 @@
     {/snippet}
   </PlayerStatsSection>
 
-  <section class="recap" aria-label="Game recaps">
-    <h3>Game recaps</h3>
-    {#if recap.length > 0}
-      <ol class="recap-list">
-        {#each recap as game (game.gameNumber)}
-          <li class="recap-game" data-result={game.localWon ? 'win' : 'loss'}>
-            <div class="recap-head">
-              <span class="recap-label">Game {game.gameNumber}</span>
-              <span class="recap-tags">
-                {#if game.overtime}
-                  <span class="recap-ot">OT</span>
-                {/if}
-                <span class="recap-result">{game.localWon ? 'W' : 'L'}</span>
-              </span>
-            </div>
-            <p class="recap-score">
-              <span>{game.localScore}</span><span class="recap-dash" aria-hidden="true">–</span
-              ><span>{game.opponentScore}</span>
-            </p>
-            <p class="recap-record">
-              {game.localWon ? `Won by ${String(game.margin)}` : `Lost by ${String(-game.margin)}`} ·
-              Series {game.record}
-            </p>
-            {#each game.standouts as standout (standout.playerId)}
-              <p class="recap-standout">
-                <strong>{standout.displayName}</strong>
-                ({standout.participantId === localParticipantId ? 'You' : 'Opp'}) ·
-                {standout.points} pts · {standout.rebounds} reb · {standout.assists} ast
-              </p>
-            {/each}
-          </li>
-        {/each}
-      </ol>
+  <Panel as="section" padding="md" aria-label="Game recaps">
+    <SectionHeading level={3} size="sm" align="start" title="Game recaps" />
+    {#if recapRows.length > 0}
+      <SeriesRecap class="mt-3" games={recapRows} label="Game recaps" />
     {:else}
-      <p class="recap-empty">{recapEmptyCopy}</p>
+      <EmptyState class="mt-3" title={recapEmptyCopy} surface="none" />
     {/if}
-  </section>
-
-  {#if showRematch}<section class="rematch" aria-label="Rematch">
-      {#if onlobby}
-        <button type="button" class="rematch-btn" onclick={onlobby}>Back to lobby</button>
-      {:else if rematchConfirmed}
-        <p class="rematch-state" data-state="confirmed">
-          Rematch confirmed — the new series is being prepared.
-        </p>
-      {:else if rematchRequested}
-        <p class="rematch-state" data-state="requested">Your opponent requested a rematch.</p>
-        <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onconfirmrematch}>
-          {rematchBusy ? 'Preparing rematch…' : 'Confirm rematch'}
-        </button>
-      {:else if localRematchRequested}
-        <p class="rematch-state" data-state="waiting" role="status">
-          Waiting for your opponent to accept the rematch.
-        </p>
-      {:else}
-        <p class="rematch-state" data-state="idle">Run it back?</p>
-        <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onrematch}>
-          <Repeat size={15} aria-hidden="true" />
-          {rematchBusy ? 'Requesting rematch…' : 'Request rematch'}
-        </button>
-      {/if}
-    </section>{/if}
-</section>
+  </Panel>
+</ResultScreen>
 
 <style>
-  .championship {
+  .result-grid {
     display: grid;
-    gap: 0.85rem;
     min-width: 0;
+    gap: 1rem;
   }
 
-  .hero {
+  .mvp-column {
     display: grid;
-    justify-items: center;
-    gap: 0.25rem;
-    padding: 1.4rem 1rem 1.2rem;
-    overflow: clip;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-line-soft));
-    border-radius: var(--radius);
-    text-align: center;
-    background:
-      radial-gradient(
-        80% 90% at 50% -20%,
-        color-mix(in srgb, var(--color-primary) 16%, transparent),
-        transparent 70%
-      ),
-      var(--color-surface-1);
+    min-width: 0;
+    align-content: start;
+    gap: 0.4rem;
   }
 
-  .hero[data-champion='opponent'] {
-    border-color: var(--color-line-strong);
-    background:
-      radial-gradient(
-        80% 90% at 50% -20%,
-        color-mix(in srgb, #8bc9e0 12%, transparent),
-        transparent 70%
-      ),
-      var(--color-surface-1);
-  }
-
-  .hero-icon {
-    display: grid;
-    place-items: center;
-    width: 3rem;
-    height: 3rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
-    border-radius: 999px;
-    color: var(--color-primary);
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  }
-
-  .hero-eyebrow {
+  .mvp-totals {
     margin: 0;
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    color: var(--color-muted-foreground);
-    text-transform: uppercase;
-  }
-
-  .hero h2 {
-    margin: 0.1rem 0 0;
-    font-family: var(--font-display);
-    font-size: clamp(1.9rem, 8vw, 2.8rem);
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    text-transform: uppercase;
-  }
-
-  .hero-score {
-    display: flex;
-    align-items: baseline;
-    gap: 0.7rem;
-    margin: 0.25rem 0 0;
-    font-family: var(--font-display);
-    font-size: clamp(2.4rem, 12vw, 3.4rem);
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hero-dash {
-    color: var(--color-muted-foreground);
-    font-size: 0.55em;
-  }
-
-  .hero-sub {
-    margin: 0.1rem 0 0;
-    font-size: 0.78rem;
-    color: var(--color-muted-foreground);
-  }
-
-  .top-grid {
-    display: grid;
-    gap: 0.85rem;
-  }
-
-  @media (min-width: 900px) {
-    .top-grid {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      align-items: stretch;
-    }
-  }
-
-  .mvp,
-  .comparison,
-  .leaders,
-  .recap,
-  .rematch {
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.75rem;
-    background: var(--color-surface-1);
-    min-width: 0;
-  }
-
-  .comparison,
-  .leaders {
-    min-width: 0;
-  }
-
-  h3 {
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    color: var(--color-primary);
-    text-transform: uppercase;
-  }
-
-  .mvp-body {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-top: 0.6rem;
-  }
-
-  .mvp-identity {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .mvp-name {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 800;
-    line-height: 1.05;
-    overflow-wrap: anywhere;
-  }
-
-  .mvp-team {
-    margin: 0.15rem 0 0;
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
+    padding: 0 0.25rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
     color: var(--color-muted-foreground);
   }
 
@@ -944,119 +824,58 @@
     font-size: 0.68rem;
   }
 
-  .mvp-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.5rem;
-    max-width: 20rem;
-    margin: 0.7rem 0 0;
-  }
-
-  .mvp-stats div {
-    padding: 0.45rem 0.3rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.5rem;
-    text-align: center;
-    background: var(--color-surface-2);
-  }
-
-  .mvp-stats dt {
-    font-family: var(--font-mono);
-    font-size: 0.58rem;
-    letter-spacing: 0.12em;
-    color: var(--color-muted-foreground);
-  }
-
-  .mvp-stats dd {
-    margin: 0.15rem 0 0;
-    font-family: var(--font-display);
-    font-size: 1.35rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .mvp-totals {
-    margin: 0.55rem 0 0;
-    font-size: 0.72rem;
-    color: var(--color-muted-foreground);
-  }
-
-  .mvp-empty,
-  .recap-empty {
+  .panel-note {
     margin: 0.5rem 0 0;
-    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
     color: var(--color-muted-foreground);
   }
 
-  .comparison-table,
+  .table-scroll {
+    overflow-x: auto;
+  }
+
   .leaders-table {
     width: 100%;
-    margin-top: 0.55rem;
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
   }
 
-  .comparison-table thead th,
   .leaders-table thead th {
-    padding: 0 0.3rem 0.4rem;
+    padding: 0 0.35rem 0.45rem;
     border-bottom: 1px solid var(--color-line-soft);
     color: var(--color-muted-foreground);
     font-family: var(--font-mono);
-    font-size: 0.56rem;
+    font-size: 0.5625rem;
     font-weight: 700;
     letter-spacing: 0.1em;
+    text-align: left;
     text-transform: uppercase;
   }
 
-  .comparison-table thead th:first-child,
-  .leaders-table thead th:first-child {
-    text-align: left;
-  }
-
-  .comparison-table thead th:last-child,
   .leaders-table thead th:last-child {
     text-align: right;
   }
 
-  .comparison-table tbody tr,
   .leaders-table tbody tr {
     border-bottom: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
   }
 
-  .comparison-table tbody tr:last-child,
   .leaders-table tbody tr:last-child {
     border-bottom: 0;
   }
 
-  .comparison-table tbody th,
-  .leaders-table tbody th {
-    padding: 0.42rem 0.3rem;
-    font-weight: 600;
-    text-align: center;
-    color: var(--color-muted-foreground);
-  }
-
-  .comparison-table tbody td {
-    padding: 0.42rem 0.3rem;
-    font-weight: 700;
-  }
-
-  .comparison-table tbody td:first-child {
-    text-align: left;
-  }
-
-  .comparison-table tbody td:last-child {
-    text-align: right;
-  }
-
   .leaders-table tbody th {
     width: 6.5rem;
+    padding: 0.45rem 0.35rem;
+    color: var(--color-muted-foreground);
+    font-weight: 600;
     text-align: left;
   }
 
   .leaders-table tbody td {
-    padding: 0.4rem 0.3rem;
+    padding: 0.45rem 0.35rem;
     vertical-align: middle;
   }
 
@@ -1100,128 +919,8 @@
     color: var(--color-muted-foreground);
   }
 
-  .panel-note {
-    margin: 0.5rem 0 0;
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    color: var(--color-muted-foreground);
-  }
-
-  .recap-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-    gap: 0.6rem;
-    margin: 0.6rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .recap-game {
-    min-width: 0;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--color-line-soft);
-    border-left: 3px solid var(--color-line-strong);
-    border-radius: 0.6rem;
-    background: var(--color-surface-2);
-  }
-
-  .recap-game[data-result='win'] {
-    border-left-color: var(--color-positive);
-  }
-
-  .recap-game[data-result='loss'] {
-    border-left-color: var(--color-destructive);
-  }
-
-  .recap-head {
-    display: flex;
-    align-items: baseline;
+  .rematch-row :global(.ui-actions) {
     justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .recap-label {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--color-muted-foreground);
-    text-transform: uppercase;
-  }
-
-  .recap-tags {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.35rem;
-  }
-
-  .recap-ot {
-    padding: 0.05rem 0.3rem;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 0.25rem;
-    font-family: var(--font-mono);
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--color-muted-foreground);
-  }
-
-  .recap-result {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    font-weight: 700;
-  }
-
-  .recap-game[data-result='win'] .recap-result {
-    color: var(--color-positive);
-  }
-
-  .recap-game[data-result='loss'] .recap-result {
-    color: var(--color-destructive);
-  }
-
-  .recap-score {
-    display: flex;
-    align-items: baseline;
-    gap: 0.45rem;
-    margin: 0.25rem 0 0;
-    font-family: var(--font-display);
-    font-size: 1.7rem;
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .recap-dash {
-    color: var(--color-muted-foreground);
-    font-size: 0.6em;
-  }
-
-  .recap-record {
-    margin: 0.2rem 0 0;
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    color: var(--color-muted-foreground);
-  }
-
-  .recap-standout {
-    margin: 0.4rem 0 0;
-    padding-top: 0.4rem;
-    border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 60%, transparent);
-    font-size: 0.72rem;
-    color: var(--color-muted-foreground);
-  }
-
-  .recap-standout strong {
-    color: var(--color-foreground);
-  }
-
-  .rematch {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem 1rem;
   }
 
   .rematch-state {
@@ -1234,203 +933,23 @@
     color: var(--color-positive);
   }
 
-  .rematch-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    min-height: 2.5rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 65%, transparent);
-    border-radius: 0.55rem;
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-    font-family: var(--font-display);
-    font-size: 0.9rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-    outline: none;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  @media (hover: hover) {
-    .rematch-btn:hover {
-      filter: brightness(1.08);
+  @media (min-width: 900px) {
+    .result-grid {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      align-items: stretch;
     }
-  }
-
-  .rematch-btn:active:not(:disabled) {
-    transform: scale(0.99);
-  }
-
-  .rematch-btn:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
   }
 
   @media (max-width: 640px) {
-    .championship {
-      gap: 0.7rem;
-    }
-    .hero {
-      gap: 0.2rem;
-      padding: 1.1rem 0.85rem 1rem;
-    }
-    .hero-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-    }
-    .hero h2 {
-      font-size: clamp(1.45rem, 7vw, 2rem);
-      text-wrap: balance;
-    }
-    .hero-score {
-      font-size: clamp(2rem, 11vw, 2.8rem);
-      gap: 0.55rem;
-    }
-    .hero-sub {
-      max-width: 26rem;
-      font-size: 0.75rem;
-      line-height: 1.5;
-      text-wrap: balance;
-    }
-    .mvp,
-    .comparison,
-    .leaders,
-    .recap,
-    .rematch {
-      padding: 0.7rem 0.75rem;
-      border-radius: 0.65rem;
-    }
-    .mvp-body {
-      gap: 0.6rem;
-    }
-    .mvp-name {
-      font-size: 1.22rem;
-    }
-    .mvp-team {
-      font-size: 0.62rem;
-    }
-    .mvp-stats {
-      gap: 0.4rem;
-      max-width: none;
-    }
-    .mvp-stats div {
-      padding: 0.4rem 0.25rem;
-    }
-    .mvp-stats dd {
-      font-size: 1.15rem;
-    }
-    .mvp-totals {
-      font-size: 0.7rem;
-      line-height: 1.55;
-    }
-    .comparison-table {
-      font-size: 0.72rem;
-    }
-    .comparison-table tbody th,
-    .comparison-table tbody td {
-      padding: 0.36rem 0.25rem;
-      line-height: 1.35;
-    }
-    .leaders-table {
-      display: block;
-      margin-top: 0.5rem;
-    }
-    .leaders-table thead {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
-      white-space: nowrap;
-    }
-    .leaders-table tbody {
-      display: grid;
-      gap: 0.55rem;
-    }
-    .leaders-table tbody tr {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.4rem;
-      border-bottom: 0;
-      padding: 0;
-    }
-    .leaders-table tbody th {
-      grid-column: 1 / -1;
-      width: auto;
-      padding: 0;
-      font-family: var(--font-mono);
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      text-align: left;
-    }
-    .leaders-table tbody td {
-      min-width: 0;
-      padding: 0;
-    }
-    .leader-cell {
-      gap: 0.45rem;
-      padding: 0.45rem 0.5rem;
-      border: 1px solid var(--color-line-soft);
-      border-radius: 0.55rem;
-      background: var(--color-surface-2);
-    }
-    .leader-name {
-      font-size: 0.8rem;
-      white-space: normal;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-      overflow: hidden;
-    }
-    .leader-value {
-      font-size: 0.64rem;
-    }
-    .recap-list {
-      grid-template-columns: 1fr;
-      gap: 0.5rem;
-    }
-    .recap-score {
-      font-size: 1.5rem;
-    }
-    .recap-standout {
-      font-size: 0.7rem;
-      line-height: 1.5;
-    }
-    .rematch {
+    .rematch-row :global(.ui-actions) {
       flex-direction: column;
       align-items: stretch;
       text-align: center;
     }
+
     .rematch-state {
       font-size: 0.8rem;
       text-wrap: balance;
-    }
-    .rematch-btn {
-      width: 100%;
-      min-height: 3rem;
-      justify-content: center;
-      font-size: 0.85rem;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-  }
-
-  @media (max-width: 380px) {
-    .mvp-name {
-      font-size: 1.08rem;
-    }
-    .mvp-stats dd {
-      font-size: 1.05rem;
-    }
-    .leader-cell {
-      padding: 0.4rem;
     }
   }
 </style>

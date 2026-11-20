@@ -5,7 +5,10 @@
   import HavocDraftBoard from './HavocDraftBoard.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import ActionRow from '#lib/components/ui/ActionRow.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   let {
     controller,
@@ -38,66 +41,67 @@
     />
   {:else if run?.phase === 'run'}
     <Panel padding="md">
-      <p class="h-eyebrow">Your squad is ready</p>
-      <h1 class="h-title">
-        {run.havocCursor >= 82 ? 'The results are in.' : 'Back to the havoc.'}
-      </h1>
-      <p class="h-copy mt-4">
-        {run.havocCursor} of 82 games completed. Your lineup and progress are saved.
-      </p>
-      <div class="h-actions mt-6">
-        {#if run.comparisonStatus === 'complete'}<Button
-            disabled={controller.busy}
-            onclick={() => void controller.createDraft()}>Draft another squad</Button
-          >{/if}<ActionLink
-          tone="secondary"
-          href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
-        >
-          {run.havocCursor >= 82 ? 'View season report' : 'Resume season'}
-          <ArrowRight size={18} />
-        </ActionLink>
-
-        <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
-      </div>
+      <PageHeader
+        eyebrow="Your squad is ready"
+        title={run.havocCursor >= 82 ? 'The results are in.' : 'Back to the havoc.'}
+        description={`${run.havocCursor} of 82 games completed. Your lineup and progress are saved.`}
+      />
+      <ActionRow class="mt-6">
+        {#snippet primary()}
+          {#if run.comparisonStatus === 'complete'}<Button
+              disabled={controller.busy}
+              onclick={() => void controller.createDraft()}>Draft another squad</Button
+            >{/if}
+        {/snippet}
+        {#snippet secondary()}
+          <ActionLink
+            tone="secondary"
+            href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
+          >
+            {run.havocCursor >= 82 ? 'View season report' : 'Resume season'}
+            <ArrowRight size={18} />
+          </ActionLink>
+        {/snippet}
+        {#snippet tertiary()}
+          <ActionLink tone="ghost" href={resolve('havoc/history/')}>Run history</ActionLink>
+        {/snippet}
+      </ActionRow>
     </Panel>
   {:else}
-    <div class="h-header">
-      <p class="h-eyebrow">Hoop Havoc · Anything but ordinary</p>
-      <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
-    </div>
-    <div class="h-intro">
-      <div>
-        <h1 class="h-title">Real legends.<br /><span>Unreal powers.</span></h1>
-        <p class="h-copy mt-6">
-          Build a starting five with outrageous basketball mutations. Send them into an 82-game
-          season. See just how far your freaks can go.
-        </p>
-        <div class="h-actions mt-8">
-          <Button
-            data-havoc-start
-            disabled={controller.busy}
-            onclick={() => void controller.createDraft()}
-          >
-            <Zap size={18} />
-            {controller.busy ? 'Opening draft…' : 'Draft your squad'}
-          </Button>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      eyebrow="Hoop Havoc · Anything but ordinary"
+      description="Build a starting five with outrageous basketball mutations. Send them into an 82-game season. See just how far your freaks can go."
+    >
+      {#snippet title()}Real legends.<br /><span>Unreal powers.</span>{/snippet}
+      {#snippet actions()}
+        <ActionLink tone="secondary" href={resolve('havoc/history/')}>Run history</ActionLink>
+      {/snippet}
+    </PageHeader>
+    <ActionRow class="mt-8">
+      {#snippet primary()}
+        <Button
+          data-havoc-start
+          disabled={controller.busy}
+          onclick={() => void controller.createDraft()}
+        >
+          <Zap size={18} />
+          {controller.busy ? 'Opening draft…' : 'Draft your squad'}
+        </Button>
+      {/snippet}
+    </ActionRow>
     <ol class="h-steps">
       <li><strong>1</strong> Pick five powered-up legends</li>
       <li><strong>2</strong> Launch your automatic season</li>
       <li><strong>3</strong> Reveal your squad's final report</li>
     </ol>
-    <details class="ui-panel" data-padding="md">
-      <summary>How does Havoc work?</summary>
+    <Disclosure summary="How does Havoc work?">
       <p class="h-copy">
         Choose one player for each position, PG through C. Every card has powers and tradeoffs. You
         get one reroll for the entire draft. No guarantees: rarer powers can backfire. Once your
         five are locked, the full season simulates automatically, followed by the same season
         without powers so you can compare the results.
       </p>
-    </details>
+    </Disclosure>
   {/if}
   {#if controller.error !== null}<Alert tone="danger">
       {controller.error}<Button class="mt-3" tone="secondary" onclick={() => void controller.load()}
@@ -111,12 +115,3 @@
         >{/if}
     </Alert>{/if}
 </section>
-
-<style>
-  .h-intro {
-    padding: 32px 0;
-  }
-  h1 span {
-    color: #f290c5;
-  }
-</style>
