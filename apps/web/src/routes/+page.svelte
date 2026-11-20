@@ -204,29 +204,29 @@
       {#if mode.solo}
         {@const saved = savedEntries[mode.id]}
         {@const history = historyLinks[mode.id]}
-        <div class="flex flex-col">
-          <ModeCard
-            href={saved ? resolve(saved.href) : resolve(mode.solo.href)}
-            imageSrc={mode.discovery.artwork ? staticAsset(`/${mode.discovery.artwork}`) : null}
-            title={mode.label}
-            description={mode.description}
-            cta={saved?.label ?? mode.discovery.cta ?? mode.label}
-            progress={saved?.progress ?? null}
-            class="flex-1 {mode.discovery.accent ? 'border-accent/60' : ''}"
-            data-sveltekit-preload-code="hover"
-            onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
-            onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
-          />
-          {#if history}
-            <ActionLink
-              href={resolve(history)}
-              aria-label={`${mode.label} run history`}
-              tone="ghost"
-              size="sm"
-              class="mt-1 self-start">Run history</ActionLink
-            >
-          {/if}
-        </div>
+        <ModeCard
+          href={saved ? resolve(saved.href) : resolve(mode.solo.href)}
+          imageSrc={mode.discovery.artwork ? staticAsset(`/${mode.discovery.artwork}`) : null}
+          title={mode.label}
+          description={mode.description}
+          cta={saved?.label ?? mode.discovery.cta ?? mode.label}
+          progress={saved?.progress ?? null}
+          class="h-full {mode.discovery.accent ? 'border-accent/60' : ''}"
+          data-sveltekit-preload-code="hover"
+          onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
+          onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
+        >
+          {#snippet footer()}
+            {#if history}
+              <ActionLink
+                href={resolve(history)}
+                aria-label={`${mode.label} run history`}
+                tone="ghost"
+                size="sm">Run history</ActionLink
+              >
+            {/if}
+          {/snippet}
+        </ModeCard>
       {:else}
         <ModeCard
           title={mode.label}

@@ -626,7 +626,7 @@
             aria-label="Series MVP"
             name={mvp.entry.displayName}
             team={formatPositions(mvp.entry.positionsPlayable)}
-            slot={mvp.pid === selfId ? 'You' : 'Opponent'}
+            position={mvp.pid === selfId ? 'You' : 'Opponent'}
             stats={[
               { label: 'PPG', value: perGameText(mvp.line.points, mvp.line.games) },
               { label: 'REB', value: perGameText(mvp.line.rebounds, mvp.line.games) },

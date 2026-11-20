@@ -6,7 +6,7 @@
     label = null,
     name = null,
     team = null,
-    slot = null,
+    position = null,
     stats = [],
     portrait = null,
     logo = null,
@@ -19,18 +19,18 @@
     label?: string | null;
     name?: string | null;
     team?: string | null;
-    slot?: string | null;
+    position?: string | null;
     stats?: readonly { label: string; value: string | number }[];
     portrait?: Snippet | null;
     logo?: Snippet | null;
     icon?: Snippet | null;
-    tone?: 'default' | 'accent';
+    tone?: 'default' | 'primary' | 'accent';
     emptyCopy?: string;
-  } & Omit<HTMLAttributes<HTMLElement>, 'slot'> = $props();
+  } & HTMLAttributes<HTMLElement> = $props();
 
   const visibleStats = $derived(stats.slice(0, 4));
   const metaLine = $derived(
-    [team, slot].filter((part): part is string => part !== null && part.length > 0).join(' · '),
+    [team, position].filter((part): part is string => part !== null && part.length > 0).join(' · '),
   );
   const empty = $derived(name === null || name.trim().length === 0);
 </script>

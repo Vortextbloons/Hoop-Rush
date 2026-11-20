@@ -576,7 +576,7 @@
             aria-label="League MVP"
             name={mvp.playerName}
             team={mvp.teamName}
-            slot={`${mvp.isUserTeam ? 'Your five' : 'Opponent'} · ${mvp.appearances} games`}
+            position={`${mvp.isUserTeam ? 'Your five' : 'Opponent'} · ${mvp.appearances} games`}
             stats={[
               { label: 'PPG', value: oneDecimal(mvp.averagePoints) },
               { label: 'REB', value: oneDecimal(mvp.averageRebounds) },

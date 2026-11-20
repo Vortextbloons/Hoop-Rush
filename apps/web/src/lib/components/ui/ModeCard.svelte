@@ -14,6 +14,7 @@
     disabled = false,
     selected = false,
     onclick = undefined,
+    footer = null,
     class: className = '',
     ...rest
   }: {
@@ -28,6 +29,7 @@
     disabled?: boolean;
     selected?: boolean;
     onclick?: (() => void) | undefined;
+    footer?: Snippet | null;
   } & Omit<HTMLAttributes<HTMLElement>, 'title' | 'onclick'> = $props();
 </script>
 
@@ -63,7 +65,33 @@
   </span>
 {/snippet}
 
-{#if disabled}
+{#if footer !== null}
+  <div
+    {...rest}
+    class={['ui-panel', 'ui-mode-card', className]}
+    data-disabled={disabled ? 'true' : undefined}
+    data-selected={selected ? 'true' : undefined}
+  >
+    {#if disabled}
+      <div class="ui-mode-card-main" aria-disabled="true">
+        {@render content()}
+      </div>
+    {:else if href !== null}
+      <!-- eslint-disable svelte/no-navigation-without-resolve -- forwarded, already-resolved href -->
+      <a class="ui-mode-card-main" {href} {onclick}>
+        {@render content()}
+      </a>
+      <!-- eslint-enable svelte/no-navigation-without-resolve -->
+    {:else if onclick !== undefined}
+      <button class="ui-mode-card-main" type="button" aria-pressed={selected} {onclick}
+        >{@render content()}</button
+      >
+    {:else}
+      <div class="ui-mode-card-main">{@render content()}</div>
+    {/if}
+    <div class="ui-mode-card-footer">{@render footer()}</div>
+  </div>
+{:else if disabled}
   <div
     {...rest}
     class={['ui-panel', 'ui-mode-card', className]}

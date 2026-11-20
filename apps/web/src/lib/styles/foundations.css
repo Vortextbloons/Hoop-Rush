@@ -1275,6 +1275,34 @@
     outline: none;
   }
 
+  .ui-mode-card-main {
+    display: grid;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+  }
+
+  .ui-mode-card-main:is(a, button):hover {
+    background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+  }
+
+  .ui-mode-card-main:is(a, button):focus-visible {
+    outline: 3px solid var(--ui-focus);
+    outline-offset: -3px;
+  }
+
+  .ui-mode-card-footer {
+    display: flex;
+    align-items: center;
+    padding: 0.55rem 1rem 0.7rem;
+    border-top: 1px solid var(--color-line-soft);
+  }
+
+  .ui-mode-card-footer:empty {
+    display: none;
+  }
+
   .ui-mode-card:is(a, button):hover {
     border-color: color-mix(in srgb, var(--color-primary) 55%, var(--ui-panel-line));
   }
@@ -1560,6 +1588,25 @@
 
   .ui-mvp-card[data-tone='accent'] .ui-label {
     color: var(--color-accent);
+  }
+
+  .ui-mvp-card[data-tone='primary'] {
+    border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+    background:
+      radial-gradient(
+        120% 90% at 50% 0%,
+        color-mix(in srgb, var(--color-primary) 12%, transparent),
+        transparent 62%
+      ),
+      var(--ui-panel-bg);
+  }
+
+  .ui-mvp-card[data-tone='primary'] .ui-label {
+    color: var(--color-primary);
+  }
+
+  .ui-mvp-card[data-tone='primary'] .ui-mvp-card-icon {
+    color: var(--color-primary);
   }
 
   .ui-mvp-card-head {

@@ -98,6 +98,11 @@
       : (playerIndex?.players.find((entry) => entry.playerId === postseason.finalsMvp.playerId) ??
           null),
   );
+  const leagueMvpFace = $derived(
+    mvp === null
+      ? null
+      : (playerIndex?.players.find((entry) => entry.playerId === mvp.playerId) ?? null),
+  );
   type StatsPhase = 'regular' | 'postseason';
   type StatsView = StatsPhase | 'compare';
   type StatsRow = CapRushPlayerSeasonLine & { phase: StatsPhase };
@@ -221,6 +226,50 @@
   }
 </script>
 
+{#snippet leagueMvpCard()}
+  <MvpCard
+    class="h-full"
+    label="League MVP"
+    tone="primary"
+    name={mvp?.displayName ?? null}
+    team={mvp?.teamName ?? null}
+    position={mvp === null ? null : `${mvp.slot ?? '—'} · ${mvp.appearances} GP`}
+    stats={mvp === null
+      ? []
+      : [
+          { label: 'PTS', value: mvp.averagePoints.toFixed(1) },
+          { label: 'REB', value: mvp.averageRebounds.toFixed(1) },
+          { label: 'AST', value: mvp.averageAssists.toFixed(1) },
+          { label: 'MVP score', value: mvp.mvpScore.toFixed(2) },
+        ]}
+    emptyCopy="No league MVP was recorded for this run."
+  >
+    {#snippet icon()}<Trophy size={18} aria-hidden="true" />{/snippet}
+    {#snippet logo()}
+      {#if manifest && mvpIdentity}
+        <TeamLogo
+          {manifest}
+          franchiseId={mvpIdentity.franchiseId}
+          teamExternalId={mvpIdentity.teamExternalId}
+          className="h-full w-full"
+        />
+      {/if}
+    {/snippet}
+    {#snippet portrait()}
+      {#if manifest && leagueMvpFace}
+        <PlayerFace
+          player={leagueMvpFace}
+          {manifest}
+          size="xl"
+          fallbackInitials={initialsOf(mvp?.displayName ?? '')}
+        />
+      {:else if mvp !== null}
+        <span class="report-initials" aria-hidden="true">{initialsOf(mvp.displayName)}</span>
+      {/if}
+    {/snippet}
+  </MvpCard>
+{/snippet}
+
 <ResultScreen
   eyebrow={`${variantLabel(report.variant)} · Season report`}
   title={report.postseason === undefined ? 'Regular-season report' : 'Championship report'}
@@ -325,58 +374,61 @@
       {/if}
     </Panel>
 
-    <MvpCard
-      label="Finals MVP"
-      name={postseason.finalsMvp.displayName}
-      team={postseason.championName}
-      slot={`${postseason.finalsMvp.slot} · ${postseason.finalsMvp.games} Finals games`}
-      stats={[
-        {
-          label: 'PTS',
-          value: formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games),
-        },
-        {
-          label: 'REB',
-          value: formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games),
-        },
-        {
-          label: 'AST',
-          value: formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games),
-        },
-        {
-          label: 'Game score',
-          value: formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games),
-        },
-      ]}
-      tone="accent"
-      class="border-accent/40"
-    >
-      {#snippet icon()}<Crown size={18} aria-hidden="true" />{/snippet}
-      {#snippet logo()}
-        {#if manifest && championIdentity}
-          <TeamLogo
-            {manifest}
-            franchiseId={championIdentity.franchiseId}
-            teamExternalId={championIdentity.teamExternalId}
-            className="h-full w-full"
-          />
-        {/if}
-      {/snippet}
-      {#snippet portrait()}
-        {#if manifest && finalsMvpFace}
-          <PlayerFace
-            player={finalsMvpFace}
-            {manifest}
-            size="xl"
-            fallbackInitials={initialsOf(postseason.finalsMvp.displayName)}
-          />
-        {:else}
-          <span class="report-initials" aria-hidden="true"
-            >{initialsOf(postseason.finalsMvp.displayName)}</span
-          >
-        {/if}
-      {/snippet}
-    </MvpCard>
+    <div class="grid items-stretch gap-4 md:grid-cols-2">
+      <MvpCard
+        class="h-full border-accent/40"
+        label="Finals MVP"
+        tone="accent"
+        name={postseason.finalsMvp.displayName}
+        team={postseason.championName}
+        position={`${postseason.finalsMvp.slot} · ${postseason.finalsMvp.games} Finals games`}
+        stats={[
+          {
+            label: 'PTS',
+            value: formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games),
+          },
+          {
+            label: 'REB',
+            value: formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games),
+          },
+          {
+            label: 'AST',
+            value: formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games),
+          },
+          {
+            label: 'Game score',
+            value: formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games),
+          },
+        ]}
+      >
+        {#snippet icon()}<Crown size={18} aria-hidden="true" />{/snippet}
+        {#snippet logo()}
+          {#if manifest && championIdentity}
+            <TeamLogo
+              {manifest}
+              franchiseId={championIdentity.franchiseId}
+              teamExternalId={championIdentity.teamExternalId}
+              className="h-full w-full"
+            />
+          {/if}
+        {/snippet}
+        {#snippet portrait()}
+          {#if manifest && finalsMvpFace}
+            <PlayerFace
+              player={finalsMvpFace}
+              {manifest}
+              size="xl"
+              fallbackInitials={initialsOf(postseason.finalsMvp.displayName)}
+            />
+          {:else}
+            <span class="report-initials" aria-hidden="true"
+              >{initialsOf(postseason.finalsMvp.displayName)}</span
+            >
+          {/if}
+        {/snippet}
+      </MvpCard>
+      {@render leagueMvpCard()}
+    </div>
 
     <CapRushBracket
       series={postseason.series}
@@ -389,6 +441,9 @@
       This is a regular-season run. It was played before Cap Rush postseasons existed, so it has no
       bracket or Finals MVP.
     </Alert>
+    <div class="grid gap-4 md:grid-cols-2">
+      {@render leagueMvpCard()}
+    </div>
   {/if}
 
   <Panel as="section" padding="md" aria-label="Season finances">
@@ -684,73 +739,6 @@
           </PlayerStatsTable>
         </div>
       </BoxScorePanel>
-    {/if}
-  </Panel>
-
-  <Panel as="section" padding="md" aria-label="League MVP">
-    <SectionHeading eyebrow="Season honors" title="League MVP" level={3} />
-    {#if mvp === null}
-      <EmptyState
-        class="mt-2"
-        title="No league MVP"
-        message="No league MVP was recorded for this run."
-        surface="none"
-      />
-    {:else}
-      {@const mvpFace = playerIndex?.players.find((entry) => entry.playerId === mvp.playerId)}
-      <MvpCard
-        class="mt-4"
-        label={mvp.isUserTeam ? 'Your lineup' : 'Opponent'}
-        name={mvp.displayName}
-        team={mvp.teamName}
-        slot={`${mvp.slot ?? '—'} · ${mvp.appearances} GP`}
-        stats={[
-          { label: 'PTS', value: mvp.averagePoints.toFixed(1) },
-          { label: 'REB', value: mvp.averageRebounds.toFixed(1) },
-          { label: 'AST', value: mvp.averageAssists.toFixed(1) },
-          { label: 'MVP score', value: mvp.mvpScore.toFixed(2) },
-        ]}
-      >
-        {#snippet icon()}<Trophy size={18} aria-hidden="true" />{/snippet}
-        {#snippet logo()}
-          {#if manifest && mvpIdentity}
-            <TeamLogo
-              {manifest}
-              franchiseId={mvpIdentity.franchiseId}
-              teamExternalId={mvpIdentity.teamExternalId}
-              className="h-full w-full"
-            />
-          {/if}
-        {/snippet}
-        {#snippet portrait()}
-          {#if manifest && mvpFace}
-            <PlayerFace
-              player={mvpFace}
-              {manifest}
-              size="xl"
-              fallbackInitials={initialsOf(mvp.displayName)}
-            />
-          {:else}
-            <span class="report-initials" aria-hidden="true">{initialsOf(mvp.displayName)}</span>
-          {/if}
-        {/snippet}
-      </MvpCard>
-      <StatGrid class="mt-4" columns={2} mobile={2}>
-        <StatTile
-          label="Game score"
-          size="sm"
-          surface="tile"
-          valueClass="font-mono text-xs"
-          value={mvp.averageGameScore.toFixed(1)}
-        />
-        <StatTile
-          label="League baseline TS"
-          size="sm"
-          surface="tile"
-          valueClass="font-mono text-xs"
-          value={report.leagueBaselineTs.toFixed(3)}
-        />
-      </StatGrid>
     {/if}
   </Panel>
 </ResultScreen>

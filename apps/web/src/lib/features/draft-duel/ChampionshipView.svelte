@@ -628,7 +628,7 @@
         label="Series MVP"
         name={mvp?.displayName ?? null}
         team={mvp === null ? null : mvpIsLocal ? 'Your roster' : 'Opponent roster'}
-        slot={mvpLine === null ? null : `${String(mvpLine.games)} games`}
+        position={mvpLine === null ? null : `${String(mvpLine.games)} games`}
         stats={mvpStats}
         emptyCopy={mvpEmptyCopy}
       >

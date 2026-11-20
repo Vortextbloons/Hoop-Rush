@@ -474,7 +474,7 @@
             : 'MVP \u00b7 The regular season'}
           name={award.winner?.displayName ?? null}
           team={award.winner === null ? null : teamName(award.winner.teamId)}
-          slot={award.winner?.slot ?? null}
+          position={award.winner?.slot ?? null}
           stats={award.winner === null
             ? []
             : [

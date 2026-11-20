@@ -174,7 +174,7 @@
           label={mvpIsLocal ? 'Your series MVP' : 'Opponent series MVP'}
           name={mvpPick?.card.source.displayName ?? `${mvp.slot} · index ${mvp.index}`}
           team={mvpPick?.card.nickname ?? null}
-          slot={mvpPick ? `${mvpPick.slot} · index ${mvp.index}` : null}
+          position={mvpPick ? `${mvpPick.slot} · index ${mvp.index}` : null}
           stats={mvpCardStats}
         >
           {#snippet portrait()}
