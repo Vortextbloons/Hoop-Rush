@@ -13,13 +13,14 @@ schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated. **Dexie versions 15
-  through 18 are supported**: each upgrades additively to 19 and keeps its
+  through 19 are supported**: each upgrades additively to 20 and keeps its
   records. Databases older than 15 reset local saves, history, and profiles
   during upgrade so users start fresh. Do not restore historical migrations.
 - **Full Court save layout**: `fullCourtSeasonCheckpoints` (key `runId`) stores
   the checkpoint and `fullCourtSeasonScores` (key `[runId+gameId]`) stores the
   compact results. A slot commit writes the checkpoint and all 15 score rows in
   one transaction, guarded by the next slot and the run's lock digest.
+  `fullCourtCoaching` (key `runId`) stores each run's validated coaching plan.
 - **Cap Rush save layout.** Save schema 4 keeps the immutable locked inputs in
   `capRushLockedInputs`, writes only a reference into `capRushActive`, and
   records compact `capRushLeagueResults` beside the full league boxes. Only save
@@ -48,8 +49,8 @@ schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
 - `src/index.ts`: runtime surface (repositories and record schemas).
 - `src/repositories/`: `dexie.ts`, `cap-rush.ts`, `cap-rush-multiplayer.ts`,
   `havoc.ts`, `fixed-five.ts`, `draft-duel.ts`, `havoc-multiplayer.ts`,
-  `full-court-draft.ts`, `full-court-season.ts`, `profile.ts`, `support.ts`,
-  `save-envelope.ts`.
+  `full-court-draft.ts`, `full-court-season.ts`, `full-court-coaching.ts`,
+  `profile.ts`, `support.ts`, `save-envelope.ts`.
 - `src/schemas/`: record envelopes per mode.
 - `src/testing/`: fake-IndexedDB test support.
 

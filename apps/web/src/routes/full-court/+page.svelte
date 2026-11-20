@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { defaultFullCourtCoachingRotation } from '@hoop-rush/engine';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
@@ -7,6 +8,7 @@
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
   import { FullCourtController } from '#lib/features/full-court/full-court-controller.svelte.js';
@@ -14,6 +16,7 @@
 
   let controller = $state.raw<FullCourtController | null>(null);
   let startupError = $state<string | null>(null);
+  let coachingOpen = $state(false);
 
   onMount(() => {
     const opened = openService(() => new FullCourtController());
@@ -31,6 +34,9 @@
   const draft = $derived(current?.draft);
   const season = $derived(current?.season);
   const playoff = $derived(current?.playoffs?.view ?? null);
+  const league = $derived(season?.lock.season);
+  const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
+  const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
 </script>
 
 <svelte:head>
@@ -57,6 +63,24 @@
     {/if}
 
     {#if season}
+      {#if userTeam && defaultRotation && (playoff === null || playoff.userOutcome.status === 'pending')}
+        <details bind:open={coachingOpen} class="ui-panel mb-4">
+          <summary
+            class="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Coaching plan
+          </summary>
+          {#if coachingOpen}
+            <FullCourtCoachingView
+              roster={userTeam.roster}
+              {defaultRotation}
+              plan={season.coaching}
+              busy={current.busy}
+              onSave={(plan) => current.saveCoaching(plan)}
+            />
+          {/if}
+        </details>
+      {/if}
       {#if current.simulating}
         <div class="mb-4 flex flex-wrap items-center gap-3">
           <p role="status" class="text-sm text-muted-foreground">

@@ -13,6 +13,7 @@ import {
   fullCourtPlayoffCheckpointSchema,
   fullCourtSeasonCheckpointSchema,
   fullCourtSeasonScoreSchema,
+  fullCourtTacticsSchema,
   fullCourtTeamHealthSchema,
   idSchema,
   seasonKeySchema,
@@ -73,6 +74,7 @@ const fullCourtSeasonTeamSchema = z.object({
   anchorSeason: seasonKeySchema.nullable(),
   roster: z.array(simulationPlayerSchema).min(5).max(12),
   rotation: fullCourtRotationPlanInputSchema.optional(),
+  tactics: fullCourtTacticsSchema.optional(),
   availability: z.array(fullCourtAvailabilitySchema).max(12).optional(),
 });
 
@@ -144,6 +146,7 @@ export type FullCourtWorkerSeasonLock = z.infer<typeof fullCourtSeasonLockSchema
 
 const fullCourtSeasonSlotOptionsSchema = z.object({
   rotation: fullCourtRotationPlanInputSchema.optional(),
+  tactics: fullCourtTacticsSchema.optional(),
   restingPlayerIds: z.array(z.string().min(1).max(64)).max(12).optional(),
   acceptForfeit: z.boolean().optional(),
   record: z.boolean().optional(),

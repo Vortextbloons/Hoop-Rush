@@ -22,6 +22,7 @@ export {
   startFullCourtPlayoffs,
   type FullCourtPlayoffRepository,
 } from './playoffs.ts';
+export { saveFullCourtCoaching } from './coaching.ts';
 
 export interface FullCourtDraftRepository {
   load(runId: string): Promise<FullCourtDraftState | null>;

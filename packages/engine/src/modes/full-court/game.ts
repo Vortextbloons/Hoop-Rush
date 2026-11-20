@@ -1,5 +1,6 @@
 import type {
   EraSimulationProfile,
+  FullCourtTactics,
   PlayerDiagnostics,
   Seed,
   SimulationPlayer,
@@ -45,6 +46,14 @@ import {
   type FullCourtRotationUnit,
   type FullCourtSubstitutionReason,
 } from './rotation.ts';
+import {
+  applyFullCourtTacticsToPrep,
+  fullCourtPaceMultiplier,
+  fullCourtPressureEnergyScale,
+  fullCourtProfiledPace,
+  fullCourtTacticsEffects,
+  resolveFullCourtTactics,
+} from './tactics.ts';
 
 export {
   FULL_COURT_CLOSING_MARGIN,
@@ -107,6 +116,8 @@ export interface FullCourtTeamGameInput {
   readonly rotation?: FullCourtRotationPlanInput;
   /** Pregame availability, starting energy, and stamina from the health system. */
   readonly availability?: readonly FullCourtAvailabilityEntry[];
+  /** Optional per-game tactics; balanced settings leave the prepared game unchanged. */
+  readonly tactics?: FullCourtTactics;
 }
 
 export interface FullCourtGameInput {
@@ -290,6 +301,8 @@ class RotationRuntime {
   lineup: LineupState;
   private stint: StintRecord;
   private readonly profile: EraSimulationProfile;
+  readonly tactics: FullCourtTactics;
+  private readonly opponentDefense: FullCourtTactics['defense'];
   private readonly playerCache: Array<Map<number, SimulationPlayer>>;
   private readonly prepCache = new Map<number, LineupState>();
 
@@ -299,12 +312,16 @@ class RotationRuntime {
     teamId: string,
     displayName: string,
     profile: EraSimulationProfile,
+    tactics: FullCourtTactics,
+    opponentDefense: FullCourtTactics['defense'],
   ) {
     this.plan = plan;
     this.side = side;
     this.teamId = teamId;
     this.displayName = displayName;
     this.profile = profile;
+    this.tactics = tactics;
+    this.opponentDefense = opponentDefense;
     this.slots = [...plan.startingSlots];
     this.energy = [...plan.startingEnergy];
     this.playedSeconds = plan.roster.map(() => 0);
@@ -351,10 +368,17 @@ class RotationRuntime {
       displayName: this.displayName,
       players,
     };
+    const prep = applyFullCourtTacticsToPrep(
+      prepareTeam(team, this.profile),
+      players,
+      this.profile,
+      this.tactics,
+      this.opponentDefense,
+    );
     const lineup: LineupState = {
       players,
       team,
-      prep: prepareTeam(team, this.profile),
+      prep,
       units: this.slots.map((index) => this.plan.playerKeys[index] ?? ''),
       key,
     };
@@ -478,9 +502,30 @@ export function runFullCourtGame(
     input.away.rotation ?? {},
     input.away.availability ?? [],
   );
-  const profile = input.profile;
-  const home = new RotationRuntime(homePlan, 0, input.home.teamId, input.home.displayName, profile);
-  const away = new RotationRuntime(awayPlan, 1, input.away.teamId, input.away.displayName, profile);
+  const homeTactics = resolveFullCourtTactics(input.home.tactics);
+  const awayTactics = resolveFullCourtTactics(input.away.tactics);
+  const profile = fullCourtProfiledPace(
+    input.profile,
+    fullCourtPaceMultiplier([homeTactics, awayTactics]),
+  );
+  const home = new RotationRuntime(
+    homePlan,
+    0,
+    input.home.teamId,
+    input.home.displayName,
+    profile,
+    homeTactics,
+    awayTactics.defense,
+  );
+  const away = new RotationRuntime(
+    awayPlan,
+    1,
+    input.away.teamId,
+    input.away.displayName,
+    profile,
+    awayTactics,
+    homeTactics.defense,
+  );
 
   const recorder = new GameRecorder([homePlan.roster.length, awayPlan.roster.length]);
   recorder.setActiveFive(0, home.slots);
@@ -489,7 +534,17 @@ export function runFullCourtGame(
   const possessionRng = context.rngFactory(fullCourtStreamSeed(input.seed, 'possession'));
   const tipRng = context.rngFactory(fullCourtStreamSeed(input.seed, 'tip'));
   const technicalRng = context.rngFactory(fullCourtStreamSeed(input.seed, 'technical'));
-  const effects = options.effects;
+  const tacticalEffects = fullCourtTacticsEffects(options.effects, [homeTactics, awayTactics]);
+  // The shared effects channel looks up player versions. Legacy rosters still use lineup tactics.
+  const effects =
+    tacticalEffects !== options.effects &&
+    [homePlan, awayPlan].some((plan) =>
+      plan.roster.some(
+        (player, index) => plan.available[index] && player.playerVersionId === undefined,
+      ),
+    )
+      ? options.effects
+      : tacticalEffects;
   const ctx: TripContext = createTripContext(
     possessionRng,
     recorder,
@@ -690,6 +745,7 @@ function chargeTime(
   for (const runtime of runtimes) {
     let active = 0;
     for (const index of runtime.slots) active |= 1 << index;
+    const exertionSeconds = seconds * fullCourtPressureEnergyScale(runtime.tactics);
     for (let index = 0; index < runtime.plan.roster.length; index += 1) {
       const energy = runtime.energy[index] ?? 0;
       const stamina = runtime.plan.stamina[index];
@@ -698,7 +754,7 @@ function chargeTime(
       }
       const onCourt = (active & (1 << index)) !== 0;
       runtime.energy[index] = onCourt
-        ? drainedEnergy(energy, stamina, seconds)
+        ? drainedEnergy(energy, stamina, exertionSeconds)
         : recoveredEnergy(energy, seconds);
       if (!onCourt) continue;
       runtime.playedSeconds[index] = (runtime.playedSeconds[index] ?? 0) + seconds;

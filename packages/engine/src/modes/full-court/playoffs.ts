@@ -25,6 +25,7 @@ import type { EngineContext } from '../../sim/kernel.ts';
 import { CONFERENCE_OPENING_PAIRS } from '../cap-rush/conference-postseason.ts';
 import { finalsHomeCourtOf } from '../cap-rush/conference-standings.ts';
 import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
+import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
 import {
@@ -343,14 +344,8 @@ export function simulateFullCourtPlayoffGame(
       gameNumber: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM + checkpoint.games.length + 1,
       dataVersion: season.catalog.dataVersion,
       profile: season.profile,
-      home:
-        side === 'home' && options.rotation !== undefined
-          ? { ...home, rotation: options.rotation }
-          : home,
-      away:
-        side === 'away' && options.rotation !== undefined
-          ? { ...away, rotation: options.rotation }
-          : away,
+      home: side === 'home' ? withFullCourtCoaching(home, options) : home,
+      away: side === 'away' ? withFullCourtCoaching(away, options) : away,
     },
     fixture.dayOffset,
     context,

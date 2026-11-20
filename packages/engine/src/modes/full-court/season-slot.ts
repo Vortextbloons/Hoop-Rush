@@ -11,12 +11,14 @@ import {
   seedSchema,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
+  type FullCourtTactics,
   type FullCourtHealthProfileSet,
   type Seed,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION } from '../../sim/constants.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { validateCapRushLeagueSchedule } from '../cap-rush/league-schedule.ts';
+import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, FULL_COURT_SEED_VERSION } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
 import { FULL_COURT_INJURY_VERSION } from './injuries.ts';
@@ -32,6 +34,7 @@ export interface FullCourtSeasonLock {
 
 export interface FullCourtSeasonSlotOptions {
   readonly rotation?: FullCourtRotationPlanInput;
+  readonly tactics?: FullCourtTactics;
   readonly restingPlayerIds?: readonly string[];
   readonly acceptForfeit?: boolean;
   readonly record?: boolean;
@@ -193,10 +196,9 @@ export function simulateFullCourtSeasonSlot(
   }
   function play(fixture: FullCourtLeagueGame, isUserGame: boolean) {
     const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
-    const game =
-      isUserGame && options.rotation !== undefined
-        ? { ...input, [userSide]: { ...input[userSide], rotation: options.rotation } }
-        : input;
+    const game = isUserGame
+      ? { ...input, [userSide]: withFullCourtCoaching(input[userSide], options) }
+      : input;
     return runFullCourtGameWithHealth(game, fixture.dayOffset, context, {
       health: {
         home: checkpoint.healthByTeam[fixture.homeTeamId],

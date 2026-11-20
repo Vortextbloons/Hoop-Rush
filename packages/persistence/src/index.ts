@@ -24,3 +24,8 @@ export {
 export * from './schemas/full-court-season-record.ts';
 export { createFullCourtPlayoffRepository } from './repositories/full-court-playoffs.ts';
 export * from './schemas/full-court-playoff-record.ts';
+export {
+  DexieFullCourtCoachingRepository,
+  createFullCourtCoachingRepository,
+} from './repositories/full-court-coaching.ts';
+export * from './schemas/full-court-coaching-record.ts';

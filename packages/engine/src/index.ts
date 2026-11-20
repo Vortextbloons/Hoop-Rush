@@ -359,6 +359,10 @@ export {
 } from './modes/full-court/draft-economy.ts';
 export { fullCourtStateDigest } from './modes/full-court/state-digest.ts';
 export {
+  assertFullCourtCoachingRoster,
+  defaultFullCourtCoachingRotation,
+} from './modes/full-court/coaching.ts';
+export {
   simulateFullCourtGame,
   simulateRecordedFullCourtGame,
   type FullCourtGameInput,

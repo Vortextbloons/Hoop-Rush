@@ -19,7 +19,7 @@ Record-level schemas live here; domain schemas live in
 - **Storage namespace**: the database is `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `src/repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; do not add upgrade
-  hooks for it. Database versions 15 through 18 upgrade additively to version 19
+  hooks for it. Database versions 15 through 19 upgrade additively to version 20
   without clearing records. Databases older than version 15 reset all
   local saves, history, and profiles during upgrade. Do not restore historical
   migrations.
@@ -30,7 +30,8 @@ Record-level schemas live here; domain schemas live in
   checkpoint's next slot and lock digest to match, and it validates unique
   fixtures plus 30 advancing health rows before writing. Postseason checkpoint
   rows in `fullCourtPlayoffs` advance one game at a time and save playoff scores
-  and health together.
+  and health together. Per-run coaching settings live in `fullCourtCoaching`
+  (key `runId`) as a validated `FullCourtCoachingPlan`.
 - **Record envelopes**: every stored record carries its domain
   `saveSchemaVersion`. Readers raise unsupported-version errors through the
   mode's load error; never silently delete or rewrite a record on read.

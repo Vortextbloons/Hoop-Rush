@@ -1,13 +1,16 @@
 import {
   advanceFullCourtPlayoffs,
   advanceFullCourtSeasonSlot,
+  saveFullCourtCoaching,
   startFullCourtPlayoffs,
   startFullCourtSeason,
   submitFullCourtDraftCommand,
 } from '@hoop-rush/application/full-court';
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
+  FULL_COURT_DEFAULT_COACHING_PLAN,
   idSchema,
+  type FullCourtCoachingPlan,
   type FullCourtCommand,
   type FullCourtDraftState,
   type FullCourtSeasonCheckpoint,
@@ -15,6 +18,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   buildFullCourtRegularSeason,
+  assertFullCourtCoachingRoster,
   fullCourtDraftIndexOf,
   fullCourtPlayoffView,
   lockFullCourtRegularSeason,
@@ -32,6 +36,7 @@ interface SeasonState {
   lock: FullCourtSeasonLock;
   checkpoint: FullCourtSeasonCheckpoint;
   scores: readonly FullCourtSeasonScore[];
+  coaching: FullCourtCoachingPlan;
 }
 
 type PlayoffState = Awaited<ReturnType<typeof startFullCourtPlayoffs>>;
@@ -121,6 +126,24 @@ export class FullCourtController {
     if (this.simulating) this.stopRequested = true;
   }
 
+  async saveCoaching(plan: FullCourtCoachingPlan): Promise<boolean> {
+    let saved = false;
+    await this.#act(async () => {
+      const season = this.season;
+      if (season === null) return;
+      const coaching = await saveFullCourtCoaching(
+        { command: 'set-full-court-coaching', runId: season.lock.season.runId, plan },
+        season.lock,
+        this.#repositories.fullCourtCoachingRepository,
+      );
+      if (this.#isDisposed()) return;
+      this.season = { ...season, coaching };
+      this.pendingForfeit = false;
+      saved = true;
+    });
+    return saved;
+  }
+
   advance(count: number, acceptForfeit = false): Promise<void> {
     return this.#act(async () => {
       if (this.season === null) return;
@@ -128,9 +151,13 @@ export class FullCourtController {
       const worker = (this.#worker ??= createFullCourtWorkerRunner());
       const regular = this.#repositories.fullCourtSeasonRepository;
       const playoffsRepo = this.#repositories.fullCourtPlayoffRepository;
-      const { lock } = this.season;
+      const { lock, coaching } = this.season;
       for (let step = 0; step < count && !this.#isDisposed() && !this.stopRequested; step++) {
-        const options = { acceptForfeit: step === 0 && acceptForfeit };
+        const options = {
+          acceptForfeit: step === 0 && acceptForfeit,
+          rotation: coaching.rotation,
+          tactics: coaching.tactics,
+        };
         const playoffs: PlayoffState | null = this.playoffs;
         const current: SeasonState = this.season;
         const outcome: AdvanceOutcome = playoffs
@@ -148,7 +175,7 @@ export class FullCourtController {
           case 'simulated':
             if ('scores' in outcome) {
               this.season = {
-                lock,
+                ...current,
                 checkpoint: outcome.checkpoint,
                 scores: [...current.scores, ...outcome.scores],
               };
@@ -203,7 +230,14 @@ export class FullCourtController {
       this.season?.lock.season.runId === runId
         ? this.season.lock
         : lockFullCourtRegularSeason(buildFullCourtRegularSeason({ ...this.#assets, draft }));
-    const checkpoint = await startFullCourtSeason(lock, regular);
+    const [checkpoint, savedCoaching] = await Promise.all([
+      startFullCourtSeason(lock, regular),
+      this.#repositories.fullCourtCoachingRepository.load(runId),
+    ]);
+    const coaching = savedCoaching ?? FULL_COURT_DEFAULT_COACHING_PLAN;
+    const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
+    if (userTeam === undefined) throw new Error('The Full Court roster is unavailable.');
+    assertFullCourtCoachingRoster(coaching, userTeam.roster);
     const scores = (await regular.listScores(runId)).filter(
       (score) => score.slot <= checkpoint.completedThroughSlot,
     );
@@ -212,7 +246,7 @@ export class FullCourtController {
         ? await this.#repositories.fullCourtPlayoffRepository.load(runId)
         : null;
     if (this.#isDisposed()) return;
-    this.season = { lock, checkpoint, scores };
+    this.season = { lock, checkpoint, scores, coaching };
     if (playoffSave === null) this.playoffs = null;
     else await this.#openPlayoffs(lock);
   }
