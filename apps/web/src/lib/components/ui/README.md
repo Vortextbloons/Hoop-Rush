@@ -21,7 +21,11 @@ repeating button, panel, badge, and segmented-control markup.
 | `StatGrid.svelte`         | `<dl>` of stat tiles                 | `columns` is the desktop count, `mobile` the small-screen count. Put `StatTile` children inside.                                     |
 | `StatTile.svelte`         | `<dt>`/`<dd>` pair                   | `label`, `value`, `note`, `size`, `tone`, and `surface="tile"` for a bordered card. A default snippet overrides the value.           |
 | `Alert.svelte`            | inline notice                        | Tones `info`, `success`, `warning`, `danger` set the colour and `role`. Optional `title`, `icon`, and `actions` snippets.            |
-| `EmptyState.svelte`       | empty result block                   | `title`, `message`, optional `actions`. Use `surface="none"` inline inside an existing panel.                                        |
+| `EmptyState.svelte`       | empty/loading/error block            | `title`, `message`, optional `actions`. `kind="loading \| error"` adds status/alert semantics; `error` accepts `retry` and `retryLabel`, and focuses itself unless `focusOnError={false}`. Use `surface="none"` inline inside an existing panel. |
+| `LoadingState.svelte`     | loading block                        | `variant="text \| skeleton"`, optional `title`, `message`, and skeleton `lines`. Announces as `role="status"`.                         |
+| `ActionRow.svelte`        | action cluster                       | `primary`, `secondary`, and `tertiary` snippets in one wrapping row. Use for play again / history / full report clusters.            |
+| `Disclosure.svelte`       | native `<details>`                   | `summary`, optional `meta` and `open`; body is the default snippet. Keyboard behaviour comes from `<details>`/`<summary>`.             |
+| `ModeCard.svelte`         | mode/format selection card           | `title`, `description`, `cta`, optional `imageSrc`, `facts`, `progress`. Renders an `<a>` with `href`, a `<button>` with `onclick`, otherwise a `<div>`; `disabled` and `selected` are visual states. |
 
 `types.ts` exports the shared `ButtonTone`, `ButtonSize`, and `BadgeTone`
 unions. Prefer the typed variants over passing one-off color classes.
@@ -125,6 +129,24 @@ section unstyled inside an existing mode panel.
 `PlayerStatsControls.svelte` is the controls-only form for modes that supply
 their own table or box score, such as the Havoc championship:
 `<PlayerStatsControls valuesLabel="Season values" {values} {onvalueschange} />`.
+
+## Result screens
+
+`src/lib/components/screens/` holds the shared final-report frame. Modes keep
+their data selection, labels, and formatting; the shells only arrange markup.
+Every component forwards `class` and arbitrary attributes to its root.
+
+| Component              | Renders                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `ResultScreen.svelte`  | Eyebrow, title, optional `badges`/`hero`/`actions` snippets, body children, and a `footer` snippet.            |
+| `ResultHero.svelte`    | Large score with `tone="default \| champion \| defeat"`, optional `caption`, `meta`, `secondary`, and `badges`. |
+| `MvpCard.svelte`       | Player name, team, slot, up to four stats, optional `portrait` snippet, and `emptyCopy` when no player exists.  |
+| `ComparisonTable.svelte` | `rows` of `{ label, left, right, note?, highlight?, bold? }` with configurable column labels.                |
+| `ScheduleGrid.svelte`  | Schedule cells (`upcoming \| win \| loss \| neutral`) with optional selection; `onselect(key)` fires.          |
+| `BoxScorePanel.svelte` | Team scores plus optional per-period table; the default snippet holds the mode's own stat columns.             |
+| `SeriesRecap.svelte`   | Per-game score rows with W/L, optional OT flag and standout line; `onselect(gameNumber)` fires.                |
+
+Types for the shared row/cell shapes live in `ui/types.ts`.
 
 ## Theming
 
