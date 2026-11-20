@@ -566,60 +566,6 @@
   </Panel>
 
   <div class="grid gap-4">
-    <Panel as="section" padding="md" aria-label="Cap status and applied penalties">
-      <SectionHeading eyebrow="Payroll impact" title="Cap status" level={3} align="start">
-        {#snippet actions()}
-          <Badge tone={capTone(report.payrollStatus)}>{capStatusLabel(report.payrollStatus)}</Badge>
-        {/snippet}
-      </SectionHeading>
-      <Panel padding="sm" class="mt-4">
-        <p class="ui-micro font-bold">Applied penalties</p>
-        <p class="mt-1 text-sm font-bold">{apronPenaltyTitle(report.payrollStatus)}</p>
-        {#if report.payrollStatus === 'first-apron' || report.payrollStatus === 'second-apron'}
-          <p class="mt-1 text-xs text-muted-foreground">
-            Intercepted passes are not included in season effect totals.
-          </p>
-        {/if}
-        {#if penaltyRows.length > 0}
-          <dl class="mt-3 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            {#each penaltyRows as row (row.label)}
-              <div class="flex items-center justify-between gap-3 border-t border-line-soft py-2">
-                <dt class="text-xs font-semibold">{row.label}</dt>
-                <dd
-                  class="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary tabular-nums"
-                >
-                  &minus;{row.reduction}
-                </dd>
-              </div>
-            {/each}
-          </dl>
-        {/if}
-      </Panel>
-      {#if report.apronTriggers.isolations > 0 || report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
-        <div class="mt-4">
-          <p class="ui-label" data-tone="muted">Season effects</p>
-          <StatGrid class="mt-2" columns={2} mobile={1}>
-            {#if report.apronTriggers.isolations > 0}
-              <StatTile
-                label="Forced isolations"
-                size="lg"
-                surface="tile"
-                value={report.apronTriggers.isolations.toLocaleString()}
-              />
-            {/if}
-            {#if report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
-              <StatTile
-                label="Defensive strikes"
-                size="lg"
-                surface="tile"
-                value={report.apronTriggers.strikes.toLocaleString()}
-              />
-            {/if}
-          </StatGrid>
-        </div>
-      {/if}
-    </Panel>
-
     {#if report.variant === 'roulette'}
       <Disclosure summary="Mutation spin" meta="The wild card" aria-label="Cap Roulette spin">
         {#if spins.length === 0}
@@ -739,6 +685,60 @@
           </PlayerStatsTable>
         </div>
       </BoxScorePanel>
+    {/if}
+  </Panel>
+
+  <Panel as="section" padding="md" aria-label="Cap status and applied penalties">
+    <SectionHeading eyebrow="Payroll impact" title="Cap status" level={3} align="start">
+      {#snippet actions()}
+        <Badge tone={capTone(report.payrollStatus)}>{capStatusLabel(report.payrollStatus)}</Badge>
+      {/snippet}
+    </SectionHeading>
+    <div class="mt-4 border-t border-line-soft pt-3">
+      <p class="ui-micro font-bold">Applied penalties</p>
+      <p class="mt-1 text-sm font-bold">{apronPenaltyTitle(report.payrollStatus)}</p>
+      {#if report.payrollStatus === 'first-apron' || report.payrollStatus === 'second-apron'}
+        <p class="mt-1 text-xs text-muted-foreground">
+          Intercepted passes are not included in season effect totals.
+        </p>
+      {/if}
+      {#if penaltyRows.length > 0}
+        <dl class="mt-3 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+          {#each penaltyRows as row (row.label)}
+            <div class="flex items-center justify-between gap-3 border-t border-line-soft py-2">
+              <dt class="text-xs font-semibold">{row.label}</dt>
+              <dd
+                class="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary tabular-nums"
+              >
+                &minus;{row.reduction}
+              </dd>
+            </div>
+          {/each}
+        </dl>
+      {/if}
+    </div>
+    {#if report.apronTriggers.isolations > 0 || report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
+      <div class="mt-4">
+        <p class="ui-label" data-tone="muted">Season effects</p>
+        <StatGrid class="mt-2" columns={2} mobile={1}>
+          {#if report.apronTriggers.isolations > 0}
+            <StatTile
+              label="Forced isolations"
+              size="lg"
+              surface="tile"
+              value={report.apronTriggers.isolations.toLocaleString()}
+            />
+          {/if}
+          {#if report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
+            <StatTile
+              label="Defensive strikes"
+              size="lg"
+              surface="tile"
+              value={report.apronTriggers.strikes.toLocaleString()}
+            />
+          {/if}
+        </StatGrid>
+      </div>
     {/if}
   </Panel>
 </ResultScreen>
