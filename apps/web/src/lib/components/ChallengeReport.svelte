@@ -23,6 +23,7 @@
   import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
   import type { SandboxHref } from '#lib/sandbox-url.js';
   import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
@@ -139,91 +140,33 @@
       index,
     }));
   });
-  const seasonStatsColumns = $derived.by((): readonly PlayerStatColumn<SeasonStatsRow>[] => {
-    return [
+  const seasonStatsColumns = $derived.by((): readonly PlayerStatColumn<SeasonStatsRow>[] =>
+    seasonStatColumns<SeasonStatsRow>(
       {
-        key: 'points',
-        label: 'PTS',
-        value: (row) => formatAggregateStat(row.aggregate.points),
-        cellClass: 'font-bold',
-      },
-      {
-        key: 'fieldGoalsAttempted',
-        label: 'FGA',
-        value: (row) => formatAggregateStat(row.aggregate.fieldGoals.attempted),
-      },
-      {
-        key: 'fieldGoalPct',
-        label: 'FG%',
-        value: (row) => ratioPct(row.raw.fieldGoals.made, row.raw.fieldGoals.attempted),
-      },
-      {
-        key: 'threesAttempted',
-        label: '3PA',
-        value: (row) => formatAggregateStat(row.aggregate.threes.attempted),
-      },
-      {
-        key: 'threePointPct',
-        label: '3P%',
-        value: (row) => ratioPct(row.raw.threes.made, row.raw.threes.attempted),
-      },
-      {
-        key: 'freeThrowsAttempted',
-        label: 'FTA',
-        value: (row) => formatAggregateStat(row.aggregate.freeThrows.attempted),
-      },
-      {
-        key: 'freeThrowPct',
-        label: 'FT%',
-        value: (row) => ratioPct(row.raw.freeThrows.made, row.raw.freeThrows.attempted),
-      },
-      {
-        key: 'trueShootingPct',
-        label: 'TS%',
-        value: (row) =>
+        points: (row) => formatAggregateStat(row.aggregate.points),
+        rebounds: (row) => formatAggregateStat(row.aggregate.rebounds.total),
+        assists: (row) => formatAggregateStat(row.aggregate.assists),
+        steals: (row) => formatAggregateStat(row.aggregate.steals),
+        blocks: (row) => formatAggregateStat(row.aggregate.blocks),
+        turnovers: (row) => formatAggregateStat(row.aggregate.turnovers),
+        fgPct: (row) => ratioPct(row.raw.fieldGoals.made, row.raw.fieldGoals.attempted),
+        threePct: (row) => ratioPct(row.raw.threes.made, row.raw.threes.attempted),
+        ftPct: (row) => ratioPct(row.raw.freeThrows.made, row.raw.freeThrows.attempted),
+        tsPct: (row) =>
           trueShootingPct(
             row.raw.points,
             row.raw.fieldGoals.attempted,
             row.raw.freeThrows.attempted,
           ),
+        usagePct: (row) => usagePct(row.raw, aggregates!.team),
+        fgAttempts: (row) => formatAggregateStat(row.aggregate.fieldGoals.attempted),
+        threeAttempts: (row) => formatAggregateStat(row.aggregate.threes.attempted),
+        ftAttempts: (row) => formatAggregateStat(row.aggregate.freeThrows.attempted),
+        threeMade: (row) => formatAggregateStat(row.aggregate.threes.made),
       },
-      {
-        key: 'usagePct',
-        label: 'USG%',
-        value: (row) => usagePct(row.raw, aggregates!.team),
-      },
-      {
-        key: 'rebounds',
-        label: 'REB',
-        value: (row) => formatAggregateStat(row.aggregate.rebounds.total),
-      },
-      {
-        key: 'assists',
-        label: 'AST',
-        value: (row) => formatAggregateStat(row.aggregate.assists),
-      },
-      {
-        key: 'steals',
-        label: 'STL',
-        value: (row) => formatAggregateStat(row.aggregate.steals),
-      },
-      {
-        key: 'blocks',
-        label: 'BLK',
-        value: (row) => formatAggregateStat(row.aggregate.blocks),
-      },
-      {
-        key: 'turnovers',
-        label: 'TOV',
-        value: (row) => formatAggregateStat(row.aggregate.turnovers),
-      },
-      {
-        key: 'threesAttemptedPerGame',
-        label: '3PA/G',
-        value: (row) => perGameValue(row.raw.threes.attempted, row.raw.gamesPlayed),
-      },
-    ];
-  });
+      { includeDetailed: true },
+    ),
+  );
   const gamesPlayed = $derived(Math.max(1, record?.gamesPlayed ?? run.games.length));
   const opponentPoints = $derived(
     run.games.reduce((total, game) => total + game.away.box.points, 0),

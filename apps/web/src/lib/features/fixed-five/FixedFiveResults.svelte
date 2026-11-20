@@ -11,6 +11,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
   import type {
@@ -119,88 +120,38 @@
     if (attempted <= 0) return '—';
     return `${((made / attempted) * 100).toFixed(1)}%`;
   }
-  const statsColumns: readonly PlayerStatColumn<StatsRow>[] = [
-    {
-      key: 'minutes',
-      label: 'MIN',
-      value: (row) => (row.line ? statValue(row.line.minutes, row.line.games) : '—'),
-    },
-    {
-      key: 'points',
-      label: 'PTS',
-      value: (row) => (row.line ? statValue(row.line.points, row.line.games) : '—'),
-      cellClass: 'ui-stats-value-strong',
-    },
-    {
-      key: 'fieldGoalPct',
-      label: 'FG%',
-      value: (row) =>
-        row.line ? pctStr(row.line.fieldGoalsMade, row.line.fieldGoalsAttempted) : '—',
-    },
-    {
-      key: 'threePointPct',
-      label: '3P%',
-      value: (row) => (row.line ? pctStr(row.line.threesMade, row.line.threesAttempted) : '—'),
-    },
-    {
-      key: 'freeThrowPct',
-      label: 'FT%',
-      value: (row) =>
-        row.line ? pctStr(row.line.freeThrowsMade, row.line.freeThrowsAttempted) : '—',
-    },
-    {
-      key: 'rebounds',
-      label: 'REB',
-      value: (row) => (row.line ? statValue(row.line.rebounds, row.line.games) : '—'),
-    },
-    {
-      key: 'assists',
-      label: 'AST',
-      value: (row) => (row.line ? statValue(row.line.assists, row.line.games) : '—'),
-    },
-    {
-      key: 'steals',
-      label: 'STL',
-      value: (row) => (row.line ? statValue(row.line.steals, row.line.games) : '—'),
-    },
-    {
-      key: 'blocks',
-      label: 'BLK',
-      value: (row) => (row.line ? statValue(row.line.blocks, row.line.games) : '—'),
-    },
-    {
-      key: 'turnovers',
-      label: 'TOV',
-      value: (row) => (row.line ? statValue(row.line.turnovers, row.line.games) : '—'),
-    },
-    {
-      key: 'trueShootingPct',
-      label: 'TS%',
-      value: (row) =>
-        row.line
-          ? trueShootingPct(
-              row.line.points,
+  const statsColumns: readonly PlayerStatColumn<StatsRow>[] = seasonStatColumns<StatsRow>({
+    points: (row) => (row.line ? statValue(row.line.points, row.line.games) : '—'),
+    rebounds: (row) => (row.line ? statValue(row.line.rebounds, row.line.games) : '—'),
+    assists: (row) => (row.line ? statValue(row.line.assists, row.line.games) : '—'),
+    steals: (row) => (row.line ? statValue(row.line.steals, row.line.games) : '—'),
+    blocks: (row) => (row.line ? statValue(row.line.blocks, row.line.games) : '—'),
+    turnovers: (row) => (row.line ? statValue(row.line.turnovers, row.line.games) : '—'),
+    fgPct: (row) =>
+      row.line ? pctStr(row.line.fieldGoalsMade, row.line.fieldGoalsAttempted) : '—',
+    threePct: (row) => (row.line ? pctStr(row.line.threesMade, row.line.threesAttempted) : '—'),
+    ftPct: (row) =>
+      row.line ? pctStr(row.line.freeThrowsMade, row.line.freeThrowsAttempted) : '—',
+    tsPct: (row) =>
+      row.line
+        ? trueShootingPct(
+            row.line.points,
+            row.line.fieldGoalsAttempted,
+            row.line.freeThrowsAttempted,
+          )
+        : '—',
+    usagePct: (row) =>
+      row.line
+        ? usagePct(
+            usagePossessions(
               row.line.fieldGoalsAttempted,
               row.line.freeThrowsAttempted,
-            )
-          : '—',
-    },
-    {
-      key: 'usagePct',
-      label: 'USG%',
-      value: (row) =>
-        row.line
-          ? usagePct(
-              usagePossessions(
-                row.line.fieldGoalsAttempted,
-                row.line.freeThrowsAttempted,
-                row.line.turnovers,
-              ),
-              statsTeamUsage,
-            )
-          : '—',
-    },
-  ];
+              row.line.turnovers,
+            ),
+            statsTeamUsage,
+          )
+        : '—',
+  });
   const modeLabel = $derived(mode === 'duel' ? 'Duel · Best of 7' : 'Season · 82 games');
   const modeDetailLabel = $derived(modeDetail ?? modeLabel);
   const youWon = $derived(

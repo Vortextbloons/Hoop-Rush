@@ -25,6 +25,7 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import type { ComparisonRow, SeriesRecapGame } from '#lib/components/ui/types.js';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import { initialsOf } from '#lib/branding.js';
   import {
@@ -416,71 +417,24 @@
     return statsTotals ? String(value) : (value / Math.max(1, gamesPlayed)).toFixed(1);
   }
 
-  const statsColumns: readonly PlayerStatColumn<PlayerAggregate>[] = [
-    { key: 'games', label: 'GP', value: (row) => row.games },
-    {
-      key: 'minutes',
-      label: 'MIN',
-      value: (row) => statValue(row.minutes, row.games),
-      hideBelow: 'sm',
-    },
-    {
-      key: 'points',
-      label: 'PTS',
-      value: (row) => statValue(row.points, row.games),
-      cellClass: 'ui-stats-value-strong',
-    },
-    { key: 'rebounds', label: 'REB', value: (row) => statValue(row.rebounds, row.games) },
-    { key: 'assists', label: 'AST', value: (row) => statValue(row.assists, row.games) },
-    {
-      key: 'steals',
-      label: 'STL',
-      value: (row) => statValue(row.steals, row.games),
-      hideBelow: 'sm',
-    },
-    {
-      key: 'blocks',
-      label: 'BLK',
-      value: (row) => statValue(row.blocks, row.games),
-      hideBelow: 'sm',
-    },
-    {
-      key: 'turnovers',
-      label: 'TOV',
-      value: (row) => statValue(row.turnovers, row.games),
-      hideBelow: 'sm',
-    },
-    {
-      key: 'fieldGoalPct',
-      label: 'FG',
-      value: (row) => ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts),
-    },
-    {
-      key: 'threePointPct',
-      label: '3P',
-      value: (row) => ratioPct(row.threeMakes, row.threeAttempts),
-    },
-    {
-      key: 'freeThrowPct',
-      label: 'FT',
-      value: (row) => ratioPct(row.freeThrowMakes, row.freeThrowAttempts),
-      hideBelow: 'sm',
-    },
-    {
-      key: 'trueShootingPct',
-      label: 'TS%',
-      value: (row) => trueShootingPct(row.points, row.fieldGoalAttempts, row.freeThrowAttempts),
-    },
-    {
-      key: 'usagePct',
-      label: 'USG%',
-      value: (row) =>
+  const statsColumns: readonly PlayerStatColumn<PlayerAggregate>[] =
+    seasonStatColumns<PlayerAggregate>({
+      points: (row) => statValue(row.points, row.games),
+      rebounds: (row) => statValue(row.rebounds, row.games),
+      assists: (row) => statValue(row.assists, row.games),
+      steals: (row) => statValue(row.steals, row.games),
+      blocks: (row) => statValue(row.blocks, row.games),
+      turnovers: (row) => statValue(row.turnovers, row.games),
+      fgPct: (row) => ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts),
+      threePct: (row) => ratioPct(row.threeMakes, row.threeAttempts),
+      ftPct: (row) => ratioPct(row.freeThrowMakes, row.freeThrowAttempts),
+      tsPct: (row) => trueShootingPct(row.points, row.fieldGoalAttempts, row.freeThrowAttempts),
+      usagePct: (row) =>
         usagePct(
           usagePossessions(row.fieldGoalAttempts, row.freeThrowAttempts, row.turnovers),
           statsTeamUsage,
         ),
-    },
-  ];
+    });
 
   const recap = $derived.by((): RecapGame[] => {
     const byGame = new Map<number, DraftDuelStandout[]>();

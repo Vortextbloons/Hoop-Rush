@@ -17,7 +17,7 @@
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { BadgeTone } from '#lib/components/ui/types.js';
-  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
@@ -145,51 +145,24 @@
     postseason: teamUsageOf(playoffRows),
   });
 
-  const statColumns: PlayerStatColumn<StatsRow>[] = [
-    { key: 'gamesPlayed', label: 'GP', value: (line) => line.gamesPlayed },
-    ...(
-      [
-        ['points', 'Pts'],
-        ['rebounds', 'Reb'],
-        ['assists', 'Ast'],
-        ['steals', 'Stl'],
-        ['blocks', 'Blk'],
-        ['turnovers', 'TO'],
-      ] as const
-    ).map(([key, label]) => ({
-      key,
-      label,
-      value: (line: CapRushPlayerSeasonLine) => formatAverage(line[key], line.gamesPlayed),
-      ...(key === 'points' ? { cellClass: 'font-bold' } : {}),
-    })),
-    ...(
-      [
-        ['fieldGoals', 'FG%', 'fieldGoalsMade', 'fieldGoalsAttempted'],
-        ['freeThrows', 'FT%', 'freeThrowsMade', 'freeThrowsAttempted'],
-        ['threes', '3P%', 'threesMade', 'threesAttempted'],
-      ] as const
-    ).map(([key, label, made, attempted]) => ({
-      key,
-      label,
-      value: (line: CapRushPlayerSeasonLine) =>
-        formatShootingPercentage(line[made], line[attempted]),
-    })),
-    {
-      key: 'trueShooting',
-      label: 'TS%',
-      value: (line: CapRushPlayerSeasonLine) =>
-        trueShootingPct(line.points, line.fieldGoalsAttempted, line.freeThrowsAttempted),
-    },
-    {
-      key: 'usage',
-      label: 'USG%',
-      value: (line) =>
-        usagePct(
-          usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
-          usageByPhase[line.phase],
-        ),
-    },
-  ];
+  const statColumns = seasonStatColumns<StatsRow>({
+    points: (line) => formatAverage(line.points, line.gamesPlayed),
+    rebounds: (line) => formatAverage(line.rebounds, line.gamesPlayed),
+    assists: (line) => formatAverage(line.assists, line.gamesPlayed),
+    steals: (line) => formatAverage(line.steals, line.gamesPlayed),
+    blocks: (line) => formatAverage(line.blocks, line.gamesPlayed),
+    turnovers: (line) => formatAverage(line.turnovers, line.gamesPlayed),
+    fgPct: (line) => formatShootingPercentage(line.fieldGoalsMade, line.fieldGoalsAttempted),
+    threePct: (line) => formatShootingPercentage(line.threesMade, line.threesAttempted),
+    ftPct: (line) => formatShootingPercentage(line.freeThrowsMade, line.freeThrowsAttempted),
+    tsPct: (line) =>
+      trueShootingPct(line.points, line.fieldGoalsAttempted, line.freeThrowsAttempted),
+    usagePct: (line) =>
+      usagePct(
+        usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
+        usageByPhase[line.phase],
+      ),
+  });
 
   function capTone(status: CapRushPayrollStatus): BadgeTone {
     if (status === 'under-cap') return 'positive';
@@ -240,7 +213,6 @@
           { label: 'PTS', value: mvp.averagePoints.toFixed(1) },
           { label: 'REB', value: mvp.averageRebounds.toFixed(1) },
           { label: 'AST', value: mvp.averageAssists.toFixed(1) },
-          { label: 'MVP score', value: mvp.mvpScore.toFixed(2) },
         ]}
     emptyCopy="No league MVP was recorded for this run."
   >
@@ -395,10 +367,6 @@
           {
             label: 'AST',
             value: formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games),
-          },
-          {
-            label: 'Game score',
-            value: formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games),
           },
         ]}
       >
