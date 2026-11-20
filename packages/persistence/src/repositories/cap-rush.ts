@@ -15,7 +15,6 @@ import type {
   Id,
 } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
   canonicalJson,
@@ -52,7 +51,6 @@ import {
   storedCapRushLeagueGameResultRowSchema,
   storedCapRushLeagueGameRowSchema,
   storedCapRushLeagueScoreRowSchema,
-  storedCapRushLegacyDraftRowSchema,
   storedCapRushLockedInputsRowSchema,
   storedCapRushPlaybackCursorRowSchema,
   storedCapRushPlaybackEvidenceRowSchema,
@@ -163,20 +161,26 @@ function asRunId(runId: string): Id {
   return runId as Id;
 }
 
-function readableSaveSchemaVersionOf(
-  row: unknown,
-): typeof CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION | typeof CAP_RUSH_SAVE_SCHEMA_VERSION {
+/**
+ * Only the current save schema is readable. Older runs are reported as
+ * unsupported so the player can abandon them; nothing is rewritten or deleted
+ * on read, and profile tables are never touched.
+ */
+function isReadableSaveSchemaVersion(row: unknown): boolean {
+  return saveSchemaVersionOf(row) === CAP_RUSH_SAVE_SCHEMA_VERSION;
+}
+
+function assertReadableSaveSchemaVersion(row: unknown): void {
   const version = saveSchemaVersionOf(row);
-  if (version !== CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION && version !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+  if (!isReadableSaveSchemaVersion(row)) {
     throw unsupported(
       `stored save schema ${version === null ? 'unknown' : String(version)} does not match current ${String(CAP_RUSH_SAVE_SCHEMA_VERSION)}`,
     );
   }
-  return version;
 }
 
 function parseStored<T>(schema: ParseableSchema<T>, row: unknown, label: string): T {
-  readableSaveSchemaVersionOf(row);
+  assertReadableSaveSchemaVersion(row);
   return parseRecord(schema, row, label, malformed);
 }
 
@@ -189,8 +193,6 @@ interface ActiveDraftEnvelope {
   readonly revision: number;
   readonly createdAtIso: string;
   readonly lockedDigest: string | null;
-  /** Version-3 rows carry the immutably locked subtree inline. */
-  readonly legacyLocked: CapRushLockedInputs | null;
 }
 
 const CAP_RUSH_LOCKED_INPUTS_DIGEST_PREFIX = 'cap-rush-locked-inputs-v1';
@@ -201,8 +203,8 @@ function capRushLockedInputsDigest(locked: CapRushLockedInputs): string {
 
 /**
  * Returns the stable format problems that older Cap Rush saves report as
- * unsupported rather than malformed. Applied to the inline version-3 draft
- * before parsing and to the hydrated version-4 draft after parsing.
+ * unsupported rather than malformed. Applied to the stored draft before parsing
+ * and to the hydrated draft after parsing.
  */
 function assertSupportedDraftFormat(
   draft: unknown,
@@ -263,19 +265,7 @@ export class DexieCapRushRepository {
   private async readActiveDraft(): Promise<CapRushDraftState | null> {
     const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
     if (row === undefined) return null;
-    const version = readableSaveSchemaVersionOf(row);
-    if (version === CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION) {
-      // Version 3 stores the whole draft, locked inputs included, inline. It is
-      // read-only compatible: the next accepted command rewrites it as version 4.
-      if (typeof row === 'object' && row !== null && 'draft' in row) {
-        assertSupportedDraftFormat((row as { draft?: unknown }).draft);
-      }
-      const parsed = parseStored(storedCapRushLegacyDraftRowSchema, row, 'active cap rush draft');
-      if (capRushStateDigest(parsed.draft) !== parsed.stateDigest) {
-        throw malformed('active cap rush draft digest does not match its state');
-      }
-      return parsed.draft;
-    }
+    assertReadableSaveSchemaVersion(row);
     if (typeof row === 'object' && row !== null && 'draft' in row) {
       // Version literals inside the draft would fail parsing as "malformed";
       // report the same stale-version cases as unsupported before that.
@@ -340,21 +330,6 @@ export class DexieCapRushRepository {
   private async readActiveDraftEnvelope(): Promise<ActiveDraftEnvelope | null> {
     const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
     if (row === undefined) return null;
-    const version = readableSaveSchemaVersionOf(row);
-    if (version === CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION) {
-      const parsed = parseStored(storedCapRushLegacyDraftRowSchema, row, 'active cap rush draft');
-      if (capRushStateDigest(parsed.draft) !== parsed.stateDigest) {
-        throw malformed('active cap rush draft digest does not match its state');
-      }
-      return {
-        runId: parsed.runId,
-        revision: parsed.revision,
-        createdAtIso: parsed.createdAtIso,
-        lockedDigest:
-          parsed.draft.locked === null ? null : this.digestOfLockedInputs(parsed.draft.locked),
-        legacyLocked: parsed.draft.locked,
-      };
-    }
     const parsed = parseStored(
       storedCapRushDraftProgressEnvelopeRowSchema,
       row,
@@ -365,15 +340,13 @@ export class DexieCapRushRepository {
       revision: parsed.revision,
       createdAtIso: parsed.createdAtIso,
       lockedDigest: parsed.draft.locked?.digest ?? null,
-      legacyLocked: null,
     };
   }
 
   /**
    * Writes the immutable locked inputs on the first lock and keeps their
-   * reference from then on. Version-3 saves migrate their inline subtree here
-   * on the first accepted command. A changed lock is rejected rather than
-   * silently replacing the inputs a season was simulated with.
+   * reference from then on. A changed lock is rejected rather than silently
+   * replacing the inputs a season was simulated with.
    */
   private async writeLockedInputsOnce(
     state: CapRushDraftState,
@@ -394,9 +367,7 @@ export class DexieCapRushRepository {
         active.lockedDigest === digest,
         'locked inputs changed after the lineup was locked',
       );
-      if (active.legacyLocked === null) {
-        return { runId: state.runId, digest };
-      }
+      return { runId: state.runId, digest };
     }
     await this.db.capRushLockedInputs.put(
       storedCapRushLockedInputsRowSchema.parse({
@@ -1086,7 +1057,11 @@ export class DexieCapRushRepository {
 
   async listHistory(): Promise<CapRushHistoryEntry[]> {
     const rows = await listCompletedHistory(this.db.capRushHistory, 'completedAtIso');
-    return rows.map((row) => this.historyEntryOf(row, 'cap rush history'));
+    // Runs written by an older save schema are abandoned: keep the list usable
+    // instead of failing on the first stale row.
+    return rows
+      .filter(isReadableSaveSchemaVersion)
+      .map((row) => this.historyEntryOf(row, 'cap rush history'));
   }
 
   async readReport(runId: string): Promise<CapRushReport | null> {

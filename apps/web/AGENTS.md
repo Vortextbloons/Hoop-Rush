@@ -46,6 +46,9 @@ imports engine, never the reverse.
 - `src/lib/modes/catalog.ts`: explicit typed registration for discovery,
   formats, routes, and lazy mode adapters. Settings schemas and IDs live in
   data-contracts. Keep mode-specific branches out of the shared lobby and shell.
+  Adding or retiring a mode follows the ordered cross-package checklist in
+  `Docs/architecture/mode-support.md`; retirement must not delete profile
+  achievement ids, Supabase migrations, or stored history rows.
 
 ## Worker boundaries
 

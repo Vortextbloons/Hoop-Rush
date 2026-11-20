@@ -7,7 +7,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_GAME_COUNT,
-  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
@@ -60,7 +59,6 @@ import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
   storedCapRushDraftProgressRowSchema,
   storedCapRushHistoryRowSchema,
-  storedCapRushLegacyDraftRowSchema,
 } from '../schemas/cap-rush-record.ts';
 import {
   CapRushCommandConflictError,
@@ -490,9 +488,7 @@ describe('cap rush repository', () => {
   it('rejects an old locked season without deleting the save', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('missing version-4 locked run');
-    }
+    if (!row) throw new Error('missing version-4 locked run');
     await db.capRushActive.put({
       ...row,
       draft: { ...row.draft, postseasonEligible: true },
@@ -504,9 +500,7 @@ describe('cap rush repository', () => {
   it('rejects an old postseason without deleting the save', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('missing version-4 locked run');
-    }
+    if (!row) throw new Error('missing version-4 locked run');
     await db.capRushActive.put({
       ...row,
       draft: { ...row.draft, postseason: { version: 'cap-rush-postseason-v1' } },
@@ -518,9 +512,7 @@ describe('cap rush repository', () => {
   it('recognizes an older rules version in a locked active run as unsupported', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('missing version-4 locked run');
-    }
+    if (!row) throw new Error('missing version-4 locked run');
     await db.capRushActive.put({
       ...row,
       draft: {
@@ -534,9 +526,7 @@ describe('cap rush repository', () => {
   it('recognizes an older salary curve in a locked active run as unsupported', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('missing version-4 locked run');
-    }
+    if (!row) throw new Error('missing version-4 locked run');
     await db.capRushActive.put({
       ...row,
       draft: {
@@ -830,9 +820,7 @@ describe('cap rush repository', () => {
     expect(lockedRow.locked).toEqual(run.state.locked);
 
     const active = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!active || active.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('missing version-4 progress row');
-    }
+    if (!active) throw new Error('missing version-4 progress row');
     expect(active.draft.locked).toEqual({
       runId: run.state.runId,
       digest: lockedRow.digest,
@@ -871,43 +859,24 @@ describe('cap rush repository', () => {
     await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'malformed' });
   });
 
-  it('resumes a version-3 active save and migrates it on the next accepted command', async () => {
+  it('reports a version-3 active save as unsupported and leaves profiles intact', async () => {
     const run = lockedRun();
-    await db.capRushActive.put(
-      storedCapRushLegacyDraftRowSchema.parse({
-        saveSchemaVersion: CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
-        recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-        runId: run.state.runId,
-        revision: run.state.revision,
-        stateDigest: capRushStateDigest(run.state),
-        draft: run.state,
-        createdAtIso: '2026-01-01T00:00:00.000Z',
-        updatedAtIso: '2026-01-01T00:00:00.000Z',
-      }),
-    );
-    expect(await db.capRushLockedInputs.count()).toBe(0);
-    expect(await repository.loadActiveDraft()).toEqual(run.state);
-
-    const bundle = acceptBundle(run.index, run.state, 1);
-    await repository.applyOutcome(
-      prepareCommandCommit({
-        outcome: { state: bundle.state, result: bundle.result },
-        command: bundle.command,
-        game: bundle.game,
-      }),
-    );
-
-    const active = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!active || active.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
-      throw new Error('expected the active row to migrate to version 4');
-    }
-    expect(active.draft.locked).toEqual({
+    await db.profiles.put({ id: 'profile-keep' } as never);
+    await db.capRushActive.put({
+      saveSchemaVersion: 3,
+      recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
       runId: run.state.runId,
-      digest: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown as string,
-    });
-    expect(await db.capRushLockedInputs.get(run.state.runId)).toBeDefined();
-    expect(await repository.loadActiveDraft()).toEqual(bundle.state);
-    expect(await repository.loadCommandResult(bundle.command.commandId)).toEqual(bundle.result);
+      revision: run.state.revision,
+      stateDigest: capRushStateDigest(run.state),
+      draft: run.state,
+      createdAtIso: '2026-01-01T00:00:00.000Z',
+      updatedAtIso: '2026-01-01T00:00:00.000Z',
+    } as never);
+
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
+    expect(await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID)).toBeDefined();
+    expect(await db.capRushLockedInputs.count()).toBe(0);
+    expect(await db.profiles.get('profile-keep')).toBeDefined();
   });
 
   it('lists league results from score rows without parsing boxes and backfills old saves', async () => {
@@ -1031,7 +1000,7 @@ describe('cap rush repository', () => {
     expect(await db.capRushLeagueResults.count()).toBe(0);
   });
 
-  it('orders history newest first across completed runs', async () => {
+  it('orders history newest first and skips runs from older save schemas', async () => {
     const rows = [
       { runId: 'run-older', completedAtIso: '2026-01-01T00:00:00.000Z', wins: 50, losses: 32 },
       { runId: 'run-newer', completedAtIso: '2026-03-01T00:00:00.000Z', wins: 82, losses: 0 },
@@ -1052,6 +1021,17 @@ describe('cap rush repository', () => {
         }),
       );
     }
+    await db.capRushHistory.put({
+      saveSchemaVersion: 3,
+      runId: 'run-legacy',
+      variant: 'clash',
+      payrollStatus: 'under-cap',
+      payrollDollars: 50_000_000,
+      wins: 10,
+      losses: 72,
+      perfectSeason: false,
+      completedAtIso: '2026-04-01T00:00:00.000Z',
+    } as never);
     const history = await repository.listHistory();
     expect(history.map((entry) => entry.runId as string)).toEqual([
       'run-newer',
@@ -1150,20 +1130,17 @@ describe('cap rush repository', () => {
         completedAt: null,
       },
     });
-    // Write the version-3 layout on purpose: finalizing must still accept an
-    // existing save and migrate it in the same transaction.
-    await db.capRushActive.put(
-      storedCapRushLegacyDraftRowSchema.parse({
-        saveSchemaVersion: CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
-        recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-        runId: completed.runId,
-        revision: completed.revision,
-        stateDigest: capRushStateDigest(completed),
-        draft: completed,
-        createdAtIso: '2026-04-01T00:00:00.000Z',
-        updatedAtIso: '2026-04-30T00:00:00.000Z',
-      }),
-    );
+    // Advance the stored progress row without committing 82 commands. The
+    // locked-input reference stays as written by the repository.
+    const active = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!active) throw new Error('missing version-4 active row');
+    await db.capRushActive.put({
+      ...active,
+      revision: completed.revision,
+      stateDigest: capRushStateDigest(completed),
+      draft: { ...completed, locked: active.draft.locked },
+      updatedAtIso: '2026-04-30T00:00:00.000Z',
+    });
     const completedAt = '2026-05-01T00:00:00.000Z';
     const finalize = capRushFinalizeSeasonCommandSchema.parse({
       command: 'finalize-cap-rush-season',

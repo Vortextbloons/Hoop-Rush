@@ -63,7 +63,6 @@ import {
   type StoredCapRushLeagueAggregateRow,
   type StoredCapRushLeagueGameRow,
   type StoredCapRushLeagueScoreRow,
-  type StoredCapRushLegacyDraftRow,
   type StoredCapRushLockedInputsRow,
   type StoredCapRushPlaybackCursorRow,
   type StoredCapRushPlaybackEvidenceRow,
@@ -218,10 +217,7 @@ export class HoopRushDatabase extends Dexie {
   havocMultiplayerResults!: Table<StoredHavocMultiplayerResultRow, [string, number]>;
   havocMultiplayerCompleted!: EntityTable<StoredHavocMultiplayerCompleted, 'roomId'>;
   havocMultiplayerHistory!: EntityTable<StoredHavocMultiplayerHistoryIndex, 'recordId'>;
-  capRushActive!: EntityTable<
-    StoredCapRushLegacyDraftRow | StoredCapRushDraftProgressRow,
-    'recordId'
-  >;
+  capRushActive!: EntityTable<StoredCapRushDraftProgressRow, 'recordId'>;
   capRushCommands!: EntityTable<StoredCapRushCommandRow, 'commandId'>;
   capRushGames!: Table<StoredCapRushGameRow, [string, number]>;
   capRushHistory!: EntityTable<StoredCapRushHistoryRow, 'runId'>;

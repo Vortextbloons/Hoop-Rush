@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   CAP_RUSH_GAME_COUNT,
-  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   capRushCommandResultSchema,
   capRushCommandSchema,
@@ -25,23 +24,13 @@ import {
 export const CAP_RUSH_ACTIVE_DRAFT_RECORD_ID = 'cap-rush-draft';
 const isoDateSchema = z.iso.datetime();
 
-/**
- * Save schema 3 remains readable for existing saves; every new record is
- * written with the current version. Keeping the union explicit (instead of
- * rewriting old rows on open) preserves "never rewrite a record on read".
- */
-const capRushReadableSaveSchemaVersionSchema = z.union([
-  z.literal(CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION),
-  z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
-]);
-
 export function capRushPlaybackGameKey(game: number | string): string {
   return typeof game === 'number' ? `regular:${String(game)}` : `playoff:${game}`;
 }
 
 export const storedCapRushPlaybackEvidenceRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameKey: z.string().min(1),
     playback: capRushPlaybackSchema,
@@ -61,7 +50,7 @@ export type StoredCapRushPlaybackEvidenceRow = z.infer<
 
 export const storedCapRushPlaybackCursorRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameKey: z.string().min(1),
     cursor: z.number().int().nonnegative(),
@@ -74,32 +63,6 @@ export const storedCapRushPlaybackCursorRowSchema = z
     }
   });
 export type StoredCapRushPlaybackCursorRow = z.infer<typeof storedCapRushPlaybackCursorRowSchema>;
-
-/**
- * Version-3 active draft row: the full draft, including the ~1 MB immutable
- * `locked` subtree, lives inline. Kept for reading saves written before the
- * split; new writes use {@link storedCapRushDraftProgressRowSchema}.
- */
-export const storedCapRushLegacyDraftRowSchema = z
-  .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION),
-    recordId: z.literal(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID),
-    runId: idSchema,
-    revision: z.number().int().nonnegative(),
-    stateDigest: capRushDigestSchema,
-    draft: capRushDraftStateSchema,
-    createdAtIso: isoDateSchema,
-    updatedAtIso: isoDateSchema,
-  })
-  .superRefine((row, ctx) => {
-    if (row.draft.runId !== row.runId) {
-      ctx.addIssue({ code: 'custom', message: 'stored draft run id does not match its row' });
-    }
-    if (row.draft.revision !== row.revision) {
-      ctx.addIssue({ code: 'custom', message: 'stored draft revision does not match its row' });
-    }
-  });
-export type StoredCapRushLegacyDraftRow = z.infer<typeof storedCapRushLegacyDraftRowSchema>;
 
 /**
  * Reference from the active progress row to the immutable locked inputs held in
@@ -210,7 +173,7 @@ export type StoredCapRushLockedInputsRow = z.infer<typeof storedCapRushLockedInp
 
 export const storedCapRushCommandRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     commandId: commandIdSchema,
     runId: idSchema,
     command: capRushCommandSchema,
@@ -235,7 +198,7 @@ export type StoredCapRushCommandRow = z.infer<typeof storedCapRushCommandRowSche
 
 export const storedCapRushGameRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
     game: capRushStoredGameSchema,
@@ -275,7 +238,7 @@ export type StoredCapRushGameRow = z.infer<typeof storedCapRushGameRowSchema>;
 
 export const storedCapRushPlayoffGameRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameId: capRushPlayoffGameIdSchema,
     game: capRushStoredPlayoffGameSchema,
@@ -300,7 +263,7 @@ export type StoredCapRushPlayoffGameRow = z.infer<typeof storedCapRushPlayoffGam
 
 export const storedCapRushLeagueGameRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameId: capRushLeagueGameIdSchema,
     game: capRushLeagueGameSchema,
@@ -320,7 +283,7 @@ export type StoredCapRushLeagueGameRow = z.infer<typeof storedCapRushLeagueGameR
  */
 export const storedCapRushLeagueGameResultRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     gameId: capRushLeagueGameIdSchema,
     game: capRushLeagueResultSchema,
@@ -356,7 +319,7 @@ export const storedCapRushLeagueScoreRowSchema = z
 export type StoredCapRushLeagueScoreRow = z.infer<typeof storedCapRushLeagueScoreRowSchema>;
 
 export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
-  .safeExtend({ saveSchemaVersion: capRushReadableSaveSchemaVersionSchema })
+  .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })
   .superRefine((row, ctx) => {
     if (row.wins + row.losses > CAP_RUSH_GAME_COUNT) {
       ctx.addIssue({ code: 'custom', message: 'stored history wins and losses exceed a season' });
@@ -366,7 +329,7 @@ export type StoredCapRushHistoryRow = z.infer<typeof storedCapRushHistoryRowSche
 
 export const storedCapRushReportRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     report: capRushReportSchema,
     updatedAtIso: isoDateSchema,
@@ -380,7 +343,7 @@ export type StoredCapRushReportRow = z.infer<typeof storedCapRushReportRowSchema
 
 export const storedCapRushLeagueAggregateRowSchema = z
   .object({
-    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
     runId: idSchema,
     aggregate: capRushLeagueAggregateSchema,
     updatedAtIso: isoDateSchema,

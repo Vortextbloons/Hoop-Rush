@@ -41,8 +41,10 @@ Record-level schemas live here; domain schemas live in
   once in `capRushLockedInputs` (`{ runId, digest, locked }`) and keeps only a
   `{ runId, digest }` reference in `capRushActive`. League score rows in
   `capRushLeagueResults` back `listLeagueResults`; full boxes stay in
-  `capRushLeagueGames`. Version-3 rows (inline locked, no score rows) stay
-  readable and migrate on the next accepted command.
+  `capRushLeagueGames`. Only save schema 4 is readable: an older active row
+  reports `unsupported` so the player abandons that run, and older completed
+  history rows are skipped so the history list still loads. Discard must remove
+  only the run's rows; never clear profile stores when rejecting an old save.
 - **Cap Rush worker wire**: a job carries `locked` on the first request a
   worker sees for a run and only `runId` afterwards. `hasLeague` tells the
   parallel wrapper how to partition without the locked payload.

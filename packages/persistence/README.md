@@ -22,8 +22,10 @@ schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
   one transaction, guarded by the next slot and the run's lock digest.
 - **Cap Rush save layout.** Save schema 4 keeps the immutable locked inputs in
   `capRushLockedInputs`, writes only a reference into `capRushActive`, and
-  records compact `capRushLeagueResults` beside the full league boxes. Save
-  schema 3 stays readable and migrates on the next accepted command.
+  records compact `capRushLeagueResults` beside the full league boxes. Only save
+  schema 4 is readable; an older active row reports `unsupported` and the player
+  abandons that run, while older completed history rows are skipped. Discard
+  removes only the run's rows, never profile stores.
 - **Command commits**: Cap Rush and Havoc share outcome and artifact contracts
   from `data-contracts/command-commit.ts`. The expected revision must agree
   with the receipt before a commit can write. Mode adapters keep artifact
