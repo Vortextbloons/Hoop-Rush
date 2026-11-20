@@ -409,11 +409,15 @@ export function capRushPlayoffSeriesId(round: number, seriesSlot: number): strin
   return `crs-${String(round)}-${String(seriesSlot)}`;
 }
 
-export function capRushSeriesWins(series: CapRushPlayoffSeries, teamId: string): number {
+type SeriesWinEvidence = Pick<CapRushPlayoffSeries, 'highTeamId' | 'lowTeamId'> & {
+  readonly games: readonly { readonly winnerTeamId: string }[];
+};
+
+export function capRushSeriesWins(series: SeriesWinEvidence, teamId: string): number {
   return series.games.filter((game) => game.winnerTeamId === teamId).length;
 }
 
-export function capRushSeriesWinner(series: CapRushPlayoffSeries): string | null {
+export function capRushSeriesWinner(series: SeriesWinEvidence): string | null {
   const high = capRushSeriesWins(series, series.highTeamId);
   const low = capRushSeriesWins(series, series.lowTeamId);
   if (high >= CAP_RUSH_SERIES_WINS) return series.highTeamId;
@@ -421,6 +425,6 @@ export function capRushSeriesWinner(series: CapRushPlayoffSeries): string | null
   return null;
 }
 
-export function capRushSeriesComplete(series: CapRushPlayoffSeries): boolean {
+export function capRushSeriesComplete(series: SeriesWinEvidence): boolean {
   return capRushSeriesWinner(series) !== null;
 }

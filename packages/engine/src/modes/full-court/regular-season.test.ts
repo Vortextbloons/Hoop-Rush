@@ -1,14 +1,17 @@
 import { expect, test } from 'bun:test';
 import {
   CAP_RUSH_FRANCHISE_ALIGNMENT,
+  CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   FULL_COURT_DEFAULT_MONEY,
   FULL_COURT_HEALTH_PROFILE_VERSION,
+  FULL_COURT_HEALTH_VERSION,
   commandIdSchema,
   contentHashSchema,
   franchiseIdSchema,
   fullCourtSeasonCheckpointSchema,
   playerVersionId,
   type FullCourtHealthProfileSet,
+  type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
@@ -21,6 +24,12 @@ import {
   fullCourtRegularSeasonGameInput,
   simulateFullCourtRegularSeasonGame,
 } from './regular-season.ts';
+import {
+  createFullCourtPlayoffCheckpoint,
+  fullCourtPlayoffView,
+  lockFullCourtPlayoffs,
+  simulateFullCourtPlayoffGame,
+} from './playoffs.ts';
 import {
   createFullCourtSeasonCheckpoint,
   lockFullCourtRegularSeason,
@@ -197,4 +206,101 @@ test('simulates an entire slot, resumes serialized health, and pauses for decisi
   }
   expect(accepted.checkpoint.completedThroughSlot).toBe(2);
   expect(accepted.scores.filter((score) => score.outcome.kind === 'forfeit')).toHaveLength(1);
+});
+
+function completedSeason() {
+  const { season } = preparedSeason();
+  const lock = lockFullCourtRegularSeason(season);
+  const regular = createFullCourtSeasonCheckpoint(lock);
+  regular.completedThroughSlot = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM;
+  const scores = season.games.map((fixture): FullCourtSeasonScore => {
+    if (fixture.slot === regular.completedThroughSlot) {
+      for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+        regular.healthByTeam[teamId] = {
+          teamId,
+          version: FULL_COURT_HEALTH_VERSION,
+          throughDay: fixture.dayOffset,
+          players: {},
+        };
+      }
+    }
+    const homeWins = fixture.awayTeamId !== season.userTeamId;
+    return {
+      ...fixture,
+      outcome: { kind: 'played', homePoints: homeWins ? 100 : 90, awayPoints: homeWins ? 90 : 100 },
+    };
+  });
+  return { lock, regular, scores };
+}
+
+test('advances a serialized playoffs through four rounds and a champion', () => {
+  const { lock, regular, scores } = completedSeason();
+  expect(() => lockFullCourtPlayoffs(lock, regular, scores.slice(1))).toThrow('one score per');
+  const playoffs = lockFullCourtPlayoffs(lock, regular, [...scores].reverse());
+  let checkpoint = createFullCourtPlayoffCheckpoint(playoffs);
+  const context = createEngineContext();
+  let watched = false;
+  expect(fullCourtPlayoffView(playoffs, checkpoint).series).toHaveLength(8);
+  for (let index = 0; index < 106; index += 1) {
+    const view = fullCourtPlayoffView(playoffs, checkpoint);
+    const game = simulateFullCourtPlayoffGame(playoffs, checkpoint, context);
+    if (game.kind === 'playoffs-complete') break;
+    if (game.kind !== 'simulated') throw new Error('Unexpected playoff decision');
+    if (!watched && view.nextGame?.userSide != null) {
+      const restored = structuredClone(checkpoint);
+      const recorded = simulateFullCourtPlayoffGame(playoffs, restored, context, { record: true });
+      if (recorded.kind !== 'simulated' || recorded.game.kind !== 'played')
+        throw new Error('Expected a recorded playoff game');
+      expect(recorded.game.tape?.length).toBeGreaterThan(0);
+      expect(recorded.checkpoint).toEqual(game.checkpoint);
+      watched = true;
+    }
+    checkpoint = game.checkpoint;
+  }
+  const final = fullCourtPlayoffView(playoffs, checkpoint);
+  expect(watched).toBe(true);
+  expect(final.nextGame).toBeNull();
+  expect(final.championTeamId).toBeTruthy();
+  expect(final.series).toHaveLength(15);
+  expect(final.series.every(({ games }) => games.length >= 4 && games.length <= 7)).toBe(true);
+  expect(new Set(checkpoint.games.map((game) => game.gameId)).size).toBe(checkpoint.games.length);
+  const forged = structuredClone(checkpoint);
+  const first = forged.games[0];
+  if (first === undefined) throw new Error('Missing playoff game');
+  first.gameId = 'fcp-1-0-7';
+  expect(() => fullCourtPlayoffView(playoffs, forged)).toThrow('does not match the bracket');
+});
+
+test('double forfeits go to the series home-court holder even when playing away', () => {
+  const { lock, regular, scores } = completedSeason();
+  const initialLock = lockFullCourtPlayoffs(lock, regular, scores);
+  const view = fullCourtPlayoffView(initialLock, createFullCourtPlayoffCheckpoint(initialLock));
+  const firstSeries = view.series[0];
+  if (firstSeries === undefined) throw new Error('Missing opening series');
+  for (const teamId of [firstSeries.highTeamId, firstSeries.lowTeamId]) {
+    const team = lock.season.teams.find((entry) => entry.teamId === teamId);
+    const health = regular.healthByTeam[teamId];
+    if (team === undefined || health === undefined) throw new Error('Missing playoff roster');
+    for (const player of team.roster) {
+      health.players[player.playerId] = {
+        loadBasisPoints: 0,
+        availableFromDay: initialLock.firstGameDay + 9,
+      };
+    }
+  }
+  const playoffs = lockFullCourtPlayoffs(lock, regular, scores);
+  const context = createEngineContext();
+  let checkpoint = createFullCourtPlayoffCheckpoint(playoffs);
+  for (let index = 0; index < 24; index += 1) {
+    const step = simulateFullCourtPlayoffGame(playoffs, checkpoint, context, {
+      acceptForfeit: true,
+    });
+    if (step.kind !== 'simulated') throw new Error('Expected an opening game');
+    checkpoint = step.checkpoint;
+  }
+  expect(checkpoint.games.find((game) => game.gameId === 'fcp-1-0-3')).toMatchObject({
+    awayTeamId: firstSeries.highTeamId,
+    winnerTeamId: firstSeries.highTeamId,
+    outcome: { kind: 'forfeit', losingSides: ['home', 'away'] },
+  });
 });

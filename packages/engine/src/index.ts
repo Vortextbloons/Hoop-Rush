@@ -391,6 +391,16 @@ export {
   type FullCourtStandings,
   type FullCourtStandingsRow,
 } from './modes/full-court/standings.ts';
+export {
+  lockFullCourtPlayoffs,
+  createFullCourtPlayoffCheckpoint,
+  fullCourtPlayoffView,
+  simulateFullCourtPlayoffGame,
+  type FullCourtPlayoffFixture,
+  type FullCourtPlayoffGameOutcome,
+  type FullCourtPlayoffLock,
+  type FullCourtPlayoffSeries,
+} from './modes/full-court/playoffs.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {

@@ -22,3 +22,5 @@ export {
   type FullCourtSeasonCommitResult,
 } from './repositories/full-court-season.ts';
 export * from './schemas/full-court-season-record.ts';
+export { createFullCourtPlayoffRepository } from './repositories/full-court-playoffs.ts';
+export * from './schemas/full-court-playoff-record.ts';

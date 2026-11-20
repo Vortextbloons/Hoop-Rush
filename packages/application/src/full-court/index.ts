@@ -17,6 +17,11 @@ export {
   startFullCourtSeason,
   type FullCourtSeasonRepository,
 } from './season.ts';
+export {
+  advanceFullCourtPlayoffs,
+  startFullCourtPlayoffs,
+  type FullCourtPlayoffRepository,
+} from './playoffs.ts';
 
 export interface FullCourtDraftRepository {
   load(runId: string): Promise<FullCourtDraftState | null>;

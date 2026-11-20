@@ -13,7 +13,7 @@ schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated. **Dexie versions 15
-  through 17 are supported**: each upgrades additively to 18 and keeps its
+  through 18 are supported**: each upgrades additively to 19 and keeps its
   records; older databases reset all local saves, history, and profiles during
   upgrade so users can start fresh. Do not restore historical migrations.
 - **Full Court save layout**: `fullCourtSeasonCheckpoints` (key `runId`) stores

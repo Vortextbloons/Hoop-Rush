@@ -6,6 +6,7 @@ import {
   HOOP_RUSH_DATABASE_STORES_V15,
   HOOP_RUSH_DATABASE_STORES_V16,
   HOOP_RUSH_DATABASE_STORES_V17,
+  HOOP_RUSH_DATABASE_STORES_V18,
   HoopRushDatabase,
 } from './dexie.ts';
 import {
@@ -19,13 +20,13 @@ const LEGACY_DATABASE_NAME = 'hoop-rush-saves';
 afterEach(restoreIndexedDb);
 
 describe('storage namespace', () => {
-  it('opens the new namespace at version 18 with every store', async () => {
+  it('opens the new namespace at version 19 with every store', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('namespace-new'));
     await db.open();
     expect(HOOP_RUSH_DATABASE_NAME).toBe('hoop-rush-saves-v2');
     expect(db.name).not.toBe(LEGACY_DATABASE_NAME);
-    expect(db.verno).toBe(18);
+    expect(db.verno).toBe(19);
     const tableNames = db.tables.map((table) => table.name).sort();
     expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_STORES).sort());
     db.close();
@@ -43,7 +44,7 @@ describe('storage namespace', () => {
 
     const current = new HoopRushDatabase(name);
     await current.open();
-    expect(current.verno).toBe(18);
+    expect(current.verno).toBe(19);
     expect(await current.table('profileSelection').get('selection')).toEqual({
       id: 'selection',
       profileId: 'v15-profile',
@@ -70,7 +71,7 @@ describe('storage namespace', () => {
 
     const current = new HoopRushDatabase(name);
     await current.open();
-    expect(current.verno).toBe(18);
+    expect(current.verno).toBe(19);
     expect(await current.table('capRushLockedInputs').get('saved-run')).toEqual({
       runId: 'saved-run',
       digest: 'saved',
@@ -103,7 +104,7 @@ describe('storage namespace', () => {
 
     const current = new HoopRushDatabase(name);
     await current.open();
-    expect(current.verno).toBe(18);
+    expect(current.verno).toBe(19);
     expect(await current.table('fullCourtDrafts').get('saved-draft')).toEqual({
       saveSchemaVersion: 1,
       runId: 'saved-draft',
@@ -117,6 +118,24 @@ describe('storage namespace', () => {
     });
     expect(await current.fullCourtSeasonCheckpoints.count()).toBe(0);
     expect(await current.fullCourtSeasonScores.count()).toBe(0);
+    current.close();
+  });
+
+  it('upgrades version 18 and keeps the regular-season checkpoint', async () => {
+    resetIndexedDb();
+    const name = testDatabaseName('v18-upgrade');
+    const old = new Dexie(name);
+    old.version(18).stores(HOOP_RUSH_DATABASE_STORES_V18);
+    const checkpoint = { runId: 'saved-season', saveSchemaVersion: 1 };
+    await old.table('fullCourtSeasonCheckpoints').put(checkpoint);
+    old.close();
+
+    const current = new HoopRushDatabase(name);
+    await current.open();
+    expect(await current.table('fullCourtSeasonCheckpoints').get('saved-season')).toEqual(
+      checkpoint,
+    );
+    expect(await current.fullCourtPlayoffs.count()).toBe(0);
     current.close();
   });
 
@@ -147,7 +166,7 @@ describe('storage namespace', () => {
       old.close();
       const current = new HoopRushDatabase(name);
       await current.open();
-      expect(current.verno).toBe(18);
+      expect(current.verno).toBe(19);
       for (const table of current.tables) expect(await table.count()).toBe(0);
       await current.table('capRushMultiplayerActive').put({ roomId: 'new-room' });
       current.close();

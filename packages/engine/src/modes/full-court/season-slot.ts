@@ -53,7 +53,7 @@ export type FullCourtSeasonSlotOutcome =
       readonly userGame: ResolvedGame;
     };
 
-function frozenCopy<T extends object>(input: T): T {
+export function frozenCopy<T extends object>(input: T): T {
   const copy = structuredClone(input);
   function freeze(value: unknown): void {
     if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;

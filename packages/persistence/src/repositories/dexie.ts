@@ -85,6 +85,7 @@ import type {
   StoredFullCourtSeasonCheckpoint,
   StoredFullCourtSeasonScore,
 } from '../schemas/full-court-season-record.ts';
+import type { StoredFullCourtPlayoffs } from '../schemas/full-court-playoff-record.ts';
 import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -173,10 +174,15 @@ export const HOOP_RUSH_DATABASE_STORES_V17: Record<string, string> = {
  * opening a version-17 database only creates these tables and keeps every
  * existing record.
  */
-export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+export const HOOP_RUSH_DATABASE_STORES_V18: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V17,
   fullCourtSeasonCheckpoints: 'runId',
   fullCourtSeasonScores: '[runId+gameId], runId',
+};
+
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V18,
+  fullCourtPlayoffs: 'runId',
 };
 
 export class HoopRushDatabase extends Dexie {
@@ -236,9 +242,10 @@ export class HoopRushDatabase extends Dexie {
   fullCourtDraftCommands!: Table<StoredFullCourtDraftCommand, [string, string]>;
   fullCourtSeasonCheckpoints!: EntityTable<StoredFullCourtSeasonCheckpoint, 'runId'>;
   fullCourtSeasonScores!: Table<StoredFullCourtSeasonScore, [string, string]>;
+  fullCourtPlayoffs!: EntityTable<StoredFullCourtPlayoffs, 'runId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    // Versions below 15 are unsupported and reset. Versions 15 through 17 keep
+    // Versions below 15 are unsupported and reset. Versions 15 through 18 keep
     // every record and only gain the tables and indexes added after them.
     this.version(15)
       .stores(HOOP_RUSH_DATABASE_STORES_V15)
@@ -251,7 +258,8 @@ export class HoopRushDatabase extends Dexie {
       );
     this.version(16).stores(HOOP_RUSH_DATABASE_STORES_V16);
     this.version(17).stores(HOOP_RUSH_DATABASE_STORES_V17);
-    this.version(18).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(18).stores(HOOP_RUSH_DATABASE_STORES_V18);
+    this.version(19).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {

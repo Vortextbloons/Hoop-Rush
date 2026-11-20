@@ -24,27 +24,29 @@ export type FullCourtSeasonCheckpoint = z.infer<typeof fullCourtSeasonCheckpoint
 
 const sideSchema = z.enum(['home', 'away']);
 
+export const fullCourtScoreOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('played'),
+    homePoints: z.number().int().nonnegative(),
+    awayPoints: z.number().int().nonnegative(),
+  }),
+  z.object({
+    kind: z.literal('forfeit'),
+    losingSides: z
+      .array(sideSchema)
+      .min(1)
+      .max(2)
+      .refine((sides) => new Set(sides).size === sides.length),
+  }),
+]);
+
 export const fullCourtSeasonScoreSchema = z
   .object({
     gameId: z.string().min(1),
     slot: z.number().int().min(1).max(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM),
     homeTeamId: z.string().min(1),
     awayTeamId: z.string().min(1),
-    outcome: z.discriminatedUnion('kind', [
-      z.object({
-        kind: z.literal('played'),
-        homePoints: z.number().int().nonnegative(),
-        awayPoints: z.number().int().nonnegative(),
-      }),
-      z.object({
-        kind: z.literal('forfeit'),
-        losingSides: z
-          .array(sideSchema)
-          .min(1)
-          .max(2)
-          .refine((sides) => new Set(sides).size === sides.length),
-      }),
-    ]),
+    outcome: fullCourtScoreOutcomeSchema,
   })
   .refine(
     (score) =>

@@ -267,6 +267,21 @@ export function capRushFinalsHomeCourtOf(input: {
     if (winner === left.teamId) leftWins += 1;
     else rightWins += 1;
   }
+  return finalsHomeCourtOf(left, right, leftWins, rightWins);
+}
+
+type FinalsStanding = Pick<
+  CapRushLeagueStandingsEntry,
+  'teamId' | 'wins' | 'pointDifferential' | 'pointsFor'
+>;
+
+export function finalsHomeCourtOf(
+  left: FinalsStanding,
+  right: FinalsStanding,
+  leftWins: number,
+  rightWins: number,
+): string {
+  if (left.wins !== right.wins) return left.wins > right.wins ? left.teamId : right.teamId;
   if (leftWins !== rightWins) return leftWins > rightWins ? left.teamId : right.teamId;
   if (left.pointDifferential !== right.pointDifferential) {
     return left.pointDifferential > right.pointDifferential ? left.teamId : right.teamId;

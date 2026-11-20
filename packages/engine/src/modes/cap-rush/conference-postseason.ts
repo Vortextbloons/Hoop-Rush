@@ -19,7 +19,7 @@ import {
 import { capRushFinalsMvpOf, capRushNextPlayoffGamePlan } from './playoff-shared.ts';
 import { capRushFinalsHomeCourtOf } from './conference-standings.ts';
 
-const OPENING_PAIRS: readonly (readonly [number, number])[] = [
+export const CONFERENCE_OPENING_PAIRS: readonly (readonly [number, number])[] = [
   [1, 8],
   [4, 5],
   [3, 6],
@@ -63,7 +63,7 @@ export function capRushConferenceOpeningSeries(
   for (const conference of ['west', 'east'] as const) {
     const table = conference === 'west' ? standings.west : standings.east;
     const offset = conference === 'west' ? 0 : 4;
-    OPENING_PAIRS.forEach(([highSeed, lowSeed], index) => {
+    CONFERENCE_OPENING_PAIRS.forEach(([highSeed, lowSeed], index) => {
       const home = table.entries[highSeed - 1];
       const road = table.entries[lowSeed - 1];
       if (home === undefined || road === undefined) {
