@@ -17,7 +17,7 @@ repeating button, panel, badge, and segmented-control markup.
 | `SegmentedControl.svelte` | `role="group"` of pressed buttons    | For immediate option groups such as "Per game / Totals". Not a tab list; it does not change panels.                                  |
 | `PageHeader.svelte`       | page header                          | Eyebrow, title, description, and an optional `actions` snippet.                                                                      |
 | `PageShell.svelte`        | page-width wrapper                   | `width="sm \| md \| lg \| xl \| full"` and `padding="none \| sm \| md \| lg \| xl"`. Replaces hand-written `mx-auto max-w-*` shells. |
-| `SectionHeading.svelte`   | eyebrow, heading, description        | `level` picks `h2`–`h4`; `size` picks the display scale; optional `actions` snippet.                                                 |
+| `SectionHeading.svelte`   | eyebrow, heading, description        | `level` picks `h2` through `h4`; `size` picks the display scale; optional `actions` snippet.                                         |
 | `StatGrid.svelte`         | `<dl>` of stat tiles                 | `columns` is the desktop count, `mobile` the small-screen count. Put `StatTile` children inside.                                     |
 | `StatTile.svelte`         | `<dt>`/`<dd>` pair                   | `label`, `value`, `note`, `size`, `tone`, and `surface="tile"` for a bordered card. A default snippet overrides the value.           |
 | `Alert.svelte`            | inline notice                        | Tones `info`, `success`, `warning`, `danger` set the colour and `role`. Optional `title`, `icon`, and `actions` snippets.            |

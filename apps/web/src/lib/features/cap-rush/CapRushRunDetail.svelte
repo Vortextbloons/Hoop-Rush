@@ -13,7 +13,7 @@
     href={resolve('cap-rush/history/')}
     class="font-mono text-[11px] text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
   >
-    ← Cap Rush history
+    ← Run history
   </a>
 
   <div class="mt-4">

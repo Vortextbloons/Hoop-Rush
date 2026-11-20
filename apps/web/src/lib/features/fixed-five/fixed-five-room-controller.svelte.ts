@@ -50,12 +50,10 @@ import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from '../multiplayer/multiplayer-lobby';
 import { LobbyAutoStart } from '../multiplayer/lobby-auto-start';
-import { multiplayerInviteLink } from '../multiplayer/invite-link';
 import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler';
 import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
 const TICK_MS = 1000;
-const COPY_FEEDBACK_MS = 1500;
 
 export interface FixedFiveRoomControllerDeps {
   roomId: string;
@@ -171,8 +169,6 @@ export class FixedFiveRoomController {
   leaveBusy = $state(false);
   rematchBusy = $state(false);
   now = $state(Date.now());
-  copiedInvite = $state(false);
-  copiedCode = $state(false);
 
   facts = $derived(roomLogFacts(this.commands));
   phase = $derived(
@@ -374,7 +370,6 @@ export class FixedFiveRoomController {
   private disposed = false;
   private winPlayed = false;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
-  private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackRaf: number | null = null;
   private playbackLastFrameMs = 0;
   private playbackCadence: PlaybackCadence | null = null;
@@ -438,47 +433,10 @@ export class FixedFiveRoomController {
       clearInterval(this.tickTimer);
       this.tickTimer = null;
     }
-    if (this.copyTimer !== null) {
-      clearTimeout(this.copyTimer);
-      this.copyTimer = null;
-    }
     this.stopPlayback();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.session.dispose();
-  }
-
-  async copyInviteLink(): Promise<void> {
-    const code = this.roomSnapshot?.code;
-    if (!code) return;
-    this.error = null;
-    try {
-      await navigator.clipboard.writeText(
-        new URL(resolve(multiplayerInviteLink(code)), window.location.origin).href,
-      );
-
-      if (this.disposed) return;
-      this.copiedInvite = true;
-      this.scheduleCopyReset('invite');
-    } catch {
-      if (this.disposed) return;
-      this.error = 'Could not copy the invite. Share the room code instead.';
-    }
-  }
-
-  async copyRoomCode(): Promise<void> {
-    const code = this.roomSnapshot?.code;
-    if (!code) return;
-    this.error = null;
-    try {
-      await navigator.clipboard.writeText(code);
-      if (this.disposed) return;
-      this.copiedCode = true;
-      this.scheduleCopyReset('code');
-    } catch {
-      if (this.disposed) return;
-      this.error = 'Could not copy the code. You can select and copy the digits below.';
-    }
   }
 
   async startDraft(): Promise<void> {
@@ -668,15 +626,5 @@ export class FixedFiveRoomController {
       }
     }
     return rows;
-  }
-
-  private scheduleCopyReset(kind: 'invite' | 'code'): void {
-    if (this.copyTimer !== null) clearTimeout(this.copyTimer);
-    this.copyTimer = setTimeout(() => {
-      this.copyTimer = null;
-      if (this.disposed) return;
-      if (kind === 'invite') this.copiedInvite = false;
-      else this.copiedCode = false;
-    }, COPY_FEEDBACK_MS);
   }
 }

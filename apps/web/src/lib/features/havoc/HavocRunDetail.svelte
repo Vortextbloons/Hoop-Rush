@@ -33,7 +33,7 @@
     href={resolve('havoc/history/')}
     class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
   >
-    ← Hall of Freaks
+    ← Run history
   </a>
 
   {#if state.detailLoading}

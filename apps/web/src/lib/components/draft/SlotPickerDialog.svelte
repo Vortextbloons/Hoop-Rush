@@ -120,6 +120,10 @@
       };
     });
   });
+  const moving = $derived.by(() => {
+    const subject = player;
+    return subject !== null && slots.some((slot) => slot?.playerId === subject.playerId);
+  });
   function placePlayer(subject: IndexRow, slotIndex: number) {
     onplace(subject, slotIndex);
   }
@@ -137,7 +141,9 @@
     if (!open) onclose();
   }}
   size="sm"
+  grabHandle
   closeLabel="Cancel"
+  contentClass="max-h-[92dvh] overscroll-contain"
 >
   {#snippet header()}
     {#if player}
@@ -170,7 +176,11 @@
 
   {#if player}
     {@const subject = player}
-    <div class="mt-4 flex flex-col gap-2">
+    <p class="mt-3 font-mono text-[10px] tracking-wide text-muted-foreground uppercase">
+      {moving ? 'Move to a position' : 'Choose a position'}
+    </p>
+
+    <div class="mt-2 flex flex-col gap-2">
       {#each pickerOptions as opt (opt.index)}
         {@const label = SLOT_LABELS[opt.index] ?? ''}
         <PositionOptionRow
@@ -184,7 +194,7 @@
                 name: opt.incumbent.displayName,
                 meta: `${opt.incumbent.seasonKey} · ${formatPositions(opt.incumbent.positionsPlayable)}`,
               }}
-          emptyLabel={`Open ${label} slot`}
+          emptyLabel={opt.state === 'open' ? `Open ${label} slot` : (SLOT_NAMES[opt.index] ?? '')}
           onSelect={() => placePlayer(subject, opt.index)}
         >
           {#snippet trailing()}

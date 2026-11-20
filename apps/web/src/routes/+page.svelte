@@ -1,9 +1,15 @@
 <script lang="ts">
   import { homeModes } from '#lib/modes/catalog.js';
-  import { browser } from '$app/env';
+  import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import { staticAsset } from '#lib/asset-url.js';
-  import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type {
+    CapRushDraftState,
+    ClassicDraftState,
+    FullCourtDraftStage,
+    HavocCompletionState,
+    HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '#lib/data.js';
   import TierBadge from '#lib/components/TierBadge.svelte';
@@ -11,13 +17,82 @@
   import { eraName } from '#lib/branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import PageShell from '#lib/components/ui/PageShell.svelte';
-  const historyHref = resolve('sandbox/history/');
+  import { FULL_COURT_ACTIVE_RUN_KEY } from '#lib/features/full-court/full-court-active-run.js';
+
+  type HistoryPath =
+    'classic/history/' | 'sandbox/history/' | 'cap-rush/history/' | 'havoc/history/';
+  const historyLinks: Partial<Record<string, HistoryPath>> = {
+    classic: 'classic/history/',
+    sandbox: 'sandbox/history/',
+    'cap-rush': 'cap-rush/history/',
+    havoc: 'havoc/history/',
+  };
   const road = Array.from({ length: 82 }, (_, i) => i);
   const modes = homeModes();
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
+  let capRushStage = $state<CapRushDraftState['stage'] | null>(null);
+  let havocStage = $state<HavocCompletionState | null>(null);
+  let fullCourtStage = $state<FullCourtDraftStage | null>(null);
+  type SavedEntryPath =
+    | 'classic/'
+    | 'classic/challenge/'
+    | 'sandbox/challenge/'
+    | 'cap-rush/'
+    | 'cap-rush/run/'
+    | 'cap-rush/result/'
+    | 'havoc/'
+    | 'havoc/run/'
+    | 'havoc/result/'
+    | 'full-court/';
+  const savedEntries = $derived.by(() => {
+    const entries: Partial<
+      Record<string, { href: SavedEntryPath; label: string; progress?: string }>
+    > = {};
+    if (classicDraft?.status === 'drafting') {
+      entries.classic = {
+        href: 'classic/',
+        label: 'Resume draft',
+        progress: `Round ${classicDraft.round}/5`,
+      };
+    }
+    if (active?.status === 'active') {
+      entries[active.mode] = {
+        href: active.mode === 'classic' ? 'classic/challenge/' : 'sandbox/challenge/',
+        label: 'Resume season',
+        progress: `Game ${(active.gamesPlayed ?? 0) + 1} · ${active.aggregates.team.wins}–${active.aggregates.team.losses}`,
+      };
+    }
+    if (capRushStage === 'postseason' || capRushStage === 'locked') {
+      entries['cap-rush'] = {
+        href: 'cap-rush/run/',
+        label: capRushStage === 'postseason' ? 'Resume postseason' : 'Resume season',
+      };
+    } else if (capRushStage === 'completed') {
+      entries['cap-rush'] = { href: 'cap-rush/result/', label: 'View season report' };
+    } else if (capRushStage !== null && capRushStage !== 'abandoned') {
+      entries['cap-rush'] = { href: 'cap-rush/', label: 'Resume draft' };
+    }
+    if (havocStage === 'draft') {
+      entries.havoc = { href: 'havoc/', label: 'Resume draft' };
+    } else if (havocStage === 'season') {
+      entries.havoc = { href: 'havoc/run/', label: 'Resume season' };
+    } else if (havocStage === 'comparison' || havocStage === 'complete') {
+      entries.havoc = {
+        href: 'havoc/result/',
+        label: havocStage === 'complete' ? 'View season report' : 'Resume season report',
+      };
+    }
+    if (fullCourtStage !== null) {
+      entries['full-court'] = {
+        href: 'full-court/',
+        label: fullCourtStage === 'drafting' ? 'Resume draft' : 'Open season',
+      };
+    }
+    return entries;
+  });
   const playersIndexHrefs = new Set(
     modes.filter((mode) => mode.solo?.warmPlayersIndex).map((mode) => mode.solo!.href),
   );
@@ -41,8 +116,7 @@
       setTimeout(work, 0);
     }
   }
-  $effect(() => {
-    if (!browser) return;
+  onMount(() => {
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -52,23 +126,35 @@
     );
     deferIdle(() => {
       if (cancelled) return;
-      import('#lib/features/challenge/challenge-repo.js')
-        .then(({ challengeRepository }) =>
-          Promise.all([
-            challengeRepository.loadActiveRunCheckpoint(),
-            challengeRepository.listCompletedRuns(3),
-            challengeRepository.loadClassicDraft(),
-          ]),
-        )
-        .then(
-          ([activeCheckpoint, rows, savedDraft]) => {
-            if (cancelled) return;
-            active = activeCheckpoint;
-            recent = rows.slice(0, 3);
-            classicDraft = savedDraft?.draft ?? null;
-          },
-          () => {},
-        );
+      void import('#lib/persistence.js')
+        .then(async ({ getPersistence }) => {
+          const {
+            challengeRepository,
+            capRushRepository,
+            havocRepository,
+            fullCourtDraftRepository,
+          } = getPersistence();
+          const [checkpoint, completed, draft, capRush, havoc, fullCourt] =
+            await Promise.allSettled([
+              challengeRepository.loadActiveRunCheckpoint(),
+              challengeRepository.listCompletedRuns(3),
+              challengeRepository.loadClassicDraft(),
+              capRushRepository.loadActiveDraft(),
+              havocRepository.loadActiveRun(),
+              Promise.resolve().then(() => {
+                const runId = localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY);
+                return runId === null ? null : fullCourtDraftRepository.load(runId);
+              }),
+            ]);
+          if (cancelled) return;
+          if (checkpoint.status === 'fulfilled') active = checkpoint.value;
+          if (completed.status === 'fulfilled') recent = completed.value.slice(0, 3);
+          if (draft.status === 'fulfilled') classicDraft = draft.value?.draft ?? null;
+          if (capRush.status === 'fulfilled') capRushStage = capRush.value?.stage ?? null;
+          if (havoc.status === 'fulfilled') havocStage = havoc.value?.completionState ?? null;
+          if (fullCourt.status === 'fulfilled') fullCourtStage = fullCourt.value?.stage ?? null;
+        })
+        .catch(() => {});
     });
     return () => {
       cancelled = true;
@@ -108,67 +194,65 @@
         {/each}
       </div>
     </div>
-    {#if active && active.status === 'active'}
-      <a
-        href={active.mode === 'classic'
-          ? resolve('classic/challenge/')
-          : resolve('sandbox/challenge/')}
-        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
-      >
-        Continue · Game {(active.gamesPlayed ?? 0) + 1} · {active.aggregates.team.wins}–{active
-          .aggregates.team.losses}
-      </a>
-    {:else if classicDraft && classicDraft.status === 'drafting'}
-      <a
-        href={resolve('classic/')}
-        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
-      >
-        Continue draft · R{classicDraft.round}/5
-      </a>
-    {/if}
   </div>
 
   <div class="grid gap-4 sm:grid-cols-2">
     {#each modes as mode (mode.id)}
       {#if mode.solo}
-        <a
-          href={resolve(mode.solo!.href)}
-          data-sveltekit-preload-code="hover"
-          onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
-          onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
-          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode
-            .discovery.accent
+        {@const saved = savedEntries[mode.id]}
+        {@const history = historyLinks[mode.id]}
+        <div
+          class="flex flex-col rounded-xl bg-card {mode.discovery.accent
             ? 'border border-accent/60'
             : ''}"
         >
-          {#if mode.discovery.artwork}
-            <img
-              src={staticAsset(`/${mode.discovery.artwork!}`)}
-              alt=""
-              aria-hidden="true"
-              class="h-10 w-10 rounded-lg"
-              width="40"
-              height="40"
-              loading="lazy"
-              decoding="async"
-              fetchpriority="low"
-            />
-          {/if}
-          <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
-            {mode.label}
-          </h2>
-          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-            {mode.description}
-          </p>
-          <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-            {mode.discovery.cta}
-            <span
-              aria-hidden="true"
-              class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-              >→</span
+          <a
+            href={saved ? resolve(saved.href) : resolve(mode.solo.href)}
+            data-sveltekit-preload-code="hover"
+            onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
+            onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
+            class="group flex flex-1 flex-col rounded-xl p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+          >
+            {#if mode.discovery.artwork}
+              <img
+                src={staticAsset(`/${mode.discovery.artwork!}`)}
+                alt=""
+                aria-hidden="true"
+                class="h-10 w-10 rounded-lg"
+                width="40"
+                height="40"
+                loading="lazy"
+                decoding="async"
+                fetchpriority="low"
+              />
+            {/if}
+            <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
+              {mode.label}
+            </h2>
+            <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+              {mode.description}
+            </p>
+            <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+              {saved?.label ?? mode.discovery.cta}
+              <span
+                aria-hidden="true"
+                class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                >→</span
+              >
+            </span>
+            {#if saved?.progress}
+              <span class="mt-1 text-xs text-muted-foreground">{saved.progress}</span>
+            {/if}
+          </a>
+          {#if history}
+            <a
+              href={resolve(history)}
+              aria-label={`${mode.label} run history`}
+              class="mx-6 mb-5 inline-flex min-h-11 self-start items-center rounded-lg text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-7"
+              >Run history</a
             >
-          </span>
-        </a>
+          {/if}
+        </div>
       {:else}
         <div class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7" aria-disabled="true">
           <h2
@@ -198,12 +282,6 @@
         >
           Recent challenges
         </h2>
-        <a
-          href={historyHref}
-          class="text-label text-muted-foreground underline-offset-4 hover:underline"
-        >
-          All history
-        </a>
       </div>
       <ul class="mt-4 flex flex-col gap-3">
         {#each recent as row (row.runId)}

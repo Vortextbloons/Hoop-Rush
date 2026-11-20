@@ -23,7 +23,7 @@ Record-level schemas live here; domain schemas live in
   without clearing records. Databases older than version 15 reset all
   local saves, history, and profiles during upgrade. Do not restore historical
   migrations.
-- **Full Court save layout**: save schema 1 keeps the season checkpoint in
+- **Full Court save layout.** Save schema 1 keeps the season checkpoint in
   `fullCourtSeasonCheckpoints` (key `runId`) and compact results in
   `fullCourtSeasonScores` (key `[runId+gameId]`). A slot commit writes the
   checkpoint and its 15 score rows in one transaction. It requires the
@@ -37,7 +37,7 @@ Record-level schemas live here; domain schemas live in
 - **Atomic commits**: checkpoint writes commit in one transaction; pending
   blocks are deleted in the same transaction as the state they supersede.
   Never commit state and clear pendings separately.
-- **Cap Rush save layout**: save schema 4 stores the immutable `locked` inputs
+- **Cap Rush save layout.** Save schema 4 stores the immutable `locked` inputs
   once in `capRushLockedInputs` (`{ runId, digest, locked }`) and keeps only a
   `{ runId, digest }` reference in `capRushActive`. League score rows in
   `capRushLeagueResults` back `listLeagueResults`; full boxes stay in

@@ -46,12 +46,7 @@
 
 {#if serviceError !== null}
   <PageShell as="section" width="sm" padding="xl">
-    <ServiceErrorPanel
-      title="Havoc is not wired yet"
-      message={serviceError}
-      tone="destructive"
-      homeLink
-    />
+    <ServiceErrorPanel title="Havoc could not start" message={serviceError} homeLink />
   </PageShell>
 {:else if controller !== null}
   <div class="multiplayer-entry">
@@ -60,6 +55,10 @@
     >
   </div>
   <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('havoc/run/'))} />
+{:else}
+  <PageShell width="sm" padding="xl">
+    <p class="text-sm text-muted-foreground" role="status">Opening Havoc…</p>
+  </PageShell>
 {/if}
 
 <style>

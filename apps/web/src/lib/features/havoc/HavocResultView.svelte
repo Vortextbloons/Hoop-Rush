@@ -40,7 +40,7 @@
         Your report arrives after both 82-game seasons: with powers, then the same schedule without
         them.
       </p>
-      <ActionLink class="mt-6" href={resolve('havoc/run/')}>Continue season</ActionLink>
+      <ActionLink class="mt-6" href={resolve('havoc/run/')}>Resume season</ActionLink>
     </Panel>
   {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
     <Panel padding="md" data-havoc-comparison-pending>
@@ -185,7 +185,7 @@
     {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
     <div class="h-actions mt-6">
       <ActionLink href={resolve('havoc/')}>Draft another squad <ArrowRight size={18} /></ActionLink>
-      <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
+      <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
     </div>
 
     {#if comparison !== null && resultState.comparisonComplete}

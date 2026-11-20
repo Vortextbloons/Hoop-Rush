@@ -30,6 +30,7 @@
     rowClass = null,
     rowAttributes = null,
     stickyIdentity = false,
+    statCellClass = '',
     note = null,
     footer = null,
     empty = null,
@@ -60,6 +61,7 @@
     rowClass?: ((row: Row, index: number) => string) | null;
     rowAttributes?: ((row: Row, index: number) => Record<string, string>) | null;
     stickyIdentity?: boolean;
+    statCellClass?: string;
     note?: string | null;
     footer?: Snippet | null;
     empty?: Snippet | null;
@@ -132,6 +134,7 @@
         playerCellClass="ui-stats-player-cell"
         playerHeadCellClass="ui-stats-player-cell"
         playerTotalCellClass="ui-stats-player-cell"
+        {statCellClass}
       >
         {#snippet identity(row)}
           {@render identitySnippet(row)}

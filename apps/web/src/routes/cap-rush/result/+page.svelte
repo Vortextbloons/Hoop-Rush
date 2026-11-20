@@ -37,7 +37,7 @@
 
 <PageShell as="section" width="lg" padding="md">
   {#if serviceError !== null}
-    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
+    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
   {:else if resultState !== null}
     {#if resultState.loading}
       <div class="flex flex-col gap-2">
@@ -55,7 +55,7 @@
             href={resolve('cap-rush/history/')}
             class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            History
+            Run history
           </a>
           <button
             type="button"

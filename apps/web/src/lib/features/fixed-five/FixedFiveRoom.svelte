@@ -8,17 +8,7 @@
   import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
   import { resolve } from '$app/paths';
   import { staticAsset } from '#lib/asset-url.js';
-  import {
-    Check,
-    Copy,
-    ArrowRight,
-    Users,
-    Clock,
-    LockKeyhole,
-    Link,
-    LogOut,
-    ShieldCheck,
-  } from '@lucide/svelte';
+  import { ArrowRight, Users, Clock, LockKeyhole, LogOut, ShieldCheck } from '@lucide/svelte';
   import FixedFiveScoreboard from '#lib/features/fixed-five/FixedFiveScoreboard.svelte';
   import FixedFiveDraftPanel from '#lib/features/fixed-five/FixedFiveDraftPanel.svelte';
   import FixedFiveSimShow from '#lib/features/fixed-five/FixedFiveSimShow.svelte';
@@ -187,28 +177,9 @@
             <h2>{selfId === 'p1' ? 'Your court. Your invite.' : 'The matchup is set.'}</h2>
             <p>
               {selfId === 'p1'
-                ? 'Share this code or send an invite link. The draft begins when you start it.'
+                ? 'Share the room code or invite link from the header. The draft begins when you start it.'
                 : 'Stay in this room. The draft opens for both players when the host starts.'}
             </p>
-            {#if snapshot.code}
-              <div class="invite-code" aria-label={`Room code ${snapshot.code}`}>
-                {snapshot.code}
-              </div>
-              <div class="invite-actions">
-                <Button tone="secondary" onclick={() => void controller.copyRoomCode()}>
-                  {#if controller.copiedCode}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy
-                    code{/if}
-                </Button>
-                <Button onclick={() => void controller.copyInviteLink()}>
-                  {#if controller.copiedInvite}
-                    <Check size={16} />Copied
-                  {:else}
-                    <Link size={16} />Copy invite link
-                  {/if}
-                </Button>
-              </div>
-              <p class="invite-footnote">Room codes expire after 15 minutes.</p>
-            {/if}
           </div>
         </div>
         <div class="lobby-settings">
@@ -698,11 +669,6 @@
     font-size: 12px;
     line-height: 1.7;
     max-width: 420px;
-  }
-
-  .invite-body .invite-footnote {
-    margin-top: 16px;
-    font-size: 10px;
   }
 
   .lobby-settings :global(.player-seats) {

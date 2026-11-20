@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, type Snippet } from 'svelte';
+  import { onDestroy, onMount, type Snippet } from 'svelte';
   import { resolve } from '$app/paths';
   import { Check, Copy, Link, Users } from '@lucide/svelte';
   import { getLobbyCoordinator } from './lobby-context.svelte.js';
@@ -45,6 +45,7 @@
   let lobbyId = $state<string | null>(null);
   let copied = $state<'code' | 'link' | null>(null);
   let copyError = $state<string | null>(null);
+  let copyTimer: ReturnType<typeof setTimeout> | null = null;
   const lobby = $derived(
     coordinator.snapshot.lobby?.id === lobbyId ? coordinator.snapshot.lobby : null,
   );
@@ -52,6 +53,9 @@
   onMount(() => {
     lobbyId = suppliedLobbyId ?? loadLobbyId(roomId);
     if (lobbyId) void coordinator.session.attach(lobbyId);
+  });
+  onDestroy(() => {
+    if (copyTimer !== null) clearTimeout(copyTimer);
   });
   async function copy(kind: 'code' | 'link') {
     if (!roomCode) return;
@@ -63,8 +67,13 @@
           : new URL(resolve(multiplayerInviteLink(roomCode)), window.location.origin).href,
       );
       copied = kind;
+      if (copyTimer !== null) clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => {
+        copyTimer = null;
+        copied = null;
+      }, 1500);
     } catch {
-      copyError = 'Copy failed. Share the room code shown here.';
+      copyError = 'Couldn’t copy. Share the room code shown here.';
     }
   }
 </script>
@@ -80,14 +89,26 @@
       <div class="invite">
         <span>Room code</span><strong>{roomCode}</strong>
         <div class="actions">
-          <button type="button" onclick={() => copy('code')} aria-label="Copy room code"
+          <button
+            type="button"
+            onclick={() => copy('code')}
+            aria-label={copied === 'code' ? 'Room code copied' : 'Copy room code'}
             >{#if copied === 'code'}<Check size={15} />{:else}<Copy size={15} />{/if}
-            <span class="code-label">Code</span><span class="mobile-code">{roomCode}</span></button
+            <span class="code-label">{copied === 'code' ? 'Copied' : 'Copy code'}</span><span
+              class="mobile-code">{roomCode}</span
+            ></button
           >
-          <button type="button" onclick={() => copy('link')}
-            >{#if copied === 'link'}<Check size={15} />{:else}<Link size={15} />{/if} Invite</button
+          <button
+            type="button"
+            onclick={() => copy('link')}
+            aria-label={copied === 'link' ? 'Invite link copied' : 'Copy invite link'}
+            >{#if copied === 'link'}<Check size={15} />{:else}<Link size={15} />{/if}
+            {copied === 'link' ? 'Copied' : 'Copy invite link'}</button
           >
         </div>
+        {#if !lobbyId}
+          <p class="expiry">Room codes expire after 15 minutes.</p>
+        {/if}
       </div>
     {/if}
   </div>
@@ -210,6 +231,11 @@
     letter-spacing: 0.2em;
     padding-left: 0.2em;
   }
+  .expiry {
+    margin-top: 6px;
+    color: var(--color-muted-foreground);
+    font-size: 10px;
+  }
   .actions,
   .seats,
   .seat,
@@ -220,6 +246,7 @@
   }
   .actions {
     justify-content: center;
+    flex-wrap: wrap;
     gap: 8px;
   }
   button {
@@ -313,6 +340,7 @@
     .compact-mobile .summary,
     .compact-mobile .invite > span,
     .compact-mobile .invite > strong,
+    .compact-mobile .expiry,
     .compact-mobile .code-label {
       display: none;
     }

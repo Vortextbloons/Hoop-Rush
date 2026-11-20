@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import type { CapRushDraftController } from './cap-rush-draft-state.svelte.js';
   import { ArrowRight, Dices, Trophy } from '@lucide/svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
 
   let { controller }: { controller: CapRushDraftController } = $props();
 
@@ -40,6 +42,9 @@
       Build a contender.<br />
       <span class="text-primary">Mind the apron.</span>
     </h1>
+    <ActionLink class="mt-4" href={resolve('cap-rush/history/')} tone="secondary">
+      Run history
+    </ActionLink>
   </div>
 
   <div class="mt-8 grid gap-4 md:grid-cols-2">

@@ -10,16 +10,12 @@
     capRushSeriesConferenceOf,
     capRushSeriesWinner,
     capRushSeriesWins,
-    type CapRushConference,
     type FullCourtSeasonCheckpoint,
     type FullCourtSeasonScore,
   } from '@hoop-rush/data-contracts';
   import { FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
-  import {
-    fullCourtStandings,
-    type FullCourtSeasonLock,
-    type FullCourtStandingsRow,
-  } from '@hoop-rush/engine';
+  import { fullCourtStandings, type FullCourtSeasonLock } from '@hoop-rush/engine';
+  import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
@@ -159,88 +155,6 @@
       {latestCell?.userHome ? 'vs' : '@'}
     {/if}
   </span>
-{/snippet}
-
-{#snippet standingsTable(rows: readonly FullCourtStandingsRow[], conference: CapRushConference)}
-  <div class="min-w-0">
-    <p
-      class="mb-2 font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-    >
-      {CAP_RUSH_CONFERENCE_NAMES[conference]}
-    </p>
-    <div class="max-h-[24rem] overflow-y-auto rounded-xl border border-line-soft">
-      <table class="w-full border-collapse text-left">
-        <caption class="sr-only"
-          >{CAP_RUSH_CONFERENCE_NAMES[conference]} Full Court standings</caption
-        >
-        <thead class="sticky top-0 z-10 bg-surface-2">
-          <tr class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-            <th scope="col" class="px-2 py-2 text-center font-bold">Seed</th>
-            <th scope="col" class="px-2 py-2 font-bold">Team</th>
-            <th scope="col" class="px-2 py-2 text-right font-bold">W</th>
-            <th scope="col" class="px-2 py-2 text-right font-bold">L</th>
-            <th scope="col" class="hidden px-2 py-2 text-right font-bold sm:table-cell">Diff</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each rows as row (row.teamId)}
-            {#if row.seed === CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS + 1}
-              <tr aria-hidden="true">
-                <td colspan="5" class="border-y border-line-strong bg-surface-2 px-2 py-1">
-                  <span
-                    class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-                  >
-                    Playoff cutoff
-                  </span>
-                </td>
-              </tr>
-            {/if}
-            <tr
-              class="border-b border-line-soft/60 last:border-0 {row.teamId === userTeamId
-                ? 'bg-primary/10'
-                : ''}"
-            >
-              <td
-                class="px-2 py-1.5 text-center font-mono text-[10px] tabular-nums {row.qualified
-                  ? 'text-foreground'
-                  : 'text-muted-foreground'}">{row.seed}</td
-              >
-              <td class="w-full max-w-0 px-2 py-1.5">
-                <span class="flex min-w-0 items-center gap-1.5">
-                  <span
-                    class="min-w-0 truncate text-[11px] {row.teamId === userTeamId
-                      ? 'font-bold text-foreground'
-                      : row.qualified
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'}"
-                    title={row.displayName}>{row.displayName}</span
-                  >
-                  {#if row.teamId === userTeamId}
-                    <span class="shrink-0 font-mono text-[8px] font-bold text-primary uppercase"
-                      >You</span
-                    >
-                  {/if}
-                </span>
-              </td>
-              <td class="px-2 py-1.5 text-right font-mono text-[10px] font-bold tabular-nums"
-                >{row.wins}</td
-              >
-              <td
-                class="px-2 py-1.5 text-right font-mono text-[10px] tabular-nums text-muted-foreground"
-                >{row.losses}</td
-              >
-              <td
-                class="hidden px-2 py-1.5 text-right font-mono text-[10px] tabular-nums sm:table-cell {row.pointDifferential >
-                0
-                  ? 'text-positive'
-                  : 'text-muted-foreground'}">{signed(row.pointDifferential)}</td
-              >
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  </div>
 {/snippet}
 
 {#snippet bracketRoundColumn(round: FullCourtBracketRound)}
@@ -429,7 +343,7 @@
               Sim next five
             {:else}
               <FastForward size={15} aria-hidden="true" />
-              Finish playoffs
+              Sim remaining games
             {/if}
           </button>
         {:else if championId !== null}
@@ -459,7 +373,7 @@
           onclick={() => requestAdvance(1)}
         >
           <Play size={15} aria-hidden="true" />
-          Sim 1 game
+          Sim next game
         </button>
         <button
           type="button"
@@ -477,7 +391,7 @@
           onclick={() => requestAdvance(remaining)}
         >
           <FastForward size={15} aria-hidden="true" />
-          Sim season
+          Sim remaining games
         </button>
       {/if}
       <p class="text-[11px] text-muted-foreground" role="status">
@@ -743,8 +657,8 @@
 
   <Panel as="section" padding="md" aria-label="Full Court standings">
     <SectionHeading
-      eyebrow="League table"
-      title="Top eight in each conference qualify."
+      eyebrow="Conference standings"
+      title="Eight per conference."
       level={2}
       size="sm"
     >
@@ -759,12 +673,23 @@
       {/snippet}
     </SectionHeading>
     <p class="mt-2 text-xs text-muted-foreground">
-      Ties break on wins, then head-to-head record among tied teams, then conference record, point
-      differential, points scored and stable team id.
+      Seeds 1–{CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS} in each conference qualify. Ties break on wins, then
+      head-to-head record among tied teams, then conference record, point differential, points scored
+      and stable team id.
     </p>
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
-      {@render standingsTable(standings.west, 'west')}
-      {@render standingsTable(standings.east, 'east')}
+      <ConferenceStandingsTable
+        conferenceLabel={CAP_RUSH_CONFERENCE_NAMES.west}
+        caption="West Full Court standings"
+        rows={standings.west}
+        {userTeamId}
+      />
+      <ConferenceStandingsTable
+        conferenceLabel={CAP_RUSH_CONFERENCE_NAMES.east}
+        caption="East Full Court standings"
+        rows={standings.east}
+        {userTeamId}
+      />
     </div>
   </Panel>
 </div>

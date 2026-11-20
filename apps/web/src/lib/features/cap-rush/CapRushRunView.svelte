@@ -215,7 +215,7 @@
                   onclick={() => void controller.playNextGame()}
                 >
                   <Play size={15} aria-hidden="true" />
-                  Sim game
+                  Sim next game
                 </button>
                 <button
                   type="button"
@@ -223,7 +223,7 @@
                   onclick={() => void controller.playSeason()}
                 >
                   <SkipForward size={15} aria-hidden="true" />
-                  Finish the season
+                  Sim remaining games
                 </button>
               {/if}
             </div>

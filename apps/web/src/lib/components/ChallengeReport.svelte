@@ -22,7 +22,8 @@
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
-  import PlayerStatsControls from '#lib/components/basketball/PlayerStatsControls.svelte';
+  import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import type { SandboxHref } from '#lib/sandbox-url.js';
   import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
@@ -109,6 +110,107 @@
       team: aggregates.team,
       players: aggregates.players.map((p) => (totalsMode ? p : perGamePlayer(p))),
     } satisfies RunAggregates;
+  });
+  type SeasonStatsRow = {
+    aggregate: PlayerSeasonAggregate;
+    raw: PlayerSeasonAggregate;
+    player: PeakPlayer | null;
+    index: number;
+  };
+  const seasonStatsRows = $derived.by((): SeasonStatsRow[] | null => {
+    if (!displayAggregates || !aggregates) return null;
+    return displayAggregates.players.map((aggregate, index) => ({
+      aggregate,
+      raw: aggregates.players.find((p) => p.playerId === aggregate.playerId) ?? aggregate,
+      player: seasonTable[index]?.player ?? null,
+      index,
+    }));
+  });
+  const seasonStatsColumns = $derived.by((): readonly PlayerStatColumn<SeasonStatsRow>[] => {
+    void totalsMode;
+    return [
+      {
+        key: 'points',
+        label: 'PTS',
+        value: (row) => formatAggregateStat(row.aggregate.points),
+        cellClass: 'font-bold',
+      },
+      {
+        key: 'fieldGoalsAttempted',
+        label: 'FGA',
+        value: (row) => formatAggregateStat(row.aggregate.fieldGoals.attempted),
+      },
+      {
+        key: 'fieldGoalPct',
+        label: 'FG%',
+        value: (row) => ratioPct(row.raw.fieldGoals.made, row.raw.fieldGoals.attempted),
+      },
+      {
+        key: 'threesAttempted',
+        label: '3PA',
+        value: (row) => formatAggregateStat(row.aggregate.threes.attempted),
+      },
+      {
+        key: 'threePointPct',
+        label: '3P%',
+        value: (row) => ratioPct(row.raw.threes.made, row.raw.threes.attempted),
+      },
+      {
+        key: 'freeThrowsAttempted',
+        label: 'FTA',
+        value: (row) => formatAggregateStat(row.aggregate.freeThrows.attempted),
+      },
+      {
+        key: 'freeThrowPct',
+        label: 'FT%',
+        value: (row) => ratioPct(row.raw.freeThrows.made, row.raw.freeThrows.attempted),
+      },
+      {
+        key: 'trueShootingPct',
+        label: 'TS%',
+        value: (row) =>
+          trueShootingPct(
+            row.raw.points,
+            row.raw.fieldGoals.attempted,
+            row.raw.freeThrows.attempted,
+          ),
+      },
+      {
+        key: 'usagePct',
+        label: 'USG%',
+        value: (row) => usagePct(row.raw, aggregates!.team),
+      },
+      {
+        key: 'rebounds',
+        label: 'REB',
+        value: (row) => formatAggregateStat(row.aggregate.rebounds.total),
+      },
+      {
+        key: 'assists',
+        label: 'AST',
+        value: (row) => formatAggregateStat(row.aggregate.assists),
+      },
+      {
+        key: 'steals',
+        label: 'STL',
+        value: (row) => formatAggregateStat(row.aggregate.steals),
+      },
+      {
+        key: 'blocks',
+        label: 'BLK',
+        value: (row) => formatAggregateStat(row.aggregate.blocks),
+      },
+      {
+        key: 'turnovers',
+        label: 'TOV',
+        value: (row) => formatAggregateStat(row.aggregate.turnovers),
+      },
+      {
+        key: 'threesAttemptedPerGame',
+        label: '3PA/G',
+        value: (row) => perGameValue(row.raw.threes.attempted, row.raw.gamesPlayed),
+      },
+    ];
   });
   const gamesPlayed = $derived(Math.max(1, record?.gamesPlayed ?? run.games.length));
   const opponentPoints = $derived(
@@ -245,9 +347,6 @@
   }
   function formatAggregateStat(value: number): string {
     return totalsMode ? String(value) : oneDecimal(value);
-  }
-  function toggleMode() {
-    totalsMode = !totalsMode;
   }
   function viewSeasonStats() {
     tab = 'team';
@@ -665,130 +764,57 @@
     </div>
   {:else if tab === 'players'}
     <section aria-label="Your five, season table" class="min-w-0 p-4 sm:p-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <SectionHeading title="Your five · season" level={2} size="md" />
-        <PlayerStatsControls
-          valuesLabel="Season values"
-          values={totalsMode ? 'totals' : 'game'}
-          onvalueschange={() => toggleMode()}
-        />
-      </div>
-      {#if displayAggregates}
-        <div class="mt-4 hidden overflow-x-auto sm:block">
-          <table class="w-full min-w-[1080px] border-collapse text-sm">
-            <thead>
-              <tr
-                class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-              >
-                <th scope="col" class="py-2 pr-3 text-left">Player</th>
-                <th scope="col" class="px-2 py-2 text-right">PTS</th>
-                <th scope="col" class="px-2 py-2 text-right">FGA</th>
-                <th scope="col" class="px-2 py-2 text-right">FG%</th>
-                <th scope="col" class="px-2 py-2 text-right">3PA</th>
-                <th scope="col" class="px-2 py-2 text-right">3P%</th>
-                <th scope="col" class="px-2 py-2 text-right">FTA</th>
-                <th scope="col" class="px-2 py-2 text-right">FT%</th>
-                <th scope="col" class="px-2 py-2 text-right">TS%</th>
-                <th scope="col" class="px-2 py-2 text-right">USG%</th>
-                <th scope="col" class="px-2 py-2 text-right">REB</th>
-                <th scope="col" class="px-2 py-2 text-right">AST</th>
-                <th scope="col" class="px-2 py-2 text-right">STL</th>
-                <th scope="col" class="px-2 py-2 text-right">BLK</th>
-                <th scope="col" class="px-2 py-2 text-right">TOV</th>
-                <th scope="col" class="px-2 py-2 text-right">3PA/G</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
-                {@const row = seasonTable[index]}
-                {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
-                <tr class="border-b border-border/50 last:border-0">
-                  <th scope="row" class="py-2 pr-3 text-left">
-                    <span class="flex items-center gap-2">
-                      {#if row}
-                        <PlayerFace
-                          player={row.player}
-                          manifest={manifest!}
-                          size="sm"
-                          fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
-                        />
-                        <span class="min-w-0">
-                          <span class="block truncate font-semibold">
-                            {row.player.displayName}
-                          </span>
-                          <span class="block font-mono text-[10px] text-muted-foreground">
-                            {SLOT_LABELS[index]}
-                          </span>
-                        </span>
-                      {:else}
-                        <span class="font-mono text-xs">{aggregate.playerId}</span>
-                      {/if}
-                    </span>
-                  </th>
-                  <td class="px-2 py-2 text-right font-mono font-bold">
-                    {formatAggregateStat(aggregate.points)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.fieldGoals.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {ratioPct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.threes.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {ratioPct(raw.threes.made, raw.threes.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.freeThrows.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {ratioPct(raw.freeThrows.made, raw.freeThrows.attempted)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {trueShootingPct(
-                      raw.points,
-                      raw.fieldGoals.attempted,
-                      raw.freeThrows.attempted,
-                    )}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {usagePct(raw, aggregates!.team)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.rebounds.total)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.assists)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.steals)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.blocks)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {formatAggregateStat(aggregate.turnovers)}
-                  </td>
-                  <td class="px-2 py-2 text-right font-mono">
-                    {perGameValue(raw.threes.attempted, raw.gamesPlayed)}
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 grid min-w-0 gap-2 sm:hidden">
-          {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
-            {@const row = seasonTable[index]}
-            {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
+      <PlayerStatsSection
+        surface="none"
+        ariaLabel="Your five, season table"
+        title="Your five · season"
+        valuesLabel="Season values"
+        values={totalsMode ? 'totals' : 'game'}
+        onvalueschange={(next) => (totalsMode = next === 'totals')}
+        rows={seasonStatsRows}
+        columns={seasonStatsColumns}
+        rowKey={(row) => row.aggregate.playerId}
+        caption={totalsMode
+          ? 'Season totals for the five drafted players'
+          : 'Per-game season averages for the five drafted players'}
+        tableClass="min-w-[1080px] text-sm"
+        statCellClass="font-mono"
+      >
+        {#snippet identity(row)}
+          <span class="ui-stats-player">
+            {#if row.player && manifest}
+              <PlayerFace
+                player={row.player}
+                {manifest}
+                size="sm"
+                fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
+              />
+              <span class="ui-stats-player-text">
+                <span class="ui-stats-player-name">{row.player.displayName}</span>
+                <span class="ui-stats-player-meta">{SLOT_LABELS[row.index]}</span>
+              </span>
+            {:else}
+              <span class="ui-stats-player-text">
+                <span class="ui-stats-player-name">{row.aggregate.playerId}</span>
+                <span class="ui-stats-player-meta">{SLOT_LABELS[row.index]}</span>
+              </span>
+            {/if}
+          </span>
+        {/snippet}
+        {#snippet empty()}
+          <p class="animate-pulse text-sm text-muted-foreground">Loading season table…</p>
+        {/snippet}
+        {#snippet cards()}
+          {#each seasonStatsRows ?? [] as row (row.aggregate.playerId)}
+            {@const aggregate = row.aggregate}
+            {@const raw = row.raw}
+            {@const index = row.index}
             <article class="min-w-0 rounded-lg border border-border bg-surface-1 px-4 py-3">
               <div class="flex items-start gap-3">
-                {#if row}
+                {#if row.player && manifest}
                   <PlayerFace
                     player={row.player}
-                    manifest={manifest!}
+                    {manifest}
                     size="sm"
                     fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
                   />
@@ -797,7 +823,7 @@
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-bold">
-                        {row?.player.displayName ?? aggregate.playerId}
+                        {row.player?.displayName ?? aggregate.playerId}
                       </p>
                       <p class="font-mono text-[10px] text-muted-foreground">
                         {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
@@ -901,12 +927,10 @@
               </div>
             </article>
           {/each}
-        </div>
-        {#if byId === null}
-          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
-        {/if}
-      {:else}
-        <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>
+        {/snippet}
+      </PlayerStatsSection>
+      {#if byId === null}
+        <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
       {/if}
     </section>
   {:else}

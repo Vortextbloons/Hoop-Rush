@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { HavocReport } from '@hoop-rush/data-contracts';
-  import type { HavocStatLine } from '@hoop-rush/data-contracts';
+  import type { HavocComparison, HavocStatLine } from '@hoop-rush/data-contracts';
   import HavocComparisonView from './HavocComparisonView.svelte';
   import HavocMvpCard from './HavocMvpCard.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import { trueShootingPct, trueShootingRate, usagePct, usagePossessions } from '#lib/format.js';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import {
     havocParticipantKindLabel,
     havocRecordLabel,
@@ -77,6 +79,136 @@
     if (havocTeamUsage <= 0 || normalTeamUsage <= 0) return '—';
     const delta = (usageOf(havoc) / havocTeamUsage - usageOf(normal) / normalTeamUsage) * 100;
     return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} pp`;
+  }
+  type ParticipantRow = HavocComparison['slots'][number]['havoc']['lines'][number];
+  type CombinedRow = {
+    key: 'havoc' | 'normal' | 'delta';
+    label: string;
+  };
+  const comparisonRows: readonly CombinedRow[] = [
+    { key: 'havoc', label: 'Havoc combined' },
+    { key: 'normal', label: 'Normal combined' },
+    { key: 'delta', label: 'Delta' },
+  ];
+  const lineColumns: readonly PlayerStatColumn<ParticipantRow>[] = [
+    { key: 'points', label: 'Pts', value: (line) => line.line.points },
+    {
+      key: 'fieldGoals',
+      label: 'FG',
+      value: (line) => `${line.line.fieldGoals.made}/${line.line.fieldGoals.attempted}`,
+    },
+    { key: 'trueShooting', label: 'TS%', value: (line) => trueShooting(line.line) },
+    { key: 'usage', label: 'USG%', value: (line) => usageShare(line.line, havocTeamUsage) },
+    { key: 'rebounds', label: 'Reb', value: (line) => line.line.rebounds.total },
+    { key: 'assists', label: 'Ast', value: (line) => line.line.assists },
+    { key: 'steals', label: 'Stl', value: (line) => line.line.steals },
+    { key: 'blocks', label: 'Blk', value: (line) => line.line.blocks },
+    { key: 'turnovers', label: 'TO', value: (line) => line.line.turnovers },
+    { key: 'fouls', label: 'PF', value: (line) => line.line.fouls },
+  ];
+  function combinedTotal(
+    slot: HavocComparison['slots'][number],
+  ): PlayerStatsTotals<ParticipantRow> {
+    return {
+      label: 'Combined (slot total)',
+      value: (column) => {
+        const line = slot.havoc.combined;
+        switch (column.key) {
+          case 'points':
+            return line.points;
+          case 'fieldGoals':
+            return `${line.fieldGoals.made}/${line.fieldGoals.attempted}`;
+          case 'trueShooting':
+            return trueShooting(line);
+          case 'usage':
+            return usageShare(line, havocTeamUsage);
+          case 'rebounds':
+            return line.rebounds.total;
+          case 'assists':
+            return line.assists;
+          case 'steals':
+            return line.steals;
+          case 'blocks':
+            return line.blocks;
+          case 'turnovers':
+            return line.turnovers;
+          case 'fouls':
+            return line.fouls;
+          default:
+            return '—';
+        }
+      },
+    };
+  }
+  function comparisonColumns(
+    slot: HavocComparison['slots'][number],
+  ): readonly PlayerStatColumn<CombinedRow>[] {
+    function sideOf(row: CombinedRow): HavocStatLine {
+      return row.key === 'normal' ? slot.normal.combined : slot.havoc.combined;
+    }
+    return [
+      {
+        key: 'points',
+        label: 'Pts',
+        value: (row) => (row.key === 'delta' ? signed(slot.deltas.points) : sideOf(row).points),
+      },
+      {
+        key: 'fieldGoals',
+        label: 'FG',
+        value: (row) =>
+          row.key === 'delta'
+            ? `${signed(slot.deltas.fieldGoalsMade)}/${signed(slot.deltas.fieldGoalAttempts)}`
+            : `${sideOf(row).fieldGoals.made}/${sideOf(row).fieldGoals.attempted}`,
+      },
+      {
+        key: 'trueShooting',
+        label: 'TS%',
+        value: (row) =>
+          row.key === 'delta'
+            ? trueShootingDelta(slot.havoc.combined, slot.normal.combined)
+            : trueShooting(sideOf(row)),
+      },
+      {
+        key: 'usage',
+        label: 'USG%',
+        value: (row) =>
+          row.key === 'delta'
+            ? usageDelta(slot.havoc.combined, slot.normal.combined)
+            : usageShare(sideOf(row), row.key === 'normal' ? normalTeamUsage : havocTeamUsage),
+      },
+      {
+        key: 'rebounds',
+        label: 'Reb',
+        value: (row) =>
+          row.key === 'delta' ? signed(slot.deltas.rebounds) : sideOf(row).rebounds.total,
+      },
+      {
+        key: 'assists',
+        label: 'Ast',
+        value: (row) => (row.key === 'delta' ? signed(slot.deltas.assists) : sideOf(row).assists),
+      },
+      {
+        key: 'steals',
+        label: 'Stl',
+        value: (row) => (row.key === 'delta' ? signed(slot.deltas.steals) : sideOf(row).steals),
+      },
+      {
+        key: 'blocks',
+        label: 'Blk',
+        value: (row) => (row.key === 'delta' ? signed(slot.deltas.blocks) : sideOf(row).blocks),
+      },
+      {
+        key: 'turnovers',
+        label: 'TO',
+        value: (row) =>
+          row.key === 'delta' ? signed(slot.deltas.turnovers) : sideOf(row).turnovers,
+      },
+      {
+        key: 'fouls',
+        label: 'PF',
+        value: (row) => (row.key === 'delta' ? signed(slot.deltas.fouls) : sideOf(row).fouls),
+      },
+    ];
   }
 </script>
 
@@ -295,160 +427,39 @@
               {slot.displayName}
             </p>
             <div class="havoc-scroll-x mt-2 overflow-x-auto">
-              <table class="w-full min-w-[38rem] text-xs">
-                <thead>
-                  <tr
-                    class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
-                  >
-                    <th scope="col" class="px-2 py-1 text-left font-medium">Line</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">FG</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">TS%</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">USG%</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">PF</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each slot.havoc.lines as line (line.instanceId)}
-                    <tr class="border-b border-border/40">
-                      <th scope="row" class="max-w-44 truncate px-2 py-1 text-left font-semibold">
-                        {line.displayName}
-                        <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
-                          {havocParticipantKindLabel(line.kind)}
-                        </span>
-                      </th>
-                      <td class="px-2 py-1 text-right font-mono font-bold">{line.line.points}</td>
-                      <td class="px-2 py-1 text-right font-mono">
-                        {line.line.fieldGoals.made}/{line.line.fieldGoals.attempted}
-                      </td>
-                      <td class="px-2 py-1 text-right font-mono">{trueShooting(line.line)}</td>
-                      <td class="px-2 py-1 text-right font-mono"
-                        >{usageShare(line.line, havocTeamUsage)}</td
-                      >
-                      <td class="px-2 py-1 text-right font-mono">{line.line.rebounds.total}</td>
-                      <td class="px-2 py-1 text-right font-mono">{line.line.assists}</td>
-                      <td class="px-2 py-1 text-right font-mono">{line.line.steals}</td>
-                      <td class="px-2 py-1 text-right font-mono">{line.line.blocks}</td>
-                      <td class="px-2 py-1 text-right font-mono">{line.line.turnovers}</td>
-                      <td class="px-2 py-1 text-right font-mono">{line.line.fouls}</td>
-                    </tr>
-                  {/each}
-                  <tr class="font-semibold">
-                    <th scope="row" class="px-2 py-1 text-left">Combined (slot total)</th>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.points}</td>
-                    <td class="px-2 py-1 text-right font-mono">
-                      {slot.havoc.combined.fieldGoals.made}/{slot.havoc.combined.fieldGoals
-                        .attempted}
-                    </td>
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{trueShooting(slot.havoc.combined)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{usageShare(slot.havoc.combined, havocTeamUsage)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{slot.havoc.combined.rebounds.total}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.assists}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.steals}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.blocks}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.turnovers}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.fouls}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <table class="mt-2 w-full min-w-[38rem] text-xs">
-                <caption class="sr-only">
-                  Matched normal and havoc totals for the {slot.slot} draft slot
-                </caption>
-                <thead>
-                  <tr
-                    class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
-                  >
-                    <th scope="col" class="px-2 py-1 text-left font-medium">Season</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">FG</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">TS%</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">USG%</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
-                    <th scope="col" class="px-2 py-1 text-right font-medium">PF</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="border-b border-border/40">
-                    <th scope="row" class="px-2 py-1 text-left font-semibold">Havoc combined</th>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.points}</td>
-                    <td class="px-2 py-1 text-right font-mono">
-                      {slot.havoc.combined.fieldGoals.made}/{slot.havoc.combined.fieldGoals
-                        .attempted}
-                    </td>
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{trueShooting(slot.havoc.combined)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{usageShare(slot.havoc.combined, havocTeamUsage)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{slot.havoc.combined.rebounds.total}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.assists}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.steals}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.blocks}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.turnovers}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.fouls}</td>
-                  </tr>
-                  <tr class="border-b border-border/40">
-                    <th scope="row" class="px-2 py-1 text-left font-semibold">Normal combined</th>
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.points}</td>
-                    <td class="px-2 py-1 text-right font-mono">
-                      {slot.normal.combined.fieldGoals.made}/{slot.normal.combined.fieldGoals
-                        .attempted}
-                    </td>
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{trueShooting(slot.normal.combined)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{usageShare(slot.normal.combined, normalTeamUsage)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{slot.normal.combined.rebounds.total}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.assists}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.steals}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.blocks}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.turnovers}</td>
-                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.fouls}</td>
-                  </tr>
-                  <tr class="font-semibold">
-                    <th scope="row" class="px-2 py-1 text-left">Delta</th>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.points)}</td>
-                    <td class="px-2 py-1 text-right font-mono">
-                      {signed(slot.deltas.fieldGoalsMade)}/{signed(slot.deltas.fieldGoalAttempts)}
-                    </td>
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{trueShootingDelta(slot.havoc.combined, slot.normal.combined)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono"
-                      >{usageDelta(slot.havoc.combined, slot.normal.combined)}</td
-                    >
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.rebounds)}</td>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.assists)}</td>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.steals)}</td>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.blocks)}</td>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.turnovers)}</td>
-                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.fouls)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <PlayerStatsTable
+                columns={lineColumns}
+                rows={slot.havoc.lines}
+                rowKey={(line) => line.instanceId}
+                caption={`Participant lines for the ${slot.slot} draft slot`}
+                playerLabel="Line"
+                totals={combinedTotal(slot)}
+                tableClass="min-w-[38rem] text-xs"
+                statCellClass="font-mono"
+                totalCellClass="font-mono"
+              >
+                {#snippet identity(line)}
+                  <span class="block max-w-44 truncate text-left font-semibold">
+                    {line.displayName}
+                    <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
+                      {havocParticipantKindLabel(line.kind)}
+                    </span>
+                  </span>
+                {/snippet}
+              </PlayerStatsTable>
+              <PlayerStatsTable
+                columns={comparisonColumns(slot)}
+                rows={comparisonRows}
+                rowKey={(row) => row.key}
+                caption={`Matched normal and havoc totals for the ${slot.slot} draft slot`}
+                playerLabel="Season"
+                tableClass="mt-2 min-w-[38rem] text-xs"
+                statCellClass="font-mono"
+              >
+                {#snippet identity(row)}
+                  <span class="font-semibold">{row.label}</span>
+                {/snippet}
+              </PlayerStatsTable>
             </div>
             <p class="mt-2 font-mono text-[10px] text-muted-foreground">
               Production index {slot.productionIndex.havoc} vs {slot.productionIndex.normal} · gain {signed(

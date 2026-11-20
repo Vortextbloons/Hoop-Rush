@@ -24,10 +24,9 @@ import {
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
+import { FULL_COURT_ACTIVE_RUN_KEY } from './full-court-active-run.js';
 import { loadFullCourtAssets } from './full-court-assets.js';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner.js';
-
-const ACTIVE_RUN_KEY = 'hoop-rush:full-court:active-run';
 
 interface SeasonState {
   lock: FullCourtSeasonLock;
@@ -70,7 +69,7 @@ export class FullCourtController {
       const assets = (this.#assets ??= await loadFullCourtAssets());
       if (this.#isDisposed()) return;
       this.index ??= fullCourtDraftIndexOf(assets.catalog, assets.catalogSource);
-      const runId = localStorage.getItem(ACTIVE_RUN_KEY);
+      const runId = localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY);
       if (runId !== null) await this.#openRun(runId);
     });
   }
@@ -87,7 +86,7 @@ export class FullCourtController {
         variant: 'standard',
         catalog: this.#assets.catalogSource,
       });
-      localStorage.setItem(ACTIVE_RUN_KEY, runId);
+      localStorage.setItem(FULL_COURT_ACTIVE_RUN_KEY, runId);
       await this.#openRun(runId);
     });
   }

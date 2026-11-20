@@ -152,14 +152,14 @@
     if (awaitingStandings) return 'Complete league standings';
     if (reviewingSeason) return 'Continue to postseason';
     if (finalsReady || postseason?.phase === 'complete') return 'Open the final report';
-    if (postseason?.userOutcome.status === 'not-qualified') return 'Finish the bracket';
-    if (postseason?.userOutcome.status === 'eliminated') return 'Finish the bracket';
+    if (postseason?.userOutcome.status === 'not-qualified') return 'Sim remaining games';
+    if (postseason?.userOutcome.status === 'eliminated') return 'Sim remaining games';
     if (
       userSeries !== null &&
       seriesWins(userSeries, userSeries.highTeamId) < 4 &&
       seriesWins(userSeries, userSeries.lowTeamId) < 4
     ) {
-      return 'Sim game';
+      return 'Sim next game';
     }
     return 'Continue the postseason';
   }

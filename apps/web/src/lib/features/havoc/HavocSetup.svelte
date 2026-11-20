@@ -53,17 +53,17 @@
           tone="secondary"
           href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
         >
-          {run.havocCursor >= 82 ? 'See season report' : 'Continue season'}
+          {run.havocCursor >= 82 ? 'View season report' : 'Resume season'}
           <ArrowRight size={18} />
         </ActionLink>
 
-        <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
+        <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
       </div>
     </Panel>
   {:else}
     <div class="h-header">
       <p class="h-eyebrow">Hoop Havoc · Anything but ordinary</p>
-      <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
+      <a class="h-link" href={resolve('havoc/history/')}>Run history</a>
     </div>
     <div class="h-intro">
       <div>

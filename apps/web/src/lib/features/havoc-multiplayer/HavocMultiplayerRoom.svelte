@@ -12,8 +12,6 @@
     ArrowRight,
     Check,
     Clock,
-    Copy,
-    Link,
     LogOut,
     Shuffle,
     UserMinus,
@@ -23,7 +21,6 @@
   import type { ReactionKey } from '@hoop-rush/application/havoc-multiplayer';
   import HavocLineupLock from '#lib/features/havoc/HavocLineupLock.svelte';
   import { HavocMultiplayerController } from '#lib/features/havoc-multiplayer/havoc-multiplayer-controller.svelte.js';
-  import { inviteLinkForHavocMultiplayerCode } from '#lib/features/havoc-multiplayer/havoc-multiplayer-identity.js';
   import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import HavocMultiplayerBroadcast from '#lib/features/havoc-multiplayer/HavocMultiplayerBroadcast.svelte';
   import HavocMultiplayerChampionship from '#lib/features/havoc-multiplayer/HavocMultiplayerChampionship.svelte';
@@ -58,8 +55,6 @@
   const lobbyCoordinator = getLobbyCoordinator();
   let reducedMotion = $state(false);
   let wideLayout = $state(false);
-  let copiedCode = $state(false);
-  let copiedLink = $state(false);
   let showdownReady = $state(false);
   let showdownSecondsLeft = $state(0);
   let followingRematch = false;
@@ -206,32 +201,6 @@
       });
   });
 
-  async function copyCode(): Promise<void> {
-    const code = controller.snapshot?.code;
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      copiedCode = true;
-      setTimeout(() => {
-        copiedCode = false;
-      }, 1500);
-    } catch {}
-  }
-
-  async function copyInviteLink(): Promise<void> {
-    const code = controller.snapshot?.code;
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}${inviteLinkForHavocMultiplayerCode(code)}`,
-      );
-      copiedLink = true;
-      setTimeout(() => {
-        copiedLink = false;
-      }, 1500);
-    } catch {}
-  }
-
   async function leaveRoom(): Promise<void> {
     await controller.leaveRoom();
     await goto(resolve('/multiplayer'));
@@ -263,9 +232,6 @@
 <section class="h-shell hm-room">
   <div class="hm-nav">
     <a href={resolve('/multiplayer')}><ArrowLeft size={15} aria-hidden="true" /> Multiplayer</a>
-    {#if controller.snapshot}
-      <span class="hm-room-code">Room {controller.snapshot.code}</span>
-    {/if}
   </div>
 
   {#if !controller.snapshot && !controller.error}
@@ -334,28 +300,8 @@
           <h2 class="h-subtitle">{isHost ? 'Your room. Your invite.' : 'The matchup is set.'}</h2>
           <p class="h-copy">
             {isHost
-              ? 'Share this 4-digit code or the invite link. Start the draft once your opponent is online.'
+              ? 'Share the room code or invite link from the header. Start the draft once your opponent is online.'
               : 'Stay in this room. The host starts the draft once both players are online.'}
-          </p>
-          <div class="hm-code" aria-label={`Room code ${controller.snapshot.code}`}>
-            {controller.snapshot.code}
-          </div>
-          <div class="h-actions">
-            <Button type="button" tone="secondary" onclick={copyCode}
-              >{#if copiedCode}<Check size={16} aria-hidden="true" /> Copied{:else}<Copy
-                  size={16}
-                  aria-hidden="true"
-                /> Copy code{/if}</Button
-            >
-            <Button type="button" onclick={copyInviteLink}
-              >{#if copiedLink}<Check size={16} aria-hidden="true" /> Copied{:else}<Link
-                  size={16}
-                  aria-hidden="true"
-                /> Copy invite link{/if}</Button
-            >
-          </div>
-          <p class="hm-footnote">
-            Hoop Havoc · {variantLabel} · Room codes expire after 15 minutes.
           </p>
         </Panel>
 
@@ -750,12 +696,6 @@
   .hm-nav a:hover {
     color: #f2f4ff;
   }
-  .hm-room-code {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    color: #ffd782;
-  }
 
   .hm-stages {
     display: flex;
@@ -827,16 +767,6 @@
   :global(.hm-invite) {
     display: grid;
     gap: 12px;
-  }
-  .hm-code {
-    font-family: var(--font-mono);
-    font-size: clamp(40px, 6vw, 62px);
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    line-height: 1;
-    padding: 18px 0;
-    color: #ffd782;
-    user-select: all;
   }
   .hm-footnote {
     margin: 0;

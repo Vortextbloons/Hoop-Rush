@@ -121,7 +121,7 @@
             href={resolve('cap-rush/history/')}
             class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Cap Rush history
+            Run history
           </a>
         </div>
         {#if controller.error !== null}

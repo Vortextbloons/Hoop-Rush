@@ -50,7 +50,10 @@ export class HavocHubState {
   }
 
   async load(): Promise<void> {
-    if (this.run === null) this.loading = true;
+    if (this.run === null) {
+      this.loading = true;
+      this.error = null;
+    }
     try {
       const snapshot = await this.service.loadActive();
       if (this.isDestroyed()) return;

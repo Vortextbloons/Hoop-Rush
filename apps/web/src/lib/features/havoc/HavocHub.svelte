@@ -4,6 +4,7 @@
   import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
   import type { HavocHubState } from './havoc-hub-state.svelte.js';
   import HavocLineupLock from './HavocLineupLock.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
@@ -37,6 +38,18 @@
   {#if hub.loading && run === null}<p class="h-copy" aria-live="polite">
       Getting your squad ready…
     </p>
+  {:else if run === null && hub.error !== null}
+    <AsyncState kind="error" title="Havoc run unavailable" message={hub.error}>
+      {#snippet actions()}
+        <Button size="sm" tone="secondary" onclick={() => void hub.load()}>Try again</Button>
+        {#if hub.isUnsupportedVersionError()}
+          <Button size="sm" tone="secondary" onclick={() => void discardStale()}
+            >Discard outdated run</Button
+          >
+        {/if}
+        <ActionLink href={resolve('havoc/')} tone="secondary">Back to Havoc</ActionLink>
+      {/snippet}
+    </AsyncState>
   {:else if run === null || run.phase === 'draft'}<Panel padding="md">
       <h1 class="h-title">Your squad awaits.</h1>
       <ActionLink class="mt-6" href={resolve('havoc/')}>Continue to draft</ActionLink>
@@ -108,7 +121,7 @@
           onclick={onOpenResult}>Reveal season report</Button
         >
       {:else}<Button class="mt-4" data-havoc-resume onclick={() => void resume()}
-          >Continue automatic season</Button
+          >Resume season</Button
         >{/if}
     </Panel>
     {#if hub.error !== null}<Alert tone="danger">{hub.error}</Alert>{/if}

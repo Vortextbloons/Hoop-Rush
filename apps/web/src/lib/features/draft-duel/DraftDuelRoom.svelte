@@ -11,10 +11,7 @@
   import { resolve } from '$app/paths';
   import {
     ArrowRight,
-    Check,
     Clock,
-    Copy,
-    Link,
     LockKeyhole,
     LogOut,
     Scale,
@@ -35,7 +32,6 @@
   import GamecastRecap from '#lib/gamecast/GamecastRecap.svelte';
   import { draftDuelGamecastPlayers } from '#lib/features/draft-duel/draft-duel-card-view.js';
   import ChampionshipView from '#lib/features/draft-duel/ChampionshipView.svelte';
-  import { inviteLinkForDraftDuelCode } from '#lib/features/draft-duel/draft-duel-identity.js';
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
   import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
@@ -45,8 +41,6 @@
   const controller = new DraftDuelController();
   const lobbyCoordinator = getLobbyCoordinator();
   let lobbyId = $state<string | null>(null);
-  let copiedCode = $state(false);
-  let copiedLink = $state(false);
   let pendingSelection = $state<{ pick: DraftDuelOfferedPick; ordinal: number } | null>(null);
   const pendingPick = $derived(
     pendingSelection?.ordinal === controller.draft?.pickOrdinal && controller.activeTurn
@@ -210,32 +204,6 @@
       });
   });
 
-  async function copyCode(): Promise<void> {
-    const code = controller.snapshot?.code;
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      copiedCode = true;
-      setTimeout(() => {
-        copiedCode = false;
-      }, 1500);
-    } catch {}
-  }
-
-  async function copyInviteLink(): Promise<void> {
-    const code = controller.snapshot?.code;
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}${inviteLinkForDraftDuelCode(code)}`,
-      );
-      copiedLink = true;
-      setTimeout(() => {
-        copiedLink = false;
-      }, 1500);
-    } catch {}
-  }
-
   async function leaveRoom(): Promise<void> {
     await controller.leaveRoom();
     await goto(resolve('draft-duel/'));
@@ -325,33 +293,9 @@
             <h2>{isHost ? 'Your table. Your invite.' : 'The matchup is set.'}</h2>
             <p>
               {isHost
-                ? 'Share this code or send an invite link. Start the draft once your opponent joins.'
+                ? 'Share the room code or invite link from the header. Start the draft once your opponent joins.'
                 : 'Stay in this room. The draft opens for both players when the host starts it.'}
             </p>
-            {#if controller.snapshot.code}
-              <div class="invite-code" aria-label={`Room code ${controller.snapshot.code}`}>
-                {controller.snapshot.code}
-              </div>
-              <div class="invite-actions">
-                <Button tone="secondary" onclick={copyCode}>
-                  {#if copiedCode}
-                    <Check size={16} aria-hidden="true" />Copied
-                  {:else}
-                    <Copy size={16} aria-hidden="true" />Copy code
-                  {/if}
-                </Button>
-
-                <Button onclick={copyInviteLink}>
-                  {#if copiedLink}
-                    <Check size={16} aria-hidden="true" />Copied
-                  {:else}
-                    <Link size={16} aria-hidden="true" />
-                    Copy invite link
-                  {/if}
-                </Button>
-              </div>
-              <p class="invite-footnote">Room codes expire after 15 minutes.</p>
-            {/if}
           </div>
         </div>
         <div class="lobby-settings">
@@ -721,17 +665,11 @@
     margin: 14px 0;
   }
 
-  .invite-body > p:not(.room-eyebrow):not(.invite-footnote) {
+  .invite-body > p:not(.room-eyebrow) {
     color: var(--color-muted-foreground);
     font-size: 12px;
     line-height: 1.7;
     max-width: 420px;
-  }
-
-  .invite-footnote {
-    margin-top: 16px;
-    font-size: 10px;
-    color: var(--color-muted-foreground);
   }
 
   .player-seats {

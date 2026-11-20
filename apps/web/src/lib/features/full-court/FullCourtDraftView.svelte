@@ -13,7 +13,8 @@
   } from '@hoop-rush/data-contracts';
   import type { FullCourtCatalogIndex } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, Lock, Search, X } from '@lucide/svelte';
+  import { Check, Lock, X } from '@lucide/svelte';
+  import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
@@ -145,13 +146,13 @@
     return 'Finishing skips every unused roster place.';
   });
 
-  function updateSearch(event: Event): void {
-    search = (event.currentTarget as HTMLInputElement).value;
+  function updateSearch(value: string): void {
+    search = value;
     pageIndex = 0;
   }
 
-  function selectPosition(next: Position | null): void {
-    position = next;
+  function selectPosition(index: number | null): void {
+    position = index === null ? null : (POSITIONS[index] ?? null);
     pageIndex = 0;
   }
 
@@ -347,52 +348,13 @@
               {/snippet}
             </SectionHeading>
 
-            <div class="mt-3 flex min-w-0 flex-col gap-2">
-              <div class="relative min-w-0">
-                <Search
-                  class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <input
-                  type="search"
-                  value={search}
-                  oninput={updateSearch}
-                  placeholder="Search players…"
-                  aria-label="Search the Full Court player catalog"
-                  class="h-10 w-full rounded-lg bg-surface-2 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-
-              <div
-                class="flex min-w-0 items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                role="group"
-                aria-label="Filter catalog by position"
-              >
-                <button
-                  type="button"
-                  aria-pressed={position === null}
-                  onclick={() => selectPosition(null)}
-                  class="shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {position ===
-                  null
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-                >
-                  All
-                </button>
-                {#each POSITIONS as slot (slot)}
-                  <button
-                    type="button"
-                    aria-pressed={position === slot}
-                    onclick={() => selectPosition(position === slot ? null : slot)}
-                    class="shrink-0 rounded-md px-2.5 py-1 font-mono text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {position ===
-                    slot
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-                  >
-                    {slot}
-                  </button>
-                {/each}
-              </div>
+            <div class="mt-3">
+              <DraftPoolFilters
+                {search}
+                position={position === null ? null : POSITIONS.indexOf(position)}
+                onsearch={updateSearch}
+                onposition={selectPosition}
+              />
             </div>
           </div>
 

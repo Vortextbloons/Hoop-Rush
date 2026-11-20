@@ -16,11 +16,14 @@
   } from './havoc-presentation';
   import { trueShootingRate } from '#lib/format.js';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import Panel from '#lib/components/ui/Panel.svelte';
   let {
     comparison,
     lineup,
   }: { comparison: HavocComparison; lineup: readonly HavocLineupSlotView[] } = $props();
+  type SquadRow = HavocComparison['slots'][number];
   const stats = [
     { key: 'points', label: 'PTS' },
     { key: 'rebounds', label: 'REB' },
@@ -105,6 +108,63 @@
     const delta = trueShootingChange(havoc, normal);
     return delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pp`;
   }
+  type StatCell = {
+    value: string;
+    delta: string;
+    better: boolean;
+    worse: boolean;
+  };
+  function statCell(player: SquadRow, key: string): StatCell | null {
+    if (key === 'trueShooting') {
+      const value = trueShootingRate(
+        player.havoc.combined.points,
+        player.havoc.combined.fieldGoals.attempted,
+        player.havoc.combined.freeThrows.attempted,
+      );
+      const delta = trueShootingChange(player.havoc.combined, player.normal.combined);
+      return {
+        value: value === null ? '—' : (value * 100).toFixed(1),
+        delta: trueShootingChangeLabel(player.havoc.combined, player.normal.combined),
+        better: delta !== null && delta > 0,
+        worse: delta !== null && delta < 0,
+      };
+    }
+    if (key === 'usage') {
+      const delta = usageDelta(player.havoc.combined, player.normal.combined);
+      return {
+        value: usageShare(player.havoc.combined, havocTeamUsage),
+        delta: usageChange(player.havoc.combined, player.normal.combined),
+        better: delta !== null && delta > 0,
+        worse: delta !== null && delta < 0,
+      };
+    }
+    const stat = stats.find((entry) => entry.key === key);
+    if (stat === undefined) return null;
+    const delta = player.deltas[stat.key];
+    return {
+      value: average(total(player.havoc.combined, stat.key)),
+      delta: change(delta),
+      better: stat.key === 'turnovers' ? delta < 0 : delta > 0,
+      worse: stat.key === 'turnovers' ? delta > 0 : delta < 0,
+    };
+  }
+  const squadColumns: readonly PlayerStatColumn<SquadRow>[] = [
+    ...stats.map((stat) => ({
+      key: stat.key,
+      label: stat.label,
+      value: (player: SquadRow) => statCell(player, stat.key)?.value ?? '—',
+    })),
+    {
+      key: 'trueShooting',
+      label: 'TS%',
+      value: (player: SquadRow) => statCell(player, 'trueShooting')?.value ?? '—',
+    },
+    {
+      key: 'usage',
+      label: 'USG%',
+      value: (player: SquadRow) => statCell(player, 'usage')?.value ?? '—',
+    },
+  ];
   let selectedSlot = $state<string | null>(null);
   let detailsOpen = $state(false);
   const selectedPlayer = $derived(comparison.slots.find((player) => player.slot === selectedSlot));
@@ -125,95 +185,54 @@
   </p>
   <p class="h-mobile-hint h-copy text-xs mt-2">Swipe the stats to see every column.</p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex (The scrollable box score needs keyboard access.) -->
-  <div class="h-box-score mt-4" role="region" aria-label="Player season box score" tabindex="0">
-    <table>
-      <thead
-        ><tr
-          ><th scope="col">Player</th>{#each stats as stat (stat.key)}<th scope="col"
-              >{stat.label}</th
-            >{/each}<th scope="col">TS%</th><th scope="col">USG%</th></tr
-        ></thead
-      >
-      <tbody>
-        {#each comparison.slots as player (player.slot)}
-          {@const source = lineup.find((slot) => slot.slot === player.slot)}
-          {@const havocTrueShooting = trueShootingRate(
-            player.havoc.combined.points,
-            player.havoc.combined.fieldGoals.attempted,
-            player.havoc.combined.freeThrows.attempted,
-          )}
-          {@const normalTrueShooting = trueShootingRate(
-            player.normal.combined.points,
-            player.normal.combined.fieldGoals.attempted,
-            player.normal.combined.freeThrows.attempted,
-          )}
-          {@const trueShootingDelta =
-            havocTrueShooting !== null && normalTrueShooting !== null
-              ? (havocTrueShooting - normalTrueShooting) * 100
-              : null}
-          {@const playerUsageDelta = usageDelta(player.havoc.combined, player.normal.combined)}
-          <tr data-havoc-player-stats={player.slot}>
-            <th scope="row">
-              <button
-                class="h-player-button"
-                onclick={() => {
-                  selectedSlot = player.slot;
-                  detailsOpen = true;
-                }}
-                aria-label="View {player.displayName} stats and powers"
-              >
-                <PlayerArt
-                  playerId={player.playerId}
-                  displayName={player.displayName}
-                  franchiseId={source?.franchiseId}
-                  seasonKey={source?.seasonKey}
-                />
-                <span
-                  ><span class="h-player-name">{player.displayName}</span><span
-                    class="h-player-caption"
-                    >{player.slot}{comparison.mvp.slot === player.slot ? ' / MVP' : ''} / View details</span
-                  ></span
-                >
-              </button>
-            </th>
-            {#each stats as stat (stat.key)}
-              {@const delta = player.deltas[stat.key]}
-              <td data-havoc-stat={stat.key}>
-                <span class="h-box-value">{average(total(player.havoc.combined, stat.key))}</span>
-                <span
-                  class="h-box-delta"
-                  class:better={stat.key === 'turnovers' ? delta < 0 : delta > 0}
-                  class:worse={stat.key === 'turnovers' ? delta > 0 : delta < 0}
-                  >{change(delta)}</span
-                >
-              </td>
-            {/each}
-            <td data-havoc-stat="trueShooting">
-              <span class="h-box-value"
-                >{havocTrueShooting === null ? '—' : (havocTrueShooting * 100).toFixed(1)}</span
-              >
-              <span
-                class="h-box-delta"
-                class:better={trueShootingDelta !== null && trueShootingDelta > 0}
-                class:worse={trueShootingDelta !== null && trueShootingDelta < 0}
-                >{trueShootingDelta === null
-                  ? '—'
-                  : `${trueShootingDelta > 0 ? '+' : ''}${trueShootingDelta.toFixed(1)} pp`}</span
-              >
-            </td>
-            <td data-havoc-stat="usage">
-              <span class="h-box-value">{usageShare(player.havoc.combined, havocTeamUsage)}</span>
-              <span
-                class="h-box-delta"
-                class:better={playerUsageDelta !== null && playerUsageDelta > 0}
-                class:worse={playerUsageDelta !== null && playerUsageDelta < 0}
-                >{usageChange(player.havoc.combined, player.normal.combined)}</span
-              >
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+  <div
+    class="h-box-score ui-stats-scroll mt-4"
+    role="region"
+    aria-label="Player season box score"
+    tabindex="0"
+  >
+    <PlayerStatsTable
+      columns={squadColumns}
+      rows={comparison.slots}
+      rowKey={(player) => player.slot}
+      caption="Player season box score"
+      tableClass="min-w-[720px]"
+      rowAttributes={(player) => ({ 'data-havoc-player-stats': player.slot })}
+      stickyIdentity
+    >
+      {#snippet identity(player)}
+        {@const source = lineup.find((slot) => slot.slot === player.slot)}
+        <button
+          class="h-player-button"
+          onclick={() => {
+            selectedSlot = player.slot;
+            detailsOpen = true;
+          }}
+          aria-label="View {player.displayName} stats and powers"
+        >
+          <PlayerArt
+            playerId={player.playerId}
+            displayName={player.displayName}
+            franchiseId={source?.franchiseId}
+            seasonKey={source?.seasonKey}
+          />
+          <span
+            ><span class="h-player-name">{player.displayName}</span><span class="h-player-caption"
+              >{player.slot}{comparison.mvp.slot === player.slot ? ' / MVP' : ''} / View details</span
+            ></span
+          >
+        </button>
+      {/snippet}
+      {#snippet cell(player, column)}
+        {@const view = statCell(player, column.key)}
+        {#if view}
+          <span class="h-box-value">{view.value}</span>
+          <span class="h-box-delta" class:better={view.better} class:worse={view.worse}
+            >{view.delta}</span
+          >
+        {/if}
+      {/snippet}
+    </PlayerStatsTable>
   </div>
 </Panel>
 <Dialog.Root bind:open={detailsOpen}>
@@ -347,7 +366,6 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
-yle>
 
 <style>
   .h-box-score {
@@ -370,32 +388,6 @@ yle>
   }
   .h-player-button :global(.h-team-crest) {
     display: none;
-  }
-  table {
-    width: 100%;
-    min-width: 720px;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-  }
-  thead th {
-    font-size: 10px;
-    color: #c1cae4;
-    padding: 8px 10px;
-    text-align: right;
-  }
-  thead th:first-child {
-    text-align: left;
-  }
-  tbody tr {
-    border-top: 1px solid #465273;
-  }
-  tbody th {
-    width: 38%;
-    text-align: left;
-  }
-  td {
-    padding: 10px;
-    text-align: right;
   }
   .h-box-value {
     display: block;
@@ -470,20 +462,6 @@ yle>
     .h-mobile-hint {
       display: block;
     }
-    table {
-      min-width: 640px;
-    }
-    thead th:first-child,
-    tbody th {
-      position: sticky;
-      left: 0;
-      z-index: 1;
-      background: #20294c;
-      width: 152px;
-      min-width: 152px;
-      max-width: 152px;
-      box-shadow: 4px 0 8px #141b3933;
-    }
     .h-player-button {
       gap: 8px;
       min-height: 64px;
@@ -499,10 +477,6 @@ yle>
     .h-player-button :global(.h-player-art) {
       width: 28px;
       height: 28px;
-    }
-    td,
-    thead th {
-      padding: 8px;
     }
     .h-stat-columns {
       gap: 6px;

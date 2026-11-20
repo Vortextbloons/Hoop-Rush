@@ -20,7 +20,7 @@ schemas live here; domain schemas stay in `@hoop-rush/data-contracts`. See
   the checkpoint and `fullCourtSeasonScores` (key `[runId+gameId]`) stores the
   compact results. A slot commit writes the checkpoint and all 15 score rows in
   one transaction, guarded by the next slot and the run's lock digest.
-- **Cap Rush save layout**: save schema 4 keeps the immutable locked inputs in
+- **Cap Rush save layout.** Save schema 4 keeps the immutable locked inputs in
   `capRushLockedInputs`, writes only a reference into `capRushActive`, and
   records compact `capRushLeagueResults` beside the full league boxes. Save
   schema 3 stays readable and migrates on the next accepted command.

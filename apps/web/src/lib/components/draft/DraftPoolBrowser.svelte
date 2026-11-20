@@ -7,7 +7,6 @@
   } from '@hoop-rush/data-contracts';
   import type { DraftFitNeed, DraftFitTier, LineupRepositionPlan } from '@hoop-rush/engine';
   import { untrack } from 'svelte';
-  import { Search } from '@lucide/svelte';
   import { lowercaseName } from '#lib/roster-browser.js';
   import { teamLabelFor } from '#lib/branding.js';
   import {
@@ -22,10 +21,11 @@
     type DraftPresentation,
     type RatingBadgeLabel,
   } from '#lib/draft-presentation.js';
-  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, planPlayerMove } from '#lib/draft-slots.js';
+  import { SLOT_INDEXES, canFillSlot, planPlayerMove } from '#lib/draft-slots.js';
   import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   type IndexRow = PlayersIndexEntry;
   const PAGE_SIZE = DRAFT_POOL_PAGE_SIZE;
   const SEARCH_DEBOUNCE_MS = 80;
@@ -171,49 +171,13 @@
     </span>
   </div>
   {#if filtersEditable}
-    <div class="flex min-w-0 flex-col gap-2 px-2 pb-2 sm:px-2">
-      <div class="relative min-w-0">
-        <Search
-          class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          type="search"
-          bind:value={searchInput}
-          placeholder="Search players…"
-          aria-label="Search players by name"
-          class="h-10 w-full rounded-lg bg-surface-2 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      </div>
-      <div
-        class="flex min-w-0 items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="group"
-        aria-label="Filter by position"
-      >
-        <button
-          type="button"
-          aria-pressed={positionFilter === null}
-          onclick={() => (positionFilter = null)}
-          class="shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-          null
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-        >
-          All
-        </button>
-        {#each SLOT_INDEXES as i (i)}
-          <button
-            type="button"
-            aria-pressed={positionFilter === i}
-            onclick={() => (positionFilter = positionFilter === i ? null : i)}
-            class="shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-            i
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-          >
-            {SLOT_LABELS[i]}
-          </button>
-        {/each}
-      </div>
+    <div class="px-2 pb-2 sm:px-2">
+      <DraftPoolFilters
+        search={searchInput}
+        position={positionFilter}
+        onsearch={(value) => (searchInput = value)}
+        onposition={(value) => (positionFilter = value)}
+      />
     </div>
   {/if}
   {#if error}

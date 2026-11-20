@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { havocObjectiveStatusOf } from './havoc-presentation';
 import { HavocHubState } from './havoc-hub-state.svelte.ts';
 import { FakeHavocService } from './testing/havoc-service-double.ts';
@@ -15,6 +15,19 @@ async function createLockedRun(service: FakeHavocService): Promise<void> {
 }
 
 describe('HavocHubState', () => {
+  it('clears a startup error when retry finds no saved run', async () => {
+    const service = new FakeHavocService();
+    const load = spyOn(service, 'loadActive').mockRejectedValueOnce(new Error('Save unavailable'));
+    const hub = new HavocHubState(service);
+    await hub.load();
+    expect(hub.error).toBe('Save unavailable');
+    await hub.load();
+    expect(hub.error).toBeNull();
+    expect(hub.run).toBeNull();
+    expect(load).toHaveBeenCalledTimes(2);
+    hub.destroy();
+  });
+
   it('continues after the first loss without blocking play', async () => {
     const service = new FakeHavocService({ outcomes: ['win', 'loss'] });
     await createLockedRun(service);

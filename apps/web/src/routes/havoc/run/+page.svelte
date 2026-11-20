@@ -40,7 +40,7 @@
 
 {#if serviceError !== null}
   <PageShell as="section" width="sm" padding="xl">
-    <ServiceErrorPanel title="Havoc is not wired yet" message={serviceError} tone="destructive" />
+    <ServiceErrorPanel title="Havoc could not start" message={serviceError} homeLink />
   </PageShell>
 {:else if hub !== null}
   <HavocHub
@@ -48,4 +48,8 @@
     onOpenResult={() => void goto(resolve('havoc/result/'))}
     onAbandoned={() => void goto(resolve('havoc/'))}
   />
+{:else}
+  <PageShell width="sm" padding="xl">
+    <p class="text-sm text-muted-foreground" role="status">Opening your Havoc season…</p>
+  </PageShell>
 {/if}

@@ -82,7 +82,7 @@
         {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
         {active.aggregates.team.losses}
       </p>
-      <ActionLink href={continueHrefResolved} tone="primary" class="mt-3">Continue</ActionLink>
+      <ActionLink href={continueHrefResolved} tone="primary" class="mt-3">Resume season</ActionLink>
     </Panel>
   {/if}
 

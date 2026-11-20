@@ -31,7 +31,7 @@
 
 {#if serviceError !== null}
   <PageShell as="section" width="sm" padding="xl">
-    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
+    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
   </PageShell>
 {:else if resultState !== null}
   <CapRushRunDetail state={resultState} {runId} />
