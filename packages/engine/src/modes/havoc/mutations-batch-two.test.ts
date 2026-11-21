@@ -79,7 +79,7 @@ function entryOf(run: ScenarioRun, sequence: number | null): HavocScoringEntry |
 }
 
 describe('new tier-1 mutations', () => {
-  it('adds 35 to every scoring rating and lifts shot and usage rate for Glass Cannon', () => {
+  it('adds 25 to every scoring rating and lifts shot and usage rate for Glass Cannon', () => {
     const source = sourceWith({ ratings: { speed: 88 } });
     const effective = applyHavocMutationPackage(source, [{ mutationId: 'glass-cannon' }]);
     for (const field of [
@@ -90,7 +90,7 @@ describe('new tier-1 mutations', () => {
       'freeThrow',
     ] as const) {
       expect(effective.ratings[field], field).toBe(
-        Math.min(100, source.profile.ratings[field] + 35),
+        Math.min(100, source.profile.ratings[field] + 25),
       );
     }
     for (const field of [
@@ -103,10 +103,10 @@ describe('new tier-1 mutations', () => {
       expect(effective.ratings[field], field).toBe(20);
     }
     expect(effective.tendencies.shotRate).toBe(
-      Math.min(100, source.profile.tendencies.shotRate + 45),
+      Math.min(100, source.profile.tendencies.shotRate + 30),
     );
     expect(effective.tendencies.usageRate).toBe(
-      Math.min(100, source.profile.tendencies.usageRate + 35),
+      Math.min(100, source.profile.tendencies.usageRate + 30),
     );
     expect(effective.ratings.speed).toBe(88);
   });
@@ -127,7 +127,7 @@ describe('new tier-1 mutations', () => {
       'threePoint',
       'freeThrow',
     ] as const) {
-      expect(effective.ratings[field], field).toBeLessThanOrEqual(40);
+      expect(effective.ratings[field], field).toBeLessThanOrEqual(15);
     }
   });
 
@@ -136,7 +136,7 @@ describe('new tier-1 mutations', () => {
     const effective = applyHavocMutationPackage(source, [{ mutationId: 'paper-giant' }]);
     expect(effective.physical.heightInches).toBe((source.physical.heightInches ?? 76) + 12);
     expect(effective.ratings.threePoint).toBe(
-      Math.min(100, source.profile.ratings.threePoint + 30),
+      Math.min(100, source.profile.ratings.threePoint + 15),
     );
     expect(effective.ratings.ballHandling).toBe(
       Math.min(100, source.profile.ratings.ballHandling + 25),
@@ -149,7 +149,7 @@ describe('new tier-1 mutations', () => {
       Math.max(0, source.profile.ratings.defensiveRebound - 30),
     );
     expect(effective.tendencies.threePointRate).toBe(
-      Math.min(100, source.profile.tendencies.threePointRate + 30),
+      Math.min(100, source.profile.tendencies.threePointRate + 15),
     );
   });
 });

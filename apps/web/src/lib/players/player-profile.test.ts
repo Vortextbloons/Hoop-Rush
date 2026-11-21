@@ -193,6 +193,28 @@ describe('player profile traits', () => {
     expect(view.strengths.map((trait) => trait.label)).toContain('Perimeter pickpocket');
   });
 
+  it('flags a midrange maestro as a strength when pull-up volume and touch are elite', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ midrange: 85 }),
+        tendencies: tendencies({ shortMidFrequency: 25, longMidFrequency: 25 }),
+      },
+      samples,
+    );
+    expect(view.strengths.map((trait) => trait.label)).toContain('Midrange maestro');
+  });
+
+  it('flags tunnel vision as a weakness for a high-usage player who does not pass', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ passing: 42 }),
+        tendencies: tendencies({ passRate: 10, usageRate: 35 }),
+      },
+      samples,
+    );
+    expect(view.weaknesses.map((trait) => trait.label)).toContain('Tunnel vision');
+  });
+
   it('names a defensive guard archetype for a steal-and-stop guard', () => {
     const view = profileOf(
       {
@@ -299,6 +321,66 @@ describe('player profile traits', () => {
     );
     expect(view.archetype).not.toBe('Defensive guard');
     expect(['Interior force', 'Anchor big', 'Glass specialist']).toContain(view.archetype);
+  });
+
+  it('names a playmaking big for a center with elite passing and engine usage', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ passing: 80, offensiveIq: 78 }),
+        tendencies: tendencies({ passRate: 35, usageRate: 35 }),
+      },
+      [...samples, ...cohort(60, 'C')],
+      { positions: ['C'], slot: 'C' },
+    );
+    expect(view.archetype).toBe('Playmaking big');
+  });
+
+  it('names a point forward for a small forward with elite passing and engine usage', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ passing: 80, offensiveIq: 78 }),
+        tendencies: tendencies({ passRate: 35, usageRate: 35 }),
+      },
+      [...samples, ...cohort(60, 'SF')],
+      { positions: ['SF'], slot: 'SF' },
+    );
+    expect(view.archetype).toBe('Point forward');
+  });
+
+  it('names a two-way anchor for a center with elite rim protection and post scoring', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ block: 80, interiorDefense: 80, insideScoring: 82 }),
+        tendencies: tendencies({ postUpRate: 20 }),
+      },
+      [...samples, ...cohort(60, 'C')],
+      { positions: ['C'], slot: 'C' },
+    );
+    expect(view.archetype).toBe('Two-way anchor');
+  });
+
+  it('names a rim runner for an athletic center who finishes inside without posting up', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ insideScoring: 82, vertical: 78 }),
+        tendencies: tendencies({ rimFrequency: 45, postUpRate: 2 }),
+      },
+      [...samples, ...cohort(60, 'C')],
+      { positions: ['C'], slot: 'C' },
+    );
+    expect(view.archetype).toBe('Rim runner');
+  });
+
+  it('names a 3-and-D wing for a wing with perimeter defense and floor spacing', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ perimeterDefense: 80, defensiveIq: 75, threePoint: 72 }),
+        tendencies: tendencies({ threePointRate: 35 }),
+      },
+      [...samples, ...cohort(60, 'SF')],
+      { positions: ['SF'], slot: 'SF' },
+    );
+    expect(view.archetype).toBe('3-and-D wing');
   });
 
   it('caps the lists shown in the panel', () => {

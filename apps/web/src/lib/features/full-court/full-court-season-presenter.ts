@@ -1,8 +1,13 @@
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   CAP_RUSH_PLAYOFF_ROUNDS,
+  CAP_RUSH_PLAYOFF_TEAMS,
+  CAP_RUSH_SERIES_GAMES,
   capRushConferenceRoundName,
+  capRushSeriesWinner,
+  capRushSeriesWins,
   franchiseAbbreviation,
+  type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
 import {
@@ -12,6 +17,12 @@ import {
 } from '@hoop-rush/engine';
 
 export type FullCourtPlayoffView = ReturnType<typeof fullCourtPlayoffView>;
+
+/**
+ * Parent-owned tab selection. `home` is the matchup-led overview, `league` holds
+ * the schedule and standings, and `playoffs` holds the series and bracket.
+ */
+export type FullCourtSeasonSection = 'home' | 'league' | 'playoffs';
 
 export interface FullCourtResultView {
   readonly won: boolean;
@@ -48,6 +59,64 @@ export interface FullCourtBracketRound {
 export interface FullCourtPostseasonStatus {
   readonly headline: string;
   readonly message: string;
+}
+
+export interface FullCourtMatchupSide {
+  readonly teamId: string;
+  readonly name: string;
+  readonly abbreviation: string;
+  readonly seed: number | null;
+}
+
+export interface FullCourtMatchupSeries {
+  readonly userWins: number;
+  readonly opponentWins: number;
+}
+
+export interface FullCourtMatchupView {
+  readonly phase: 'regular' | 'playoff';
+  readonly label: string;
+  readonly home: FullCourtMatchupSide;
+  readonly away: FullCourtMatchupSide;
+  readonly userSide: 'home' | 'away' | null;
+  readonly series: FullCourtMatchupSeries | null;
+}
+
+export type FullCourtHomeActionKind = 'sim' | 'start-playoffs';
+
+export interface FullCourtHomeAction {
+  readonly kind: FullCourtHomeActionKind;
+  readonly label: string;
+  readonly count: number;
+}
+
+export interface FullCourtHomeControls {
+  readonly primary: FullCourtHomeAction | null;
+  readonly secondary: readonly FullCourtHomeAction[];
+  readonly status: string;
+}
+
+export interface FullCourtSeriesRecapView {
+  readonly round: number;
+  readonly roundLabel: string;
+  readonly opponentId: string;
+  readonly opponentName: string;
+  readonly won: boolean;
+  readonly userWins: number;
+  readonly opponentWins: number;
+}
+
+export interface FullCourtFinalRecap {
+  readonly championTeamId: string;
+  readonly championName: string;
+  readonly userChampion: boolean;
+  readonly seriesWon: number;
+  readonly seriesPlayed: number;
+  readonly gameWins: number;
+  readonly gameLosses: number;
+  readonly headline: string;
+  readonly message: string;
+  readonly series: readonly FullCourtSeriesRecapView[];
 }
 
 type ScoreWithOutcome = Pick<FullCourtSeasonScore, 'homeTeamId' | 'awayTeamId' | 'outcome'>;
@@ -226,5 +295,191 @@ export function fullCourtPlayoffStatus(
   return {
     headline: 'The postseason is live',
     message: 'One game at a time. Your locked lineup carries into every round.',
+  };
+}
+
+function sideOf(
+  teamId: string,
+  teamNameOf: (teamId: string) => string,
+  seed: number | null,
+): FullCourtMatchupSide {
+  return {
+    teamId,
+    name: teamNameOf(teamId),
+    abbreviation: franchiseAbbreviation(teamId),
+    seed,
+  };
+}
+
+/**
+ * Next matchup for the home card. It reads the same locked schedule and bracket
+ * the engine plays from, so the card never advertises a game the season cannot
+ * advance to.
+ */
+export function fullCourtNextMatchup(
+  lock: FullCourtSeasonLock,
+  checkpoint: FullCourtSeasonCheckpoint,
+  playoff: FullCourtPlayoffView | null,
+  teamNameOf: (teamId: string) => string,
+): FullCourtMatchupView | null {
+  const { userTeamId, games } = lock.season;
+  if (playoff !== null) {
+    const next = playoff.nextGame;
+    if (next !== null) {
+      return {
+        phase: 'playoff',
+        label: `Game ${String(next.gameOrdinal)} · ${capRushConferenceRoundName(next.round)}`,
+        home: sideOf(next.homeTeamId, teamNameOf, next.homeSeed),
+        away: sideOf(next.awayTeamId, teamNameOf, next.awaySeed),
+        userSide: next.homeTeamId === userTeamId ? 'home' : 'away',
+        series: null,
+      };
+    }
+    const series = fullCourtUserSeries(playoff.series, userTeamId);
+    if (series === null) return null;
+    const opponentId = series.highTeamId === userTeamId ? series.lowTeamId : series.highTeamId;
+    const userWins = capRushSeriesWins(series, userTeamId);
+    const opponentWins = capRushSeriesWins(series, opponentId);
+    const decided = capRushSeriesWinner(series) !== null;
+    return {
+      phase: 'playoff',
+      label: decided
+        ? `${capRushConferenceRoundName(series.round)} · Series decided`
+        : `${capRushConferenceRoundName(series.round)} · Your series`,
+      home: sideOf(series.highTeamId, teamNameOf, series.highSeed),
+      away: sideOf(series.lowTeamId, teamNameOf, series.lowSeed),
+      userSide: series.highTeamId === userTeamId ? 'home' : 'away',
+      series: { userWins, opponentWins },
+    };
+  }
+  const slot = Math.min(checkpoint.completedThroughSlot + 1, CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
+  if (checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) return null;
+  const fixture = games.find(
+    (game) =>
+      game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+  );
+  if (fixture === undefined) return null;
+  const homeId = fixture.homeTeamId;
+  const awayId = fixture.awayTeamId;
+  const userHome = homeId === userTeamId;
+  return {
+    phase: 'regular',
+    label: `Game ${String(slot)} of ${String(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM)}`,
+    home: sideOf(homeId, teamNameOf, null),
+    away: sideOf(awayId, teamNameOf, null),
+    userSide: userHome ? 'home' : 'away',
+    series: null,
+  };
+}
+
+/**
+ * The home screen owns the one primary action for the current season state.
+ * Regular season sims, the playoff seeding step, forfeit confirmation, and
+ * terminal recap are mutually exclusive so the card never offers a stale action.
+ */
+export function fullCourtHomeControls(input: {
+  readonly checkpoint: FullCourtSeasonCheckpoint;
+  readonly playoff: FullCourtPlayoffView | null;
+  readonly pendingForfeit: boolean;
+  readonly busy: boolean;
+}): FullCourtHomeControls {
+  const { checkpoint, playoff, pendingForfeit, busy } = input;
+  const played = Math.min(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM, checkpoint.completedThroughSlot);
+  const remaining = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - played;
+  const regularComplete = remaining === 0;
+  const sim = (label: string, count: number): FullCourtHomeAction => ({
+    kind: 'sim',
+    label,
+    count,
+  });
+  const withStatus = (controls: Omit<FullCourtHomeControls, 'status'>, status: string) =>
+    busy ? { ...controls, status: 'Simulation in progress…' } : { ...controls, status };
+  if (pendingForfeit) {
+    return withStatus(
+      { primary: null, secondary: [] },
+      'The next game cannot continue until the forfeit is accepted.',
+    );
+  }
+  if (playoff !== null) {
+    if (playoff.championTeamId !== null || playoff.nextGame === null) {
+      return withStatus({ primary: null, secondary: [] }, 'The bracket and champion are saved.');
+    }
+    const userAlive = playoff.userOutcome.status === 'pending';
+    return withStatus(
+      {
+        primary: sim('Sim next game', 1),
+        secondary: [
+          userAlive
+            ? sim('Sim next five', 5)
+            : sim('Sim remaining games', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
+        ],
+      },
+      'Accepted results save immediately.',
+    );
+  }
+  if (regularComplete) {
+    return withStatus(
+      {
+        primary: {
+          kind: 'start-playoffs',
+          label: 'Start playoffs',
+          count: 0,
+        },
+        secondary: [],
+      },
+      'The 82-game regular season is complete. Seed the bracket.',
+    );
+  }
+  return withStatus(
+    {
+      primary: sim('Sim next game', 1),
+      secondary: [
+        sim(`Sim ${String(Math.min(5, remaining))}`, Math.min(5, remaining)),
+        sim('Sim remaining games', remaining),
+      ],
+    },
+    'One game, five games, or the rest of the regular season.',
+  );
+}
+
+/** Season-ending recap once a champion exists; the only terminal state in Full Court. */
+export function fullCourtFinalRecap(
+  lock: FullCourtSeasonLock,
+  playoff: FullCourtPlayoffView | null,
+  teamNameOf: (teamId: string) => string,
+): FullCourtFinalRecap | null {
+  if (playoff === null || playoff.championTeamId === null) return null;
+  const { userTeamId } = lock.season;
+  const championTeamId = playoff.championTeamId;
+  const status = fullCourtPlayoffStatus(playoff, userTeamId, teamNameOf);
+  const userSeries = playoff.series.filter(
+    (entry) => entry.highTeamId === userTeamId || entry.lowTeamId === userTeamId,
+  );
+  const series: FullCourtSeriesRecapView[] = userSeries.map((entry) => {
+    const opponentId = entry.highTeamId === userTeamId ? entry.lowTeamId : entry.highTeamId;
+    const winner = capRushSeriesWinner(entry);
+    return {
+      round: entry.round,
+      roundLabel: capRushConferenceRoundName(entry.round),
+      opponentId,
+      opponentName: teamNameOf(opponentId),
+      won: winner === userTeamId,
+      userWins: capRushSeriesWins(entry, userTeamId),
+      opponentWins: capRushSeriesWins(entry, opponentId),
+    };
+  });
+  const gameWins = series.reduce((total, entry) => total + entry.userWins, 0);
+  const gameLosses = series.reduce((total, entry) => total + entry.opponentWins, 0);
+  return {
+    championTeamId,
+    championName: teamNameOf(championTeamId),
+    userChampion: championTeamId === userTeamId,
+    seriesWon: series.filter((entry) => entry.won).length,
+    seriesPlayed: series.length,
+    gameWins,
+    gameLosses,
+    headline: status.headline,
+    message: status.message,
+    series,
   };
 }

@@ -11,11 +11,13 @@
     FULL_COURT_MIN_ROSTER_SIZE,
     POSITIONS,
   } from '@hoop-rush/data-contracts';
-  import type { FullCourtCatalogIndex } from '@hoop-rush/engine';
+  import { fullCourtSalaryDollarsOf, type FullCourtCatalogIndex } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, Lock, X } from '@lucide/svelte';
+  import { Check, Lock, Users, X } from '@lucide/svelte';
   import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
+  import type { ProfileTab } from '#lib/components/PlayerProfileSheet.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
@@ -27,6 +29,8 @@
   import { franchiseIdentityOf, initialsOf, teamLabelFor } from '#lib/branding.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import { formatPositions } from '#lib/player-positions.js';
+  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import { capRushProfileInput } from '#lib/features/cap-rush/cap-rush-player-profile.js';
   import {
     capStatusClass,
     capStatusLabel,
@@ -40,7 +44,10 @@
     fullCourtDraftSummary,
     fullCourtFaceIndex,
     fullCourtFaceKey,
+    fullCourtLockCopy,
     fullCourtPickReasonLabel,
+    fullCourtProfileReferences,
+    fullCourtSigningImpact,
     fullCourtVariantLabel,
     type FullCourtCatalogRow,
   } from './full-court-draft-presentation.js';
@@ -68,6 +75,8 @@
   let search = $state('');
   let position = $state<Position | null>(null);
   let pageIndex = $state(0);
+  let profileVersionId = $state<string | null>(null);
+  let profileTab = $state<ProfileTab>('details');
 
   onMount(() => {
     let mounted = true;
@@ -116,7 +125,7 @@
   const depthLabel = $derived.by(() => {
     if (complete) return 'Roster confirmed for the run.';
     if (summary.rosterCount >= FULL_COURT_MAX_ROSTER_SIZE) {
-      return 'Twelve players. Finish to lock the roster.';
+      return 'Twelve players. Lock the roster.';
     }
     const cost = summary.depthForecastDollars;
     if (cost === null) return 'No legal completion remains in the catalog.';
@@ -137,13 +146,19 @@
     const tolerance = summary.absenceTolerance;
     return `Absorbs ${String(tolerance)} simultaneous ${tolerance === 1 ? 'absence' : 'absences'} before dropping below five.`;
   });
-  const finishHint = $derived.by(() => {
-    if (complete) return 'Payroll and roster membership are fixed for the run.';
-    if (!summary.canFinish) {
-      const remaining = FULL_COURT_MIN_ROSTER_SIZE - summary.rosterCount;
-      return `${String(remaining)} more ${remaining === 1 ? 'pick' : 'picks'} to reach the six-player minimum.`;
-    }
-    return 'Finishing skips every unused roster place.';
+  const lock = $derived(fullCourtLockCopy(draft, summary));
+  const selectedProfile = $derived.by(() => {
+    if (profileVersionId === null) return null;
+    const player = index.byVersionId.get(profileVersionId);
+    if (player === undefined) return null;
+    const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
+    return {
+      player,
+      view: buildPlayerProfile(capRushProfileInput(player, teamLabel(player)), reference),
+      face: faceFor(player),
+      salaryDollars: fullCourtSalaryDollarsOf(player),
+      signed: draft.picks.some((pick) => pick.player.playerVersionId === player.playerVersionId),
+    };
   });
 
   function updateSearch(value: string): void {
@@ -178,6 +193,11 @@
       : teamLabelFor(manifest, player.franchiseId, player.eraId);
   }
 
+  function openProfile(versionId: string): void {
+    profileVersionId = versionId;
+    profileTab = 'details';
+  }
+
   function statusTone(
     status: ReturnType<typeof fullCourtDraftSummary>['status'],
   ): 'default' | 'muted' | 'primary' | 'accent' | 'negative' {
@@ -193,15 +213,6 @@
     }
   }
 
-  function rowReason(row: FullCourtCatalogRow): string {
-    const reason = fullCourtPickReasonLabel(row.assessment, draft.money);
-    if (reason !== null) return reason;
-    if (row.assessment.projectedPayroll !== null) {
-      return `Legal finish ${formatMillions(row.assessment.projectedPayroll)}`;
-    }
-    return 'Fits payroll and the War Chest';
-  }
-
   function rowActionLabel(row: FullCourtCatalogRow): string {
     if (row.onRoster) return 'Signed';
     if (row.playerRostered) return 'Rostered';
@@ -212,7 +223,7 @@
 <PageShell
   width="full"
   padding="none"
-  class="px-3 pt-4 pb-24 sm:px-6 md:pb-10"
+  class="px-3 pt-4 pb-[calc(9rem_+_env(safe-area-inset-bottom))] sm:px-6 min-[1100px]:pb-10"
   aria-busy={busy ? 'true' : undefined}
 >
   <header class="flex flex-wrap items-end justify-between gap-4">
@@ -242,7 +253,7 @@
       <div
         class="mt-1.5 flex h-2.5 items-stretch gap-0.5"
         role="img"
-        aria-label={`${String(summary.rosterCount)} of ${String(FULL_COURT_MAX_ROSTER_SIZE)} roster places filled; six are needed to finish`}
+        aria-label={`${String(summary.rosterCount)} of ${String(FULL_COURT_MAX_ROSTER_SIZE)} roster places filled; six are needed to lock`}
       >
         {#each ROSTER_TICKS as tick (tick)}
           <span
@@ -252,13 +263,13 @@
           ></span>
         {/each}
       </div>
-      <p class="ui-micro mt-1.5">Six needed to finish</p>
+      <p class="ui-micro mt-1.5">Six needed to lock</p>
     </div>
   </header>
 
   <div class="mt-4 space-y-3">
     <Panel as="section" class="px-4 py-3 sm:px-5" aria-label="Draft payroll and War Chest">
-      <StatGrid columns={4} mobile={2}>
+      <StatGrid columns={3} mobile={3}>
         <StatTile
           label="Player payroll"
           size="lg"
@@ -272,7 +283,7 @@
           size="md"
           surface="tile"
           value={capStatusLabel(summary.status)}
-          note={formatMillions(draft.money.hardLimitDollars) + ' hard limit'}
+          note={`${formatMillions(draft.money.hardLimitDollars)} hard limit`}
           tone={statusTone(summary.status)}
         />
         <StatTile
@@ -282,13 +293,6 @@
           value={formatWarChestCr(summary.warChestDollars)}
           note={`${formatWarChestCr(summary.spentDollars)} spent`}
           tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
-        />
-        <StatTile
-          label="Roster places"
-          size="md"
-          surface="tile"
-          value={`${summary.rosterCount} / ${FULL_COURT_MAX_ROSTER_SIZE}`}
-          note={`${FULL_COURT_MIN_ROSTER_SIZE}–${FULL_COURT_MAX_ROSTER_SIZE} players allowed`}
         />
       </StatGrid>
 
@@ -327,9 +331,10 @@
       </div>
 
       <div
-        class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
+        class="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
       >
         <p class="text-[11px] font-semibold">{depthLabel}</p>
+        <p class="ui-micro">{FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players</p>
       </div>
     </Panel>
 
@@ -370,7 +375,9 @@
               {#each catalogPage.rows as row (row.player.playerVersionId)}
                 {@const face = faceFor(row.player)}
                 {@const team = teamFor(row.player)}
-                {@const reason = rowReason(row)}
+                {@const impact = fullCourtSigningImpact(row, draft.money)}
+                {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
+                {@const signable = row.assessment.legal && !row.onRoster && !complete}
                 <li class="min-w-0">
                   <article
                     class="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card {row.onRoster
@@ -381,12 +388,19 @@
                   >
                     <div class="flex min-w-0 items-start gap-2 p-2.5">
                       {#if face !== null && manifest !== null}
-                        <PlayerFace
-                          player={face}
-                          {manifest}
-                          size="md"
-                          fallbackInitials={initialsOf(row.player.displayName)}
-                        />
+                        <button
+                          type="button"
+                          class="shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`${row.player.displayName} details`}
+                          onclick={() => openProfile(row.player.playerVersionId)}
+                        >
+                          <PlayerFace
+                            player={face}
+                            {manifest}
+                            size="md"
+                            fallbackInitials={initialsOf(row.player.displayName)}
+                          />
+                        </button>
                       {:else}
                         <span
                           class="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-surface-3 font-display text-sm font-extrabold text-muted-foreground"
@@ -395,9 +409,14 @@
                       {/if}
                       <div class="min-w-0 flex-1">
                         <div class="flex items-baseline justify-between gap-2">
-                          <h3 class="min-w-0 truncate font-display text-sm font-extrabold">
+                          <button
+                            type="button"
+                            class="min-w-0 truncate rounded text-left font-display text-sm font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label={`${row.player.displayName} details`}
+                            onclick={() => openProfile(row.player.playerVersionId)}
+                          >
                             {row.player.displayName}
-                          </h3>
+                          </button>
                           <span
                             class="shrink-0 font-mono text-[11px] font-bold text-muted-foreground tabular-nums"
                             aria-label={`Overall ${String(row.player.originalOverall)}`}
@@ -443,14 +462,57 @@
                       >
                     </div>
 
+                    {#if signable}
+                      <dl class="mx-2.5 grid gap-0.5 pb-2 font-mono text-[9px] leading-snug">
+                        <div class="flex items-baseline justify-between gap-2">
+                          <dt class="text-muted-foreground">Payroll after</dt>
+                          <dd class="font-bold tabular-nums">{impact.payrollAfter}</dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-2">
+                          <dt class="text-muted-foreground">Room left</dt>
+                          <dd class="font-bold tabular-nums">{impact.roomAfter}</dd>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-2">
+                          <dt class="text-muted-foreground">War Chest after</dt>
+                          <dd class="font-bold tabular-nums">{impact.warChestAfter}</dd>
+                        </div>
+                        {#if impact.apronShift !== null}
+                          <div class="flex items-baseline justify-between gap-2 text-accent">
+                            <dt class="font-bold uppercase">Apron</dt>
+                            <dd class="font-bold">{impact.apronShift}</dd>
+                          </div>
+                        {/if}
+                        {#if row.assessment.projectedPayroll !== null}
+                          <div class="flex items-baseline justify-between gap-2">
+                            <dt class="text-muted-foreground">Cheapest finish</dt>
+                            <dd class="font-bold tabular-nums">
+                              {formatMillions(row.assessment.projectedPayroll)}
+                            </dd>
+                          </div>
+                        {/if}
+                      </dl>
+                    {/if}
+
                     <div class="mt-auto flex items-end gap-2 p-2.5 pt-1">
-                      <p class="min-w-0 flex-1 text-[10px] leading-snug text-muted-foreground">
-                        {reason}
+                      <p
+                        class="min-w-0 flex-1 text-[10px] leading-snug {blocker === null
+                          ? 'text-muted-foreground'
+                          : 'font-semibold text-negative'}"
+                      >
+                        {#if blocker !== null}
+                          {blocker}
+                        {:else if row.onRoster}
+                          On the roster.
+                        {:else if complete}
+                          Roster is locked.
+                        {:else}
+                          Fits payroll and the War Chest.
+                        {/if}
                       </p>
                       <Button
                         size="sm"
-                        tone={row.assessment.legal ? 'primary' : 'default'}
-                        disabled={busy || !row.assessment.legal}
+                        tone={signable ? 'primary' : 'default'}
+                        disabled={busy || !signable}
                         aria-label={`${rowActionLabel(row)} ${row.player.displayName}`}
                         onclick={() => onPick(row.player.playerVersionId)}
                       >
@@ -506,23 +568,33 @@
           aria-label="Draft actions"
         >
           <div class="min-w-0 flex-1">
-            <p class="font-display text-sm font-extrabold uppercase">
-              {complete ? 'Roster confirmed' : 'Finish the draft'}
+            <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span class="font-display text-sm font-extrabold uppercase">{lock.headline}</span>
+              {#if lock.stamp !== null}
+                <span class="lock-stamp">{lock.stamp}</span>
+              {/if}
             </p>
-            <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{finishHint}</p>
+            <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{lock.detail}</p>
           </div>
+          <a
+            href="#draft-roster"
+            class="roster-jump items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Users size={14} aria-hidden="true" />
+            <span>Roster {summary.rosterCount}</span>
+          </a>
           {#if complete}
             <Badge tone="positive"><Check size={13} aria-hidden="true" /> Locked</Badge>
           {:else}
             <Button tone="primary" disabled={busy || !summary.canFinish} onclick={onFinish}>
               <Lock size={15} aria-hidden="true" />
-              Finish draft
+              Lock the roster
             </Button>
           {/if}
         </div>
       </div>
 
-      <aside class="roster-panel" aria-label="Draft roster">
+      <aside id="draft-roster" class="roster-panel" aria-label="Draft roster">
         <Panel as="section" padding="none">
           <div class="border-b border-line-soft p-3">
             <SectionHeading level={2} size="sm" title="Roster" align="center">
@@ -531,7 +603,7 @@
               {/snippet}
             </SectionHeading>
             <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-              Six to twelve players. Finish skips every unused place; remove anyone before
+              Six to twelve players. Locking skips every unused place; remove anyone before
               confirming.
             </p>
           </div>
@@ -560,9 +632,14 @@
                     >
                   {/if}
                   <div class="min-w-0 flex-1">
-                    <p class="truncate font-display text-xs font-extrabold">
+                    <button
+                      type="button"
+                      class="block max-w-full truncate rounded text-left font-display text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`${pick.player.displayName} details`}
+                      onclick={() => openProfile(pick.player.playerVersionId)}
+                    >
                       {pick.player.displayName}
-                    </p>
+                    </button>
                     <p
                       class="flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted-foreground"
                     >
@@ -610,6 +687,26 @@
   </div>
 </PageShell>
 
+{#if selectedProfile !== null}
+  <!-- No apron tab: Cap Rush's apron view keys off its fixed cap constants, not this draft's pinned money. -->
+  <PlayerProfileSheet
+    profile={selectedProfile.view}
+    face={selectedProfile.face}
+    {manifest}
+    money={{
+      salaryLabel: formatMillions(selectedProfile.salaryDollars),
+      statusLabel: selectedProfile.signed ? 'Signed' : 'Projected',
+      note: null,
+    }}
+    tabs={['details', 'tendencies', 'ratings']}
+    bind:tab={profileTab}
+    open
+    onOpenChange={(open) => {
+      if (!open) profileVersionId = null;
+    }}
+  />
+{/if}
+
 <style>
   .draft-layout {
     display: grid;
@@ -621,16 +718,38 @@
   }
   .roster-panel {
     min-width: 0;
+    scroll-margin-top: 1rem;
+    scroll-margin-bottom: 8rem;
   }
   .roster-list {
     max-height: 48vh;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  .roster-jump {
+    display: inline-flex;
+    min-height: 2.25rem;
+  }
+  .lock-stamp {
+    padding: 0.05rem 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--color-positive) 55%, transparent);
+    border-radius: 0.25rem;
+    color: var(--color-positive);
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: 1.5;
+    text-transform: uppercase;
+  }
+  /* Pinned below the single-column layout so the roster jump and the lock stay
+     reachable wherever the reader is in the draft. */
   .finish-bar {
-    position: sticky;
-    bottom: 0.75rem;
-    z-index: 20;
+    position: fixed;
+    right: 0.75rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 0.75rem;
+    z-index: 30;
   }
   @media (min-width: 1100px) {
     .draft-layout {
@@ -644,6 +763,15 @@
       order: -1;
       position: sticky;
       top: 1rem;
+    }
+    .roster-jump {
+      display: none;
+    }
+    .finish-bar {
+      position: sticky;
+      right: auto;
+      bottom: 0.75rem;
+      left: auto;
     }
   }
   @media (max-width: 639px) {

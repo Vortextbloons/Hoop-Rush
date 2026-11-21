@@ -461,6 +461,20 @@ const STRENGTH_RULES: readonly TraitRule[] = [
     signal: { ratings: ['strength'] },
     test: (c) => c.rating('strength') >= 0.9,
   },
+  {
+    label: 'Midrange maestro',
+    phrase: 'midrange pull-ups',
+    signal: { ratings: ['midrange'], tendencies: ['shortMidFrequency', 'longMidFrequency'] },
+    test: (c) =>
+      c.rating('midrange') >= 0.85 &&
+      (c.tendency('shortMidFrequency') >= 0.5 || c.tendency('longMidFrequency') >= 0.5),
+  },
+  {
+    label: 'Paint enforcer',
+    phrase: 'interior deterrence',
+    signal: { ratings: ['interiorDefense', 'strength'] },
+    test: (c) => c.rating('interiorDefense') >= 0.85 && c.rating('strength') >= 0.8,
+  },
 ];
 
 const WEAKNESS_RULES: readonly TraitRule[] = [
@@ -523,6 +537,21 @@ const WEAKNESS_RULES: readonly TraitRule[] = [
     phrase: 'shot blocking',
     signal: { ratings: ['block'] },
     test: (c) => c.rating('block') <= 0.12,
+  },
+  {
+    label: 'Tunnel vision',
+    phrase: 'playmaking vision',
+    signal: { ratings: ['passing'], tendencies: ['passRate'] },
+    test: (c) =>
+      c.rating('passing') <= 0.2 &&
+      c.tendency('passRate') <= 0.25 &&
+      c.tendency('usageRate') >= 0.5,
+  },
+  {
+    label: 'Interior liability',
+    phrase: 'interior defense',
+    signal: { ratings: ['interiorDefense'] },
+    test: (c) => c.rating('interiorDefense') <= 0.15,
   },
 ];
 
@@ -668,6 +697,8 @@ function archetypeOf(
 
   const isGuard = positions.some((position) => position === 'PG' || position === 'SG');
   const isBig = positions.some((position) => position === 'C' || position === 'PF');
+  const hasWing = positions.some((position) => position === 'SF');
+  const isCenter = positions.includes('C');
   const shootsIt = has('Unlimited range') || has('High-volume shooter');
 
   const candidates: { label: string; score: number }[] = [];
@@ -679,10 +710,25 @@ function archetypeOf(
     });
   }
   if (isGuard) {
-    candidates.push({
-      label: 'Defensive guard',
-      score: evidence('Perimeter pickpocket', 'Perimeter stopper'),
-    });
+    if (has('Perimeter stopper') && has('High-usage engine')) {
+      candidates.push({
+        label: 'Two-way guard',
+        score: evidence('Perimeter stopper', 'High-usage engine'),
+      });
+    } else if (has('Perimeter stopper') && (has('Floor spacer') || has('High-volume shooter'))) {
+      candidates.push({
+        label: '3-and-D guard',
+        score: evidence(
+          'Perimeter stopper',
+          has('High-volume shooter') ? 'High-volume shooter' : 'Floor spacer',
+        ),
+      });
+    } else if (has('Perimeter stopper') && has('Perimeter pickpocket')) {
+      candidates.push({
+        label: 'Defensive guard',
+        score: evidence('Perimeter pickpocket', 'Perimeter stopper'),
+      });
+    }
     candidates.push({ label: 'Creator', score: evidence('Table-setting passer') });
     candidates.push({
       label: 'Scoring guard',
@@ -692,19 +738,69 @@ function archetypeOf(
     if (shootsIt)
       candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
   } else if (isBig) {
+    if (has('Table-setting passer')) {
+      if (has('High-usage engine')) {
+        candidates.push({
+          label: hasWing && !isCenter ? 'Point forward' : 'Playmaking big',
+          score: evidence('Table-setting passer', 'High-usage engine'),
+        });
+      } else {
+        candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
+      }
+    }
+    if (has('Rim protector')) {
+      if (has('Post scorer') || has('High-usage engine')) {
+        candidates.push({
+          label: 'Two-way anchor',
+          score: evidence(
+            'Rim protector',
+            has('Post scorer') ? 'Post scorer' : 'High-usage engine',
+          ),
+        });
+      } else if (has('Owns the glass')) {
+        candidates.push({
+          label: 'Anchor big',
+          score: evidence('Rim protector', 'Owns the glass'),
+        });
+      }
+    }
     candidates.push({ label: 'Interior force', score: evidence('Post scorer', 'Owns the glass') });
-    candidates.push({ label: 'Anchor big', score: evidence('Rim protector', 'Owns the glass') });
     candidates.push({ label: 'Glass specialist', score: evidence('Owns the glass') });
-    candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
+    if (has('Rim finisher') && !has('Post scorer')) {
+      candidates.push({ label: 'Rim runner', score: evidence('Rim finisher') });
+    }
     if (shootsIt) candidates.push({ label: 'Stretch big', score: evidence('High-volume shooter') });
   } else {
+    if (has('Table-setting passer')) {
+      if (has('High-usage engine')) {
+        candidates.push({
+          label: 'Point forward',
+          score: evidence('Table-setting passer', 'High-usage engine'),
+        });
+      } else {
+        candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
+      }
+    }
+    if (has('Perimeter stopper')) {
+      if (has('High-volume shooter')) {
+        candidates.push({
+          label: 'Two-way wing',
+          score: evidence('Perimeter stopper', 'High-volume shooter'),
+        });
+      } else if (has('Floor spacer')) {
+        candidates.push({
+          label: '3-and-D wing',
+          score: evidence('Perimeter stopper', 'Floor spacer'),
+        });
+      } else {
+        candidates.push({ label: 'Wing stopper', score: evidence('Perimeter stopper') });
+      }
+    }
     candidates.push({
-      label: 'Two-way wing',
-      score: evidence('Perimeter stopper', 'High-volume shooter'),
+      label: 'Scoring wing',
+      score: evidence('High-usage engine', 'Isolation scorer'),
     });
-    candidates.push({ label: 'Wing stopper', score: evidence('Perimeter stopper') });
     candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
-    candidates.push({ label: 'Connector', score: evidence('Table-setting passer') });
     candidates.push({ label: 'Slashing wing', score: evidence('Downhill driver') });
   }
 
@@ -718,7 +814,15 @@ function archetypeOf(
   const floor = isGuard ? 'Rotation guard' : isBig ? 'Rotation big' : 'Rotation wing';
   if (best === null || best.score <= 0) return floor;
   if (tied.length > 1) {
-    const scoring = tied.find((entry) => entry.label === 'Scoring guard');
+    const scoring = tied.find(
+      (entry) =>
+        entry.label === 'Scoring guard' ||
+        entry.label === 'Scoring wing' ||
+        entry.label === 'Two-way anchor' ||
+        entry.label === 'Two-way guard' ||
+        entry.label === 'Point forward' ||
+        entry.label === 'Playmaking big',
+    );
     if (scoring !== undefined && tendencies.usageRate >= 30) return scoring.label;
     const gravity = tied.find((entry) => entry.label === 'Gravity shooter');
     if (gravity !== undefined) return gravity.label;

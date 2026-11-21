@@ -150,11 +150,11 @@ describe('new tier-1 transformations', () => {
     expect(flipped.ratings.midrange).toBe(75);
     expect(flipped.ratings.threePoint).toBe(65);
     expect(flipped.ratings.vertical).toBe(60);
-    expect(flipped.ratings.perimeterDefense).toBe(25);
-    expect(flipped.ratings.interiorDefense).toBe(25);
-    expect(flipped.ratings.steal).toBe(25);
-    expect(flipped.ratings.block).toBe(25);
-    expect(flipped.ratings.defensiveRebound).toBe(30);
+    expect(flipped.ratings.perimeterDefense).toBe(20);
+    expect(flipped.ratings.interiorDefense).toBe(20);
+    expect(flipped.ratings.steal).toBe(20);
+    expect(flipped.ratings.block).toBe(20);
+    expect(flipped.ratings.defensiveRebound).toBe(25);
     expect(flipped.ratings.freeThrow).toBe(70);
     expect(flipped.ratings.ballHandling).toBe(60);
     expect(flipped.ratings.passing).toBe(55);
@@ -165,36 +165,35 @@ describe('new tier-1 transformations', () => {
     expect(flipped.ratings.strength).toBe(25);
   });
 
-  it('builds Tiny Titan 12 inches shorter with 90 interior ratings and capped speed', () => {
-    const titan = applyHavocMutationPackage(sourceWith({ heightInches: 79 }), [
-      { mutationId: 'tiny-titan' },
-    ]);
+  it('builds Tiny Titan 12 inches shorter with +15 interior ratings and -30 speed', () => {
+    const source = sourceWith({ heightInches: 79 });
+    const titan = applyHavocMutationPackage(source, [{ mutationId: 'tiny-titan' }]);
     expect(titan.physical.heightInches).toBe(67);
-    expect(titan.ratings.strength).toBe(90);
-    expect(titan.ratings.block).toBe(90);
-    expect(titan.ratings.vertical).toBe(90);
-    expect(titan.ratings.offensiveRebound).toBe(90);
-    expect(titan.ratings.defensiveRebound).toBe(90);
-    expect(titan.ratings.speed).toBe(40);
-    const slowerSource = applyHavocMutationPackage(sourceWith({ ratings: { speed: 35 } }), [
-      { mutationId: 'tiny-titan' },
-    ]);
-    expect(slowerSource.ratings.speed).toBe(35);
+    expect(titan.ratings.strength).toBe(Math.min(100, source.profile.ratings.strength + 15));
+    expect(titan.ratings.block).toBe(Math.min(100, source.profile.ratings.block + 15));
+    expect(titan.ratings.vertical).toBe(Math.min(100, source.profile.ratings.vertical + 15));
+    expect(titan.ratings.offensiveRebound).toBe(
+      Math.min(100, source.profile.ratings.offensiveRebound + 15),
+    );
+    expect(titan.ratings.defensiveRebound).toBe(
+      Math.min(100, source.profile.ratings.defensiveRebound + 15),
+    );
+    expect(titan.ratings.speed).toBe(Math.max(0, source.profile.ratings.speed - 30));
   });
 
-  it('adds 15 to every rating and tendency under Mr. Everything', () => {
+  it('adds 8 to every rating and tendency under Mr. Everything', () => {
     const source = sourceWith();
     const everything = applyHavocMutationPackage(source, [{ mutationId: 'mr-everything' }]);
     for (const field of REQUIRED_RATING_KEYS) {
       expect(everything.ratings[field], field).toBe(
-        Math.min(100, source.profile.ratings[field] + 15),
+        Math.min(100, source.profile.ratings[field] + 8),
       );
     }
     for (const field of Object.keys(
       source.profile.tendencies,
     ) as (keyof typeof everything.tendencies)[]) {
       expect(everything.tendencies[field], field).toBe(
-        Math.min(100, source.profile.tendencies[field] + 15),
+        Math.min(100, source.profile.tendencies[field] + 8),
       );
     }
     expect(everything.physical.heightInches).toBe(76);
@@ -211,8 +210,8 @@ describe('new tier-1 transformations', () => {
     expect(merchant.ratings.freeThrow).toBe(100);
     expect(merchant.ratings.ballHandling).toBe(100);
     expect(merchant.ratings.offensiveIq).toBe(100);
-    expect(merchant.tendencies.driveRate).toBe(95);
-    expect(merchant.tendencies.freeThrowRate).toBe(95);
+    expect(merchant.tendencies.driveRate).toBe(55);
+    expect(merchant.tendencies.freeThrowRate).toBe(55);
     expect(merchant.ratings.threePoint).toBe(65);
   });
 

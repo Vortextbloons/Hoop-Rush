@@ -16,7 +16,19 @@
 
   let controller = $state.raw<FullCourtController | null>(null);
   let startupError = $state<string | null>(null);
-  let coachingOpen = $state(false);
+  const seasonSections = [
+    { value: 'home', label: 'Overview' },
+    { value: 'team', label: 'Team' },
+    { value: 'league', label: 'League' },
+    { value: 'playoffs', label: 'Playoffs' },
+  ] as const;
+  let section = $state<(typeof seasonSections)[number]['value']>('home');
+  let confirmNewDraft = $state(false);
+
+  function selectSection(value: typeof section) {
+    section = value;
+    confirmNewDraft = false;
+  }
 
   onMount(() => {
     const opened = openService(() => new FullCourtController());
@@ -36,6 +48,13 @@
   const playoff = $derived(current?.playoffs?.view ?? null);
   const league = $derived(season?.lock.season);
   const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
+  const health = $derived(
+    userTeam && season
+      ? (current?.playoffs?.checkpoint.healthByTeam ?? season.checkpoint.healthByTeam)[
+          userTeam.teamId
+        ]
+      : undefined,
+  );
   const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
 </script>
 
@@ -45,7 +64,7 @@
 
 <PageShell as="section" width="xl" padding="xl">
   {#if draft?.stage !== 'drafting'}
-    <PageHeader class="mb-6" eyebrow="Full Court" title="Full Court" />
+    <PageHeader class="mb-6" eyebrow="Basketball simulation" title="Full Court" />
   {/if}
   {#if startupError !== null}
     <ServiceErrorPanel title="Full Court could not start" message={startupError} homeLink />
@@ -63,24 +82,19 @@
     {/if}
 
     {#if season}
-      {#if userTeam && defaultRotation && (playoff === null || playoff.userOutcome.status === 'pending')}
-        <details bind:open={coachingOpen} class="ui-panel mb-4">
-          <summary
-            class="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
+      <nav
+        aria-label="Full Court season"
+        class="mb-5 grid grid-cols-4 gap-1 rounded-xl border border-border p-1"
+      >
+        {#each seasonSections as item (item.value)}
+          <Button
+            class="min-h-11 px-1"
+            tone={section === item.value ? 'primary' : 'secondary'}
+            aria-current={section === item.value ? 'page' : undefined}
+            onclick={() => selectSection(item.value)}>{item.label}</Button
           >
-            Coaching plan
-          </summary>
-          {#if coachingOpen}
-            <FullCourtCoachingView
-              roster={userTeam.roster}
-              {defaultRotation}
-              plan={season.coaching}
-              busy={current.busy}
-              onSave={(plan) => current.saveCoaching(plan)}
-            />
-          {/if}
-        </details>
-      {/if}
+        {/each}
+      </nav>
       {#if current.simulating}
         <div class="mb-4 flex flex-wrap items-center gap-3">
           <p role="status" class="text-sm text-muted-foreground">
@@ -94,23 +108,55 @@
           >
         </div>
       {/if}
-      <FullCourtSeasonView
-        lock={season.lock}
-        checkpoint={season.checkpoint}
-        scores={season.scores}
-        {playoff}
-        busy={current.busy}
-        pendingForfeit={current.pendingForfeit}
-        onAdvance={(count, acceptForfeit) => void current.advance(count, acceptForfeit)}
-        onStartPlayoffs={() => void current.startPlayoffs()}
-      />
-      {#if playoff !== null && playoff.nextGame === null}
-        <Button
-          class="mt-6"
-          tone="secondary"
-          loading={current.busy}
-          onclick={() => void current.startDraft()}>Start a new draft</Button
-        >
+      {#if userTeam && defaultRotation}
+        <div hidden={section !== 'team'}>
+          <FullCourtCoachingView
+            roster={userTeam.roster}
+            {defaultRotation}
+            plan={season.coaching}
+            readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
+            health={health ?? null}
+            dayOffset={health?.throughDay ?? null}
+            busy={current.busy}
+            onSave={(plan) => current.saveCoaching(plan)}
+          />
+        </div>
+      {/if}
+      {#if section !== 'team'}
+        <FullCourtSeasonView
+          {section}
+          lock={season.lock}
+          checkpoint={season.checkpoint}
+          scores={season.scores}
+          {playoff}
+          busy={current.busy}
+          pendingForfeit={current.pendingForfeit}
+          onAdvance={(count, acceptForfeit) => void current.advance(count, acceptForfeit)}
+          onStartPlayoffs={() => void current.startPlayoffs()}
+        />
+      {/if}
+      {#if section === 'home' && playoff !== null && playoff.nextGame === null}
+        {#if confirmNewDraft}
+          <Alert class="mt-6" tone="warning" title="Start a new draft?">
+            Your next roster will replace this run as the active save.
+            {#snippet actions()}
+              <Button tone="secondary" onclick={() => (confirmNewDraft = false)}
+                >Keep this run</Button
+              >
+              <Button
+                tone="primary"
+                loading={current.busy}
+                onclick={() => void current.startDraft()}
+              >
+                Start a new draft
+              </Button>
+            {/snippet}
+          </Alert>
+        {:else}
+          <Button class="mt-6" tone="secondary" onclick={() => (confirmNewDraft = true)}>
+            Start a new draft
+          </Button>
+        {/if}
       {/if}
     {:else if draft?.stage === 'drafting' && current.index !== null}
       <FullCourtDraftView
@@ -119,7 +165,10 @@
         busy={current.busy}
         onPick={(versionId) => void current.editDraft('pick-full-court-player', versionId)}
         onRemove={(versionId) => void current.editDraft('remove-full-court-player', versionId)}
-        onFinish={() => void current.editDraft('finish-full-court-draft')}
+        onFinish={() => {
+          selectSection('home');
+          void current.editDraft('finish-full-court-draft');
+        }}
       />
     {:else if current.busy}
       <p role="status" class="text-sm text-muted-foreground">Opening Full Court…</p>

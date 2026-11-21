@@ -22,6 +22,7 @@ import {
   type FullCourtCatalogIndex,
 } from '@hoop-rush/engine';
 import { buildCapRushTestCatalog, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
+import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
 import {
   FULL_COURT_CATALOG_PAGE_SIZE,
   formatWarChestCr,
@@ -29,7 +30,10 @@ import {
   fullCourtDraftSummary,
   fullCourtFaceIndex,
   fullCourtFaceKey,
+  fullCourtLockCopy,
   fullCourtPickReasonLabel,
+  fullCourtProfileReferences,
+  fullCourtSigningImpact,
   fullCourtVariantLabel,
 } from './full-court-draft-presentation.ts';
 
@@ -186,6 +190,69 @@ describe('full court draft presentation', () => {
   it('formats the War Chest through the fixed CR conversion', () => {
     expect(formatWarChestCr(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('450 CR');
     expect(formatWarChestCr(437_500_000)).toBe('437.5 CR');
+  });
+
+  it('prices a signing from the engine assessment the card shows', () => {
+    const { index, state } = setup();
+    const page = fullCourtCatalogPage(index, state, { limit: 5 });
+    const row = page.rows[0];
+    if (row === undefined) throw new Error('missing catalog row');
+    expect(row.assessment.legal).toBe(true);
+
+    const impact = fullCourtSigningImpact(row, state.money);
+    expect(impact.payrollAfter).toBe(formatMillions(row.assessment.payrollAfterPick));
+    expect(impact.roomAfter).toBe(
+      formatMillions(state.money.hardLimitDollars - row.assessment.payrollAfterPick),
+    );
+    expect(impact.warChestAfter).toBe(formatWarChestCr(row.assessment.warChestAfterPick));
+  });
+
+  it('reports an apron shift only when the signing crosses a line', () => {
+    const { index, state } = setup();
+    const page = fullCourtCatalogPage(index, state, { limit: index.catalog.candidates.length });
+    const row = page.rows[0];
+    if (row === undefined) throw new Error('missing catalog row');
+    expect(fullCourtSigningImpact(row, state.money).apronShift).toBeNull();
+
+    const zeroCap = {
+      ...state.money,
+      capLineDollars: 0,
+      firstApronDollars: state.money.hardLimitDollars,
+    };
+    expect(fullCourtSigningImpact(row, zeroCap).apronShift).toBe('Crosses the first apron');
+
+    const zeroApron = { ...state.money, capLineDollars: 0, firstApronDollars: 0 };
+    expect(fullCourtSigningImpact(row, zeroApron).apronShift).toBe('Crosses the second apron');
+  });
+
+  it('states the payroll and War Chest that lock with an unfinished or locked roster', () => {
+    const setupValue = setup();
+    const empty = fullCourtDraftSummary(setupValue.state, setupValue.index);
+    const waiting = fullCourtLockCopy(setupValue.state, empty);
+    expect(waiting.stamp).toBeNull();
+    expect(waiting.headline).toBe('Add before locking');
+    expect(waiting.detail).toContain('6 more signings reaches the 6-player minimum.');
+
+    const six = stateWithPicks(setupValue, FULL_COURT_MIN_ROSTER_SIZE);
+    const ready = fullCourtLockCopy(six, fullCourtDraftSummary(six, setupValue.index));
+    expect(ready.stamp).toBeNull();
+    expect(ready.headline).toBe('Lock the roster');
+    expect(ready.detail).toContain('6 players');
+
+    const locked = fullCourtDraftStateSchema.parse({ ...six, stage: 'complete' });
+    const done = fullCourtLockCopy(locked, fullCourtDraftSummary(locked, setupValue.index));
+    expect(done.stamp).toBe('Locked');
+    expect(done.headline).toBe('Draft complete');
+    expect(done.detail).toContain('Every salary is fixed for the run.');
+  });
+
+  it('keeps profile percentiles inside the shared minimum cohort size', () => {
+    const catalog = buildCapRushTestCatalog({ positions: ['PG'] });
+    const index = fullCourtDraftIndexOf(catalog, capRushTestCatalogSource(catalog));
+    const references = fullCourtProfileReferences(index);
+    expect(references.forSlot('PG')?.sampleSize).toBe(catalog.candidates.length);
+    expect(references.forSlot('C')).toBeNull();
+    expect(fullCourtProfileReferences(index)).toBe(references);
   });
 
   it('labels both Full Court variants', () => {

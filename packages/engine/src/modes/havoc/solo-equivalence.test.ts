@@ -109,16 +109,16 @@ const PINNED_DRAFTS: readonly PinnedDraft[] = [
   {
     seed: 'havoc-equiv-a',
     rerollOnFirstTurn: false,
-    transcriptDigest: 'ea3c6a13f073815faa60a4c9b75cafe3',
+    transcriptDigest: '22958296c5fa8132a75a861cc0a09246',
     rerollStateDigest: null,
-    lockedStateDigest: 'c3a8ffa7083a6ea3528be54d4c113877',
+    lockedStateDigest: 'ae9cc7ae2cb5df52f9fbf934e0232bbe',
   },
   {
     seed: 'havoc-equiv-b',
     rerollOnFirstTurn: true,
-    transcriptDigest: '7440e9f102c0f2bd1c23fccf05055081',
-    rerollStateDigest: '7e536ca67ee8d5baa499d444495ef6f6',
-    lockedStateDigest: '196f97c0f1c1ff24c84c49feb29ebad0',
+    transcriptDigest: '319a1dea3a6aff8601e8ceb4f375d7ba',
+    rerollStateDigest: 'eb9b214706c4b3bbb888d6c1b3238437',
+    lockedStateDigest: 'b656847fbb37a0cbf96e83098ed5c56f',
   },
 ];
 

@@ -11,6 +11,9 @@ import {
   defaultFullCourtCoachingDraft,
   fullCourtCoachingDraft,
   fullCourtCoachingPlan,
+  fullCourtCoachingSignature,
+  fullCourtPlayerHealthView,
+  fullCourtTeamMinutes,
   validateFullCourtCoachingDraft,
   type FullCourtCoachingDraft,
 } from './full-court-coaching-presenter.ts';
@@ -26,6 +29,11 @@ const ROSTER_IDS = ROSTER.map((player) => player.playerId);
 const DEFAULT_ROTATION: NonNullable<FullCourtCoachingPlan['rotation']> = {
   startingFive: ['p1', 'p2', 'p3', 'p4', 'p5'],
   minuteTargets: { p1: 40, p2: 38, p3: 36, p4: 34, p5: 32, p6: 28, p7: 20, p8: 12 },
+};
+const CUSTOM_PLAN: FullCourtCoachingPlan = {
+  schemaVersion: 1,
+  tactics: { pace: 'fast', offense: 'perimeter', defense: 'pressure' },
+  rotation: { ...DEFAULT_ROTATION },
 };
 
 function customDraft(): FullCourtCoachingDraft {
@@ -178,5 +186,99 @@ describe('Full Court coaching validation', () => {
     expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
       'Assign at least one minute to each starter and closer.',
     );
+  });
+});
+
+describe('Full Court team minutes', () => {
+  test('orders starters by slot and the bench by workload', () => {
+    const draft = customDraft();
+    const view = fullCourtTeamMinutes(draft, ROSTER, CUSTOM_PLAN);
+
+    expect(view.starters.map((row) => String(row.player.playerId))).toEqual([
+      'p1',
+      'p2',
+      'p3',
+      'p4',
+      'p5',
+    ]);
+    expect(view.starters[0]?.starterSlot).toBe(0);
+    expect(view.bench.map((row) => String(row.player.playerId))).toEqual(['p6', 'p7', 'p8']);
+    expect(view.bench.every((row) => row.starterSlot === null)).toBe(true);
+    expect(view.starterMinutes).toBe(180);
+    expect(view.benchMinutes).toBe(60);
+  });
+
+  test('marks closers and reads saved minutes beside the draft', () => {
+    const draft = customDraft();
+    draft.closingFive = ['p1', 'p2', 'p3', 'p4', 'p6'];
+    draft.minuteTargets.p6 = 24;
+    const view = fullCourtTeamMinutes(draft, ROSTER, CUSTOM_PLAN);
+    const closer = view.bench.find((row) => row.player.playerId === 'p6');
+
+    expect(closer?.closer).toBe(true);
+    expect(closer?.minutes).toBe(24);
+    expect(closer?.savedMinutes).toBe(28);
+    expect(view.starters[0]?.savedMinutes).toBe(40);
+  });
+
+  test('reads health into an availability label for the fixture day', () => {
+    const draft = customDraft();
+    const health = {
+      version: 'full-court-health-v1' as const,
+      teamId: 'team',
+      throughDay: 10,
+      players: {
+        p1: { loadBasisPoints: 9_000, availableFromDay: null },
+        p2: { loadBasisPoints: 0, availableFromDay: 14 },
+      },
+    };
+    const view = fullCourtTeamMinutes(draft, ROSTER, CUSTOM_PLAN, health, 11);
+
+    expect(view.starters[0]?.health).toEqual({ tone: 'fatigued', label: 'Heavy load 90%' });
+    expect(view.starters[1]?.health).toEqual({ tone: 'unavailable', label: 'Out to day 14' });
+    expect(view.starters[2]?.health).toBeNull();
+  });
+
+  test('treats a return day on the fixture day as available', () => {
+    expect(fullCourtPlayerHealthView({ loadBasisPoints: 0, availableFromDay: 11 }, 11)).toEqual({
+      tone: 'available',
+      label: 'Load 0%',
+    });
+    expect(fullCourtPlayerHealthView({ loadBasisPoints: 0, availableFromDay: 12 }, 11)).toEqual({
+      tone: 'unavailable',
+      label: 'Out to day 12',
+    });
+  });
+});
+
+describe('Full Court coaching signature', () => {
+  test('matches equal plans and ignores key order in minute targets', () => {
+    const left = fullCourtCoachingPlan(customDraft());
+    const draft = customDraft();
+    draft.minuteTargets = { p8: 12, p7: 20, p6: 28, p5: 32, p4: 34, p3: 36, p2: 38, p1: 40 };
+    const right = fullCourtCoachingPlan(draft);
+
+    expect(fullCourtCoachingSignature(left)).toBe(fullCourtCoachingSignature(right));
+  });
+
+  test('changes when tactics, rotation mode, or minute targets change', () => {
+    const base = fullCourtCoachingPlan(customDraft());
+
+    expect(
+      fullCourtCoachingSignature({
+        ...base,
+        tactics: { ...base.tactics, pace: 'slow' },
+      }),
+    ).not.toBe(fullCourtCoachingSignature(base));
+
+    const draft = customDraft();
+    draft.minuteTargets.p1 = 39;
+    draft.minuteTargets.p2 = 39;
+    expect(fullCourtCoachingSignature(fullCourtCoachingPlan(draft))).not.toBe(
+      fullCourtCoachingSignature(base),
+    );
+
+    const automatic = { ...base, rotation: undefined };
+    expect(fullCourtCoachingSignature(automatic)).not.toBe(fullCourtCoachingSignature(base));
   });
 });
