@@ -34,12 +34,11 @@
   import { startClassicRun } from '#lib/features/challenge/start-challenge-run.js';
   import { leaguePrecompute } from '#lib/features/challenge/league-precompute.js';
   import { randomUUID } from '#lib/ids.js';
-  import { resolvePlayerRefs } from '#lib/player-refs.js';
   import { poolSortLabel, presentationForVariant, variantLabel } from '#lib/draft-presentation.js';
   import {
     loadDraftFitContext,
-    DRAFT_FIT_SLOT_ORDER,
-    poolRowKey,
+    fitRowsByPoolRow,
+    lockedDraftSlots,
     resolveDraftPoolDetails,
     scoreDraftPoolMemo,
     type DraftFitContext,
@@ -54,13 +53,14 @@
   import ClassicRollReel from '#lib/components/classic/ClassicRollReel.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import { arenaDraftPick, arenaError } from '#lib/arena-sound.js';
-  import { lazyModule } from '#lib/lazy-module.js';
+  import {
+    DraftSlotPickerState,
+    loadSlotPickerDialog,
+    useDraftLineupRefs,
+  } from '#lib/draft-setup.svelte.js';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
-  const loadSlotPickerDialog = lazyModule(
-    () => import('#lib/components/draft/SlotPickerDialog.svelte'),
-  );
   type IndexRow = PlayersIndexEntry;
   type Variant = 'ratings' | 'ball-knowledge';
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -72,9 +72,7 @@
   let draftError: string | null = $state(null);
   let setupError: string | null = $state(null);
   let actionError: string | null = $state(null);
-  let pickerPlayer = $state<IndexRow | null>(null);
-  let pickerTrigger = $state<HTMLElement | null>(null);
-  let pickerFallbackId = $state<string | null>(null);
+  const picker = new DraftSlotPickerState(() => mounted);
   let spinning = $state(false);
   let spinKey = $state(0);
   let reelAxis = $state<'both' | 'franchise' | 'era'>('both');
@@ -82,7 +80,6 @@
   let guardTarget = $state<ClassicGuardTarget | null>(null);
   let starting = $state(false);
   let launchError: string | null = $state(null);
-  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let poolDetails = $state.raw<PeakPlayerSeason[]>([]);
   let fitContext = $state.raw<DraftFitContext | null>(null);
   let runSeed = $state<Seed | null>(null);
@@ -213,32 +210,10 @@
     }
     return rows;
   });
-  $effect(() => {
-    const m = manifest;
-    const refs = slots
-      .filter((player): player is IndexRow => player !== null)
-      .map((player) => ({
-        playerId: player.playerId,
-        franchiseId: player.franchiseId,
-        eraId: player.eraId,
-      }));
-    if (!m || refs.length === 0) {
-      resolvedDraftPlayers = [];
-      return;
-    }
-    let cancelled = false;
-    resolvePlayerRefs(refs, m).then(
-      (players) => {
-        if (!cancelled) resolvedDraftPlayers = players;
-      },
-      () => {
-        if (!cancelled) resolvedDraftPlayers = [];
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
+  const lineup = useDraftLineupRefs(
+    () => slots,
+    () => manifest,
+  );
   $effect(() => {
     const m = manifest;
     const currentRoll = roll;
@@ -274,39 +249,19 @@
   const fitReport = $derived.by(() => {
     if (presentation !== 'ratings' || draft?.status !== 'drafting') return null;
     const context = fitContext;
-    if (!context || poolDetails.length === 0 || resolvedDraftPlayers.length === 0) return null;
+    if (!context || poolDetails.length === 0 || lineup.players.length === 0) return null;
     try {
       return scoreDraftPoolMemo({
         pool: poolDetails,
-        locked: resolvedDraftPlayers,
-        lockedSlots: slots.flatMap((player, index) =>
-          player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
-        ),
+        locked: lineup.players,
+        lockedSlots: lockedDraftSlots(slots),
         context,
       });
     } catch {
       return null;
     }
   });
-  const fitByRow = $derived.by(() => {
-    if (fitReport === null) return null;
-    const keyById = new Map<string, string>(
-      poolDetails.map((player) => [player.playerId, poolRowKey(player)]),
-    );
-    return new Map(
-      fitReport.scores.map((entry) => [
-        keyById.get(entry.playerId) ?? entry.playerId,
-        {
-          tier: entry.tier,
-          need: entry.primaryNeed,
-          netDelta: entry.netDelta,
-          worstNetDelta: entry.worstNetDelta,
-          warningLabel: entry.warningLabel,
-          recommendedSlot: entry.recommendedSlot,
-        },
-      ]),
-    );
-  });
+  const fitByRow = $derived(fitRowsByPoolRow(fitReport, poolDetails));
   const pickedCount = $derived(slots.filter((player) => player !== null).length);
   const franchiseRerollAvailable = $derived(
     draft && catalog.length > 0
@@ -385,31 +340,10 @@
       actionError = errorMessageOf(error);
     }
   }
-  function openPicker(player: IndexRow) {
-    pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
-    pickerPlayer = player;
-  }
   function pickSuggested(playerId: string) {
     if (spinning || starting) return;
     const row = rollRows.find((candidate) => candidate.playerId === playerId);
-    if (row) openPicker(row);
-  }
-  function closePicker() {
-    if (!mounted) return;
-    pickerPlayer = null;
-    const trigger = pickerTrigger;
-    const fallback = pickerFallbackId;
-    pickerTrigger = null;
-    pickerFallbackId = null;
-    queueMicrotask(() => {
-      if (!mounted) return;
-      if (trigger?.isConnected) {
-        trigger.focus();
-      } else if (fallback) {
-        document.getElementById(fallback)?.focus();
-      }
-    });
+    if (row) picker.open(row);
   }
   async function placePlayer(player: IndexRow, slotIndex: number) {
     if (!draft || catalog.length === 0 || spinning || starting) return;
@@ -429,7 +363,7 @@
           );
       if (next.status === 'complete' && !alreadyDrafted) {
         starting = true;
-        closePicker();
+        picker.close();
         const saved = await persist(next);
         if (!mounted) return;
         draft = saved;
@@ -439,7 +373,7 @@
         void launchRun(next);
       } else {
         spinning = true;
-        closePicker();
+        picker.close();
         await applyRoll(next, 'both');
         if (!mounted) return;
         try {
@@ -638,7 +572,7 @@
             {fitByRow}
             error={actionError}
             emptyMessage="No players in this pool."
-            onpick={openPicker}
+            onpick={(player) => picker.open(player)}
           />
         {:else if draft.status === 'complete'}
           {@const completeDraft = draft}
@@ -714,11 +648,11 @@
           {manifest}
           ready={draft.status === 'complete'}
           allowRemove={false}
-          onmove={openPicker}
+          onmove={(player) => picker.open(player)}
           onremove={() => undefined}
         />
         <DraftValuePanel
-          players={resolvedDraftPlayers}
+          players={lineup.players}
           {presentation}
           poolScores={fitReport?.scores ?? null}
           missingNeeds={fitReport?.missingNeeds ?? []}
@@ -731,17 +665,17 @@
     {/if}
   {/if}
 
-  {#if pickerPlayer}
+  {#if picker.player}
     {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
       <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening lineup picker…</p>
       <SlotPickerDialog
-        player={pickerPlayer}
+        player={picker.player}
         {slots}
         manifest={manifest!}
         {presentation}
         allowDisplacement
         onplace={placePlayer}
-        onclose={closePicker}
+        onclose={() => picker.close()}
       />
     {/await}
   {/if}

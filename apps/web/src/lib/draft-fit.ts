@@ -11,6 +11,7 @@ import {
   toSimulationPlayer,
   type DraftFitNeed,
   type DraftFitReport,
+  type DraftFitScore,
   type DraftFitTier,
 } from '@hoop-rush/engine';
 export type { DraftFitNeed, DraftFitReport, DraftFitScore, DraftFitTier } from '@hoop-rush/engine';
@@ -133,6 +134,42 @@ export function heuristicDraftPoolReport(input: {
     lockedSlots: input.lockedSlots,
     allowDisplacement: input.allowDisplacement,
   });
+}
+
+export function lockedDraftSlots(slots: readonly unknown[]): ProjectionSlot[] {
+  return DRAFT_FIT_SLOT_ORDER.filter((_, index) => slots[index] != null);
+}
+
+export interface DraftFitRow {
+  tier: DraftFitTier;
+  need: DraftFitNeed;
+  netDelta: number | null;
+  worstNetDelta: number | null;
+  warningLabel: string | null;
+  recommendedSlot: DraftFitScore['recommendedSlot'];
+}
+
+export function fitRowsByPoolRow(
+  report: DraftFitReport | null,
+  pool: readonly PeakPlayerSeason[],
+): ReadonlyMap<string, DraftFitRow> | null {
+  if (report === null) return null;
+  const keyById = new Map<string, string>(
+    pool.map((player) => [player.playerId, poolRowKey(player)]),
+  );
+  return new Map(
+    report.scores.map((entry) => [
+      keyById.get(entry.playerId) ?? entry.playerId,
+      {
+        tier: entry.tier,
+        need: entry.primaryNeed,
+        netDelta: entry.netDelta,
+        worstNetDelta: entry.worstNetDelta,
+        warningLabel: entry.warningLabel,
+        recommendedSlot: entry.recommendedSlot,
+      },
+    ]),
+  );
 }
 
 export interface FitTierMeta {

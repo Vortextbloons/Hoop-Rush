@@ -23,7 +23,8 @@
   import { sortDraftRows } from '#lib/draft-presentation.js';
   import {
     heuristicDraftPoolReport,
-    DRAFT_FIT_SLOT_ORDER,
+    fitRowsByPoolRow,
+    lockedDraftSlots,
     loadDraftFitContext,
     nextPageWindow,
     poolRowKey,
@@ -31,7 +32,7 @@
     type DraftFitContext,
     type DraftFitScore,
     type DraftFitNeed,
-    type DraftFitTier,
+    type DraftFitRow,
   } from '#lib/draft-fit.js';
   import RosterFilters from '#lib/components/RosterFilters.svelte';
   import LineupCourt from '#lib/components/LineupCourt.svelte';
@@ -39,10 +40,11 @@
   import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
-  import { lazyModule } from '#lib/lazy-module.js';
-  const loadSlotPickerDialog = lazyModule(
-    () => import('#lib/components/draft/SlotPickerDialog.svelte'),
-  );
+  import {
+    DraftSlotPickerState,
+    loadSlotPickerDialog,
+    useDraftLineupRefs,
+  } from '#lib/draft-setup.svelte.js';
   import { planPlayerMove } from '#lib/draft-slots.js';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -74,19 +76,8 @@
     runSeed = seed;
     leaguePrecompute.prime(seed);
   });
-  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let sandboxFitContext = $state.raw<DraftFitContext | null>(null);
-  let pageDots = $state.raw<ReadonlyMap<
-    string,
-    {
-      tier: DraftFitTier;
-      need: DraftFitNeed;
-      netDelta: number | null;
-      worstNetDelta: number | null;
-      warningLabel: string | null;
-      recommendedSlot: DraftFitScore['recommendedSlot'];
-    }
-  > | null>(null);
+  let pageDots = $state.raw<ReadonlyMap<string, DraftFitRow> | null>(null);
   let pageScores = $state.raw<DraftFitScore[] | null>(null);
   let pageRefinedCount = $state(0);
   let pageNeeds = $state.raw<DraftFitNeed[]>([]);
@@ -95,9 +86,7 @@
   let lastVisibleKey = '';
   let pageScoreGen = 0;
   let dataGen = 0;
-  let pickerPlayer = $state<IndexRow | null>(null);
-  let pickerTrigger = $state<HTMLElement | null>(null);
-  let pickerFallbackId = $state<string | null>(null);
+  const picker = new DraftSlotPickerState(() => mounted);
   let franchiseFilter = $state('');
   let eraFilter = $state('');
   function loadSandboxData() {
@@ -138,32 +127,10 @@
     };
   }
   $effect(() => loadSandboxData());
-  $effect(() => {
-    const m = manifest;
-    const refs = slots
-      .filter((player): player is IndexRow => player !== null)
-      .map((player) => ({
-        playerId: player.playerId,
-        franchiseId: player.franchiseId,
-        eraId: player.eraId,
-      }));
-    if (!m || refs.length === 0) {
-      resolvedDraftPlayers = [];
-      return;
-    }
-    let cancelled = false;
-    resolvePlayerRefs(refs, m).then(
-      (players) => {
-        if (!cancelled) resolvedDraftPlayers = players;
-      },
-      () => {
-        if (!cancelled) resolvedDraftPlayers = [];
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
+  const lineup = useDraftLineupRefs(
+    () => slots,
+    () => manifest,
+  );
   $effect(() => {
     const m = manifest;
     const eraId = eraFilter;
@@ -234,40 +201,11 @@
         details.every((player) => player.eraId === sandboxFitContext?.eraProfile.eraId)
           ? sandboxFitContext
           : null;
+      const fit = { pool: details, locked: lineup.players, lockedSlots: lockedDraftSlots(slots) };
       const report =
-        context === null
-          ? heuristicDraftPoolReport({
-              pool: details,
-              locked: resolvedDraftPlayers,
-              lockedSlots: slots.flatMap((player, index) =>
-                player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
-              ),
-            })
-          : scoreDraftPoolMemo({
-              pool: details,
-              locked: resolvedDraftPlayers,
-              lockedSlots: slots.flatMap((player, index) =>
-                player ? [DRAFT_FIT_SLOT_ORDER[index]!] : [],
-              ),
-              context,
-            });
+        context === null ? heuristicDraftPoolReport(fit) : scoreDraftPoolMemo({ ...fit, context });
       if (gen !== pageScoreGen || !mounted) return;
-      const keyById = new Map<string, string>(
-        details.map((player) => [player.playerId, poolRowKey(player)]),
-      );
-      pageDots = new Map(
-        report.scores.map((entry) => [
-          keyById.get(entry.playerId) ?? entry.playerId,
-          {
-            tier: entry.tier,
-            need: entry.primaryNeed,
-            netDelta: entry.netDelta,
-            worstNetDelta: entry.worstNetDelta,
-            warningLabel: entry.warningLabel,
-            recommendedSlot: entry.recommendedSlot,
-          },
-        ]),
-      );
+      pageDots = fitRowsByPoolRow(report, details);
       pageScores = report.scores;
       pageRefinedCount = report.refinedCount;
       pageNeeds = report.missingNeeds;
@@ -294,7 +232,7 @@
     if (upcoming.length > 0) void ensureDetails(upcoming).catch(() => {});
   }
   $effect(() => {
-    void resolvedDraftPlayers;
+    void lineup.players;
     void sandboxFitContext;
     void manifest;
     void eraFilter;
@@ -322,7 +260,7 @@
       () => {
         if (!mounted) return;
         slots = slots.map((current, i) => current ?? filled[i] ?? null);
-        pickerPlayer = null;
+        picker.player = null;
       },
       () => {},
     );
@@ -381,33 +319,12 @@
       );
       if (entry) void getPool(entry).catch(() => {});
     }
-    closePicker();
-  }
-  function openPicker(player: IndexRow) {
-    pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
-    pickerPlayer = player;
+    picker.close();
   }
   function pickSuggested(playerId: string) {
     if (starting) return;
     const row = lastVisible.find((candidate) => candidate.playerId === playerId);
-    if (row) openPicker(row);
-  }
-  function closePicker() {
-    if (!mounted) return;
-    pickerPlayer = null;
-    const trigger = pickerTrigger;
-    const fallback = pickerFallbackId;
-    pickerTrigger = null;
-    pickerFallbackId = null;
-    queueMicrotask(() => {
-      if (!mounted) return;
-      if (trigger?.isConnected) {
-        trigger.focus();
-      } else if (fallback) {
-        document.getElementById(fallback)?.focus();
-      }
-    });
+    if (row) picker.open(row);
   }
   function removePlayer(slotIndex: number) {
     slots[slotIndex] = null;
@@ -520,7 +437,7 @@
           fitByRow={pageDots}
           error={null}
           emptyMessage="No players match."
-          onpick={openPicker}
+          onpick={(player) => picker.open(player)}
           onvisible={handleVisiblePage}
         />
 
@@ -538,11 +455,11 @@
           {slots}
           {manifest}
           ready={lineupIsLegal}
-          onmove={openPicker}
+          onmove={(player) => picker.open(player)}
           onremove={removePlayer}
         />
         <DraftValuePanel
-          players={resolvedDraftPlayers}
+          players={lineup.players}
           presentation="sandbox"
           poolScores={pageScores}
           missingNeeds={pageNeeds}
@@ -568,17 +485,17 @@
     {/if}
   {/if}
 
-  {#if pickerPlayer}
+  {#if picker.player}
     {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
       <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening lineup picker…</p>
       <SlotPickerDialog
-        player={pickerPlayer}
+        player={picker.player}
         {slots}
         manifest={manifest!}
         presentation="sandbox"
         allowDisplacement
         onplace={placePlayer}
-        onclose={closePicker}
+        onclose={() => picker.close()}
       />
     {/await}
   {/if}
