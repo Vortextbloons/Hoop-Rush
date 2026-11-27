@@ -383,6 +383,56 @@ describe('player profile traits', () => {
     expect(view.archetype).toBe('3-and-D wing');
   });
 
+  it('names a pick-and-roll maestro for a guard who lives in PnR with passing', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ passing: 78, offensiveIq: 78 }),
+        tendencies: tendencies({ pickAndRollBallHandlerRate: 30 }),
+      },
+      samples,
+    );
+    expect(view.strengths.map((trait) => trait.label)).toContain('Pick-and-roll maestro');
+    expect(view.archetype).toBe('Pick-and-roll maestro');
+  });
+
+  it('names a 3-and-D big for a center with rim protection and floor spacing', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ block: 85, interiorDefense: 80, threePoint: 76 }),
+        tendencies: tendencies({ threePointRate: 35 }),
+      },
+      [...samples, ...cohort(60, 'C')],
+      { positions: ['C'], slot: 'C' },
+    );
+    expect(view.archetype).toBe('3-and-D big');
+  });
+
+  it('names an off-ball mover for a wing who cuts and spaces the floor', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ insideScoring: 78, threePoint: 76 }),
+        tendencies: tendencies({ cutRate: 25, threePointRate: 35 }),
+      },
+      [...samples, ...cohort(60, 'SF')],
+      { positions: ['SF'], slot: 'SF' },
+    );
+    expect(view.strengths.map((trait) => trait.label)).toContain('Off-ball cutter');
+    expect(view.archetype).toBe('Off-ball mover');
+  });
+
+  it('flags lacks burst and misses rotations as weaknesses', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ speed: 35, defensiveIq: 35 }),
+        tendencies: tendencies(),
+      },
+      samples,
+    );
+    const labels = view.weaknesses.map((trait) => trait.label);
+    expect(labels).toContain('Lacks burst');
+    expect(labels).toContain('Misses rotations');
+  });
+
   it('caps the lists shown in the panel', () => {
     const view = profileOf({ ratings: ratings(), tendencies: tendencies() }, samples);
     expect(view.strengths.length).toBeLessThanOrEqual(4);

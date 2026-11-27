@@ -475,6 +475,32 @@ const STRENGTH_RULES: readonly TraitRule[] = [
     signal: { ratings: ['interiorDefense', 'strength'] },
     test: (c) => c.rating('interiorDefense') >= 0.85 && c.rating('strength') >= 0.8,
   },
+  {
+    label: 'Pick-and-roll maestro',
+    phrase: 'pick-and-roll creation',
+    signal: { tendencies: ['pickAndRollBallHandlerRate'], ratings: ['passing', 'offensiveIq'] },
+    test: (c) =>
+      c.tendency('pickAndRollBallHandlerRate') >= 0.85 &&
+      (c.rating('passing') >= 0.75 || c.rating('offensiveIq') >= 0.75),
+  },
+  {
+    label: 'Off-ball cutter',
+    phrase: 'off-ball cutting',
+    signal: { tendencies: ['cutRate'], ratings: ['insideScoring'] },
+    test: (c) => c.tendency('cutRate') >= 0.85 && c.rating('insideScoring') >= 0.75,
+  },
+  {
+    label: 'Roll-man threat',
+    phrase: 'roll-man finishing',
+    signal: { tendencies: ['pickAndRollRollManRate'], ratings: ['insideScoring'] },
+    test: (c) => c.tendency('pickAndRollRollManRate') >= 0.85 && c.rating('insideScoring') >= 0.75,
+  },
+  {
+    label: 'Explosive athlete',
+    phrase: 'vertical athleticism',
+    signal: { ratings: ['vertical', 'speed'] },
+    test: (c) => c.rating('vertical') >= 0.9 && c.rating('speed') >= 0.75,
+  },
 ];
 
 const WEAKNESS_RULES: readonly TraitRule[] = [
@@ -552,6 +578,30 @@ const WEAKNESS_RULES: readonly TraitRule[] = [
     phrase: 'interior defense',
     signal: { ratings: ['interiorDefense'] },
     test: (c) => c.rating('interiorDefense') <= 0.15,
+  },
+  {
+    label: 'Lacks burst',
+    phrase: 'foot speed',
+    signal: { ratings: ['speed'] },
+    test: (c) => c.rating('speed') <= 0.12,
+  },
+  {
+    label: 'Loose handle',
+    phrase: 'ball handling',
+    signal: { ratings: ['ballHandling'], tendencies: ['turnoverRate'] },
+    test: (c) => c.rating('ballHandling') <= 0.12 && c.tendency('turnoverRate') >= 0.6,
+  },
+  {
+    label: 'Struggles inside',
+    phrase: 'finishing at the rim',
+    signal: { ratings: ['insideScoring'] },
+    test: (c) => c.rating('insideScoring') <= 0.15 && c.tendency('rimFrequency') >= 0.4,
+  },
+  {
+    label: 'Misses rotations',
+    phrase: 'defensive awareness',
+    signal: { ratings: ['defensiveIq'] },
+    test: (c) => c.rating('defensiveIq') <= 0.12,
   },
 ];
 
@@ -730,11 +780,41 @@ function archetypeOf(
       });
     }
     candidates.push({ label: 'Creator', score: evidence('Table-setting passer') });
+    if (has('Pick-and-roll maestro')) {
+      candidates.push({
+        label: 'Pick-and-roll maestro',
+        score: evidence('Pick-and-roll maestro'),
+      });
+    }
+    if (has('Midrange maestro') && (has('Isolation scorer') || has('High-usage engine'))) {
+      candidates.push({
+        label: 'Shot creator',
+        score: evidence(
+          'Midrange maestro',
+          has('Isolation scorer') ? 'Isolation scorer' : 'High-usage engine',
+        ),
+      });
+    }
+    if (has('High-usage engine') && has('High-volume shooter') && !has('Perimeter stopper')) {
+      candidates.push({
+        label: 'Microwave scorer',
+        score: evidence('High-usage engine', 'High-volume shooter'),
+      });
+    }
     candidates.push({
       label: 'Scoring guard',
       score: evidence('High-usage engine', 'Isolation scorer'),
     });
     candidates.push({ label: 'Slashing guard', score: evidence('Downhill driver') });
+    if (has('Transition weapon') && (has('Downhill driver') || has('Rim finisher'))) {
+      candidates.push({
+        label: 'Transition spark',
+        score: evidence(
+          'Transition weapon',
+          has('Downhill driver') ? 'Downhill driver' : 'Rim finisher',
+        ),
+      });
+    }
     if (shootsIt)
       candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
   } else if (isBig) {
@@ -762,10 +842,36 @@ function archetypeOf(
           label: 'Anchor big',
           score: evidence('Rim protector', 'Owns the glass'),
         });
+      } else if (has('High-volume shooter') || has('Floor spacer')) {
+        candidates.push({
+          label: '3-and-D big',
+          score: evidence(
+            'Rim protector',
+            has('High-volume shooter') ? 'High-volume shooter' : 'Floor spacer',
+          ),
+        });
       }
     }
+    if (has('Paint enforcer') && (has('Owns the glass') || has('Strong upper body'))) {
+      candidates.push({
+        label: 'Paint enforcer',
+        score: evidence(
+          'Paint enforcer',
+          has('Owns the glass') ? 'Owns the glass' : 'Strong upper body',
+        ),
+      });
+    }
     candidates.push({ label: 'Interior force', score: evidence('Post scorer', 'Owns the glass') });
+    if (has('Post scorer') && !has('Owns the glass') && !has('Rim protector')) {
+      candidates.push({ label: 'Post hub', score: evidence('Post scorer') });
+    }
     candidates.push({ label: 'Glass specialist', score: evidence('Owns the glass') });
+    if (has('Roll-man threat') && has('Rim finisher')) {
+      candidates.push({
+        label: 'Roll-and-finish big',
+        score: evidence('Roll-man threat', 'Rim finisher'),
+      });
+    }
     if (has('Rim finisher') && !has('Post scorer')) {
       candidates.push({ label: 'Rim runner', score: evidence('Rim finisher') });
     }
@@ -792,9 +898,32 @@ function archetypeOf(
           label: '3-and-D wing',
           score: evidence('Perimeter stopper', 'Floor spacer'),
         });
+      } else if (has('Downhill driver')) {
+        candidates.push({
+          label: 'Two-way slasher',
+          score: evidence('Perimeter stopper', 'Downhill driver'),
+        });
       } else {
         candidates.push({ label: 'Wing stopper', score: evidence('Perimeter stopper') });
       }
+    }
+    if (has('Midrange maestro') && (has('Isolation scorer') || has('High-usage engine'))) {
+      candidates.push({
+        label: 'Shot-creating wing',
+        score: evidence(
+          'Midrange maestro',
+          has('Isolation scorer') ? 'Isolation scorer' : 'High-usage engine',
+        ),
+      });
+    }
+    if (has('Off-ball cutter') && (has('Floor spacer') || has('High-volume shooter'))) {
+      candidates.push({
+        label: 'Off-ball mover',
+        score: evidence(
+          'Off-ball cutter',
+          has('High-volume shooter') ? 'High-volume shooter' : 'Floor spacer',
+        ),
+      });
     }
     candidates.push({
       label: 'Scoring wing',
@@ -802,6 +931,15 @@ function archetypeOf(
     });
     candidates.push({ label: 'Floor spacer', score: evidence('High-volume shooter') });
     candidates.push({ label: 'Slashing wing', score: evidence('Downhill driver') });
+    if (has('Transition weapon') && (has('Downhill driver') || has('Rim finisher'))) {
+      candidates.push({
+        label: 'Transition wing',
+        score: evidence(
+          'Transition weapon',
+          has('Downhill driver') ? 'Downhill driver' : 'Rim finisher',
+        ),
+      });
+    }
   }
 
   // Ties are common at the ceiling (many traits reach the 100th percentile), so
