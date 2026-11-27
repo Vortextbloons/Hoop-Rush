@@ -26,7 +26,11 @@ import { nonShootingFoulProbability } from '../../../sim/fouls.ts';
 import { prepareTeam, type TeamPrep } from '../../../sim/prepare.ts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import type { HavocEvidence } from '../../../sim/havoc-runtime.ts';
-import { POSSESSION_STARTS } from '../../../sim/possession-wasm.ts';
+import {
+  encodeStruckTables,
+  encodeTeamActionAndShotTables,
+  encodeTeamPickTables,
+} from '../../../sim/possession-tables.ts';
 import { eraPossEstimatePerTrip, turnoverProbability } from '../../../sim/security.ts';
 import {
   DEEP_FOUR_FT_MISS,
@@ -44,13 +48,8 @@ import {
 } from './battle-ledger.ts';
 import { ACTION_TYPES } from '../../../sim/usage.ts';
 import { SHOT_ZONES } from '../../../domain/zones.ts';
-import { freeThrowProbability, shootingFoulProbability } from '../../../sim/fouls.ts';
-import {
-  blockComponents,
-  assistBase,
-  shotComponents,
-  zeroTable,
-} from '../../../sim/possession-wasm.ts';
+import { shootingFoulProbability } from '../../../sim/fouls.ts';
+import { blockComponents, assistBase, shotComponents } from '../../../sim/possession-wasm.ts';
 import { POSSESSION_WASM_BYTES } from '../../../sim/wasm/possession-wasm.gen.ts';
 
 const CHANNELS = havocAuthoritativeChannelSchema.options;
@@ -690,28 +689,7 @@ function buildBattleTeamBlock(
   const keyOf = (player: SimulationPlayer): string =>
     books[prepared.side].bindings[team.players.indexOf(player)]?.participant.instanceId ??
     player.playerId;
-  table(prep.initiatorPickTable);
-  table(prep.foulerPickTable);
-  table(prep.stealerPickTable);
-  table(prep.rebounderPickTables[0]);
-  table(prep.rebounderPickTables[1]);
-  team.players.forEach((player) =>
-    data.push(
-      prep.freeThrowP[team.players.indexOf(player)] ?? freeThrowProbability(player, profile),
-    ),
-  );
-  table(prep.freeThrowShooterPickTable);
-  data.push(prep.offensiveReboundMean, prep.defensiveReboundMean, prep.spacing, prep.pressure);
-  data.push(
-    Math.min(
-      0.9,
-      Math.max(
-        0.3,
-        profile.parameters.stealShareOfTurnovers *
-          (1 + (prep.stealAbility - C.stealNeutralAbility) / 100),
-      ),
-    ),
-  );
+  encodeTeamPickTables(data, table, prep, team.players, profile);
   const turnoverVariants: number[][] = [];
   for (let variant = 0; variant < variantCount; variant += 1) {
     const values: number[] = [];
@@ -725,37 +703,7 @@ function buildBattleTeamBlock(
   const turnoverStart = data.length;
   append(turnoverVariants[0] ?? []);
   append(turnoverVariants[1] ?? turnoverVariants[0] ?? []);
-  for (const player of team.players) {
-    const tables = prep.actionPickTables.get(keyOf(player));
-    if (tables === undefined) throw new Error('havoc battle: missing action tables');
-    for (const start of POSSESSION_STARTS) table(tables.byStart[start], ACTION_TYPES);
-  }
-  for (const player of team.players) {
-    const values = prep.passP.get(keyOf(player));
-    if (values === undefined) throw new Error('havoc battle: missing pass probabilities');
-    append(values);
-  }
-  for (const initiator of team.players) {
-    const shots = prep.teammateShots.get(keyOf(initiator));
-    if (shots === undefined) throw new Error('havoc battle: missing teammate shots');
-    for (const action of ACTION_TYPES) {
-      const weights = shots.byAction[ACTION_TYPES.indexOf(action)];
-      if (weights === undefined) throw new Error('havoc battle: missing teammate weights');
-      table(weights.pickTable, weights.teammates);
-    }
-  }
-  for (const shooter of team.players) {
-    const zones = prep.zonePrep.get(keyOf(shooter));
-    if (zones === undefined) throw new Error('havoc battle: missing zone preparation');
-    for (const action of ACTION_TYPES) table(zones.actionPickTables[action], SHOT_ZONES);
-  }
-  for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
-    for (let shooterSlot = 0; shooterSlot < count; shooterSlot += 1) {
-      const defenderTable = prep.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
-      if (defenderTable === undefined) throw new Error('havoc battle: missing defender table');
-      table(defenderTable);
-    }
-  }
+  encodeTeamActionAndShotTables(data, table, prep, team.players, keyOf, 'havoc battle');
   for (const [slot, defender] of team.players.entries()) {
     for (const zone of SHOT_ZONES)
       data.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
@@ -856,24 +804,8 @@ function buildBattleTeamBlock(
     data.push(0);
     data.push(0);
   } else {
-    const pool = adjusted.pool;
     data.push(1);
-    data.push(pool.length);
-    for (const player of pool) data.push(team.players.indexOf(player));
-    data.push(adjusted.prep.defensiveReboundMean);
-    table(adjusted.prep.stealerPickTable, pool);
-    table(adjusted.prep.rebounderPickTables[1], pool);
-    for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
-      for (let shooterSlot = 0; shooterSlot < shooters; shooterSlot += 1) {
-        const defenderTable = adjusted.prep.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
-        if (defenderTable === undefined) {
-          table(zeroTable(pool.length), pool);
-          continue;
-        }
-        table(defenderTable, pool);
-      }
-    }
-    table(zeroTable(pool.length), pool);
+    encodeStruckTables(data, table, adjusted.prep, adjusted.pool, team.players, shooters);
   }
   if (recordTemplate !== undefined && adjusted === undefined) {
     recordTemplate({ data: data.slice(), turnoverStart, foulStart });
@@ -1963,20 +1895,10 @@ function buildAdjustedSection(
   const team = prepared.team;
   const defense = books[(1 - prepared.side) as 0 | 1];
   const shooters = defense.prepared.team.players.length;
-  const data: number[] = [1, adjusted.pool.length];
-  for (const player of adjusted.pool) data.push(team.players.indexOf(player));
-  data.push(adjusted.prep.defensiveReboundMean);
+  const data: number[] = [1];
   const table = (value: WeightedPickTable): void => {
     data.push(value.total, ...value.weights);
   };
-  table(adjusted.prep.stealerPickTable);
-  table(adjusted.prep.rebounderPickTables[1]);
-  for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
-    for (let shooterSlot = 0; shooterSlot < shooters; shooterSlot += 1) {
-      const defenderTable = adjusted.prep.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
-      table(defenderTable ?? zeroTable(adjusted.pool.length));
-    }
-  }
-  table(zeroTable(adjusted.pool.length));
+  encodeStruckTables(data, table, adjusted.prep, adjusted.pool, team.players, shooters);
   return data;
 }

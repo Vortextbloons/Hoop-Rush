@@ -9,26 +9,22 @@ import { creationScore } from '../domain/archetypes.ts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 import { meanTripSeconds } from './clock.ts';
 import { ENGINE_CONSTANTS as C } from './constants.ts';
-import {
-  freeThrowProbability,
-  nonShootingFoulProbability,
-  shootingFoulProbability,
-} from './fouls.ts';
+import { nonShootingFoulProbability, shootingFoulProbability } from './fouls.ts';
 import type { HavocEvidence } from './havoc-runtime.ts';
 import { prepareTeam, type TeamPrep } from './prepare.ts';
 import type { GameRecorder, RecorderPlayer, RecorderSide, SideIndex } from './recorder.ts';
 import type { WeightedPickTable } from './rng.ts';
 import { eraPossEstimatePerTrip, turnoverProbability } from './security.ts';
 import { contestPenalty, shotQualityBonus } from './shooting.ts';
-import {
-  ACTION_TYPES,
-  isThreePointZone,
-  zoneSkillRating,
-  type ActionType,
-  type PossessionStartType,
-} from './usage.ts';
+import { ACTION_TYPES, isThreePointZone, zoneSkillRating, type ActionType } from './usage.ts';
 import { apronPlayerKeyOf } from './apron-runtime.ts';
 import type { TripContext } from './possession.ts';
+import {
+  POSSESSION_STARTS,
+  encodeStruckTables,
+  encodeTeamActionAndShotTables,
+  encodeTeamPickTables,
+} from './possession-tables.ts';
 import { POSSESSION_WASM_BYTES } from './wasm/possession-wasm.gen.ts';
 
 interface PossessionWasm {
@@ -39,14 +35,6 @@ interface PossessionWasm {
   run_trip(): number;
 }
 
-export const POSSESSION_STARTS: readonly PossessionStartType[] = [
-  'neutral',
-  'madeBasket',
-  'deadBall',
-  'liveTurnover',
-  'defensiveRebound',
-  'offensiveRebound',
-];
 const AUTHORITATIVE_CHANNELS = havocAuthoritativeChannelSchema.options;
 const ALL_AUTHORITATIVE: HavocEvidence = { isAuthoritative: () => true };
 const STAT_FIELDS = 40;
@@ -79,10 +67,6 @@ interface Runtime {
 }
 
 let compiled: WebAssembly.Module | undefined;
-
-export function zeroTable(count: number): WeightedPickTable {
-  return { total: 0, weights: Array.from({ length: count }, () => 0) };
-}
 
 function playerVersion(player: SimulationPlayer): string {
   const version = player.playerVersionId;
@@ -337,26 +321,7 @@ function buildStatic(ctx: TripContext): StaticLayout {
     const count = counts[side];
     const shooters = counts[other];
     const keyOf = (player: SimulationPlayer): string => prep.keyOf(player);
-    table(prep.initiatorPickTable, team.players);
-    table(prep.foulerPickTable, team.players);
-    table(prep.stealerPickTable, team.players);
-    table(prep.rebounderPickTables[0], team.players);
-    table(prep.rebounderPickTables[1], team.players);
-    team.players.forEach((player, index) => {
-      data.push(prep.freeThrowP[index] ?? freeThrowProbability(player, profile));
-    });
-    table(prep.freeThrowShooterPickTable, team.players);
-    data.push(prep.offensiveReboundMean, prep.defensiveReboundMean, prep.spacing, prep.pressure);
-    data.push(
-      Math.min(
-        0.9,
-        Math.max(
-          0.3,
-          profile.parameters.stealShareOfTurnovers *
-            (1 + (prep.stealAbility - C.stealNeutralAbility) / 100),
-        ),
-      ),
-    );
+    encodeTeamPickTables(data, table, prep, team.players, profile);
     const awayPressure = side === 1 ? (ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
     const turnoverVariants: number[][] = [];
     for (let variant = 0; variant < variantCount; variant += 1) {
@@ -385,37 +350,7 @@ function buildStatic(ctx: TripContext): StaticLayout {
     }
     data.push(...(turnoverVariants[0] ?? []));
     data.push(...(turnoverVariants[1] ?? turnoverVariants[0] ?? []));
-    for (const player of team.players) {
-      const tables = prep.actionPickTables.get(keyOf(player));
-      if (tables === undefined) throw new Error('possession: missing action tables');
-      for (const start of POSSESSION_STARTS) table(tables.byStart[start], ACTION_TYPES);
-    }
-    for (const player of team.players) {
-      const values = prep.passP.get(keyOf(player));
-      if (values === undefined) throw new Error('possession: missing pass probabilities');
-      data.push(...values);
-    }
-    for (const initiator of team.players) {
-      const shots = prep.teammateShots.get(keyOf(initiator));
-      if (shots === undefined) throw new Error('possession: missing teammate shots');
-      for (const action of ACTION_TYPES) {
-        const weights = shots.byAction[ACTION_TYPES.indexOf(action)];
-        if (weights === undefined) throw new Error('possession: missing teammate weights');
-        table(weights.pickTable, weights.teammates);
-      }
-    }
-    for (const shooter of team.players) {
-      const zones = prep.zonePrep.get(keyOf(shooter));
-      if (zones === undefined) throw new Error('possession: missing zone preparation');
-      for (const action of ACTION_TYPES) table(zones.actionPickTables[action], SHOT_ZONES);
-    }
-    for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
-      for (let shooterSlot = 0; shooterSlot < count; shooterSlot += 1) {
-        const defenderTable = prep.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
-        if (defenderTable === undefined) throw new Error('possession: missing defender table');
-        table(defenderTable, team.players);
-      }
-    }
+    encodeTeamActionAndShotTables(data, table, prep, team.players, keyOf, 'possession');
     for (const [slot, defender] of team.players.entries()) {
       for (const zone of SHOT_ZONES)
         data.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
@@ -534,22 +469,7 @@ function buildStatic(ctx: TripContext): StaticLayout {
     } else {
       const key = struckKeys[side];
       const pool = team.players.filter((player) => apronPlayerKeyOf(player) !== key);
-      data.push(pool.length);
-      for (const player of pool) data.push(team.players.indexOf(player));
-      data.push(adjusted.defensiveReboundMean);
-      table(adjusted.stealerPickTable, pool);
-      table(adjusted.rebounderPickTables[1], pool);
-      for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
-        for (let shooterSlot = 0; shooterSlot < shooters; shooterSlot += 1) {
-          const defenderTable = adjusted.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
-          if (defenderTable === undefined) {
-            table(zeroTable(pool.length), pool);
-            continue;
-          }
-          table(defenderTable, pool);
-        }
-      }
-      table(zeroTable(pool.length), pool);
+      encodeStruckTables(data, table, adjusted, pool, team.players, shooters);
     }
   }
   data[1] = data.length;
