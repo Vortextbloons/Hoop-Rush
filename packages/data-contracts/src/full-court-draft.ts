@@ -12,6 +12,10 @@ import {
 
 export const FULL_COURT_DRAFT_SCHEMA_VERSION = 1;
 export const FULL_COURT_MONEY_VERSION = 'full-court-money-v1';
+export const FULL_COURT_POOL_VERSION = 'full-court-pool-v1';
+export const FULL_COURT_POOL_MIN_SIZE = 60;
+export const FULL_COURT_POOL_TARGET_SIZE = 75;
+export const FULL_COURT_POOL_MAX_SIZE = 90;
 export const FULL_COURT_MIN_ROSTER_SIZE = 6;
 export const FULL_COURT_MAX_ROSTER_SIZE = 12;
 export const FULL_COURT_MATCH_MINIMUM_PLAYERS = 5;
@@ -208,6 +212,29 @@ export const fullCourtRouletteDraftStateSchema = z.object({
 });
 export type FullCourtRouletteDraftState = z.infer<typeof fullCourtRouletteDraftStateSchema>;
 
+export const fullCourtDraftPoolSchema = z
+  .object({
+    poolVersion: z.string().min(1).max(64),
+    playerVersionIds: z
+      .array(playerVersionIdSchema)
+      .min(FULL_COURT_MIN_ROSTER_SIZE)
+      .max(FULL_COURT_POOL_MAX_SIZE),
+  })
+  .superRefine((pool, ctx) => {
+    const seen = new Set<string>();
+    for (const id of pool.playerVersionIds) {
+      if (seen.has(id)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `draft pool repeats player version ${id}`,
+        });
+        break;
+      }
+      seen.add(id);
+    }
+  });
+export type FullCourtDraftPool = z.infer<typeof fullCourtDraftPoolSchema>;
+
 export const fullCourtDraftStateSchema = z
   .object({
     schemaVersion: z.literal(FULL_COURT_DRAFT_SCHEMA_VERSION),
@@ -217,6 +244,7 @@ export const fullCourtDraftStateSchema = z
     variant: fullCourtVariantSchema,
     catalog: capRushCatalogSourceSchema,
     money: fullCourtMoneyConfigSchema,
+    pool: fullCourtDraftPoolSchema.optional(),
     stage: fullCourtDraftStageSchema,
     picks: z.array(fullCourtDraftPickSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
     spending: z.array(fullCourtSpendingEntrySchema).max(64),
@@ -416,6 +444,29 @@ export const fullCourtDraftStateSchema = z
         code: 'custom',
         message: 'a confirmed roster requires at least six players',
       });
+    }
+
+    if (state.pool !== undefined) {
+      const poolVersions = new Set<string>(state.pool.playerVersionIds);
+      for (const pick of state.picks) {
+        if (!poolVersions.has(pick.player.playerVersionId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `pick ${pick.player.playerVersionId} is outside the draft pool`,
+          });
+        }
+      }
+      for (const report of state.reports ?? []) {
+        if (
+          report.target.kind === 'player-scouting' &&
+          !poolVersions.has(report.target.playerVersionId)
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `scouting report ${report.target.playerVersionId} is outside the draft pool`,
+          });
+        }
+      }
     }
   });
 export type FullCourtDraftState = z.infer<typeof fullCourtDraftStateSchema>;

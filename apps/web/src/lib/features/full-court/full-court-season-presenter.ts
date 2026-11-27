@@ -54,6 +54,9 @@ export interface FullCourtSeriesGameView extends FullCourtResultView {
   readonly gameId: string;
   readonly gameOrdinal: number;
   readonly userHome: boolean;
+  /** The opponent's stored adjustment for this game, when one was applied. */
+  readonly opponentAdaptation: FullCourtPlayoffAdaptation | null;
+  readonly adjustmentResponse: string | null;
 }
 
 export interface FullCourtBracketRound {
@@ -90,7 +93,15 @@ export interface FullCourtMatchupView {
 
 export type FullCourtHomeActionKind = 'sim' | 'start-playoffs';
 
-export interface FullCourtHomeAction {
+/** Optional interruptions for a regular-season batch. */
+export interface FullCourtAdvanceOptions {
+  /** Stop after the first user injury that would affect the next fixture. */
+  readonly stopAtInjury?: boolean;
+  /** Stop after a scheduled quarterly review slot. */
+  readonly stopAtReview?: boolean;
+}
+
+export interface FullCourtHomeAction extends FullCourtAdvanceOptions {
   readonly kind: FullCourtHomeActionKind;
   readonly label: string;
   readonly count: number;
@@ -234,13 +245,30 @@ export function fullCourtSeriesGames(
 ): FullCourtSeriesGameView[] {
   return series.games.map((game, index) => {
     const result = fullCourtResultOf(game, userTeamId);
+    const userHome = game.homeTeamId === userTeamId;
+    const opponentSide = userHome ? 'away' : 'home';
+    const opponentAdaptation = game.adaptations?.[opponentSide] ?? null;
+    const evidence = game.evidence?.[userHome ? 'home' : 'away'];
+    let adjustmentResponse: string | null = null;
+    if (opponentAdaptation !== null && evidence !== undefined) {
+      const inside = opponentAdaptation.reason === 'persistent-inside-scoring';
+      const basisPoints = inside
+        ? (evidence.rimAttempts / evidence.fieldGoalAttempts) * 10_000
+        : (evidence.leadUsageCentis / evidence.teamUsageCentis) * 10_000;
+      const metric = inside ? 'rim share' : 'lead-player opportunity share';
+      const current = formatBpsPercent(Math.round(basisPoints));
+      const previous = formatBpsPercent(opponentAdaptation.observedShareBps);
+      adjustmentResponse = `Your ${metric} was ${current} this game, after ${previous} in the prior sample.`;
+    }
     return {
       gameId: game.gameId,
       gameOrdinal: index + 1,
       ...result,
-      userHome: game.homeTeamId === userTeamId,
+      userHome,
       won: game.winnerTeamId === userTeamId,
       compactLabel: result.doubleForfeit ? 'Double forfeit' : result.compactLabel,
+      opponentAdaptation,
+      adjustmentResponse,
     };
   });
 }
@@ -485,6 +513,7 @@ export type FullCourtGameDayPlayerStatus =
 
 export interface FullCourtGameDayPlayerView {
   readonly playerId: string;
+  readonly playerVersionId?: string | undefined;
   readonly displayName: string;
   readonly positions: readonly string[];
   readonly status: FullCourtGameDayPlayerStatus;
@@ -579,6 +608,7 @@ export function fullCourtGameDayReadiness(input: {
   const players = baseRows.map((row): FullCourtGameDayPlayerView => {
     const common = {
       playerId: row.player.playerId,
+      playerVersionId: row.player.playerVersionId,
       displayName: row.player.displayName,
       positions: row.player.positions,
       resting: row.resting,
@@ -680,10 +710,15 @@ export function fullCourtHomeControls(input: {
   const played = Math.min(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM, checkpoint.completedThroughSlot);
   const remaining = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - played;
   const regularComplete = remaining === 0;
-  const sim = (label: string, count: number): FullCourtHomeAction => ({
+  const sim = (
+    label: string,
+    count: number,
+    options: FullCourtAdvanceOptions = {},
+  ): FullCourtHomeAction => ({
     kind: 'sim',
     label,
     count,
+    ...options,
   });
   const withStatus = (controls: Omit<FullCourtHomeControls, 'status'>, status: string) =>
     busy ? { ...controls, status: 'Simulation in progress…' } : { ...controls, status };
@@ -713,9 +748,9 @@ export function fullCourtHomeControls(input: {
             : sim('Sim remaining games', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
         ],
       },
-      playoff.nextGame.userSide === null
-        ? 'AI-only bracket games finish before your next game.'
-        : 'Accepted results save immediately.',
+      userAlive
+        ? 'Sims count your games; AI-only bracket games advance automatically.'
+        : 'Your run is over. Sim the remaining bracket to crown a champion.',
     );
   }
   if (regularComplete) {
@@ -734,22 +769,23 @@ export function fullCourtHomeControls(input: {
   const reviewSlot = fullCourtNextReviewSlot(played);
   const reviewCount = reviewSlot === null ? null : reviewSlot - played;
   const shortCount = Math.min(5, remaining);
+  const interrupted: FullCourtAdvanceOptions = { stopAtInjury: true, stopAtReview: true };
   const secondary: FullCourtHomeAction[] = [];
   if (reviewCount !== null && reviewCount === shortCount) {
-    secondary.push(sim('Sim to next review', reviewCount));
+    secondary.push(sim('Sim to next review', reviewCount, interrupted));
   } else {
-    secondary.push(sim(`Sim ${String(shortCount)}`, shortCount));
-    if (reviewCount !== null) secondary.push(sim('Sim to next review', reviewCount));
+    secondary.push(sim(`Sim ${String(shortCount)}`, shortCount, interrupted));
+    if (reviewCount !== null) secondary.push(sim('Sim to next review', reviewCount, interrupted));
   }
   if (remaining !== shortCount && remaining !== reviewCount) {
     secondary.push(sim('Sim remaining games', remaining));
   }
   return withStatus(
     {
-      primary: sim('Sim next game', 1),
+      primary: sim('Sim next game', 1, interrupted),
       secondary,
     },
-    'Sim one game, to the next quarterly review, or through the regular season.',
+    'Sim one game, to the next review, or through the regular season. Batches pause at a review or an actionable injury.',
   );
 }
 
@@ -824,6 +860,155 @@ export function fullCourtPlayoffAdaptationRead(
     reasonLabel: 'Persistent opportunity concentration',
     detailLabel: `${observed} lead-player opportunity share across ${String(adaptation.sampleGames)} played games (threshold ${threshold}).`,
   };
+}
+
+/** True when the opponent's next-game adjustment is new or has changed setting. */
+export function fullCourtPlayoffAdjustmentChanged(
+  applied: FullCourtPlayoffAdaptation | null | undefined,
+  next: FullCourtPlayoffAdaptation | null | undefined,
+): boolean {
+  return next !== null && next !== undefined && (applied?.defense ?? null) !== next.defense;
+}
+
+export type FullCourtSimulationStop =
+  | { readonly kind: 'review'; readonly slot: number }
+  | {
+      readonly kind: 'injury';
+      readonly slot: number;
+      readonly playerIds: readonly string[];
+      readonly availableFromDay: number;
+    }
+  | {
+      readonly kind: 'series-complete';
+      readonly round: number;
+      readonly opponentTeamId: string;
+      readonly won: boolean;
+      readonly userWins: number;
+      readonly opponentWins: number;
+    }
+  | {
+      readonly kind: 'opponent-change';
+      readonly round: number;
+      readonly opponentTeamId: string;
+      readonly gameOrdinal: number;
+    }
+  | {
+      readonly kind: 'opponent-adjustment';
+      readonly round: number;
+      readonly opponentTeamId: string;
+      readonly gameOrdinal: number;
+      readonly adaptation: FullCourtPlayoffAdaptation;
+    }
+  | {
+      readonly kind: 'game-limit';
+      readonly userGames: number;
+      readonly bracketGames: number;
+    }
+  | {
+      readonly kind: 'playoffs-complete';
+      readonly championTeamId: string;
+      readonly userTeamId: string;
+    }
+  | { readonly kind: 'stopped'; readonly userGames: number; readonly bracketGames: number };
+
+/** Typed, display-ready feedback for why a simulation batch returned control. */
+export interface FullCourtSimulationNotice {
+  readonly stop: FullCourtSimulationStop;
+  readonly tone: 'info' | 'success' | 'warning';
+  readonly title: string;
+  readonly message: string;
+}
+
+function gamesLabel(count: number): string {
+  return `${String(count)} ${count === 1 ? 'game' : 'games'}`;
+}
+
+export function fullCourtSimulationNotice(
+  stop: FullCourtSimulationStop,
+  teamNameOf: (teamId: string) => string,
+  playerNameOf: (playerId: string) => string,
+): FullCourtSimulationNotice {
+  switch (stop.kind) {
+    case 'review':
+      return {
+        stop,
+        tone: 'info',
+        title: `Scheduled review · ${gamesLabel(stop.slot)} played`,
+        message:
+          'Review injuries, rest choices, and tactics before simulating the next block of games.',
+      };
+    case 'injury': {
+      const names = stop.playerIds.map(playerNameOf);
+      const playerList = names.join(', ');
+      return {
+        stop,
+        tone: 'warning',
+        title: names.length === 1 ? `${playerList} is out` : `${playerList} are out`,
+        message: `Out until day ${String(stop.availableFromDay)}. Adjust rest or rotation before continuing.`,
+      };
+    }
+    case 'series-complete': {
+      const opponent = teamNameOf(stop.opponentTeamId);
+      return {
+        stop,
+        tone: stop.won ? 'success' : 'warning',
+        title: stop.won ? 'Series won' : 'Series lost',
+        message: stop.won
+          ? `You beat ${opponent} ${String(stop.userWins)}–${String(stop.opponentWins)} in the ${capRushConferenceRoundName(stop.round)}. Return when the next opponent is ready.`
+          : `Your run ended against ${opponent} ${String(stop.userWins)}–${String(stop.opponentWins)} in the ${capRushConferenceRoundName(stop.round)}. Sim the remaining bracket when ready.`,
+      };
+    }
+    case 'opponent-change': {
+      const opponent = teamNameOf(stop.opponentTeamId);
+      return {
+        stop,
+        tone: 'info',
+        title: `Next opponent: ${opponent}`,
+        message: `${capRushConferenceRoundName(stop.round)}. Set matchups, rest, and tactics before Game ${String(stop.gameOrdinal)}.`,
+      };
+    }
+    case 'opponent-adjustment': {
+      const read = fullCourtPlayoffAdaptationRead(stop.adaptation);
+      return {
+        stop,
+        tone: 'warning',
+        title: `Opponent adjusted: ${read.settingLabel}`,
+        message: `${read.reasonLabel} (${read.detailLabel}). They will use it in Game ${String(stop.gameOrdinal)}. Adjust your plan, then continue.`,
+      };
+    }
+    case 'game-limit':
+      return {
+        stop,
+        tone: 'info',
+        title: 'Simulation complete',
+        message:
+          stop.userGames > 0
+            ? `${gamesLabel(stop.userGames)} played for your team.`
+            : `${gamesLabel(stop.bracketGames)} of the bracket played.`,
+      };
+    case 'playoffs-complete': {
+      const champion = teamNameOf(stop.championTeamId);
+      return {
+        stop,
+        tone: stop.championTeamId === stop.userTeamId ? 'success' : 'info',
+        title: 'Bracket complete',
+        message:
+          stop.championTeamId === stop.userTeamId
+            ? 'You are the Full Court champion.'
+            : `${champion} take the title. Your run is complete.`,
+      };
+    }
+    case 'stopped':
+      return {
+        stop,
+        tone: 'info',
+        title: 'Simulation stopped',
+        message:
+          stop.userGames > 0
+            ? `Saved after ${gamesLabel(stop.userGames)} for your team.`
+            : `Saved after ${gamesLabel(stop.bracketGames)} of the bracket.`,
+      };
+  }
 }
 
 const PLAYOFF_GAME_ID_PATTERN = /^fcp-([1-4])-([0-7])-([1-7])$/;

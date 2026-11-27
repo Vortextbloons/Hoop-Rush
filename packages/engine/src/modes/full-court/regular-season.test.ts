@@ -69,6 +69,7 @@ function preparedSeason() {
       money: { ...FULL_COURT_DEFAULT_MONEY, capLineDollars: 0, firstApronDollars: 0 },
     },
     index,
+    { pool: 'open' },
   );
   const chosen = setup.catalog.candidates.filter((player) => player.positions.primary === 'PG');
   for (const candidate of chosen) {

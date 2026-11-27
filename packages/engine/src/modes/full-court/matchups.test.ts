@@ -119,6 +119,7 @@ function buildTestSeasonLock() {
       money: { ...FULL_COURT_DEFAULT_MONEY, capLineDollars: 0, firstApronDollars: 0 },
     }),
     index,
+    { pool: 'open' },
   );
   for (const candidate of base.candidates.filter((player) => player.positions.primary === 'PG')) {
     draft = applyFullCourtCommand(

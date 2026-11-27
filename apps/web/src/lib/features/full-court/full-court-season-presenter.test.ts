@@ -3,6 +3,7 @@ import {
   FULL_COURT_HEALTH_VERSION,
   fullCourtTeamHealthSchema,
   seedSchema,
+  type FullCourtPlayoffAdaptation,
   type FullCourtPlayoffScore,
 } from '@hoop-rush/data-contracts';
 import {
@@ -19,8 +20,10 @@ import {
   fullCourtNextMatchup,
   fullCourtNextReviewSlot,
   fullCourtNextUserFixture,
+  fullCourtPlayoffAdjustmentChanged,
   fullCourtResultOf,
   fullCourtSeriesGames,
+  fullCourtSimulationNotice,
 } from './full-court-season-presenter';
 import { fullCourtTestPlayoffLock, fullCourtTestSeasonLock } from './full-court-test-support';
 
@@ -150,7 +153,25 @@ describe('full court home controls', () => {
     });
     expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
     expect(controls.secondary).toHaveLength(1);
-    expect(controls.status).toBe('AI-only bracket games finish before your next game.');
+    expect(controls.status).toBe(
+      'Sims count your games; AI-only bracket games advance automatically.',
+    );
+  });
+
+  test('offers a remaining-bracket batch after the user is eliminated', () => {
+    const playoffs = fullCourtTestPlayoffLock(lock);
+    const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
+    const controls = fullCourtHomeControls({
+      checkpoint: { ...opened, completedThroughSlot: 82 },
+      playoff: { ...view, userOutcome: { status: 'eliminated', round: 1 } },
+      pendingForfeit: false,
+      busy: false,
+    });
+    expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
+    expect(controls.secondary[0]).toMatchObject({
+      label: 'Sim remaining games',
+    });
+    expect(controls.status).toContain('Your run is over');
   });
 
   test('stops offering sim actions once a champion exists', () => {
@@ -478,5 +499,198 @@ describe('full court final recap', () => {
       gameLosses: 0,
       headline: 'Full Court champions',
     });
+  });
+});
+
+describe('full court simulation interruptions', () => {
+  test('regular-season single games and short batches pause for reviews and injuries', () => {
+    const controls = fullCourtHomeControls({
+      checkpoint: opened,
+      playoff: null,
+      pendingForfeit: false,
+      busy: false,
+    });
+    expect(controls.primary).toMatchObject({
+      count: 1,
+      stopAtInjury: true,
+      stopAtReview: true,
+    });
+    const five = controls.secondary.find((action) => action.label === 'Sim 5');
+    expect(five).toMatchObject({ stopAtInjury: true, stopAtReview: true });
+    const remaining = controls.secondary.find((action) => action.label === 'Sim remaining games');
+    expect(remaining).toBeDefined();
+    expect(remaining?.stopAtInjury).toBeUndefined();
+    expect(remaining?.stopAtReview).toBeUndefined();
+  });
+
+  test('playoff sims leave series and opponent decisions to the controller', () => {
+    const playoffs = fullCourtTestPlayoffLock(lock);
+    const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
+    const controls = fullCourtHomeControls({
+      checkpoint: { ...opened, completedThroughSlot: 82 },
+      playoff: view,
+      pendingForfeit: false,
+      busy: false,
+    });
+    expect(controls.primary?.stopAtInjury).toBeUndefined();
+    expect(controls.secondary[0]?.label).toBe('Sim next five');
+    expect(controls.secondary[0]?.count).toBe(5);
+  });
+
+  test('regular-season batches stay uninterrupted once the season is over', () => {
+    const controls = fullCourtHomeControls({
+      checkpoint: { ...opened, completedThroughSlot: 82 },
+      playoff: null,
+      pendingForfeit: false,
+      busy: false,
+    });
+    expect(controls.primary).toMatchObject({ kind: 'start-playoffs' });
+    expect(controls.secondary).toEqual([]);
+  });
+});
+
+describe('full court stored playoff adaptations', () => {
+  const adaptation: FullCourtPlayoffAdaptation = {
+    defense: 'protect-paint',
+    reason: 'persistent-inside-scoring',
+    sampleGames: 2,
+    windowGames: 2,
+    observedShareBps: 5_000,
+    thresholdShareBps: 4_600,
+  };
+
+  test('reads the opponent adjustment stored on each series game', () => {
+    const played: FullCourtPlayoffScore = {
+      gameId: 'fcp-1-0-3',
+      dayOffset: 180,
+      homeTeamId: 'lal',
+      awayTeamId: 'bos',
+      winnerTeamId: 'lal',
+      outcome: { kind: 'played', homePoints: 100, awayPoints: 95 },
+      adaptations: { home: adaptation },
+      evidence: {
+        home: {
+          fieldGoalAttempts: 100,
+          rimAttempts: 60,
+          leadUsageCentis: 4_000,
+          teamUsageCentis: 12_000,
+        },
+        away: {
+          fieldGoalAttempts: 100,
+          rimAttempts: 38,
+          leadUsageCentis: 4_000,
+          teamUsageCentis: 12_000,
+        },
+      },
+    };
+    const series: FullCourtPlayoffSeries = {
+      seriesId: 'fcs-1-0',
+      round: 1,
+      seriesSlot: 0,
+      highSeed: 1,
+      lowSeed: 8,
+      highTeamId: 'lal',
+      lowTeamId: 'bos',
+      games: [played],
+    };
+
+    expect(fullCourtSeriesGames(series, 'bos')[0]?.opponentAdaptation).toEqual(adaptation);
+    expect(fullCourtSeriesGames(series, 'bos')[0]?.adjustmentResponse).toBe(
+      'Your rim share was 38% this game, after 50% in the prior sample.',
+    );
+    expect(fullCourtSeriesGames(series, 'lal')[0]?.opponentAdaptation).toBeNull();
+  });
+
+  test('treats a new or changed opponent setting as an adjustment, not a repeat', () => {
+    expect(fullCourtPlayoffAdjustmentChanged(undefined, adaptation)).toBe(true);
+    expect(fullCourtPlayoffAdjustmentChanged(null, adaptation)).toBe(true);
+    expect(fullCourtPlayoffAdjustmentChanged(adaptation, adaptation)).toBe(false);
+    expect(
+      fullCourtPlayoffAdjustmentChanged(adaptation, {
+        ...adaptation,
+        defense: 'pressure',
+        reason: 'persistent-opportunity-concentration',
+      }),
+    ).toBe(true);
+    expect(fullCourtPlayoffAdjustmentChanged(adaptation, undefined)).toBe(false);
+  });
+});
+
+describe('full court stop notices', () => {
+  const playerNameOf = (playerId: string) => `Player ${playerId}`;
+
+  test('describes schedule reviews, injuries, series, and opponent decisions', () => {
+    expect(
+      fullCourtSimulationNotice({ kind: 'review', slot: 20 }, teamNameOf, playerNameOf),
+    ).toMatchObject({
+      tone: 'info',
+      title: 'Scheduled review · 20 games played',
+    });
+    expect(
+      fullCourtSimulationNotice(
+        { kind: 'injury', slot: 4, playerIds: ['p1'], availableFromDay: 12 },
+        teamNameOf,
+        playerNameOf,
+      ),
+    ).toMatchObject({
+      tone: 'warning',
+      title: 'Player p1 is out',
+      message: 'Out until day 12. Adjust rest or rotation before continuing.',
+    });
+    expect(
+      fullCourtSimulationNotice(
+        {
+          kind: 'series-complete',
+          round: 1,
+          opponentTeamId: lock.season.teams[1]?.teamId ?? 'opponent',
+          won: true,
+          userWins: 4,
+          opponentWins: 2,
+        },
+        teamNameOf,
+        playerNameOf,
+      ),
+    ).toMatchObject({ tone: 'success', title: 'Series won' });
+    expect(
+      fullCourtSimulationNotice(
+        { kind: 'opponent-change', round: 2, opponentTeamId: 'opponent', gameOrdinal: 1 },
+        teamNameOf,
+        playerNameOf,
+      ),
+    ).toMatchObject({ title: 'Next opponent: opponent' });
+  });
+
+  test('explains an adjusted opponent and a finished bracket', () => {
+    const adaptation: FullCourtPlayoffAdaptation = {
+      defense: 'pressure',
+      reason: 'persistent-opportunity-concentration',
+      sampleGames: 2,
+      windowGames: 2,
+      observedShareBps: 2_800,
+      thresholdShareBps: 2_600,
+    };
+    const adjustmentNotice = fullCourtSimulationNotice(
+      {
+        kind: 'opponent-adjustment',
+        round: 1,
+        opponentTeamId: 'opponent',
+        gameOrdinal: 3,
+        adaptation,
+      },
+      teamNameOf,
+      playerNameOf,
+    );
+    expect(adjustmentNotice).toMatchObject({
+      tone: 'warning',
+      title: 'Opponent adjusted: Pressure',
+    });
+    expect(adjustmentNotice.message).toContain('Game 3');
+    expect(
+      fullCourtSimulationNotice(
+        { kind: 'playoffs-complete', championTeamId: 'opponent', userTeamId },
+        teamNameOf,
+        playerNameOf,
+      ),
+    ).toMatchObject({ title: 'Bracket complete' });
   });
 });

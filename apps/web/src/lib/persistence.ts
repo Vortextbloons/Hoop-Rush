@@ -12,6 +12,7 @@ import {
   createFullCourtBlueprintRepository,
   createFullCourtCoachingRepository,
   createFullCourtHistoryRepository,
+  createFullCourtNextGamePlanRepository,
   createFullCourtPlayoffRepository,
   createFullCourtSeasonRepository,
   createFullCourtWatchedReplayRepository,
@@ -33,6 +34,7 @@ export interface Persistence {
   fullCourtCoachingRepository: ReturnType<typeof createFullCourtCoachingRepository>;
   fullCourtHistoryRepository: ReturnType<typeof createFullCourtHistoryRepository>;
   fullCourtWatchedReplayRepository: ReturnType<typeof createFullCourtWatchedReplayRepository>;
+  fullCourtNextGamePlanRepository: ReturnType<typeof createFullCourtNextGamePlanRepository>;
   profileRepository: DexieProfileRepository;
 }
 
@@ -57,6 +59,7 @@ export function getPersistence(): Persistence {
       fullCourtCoachingRepository: createFullCourtCoachingRepository(db),
       fullCourtHistoryRepository: createFullCourtHistoryRepository(db),
       fullCourtWatchedReplayRepository: createFullCourtWatchedReplayRepository(db),
+      fullCourtNextGamePlanRepository: createFullCourtNextGamePlanRepository(db),
       profileRepository: new DexieProfileRepository(db),
     };
   }

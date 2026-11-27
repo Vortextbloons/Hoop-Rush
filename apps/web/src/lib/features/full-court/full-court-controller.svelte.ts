@@ -14,6 +14,10 @@ import {
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   FULL_COURT_DEFAULT_COACHING_PLAN,
+  FULL_COURT_NEXT_GAME_PLAN_SCHEMA_VERSION,
+  capRushPlayoffSeriesId,
+  capRushSeriesWinner,
+  capRushSeriesWins,
   fullCourtDefensiveMatchupsSchema,
   idSchema,
   type FullCourtBlueprint,
@@ -43,6 +47,8 @@ import {
   type FullCourtPlayoffLock,
   type FullCourtPlayoffOpponentPreview,
   type FullCourtSeasonLock,
+  type FullCourtSeasonSlotOptions,
+  type FullCourtSeasonSlotOutcome,
 } from '@hoop-rush/engine';
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
@@ -53,7 +59,14 @@ import { loadFullCourtHealthProfiles } from './full-court-health-profiles.js';
 import { resolveFullCourtSeasonLock } from './full-court-season-lock.js';
 import {
   fullCourtGameDayReadiness,
+  fullCourtNextReviewSlot,
   fullCourtNextUserFixture,
+  fullCourtPlayoffAdjustmentChanged,
+  fullCourtSimulationNotice,
+  fullCourtUserSeries,
+  type FullCourtAdvanceOptions,
+  type FullCourtSimulationNotice,
+  type FullCourtSimulationStop,
   type FullCourtUserFixture,
 } from './full-court-season-presenter.js';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner.js';
@@ -74,9 +87,28 @@ interface SeasonState {
 
 type PlayoffState = Awaited<ReturnType<typeof startFullCourtPlayoffs>>;
 type PlayedGame = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
-type AdvanceOutcome = Awaited<
-  ReturnType<typeof advanceFullCourtSeasonSlot> | ReturnType<typeof advanceFullCourtPlayoffs>
->;
+type RegularSimulatedOutcome = Extract<FullCourtSeasonSlotOutcome, { kind: 'simulated' }>;
+type FullCourtWorker = ReturnType<typeof createFullCourtWorkerRunner>;
+
+/** Pinned rest and matchup choices captured for the next user fixture. */
+interface PinnedGamePlan {
+  readonly restGameId: string | null;
+  readonly restingPlayerIds: readonly string[];
+  readonly matchupGameId: string | null;
+  readonly matchupOpponentId: string | null;
+  readonly matchupAssignments: readonly FullCourtDefensiveMatchupAssignment[];
+}
+
+interface AdvanceRunInput {
+  readonly count: number;
+  readonly acceptForfeit: boolean;
+  readonly record: boolean;
+  readonly options: FullCourtAdvanceOptions;
+  readonly lock: FullCourtSeasonLock;
+  readonly coaching: FullCourtCoachingPlan;
+  readonly pinned: PinnedGamePlan;
+  readonly worker: FullCourtWorker;
+}
 
 export class FullCourtController {
   index = $state.raw<FullCourtCatalogIndex | null>(null);
@@ -86,6 +118,8 @@ export class FullCourtController {
   latestGame = $state.raw<PlayedGame | null>(null);
   practice = $state.raw<FullCourtPracticeReport | null>(null);
   savedReplay = $state.raw<FullCourtWatchedReplay | null>(null);
+  /** Why the last simulation batch returned control, when it stopped for a decision. */
+  notice = $state.raw<FullCourtSimulationNotice | null>(null);
   error = $state<string | null>(null);
   pendingForfeit = $state(false);
   busy = $state(false);
@@ -104,6 +138,12 @@ export class FullCourtController {
   #repositories: Persistence;
   #createWorker: typeof createFullCourtWorkerRunner;
   #worker: ReturnType<typeof createFullCourtWorkerRunner> | null = null;
+  #nextGamePlanWrite = Promise.resolve();
+  /**
+   * The next-round series whose opponent change was already surfaced. It lets
+   * the next sim play that series instead of stopping on the same boundary.
+   */
+  #controlReturnedForSeriesId: string | null = null;
 
   constructor(dependencies: FullCourtControllerDependencies = {}) {
     this.#loadAssets = dependencies.loadAssets ?? loadFullCourtAssets;
@@ -178,8 +218,16 @@ export class FullCourtController {
     if (this.simulating) this.stopRequested = true;
   }
 
+  clearNotice(): void {
+    this.notice = null;
+  }
+
   /** Rest choices stay pinned to the next user fixture and clear once it is played. */
   setRestingPlayers(playerIds: readonly string[]): void {
+    this.#setRestingPlayers(playerIds, true);
+  }
+
+  #setRestingPlayers(playerIds: readonly string[], persist: boolean): void {
     const fixture = this.#nextUserFixture();
     if (fixture === null) {
       if (playerIds.length > 0) this.error = 'No Full Court game is ready for rest choices.';
@@ -204,6 +252,7 @@ export class FullCourtController {
     this.restingForGameId = fixture.gameId;
     this.restingPlayerIds = unique;
     this.error = null;
+    if (persist) this.#saveNextGamePlan(fixture);
   }
 
   #userTeam() {
@@ -239,23 +288,6 @@ export class FullCourtController {
     });
   }
 
-  #nextOverallUserGameId(): string | null {
-    const season = this.season;
-    if (season === null) return null;
-    if (this.playoffs !== null) {
-      const next = this.playoffs.view.nextGame;
-      return next !== null && next.userSide !== null ? next.gameId : null;
-    }
-    const slot = season.checkpoint.completedThroughSlot + 1;
-    const fixture = season.lock.season.games.find(
-      (game) =>
-        game.slot === slot &&
-        (game.homeTeamId === season.lock.season.userTeamId ||
-          game.awayTeamId === season.lock.season.userTeamId),
-    );
-    return fixture?.gameId ?? null;
-  }
-
   #clearRest(): void {
     this.restingPlayerIds = [];
     this.restingForGameId = null;
@@ -272,6 +304,13 @@ export class FullCourtController {
    * opponent, validate against both locked rosters, and clear once played.
    */
   setDefensiveMatchups(assignments: readonly FullCourtDefensiveMatchupAssignment[]): boolean {
+    return this.#setDefensiveMatchups(assignments, true);
+  }
+
+  #setDefensiveMatchups(
+    assignments: readonly FullCourtDefensiveMatchupAssignment[],
+    persist: boolean,
+  ): boolean {
     const season = this.season;
     const fixture = this.#nextUserFixture();
     const userTeam = this.#userTeam();
@@ -294,6 +333,7 @@ export class FullCourtController {
       this.#clearDefensiveMatchups();
       if (season.checkpoint.completedThroughSlot === 0) this.practice = null;
       this.error = null;
+      if (persist) this.#saveNextGamePlan(fixture);
       return true;
     }
     const candidate = fullCourtDefensiveMatchupsSchema.safeParse({
@@ -321,13 +361,12 @@ export class FullCourtController {
     this.defensiveMatchupAssignments = candidate.data.assignments.map((entry) => ({ ...entry }));
     if (season.checkpoint.completedThroughSlot === 0) this.practice = null;
     this.error = null;
+    if (persist) this.#saveNextGamePlan(fixture);
     return true;
   }
 
   clearDefensiveMatchups(): void {
-    this.#clearDefensiveMatchups();
-    if (this.season?.checkpoint.completedThroughSlot === 0) this.practice = null;
-    this.error = null;
+    this.#setDefensiveMatchups([], true);
   }
 
   #activeDefensiveMatchupsFor(
@@ -346,6 +385,68 @@ export class FullCourtController {
       opponentTeamId,
       assignments: [...this.defensiveMatchupAssignments],
     };
+  }
+
+  #saveNextGamePlan(fixture: FullCourtUserFixture): void {
+    const season = this.season;
+    if (season === null) return;
+    const { runId, userTeamId } = season.lock.season;
+    const opponentTeamId =
+      fixture.homeTeamId === userTeamId ? fixture.awayTeamId : fixture.homeTeamId;
+    const gameId = fixture.gameId;
+    const restingPlayerIds = this.restingForGameId === gameId ? [...this.restingPlayerIds] : [];
+    const defensiveMatchups = this.#activeDefensiveMatchupsFor(gameId, opponentTeamId);
+    const repository = this.#repositories.fullCourtNextGamePlanRepository;
+    this.#nextGamePlanWrite = this.#nextGamePlanWrite
+      .then(() =>
+        restingPlayerIds.length === 0 && defensiveMatchups === undefined
+          ? repository.clear(runId, gameId)
+          : repository.save(runId, {
+              schemaVersion: FULL_COURT_NEXT_GAME_PLAN_SCHEMA_VERSION,
+              gameId,
+              opponentTeamId,
+              restingPlayerIds,
+              defensiveMatchups,
+            }),
+      )
+      .catch((error: unknown) => {
+        if (!this.#isDisposed() && this.draft?.runId === runId) {
+          this.error = errorMessageOf(error);
+        }
+      });
+  }
+
+  async #restoreNextGamePlan(runId: string): Promise<void> {
+    const repository = this.#repositories.fullCourtNextGamePlanRepository;
+    const plan = await repository.load(runId);
+    if (plan === null || this.#isDisposed()) return;
+    const fixture = this.#nextUserFixture();
+    const userTeamId = this.season?.lock.season.userTeamId;
+    const opponentId =
+      fixture?.homeTeamId === userTeamId ? fixture?.awayTeamId : fixture?.homeTeamId;
+    if (fixture?.gameId !== plan.gameId || opponentId !== plan.opponentTeamId) {
+      await repository.clear(runId, plan.gameId);
+      return;
+    }
+    this.#setRestingPlayers(plan.restingPlayerIds, false);
+    if (plan.defensiveMatchups !== undefined) {
+      const restError = this.error;
+      this.#setDefensiveMatchups(plan.defensiveMatchups.assignments, false);
+      this.error ??= restError;
+    }
+  }
+
+  async #clearCommittedGamePlan(
+    runId: string,
+    gameId: string | null,
+    plan: PinnedGamePlan,
+  ): Promise<void> {
+    if (gameId === null) return;
+    if (plan.restGameId === gameId) this.#clearRest();
+    if (plan.matchupGameId === gameId) this.#clearDefensiveMatchups();
+    if (plan.restGameId === gameId || plan.matchupGameId === gameId) {
+      await this.#repositories.fullCourtNextGamePlanRepository.clear(runId, gameId);
+    }
   }
 
   nextPlayoffPreview(): FullCourtPlayoffOpponentPreview | null {
@@ -556,10 +657,20 @@ export class FullCourtController {
     return saved;
   }
 
-  advance(count: number, acceptForfeit = false, record = false): Promise<void> {
+  advance(
+    count: number,
+    acceptForfeit = false,
+    record = false,
+    options: FullCourtAdvanceOptions = {},
+  ): Promise<void> {
     return this.#act(async () => {
-      if (this.season === null) return;
+      const season = this.season;
+      if (season === null) return;
       this.simulating = true;
+      await this.#nextGamePlanWrite;
+      if (this.#isDisposed()) return;
+      this.notice = null;
+      this.pendingForfeit = false;
       const nextFixture = this.#nextUserFixture();
       if (this.restingForGameId !== null && this.restingForGameId !== nextFixture?.gameId) {
         this.#clearRest();
@@ -567,7 +678,7 @@ export class FullCourtController {
       const nextOpponentId =
         nextFixture === null
           ? null
-          : nextFixture.homeTeamId === this.season.lock.season.userTeamId
+          : nextFixture.homeTeamId === season.lock.season.userTeamId
             ? nextFixture.awayTeamId
             : nextFixture.homeTeamId;
       if (
@@ -584,143 +695,395 @@ export class FullCourtController {
           return;
         }
       }
-      const restGameId = this.restingForGameId;
-      const restingPlayerIds = this.restingPlayerIds;
-      const matchupGameId = this.defensiveMatchupsForGameId;
-      const matchupOpponentId = this.defensiveMatchupsOpponentId;
-      const matchupAssignments = this.defensiveMatchupAssignments;
+      const pinned: PinnedGamePlan = {
+        restGameId: this.restingForGameId,
+        restingPlayerIds: this.restingPlayerIds,
+        matchupGameId: this.defensiveMatchupsForGameId,
+        matchupOpponentId: this.defensiveMatchupsOpponentId,
+        matchupAssignments: this.defensiveMatchupAssignments,
+      };
+      const { lock, coaching } = season;
       const worker = (this.#worker ??= this.#createWorker());
-      const regular = this.#repositories.fullCourtSeasonRepository;
-      const playoffsRepo = this.#repositories.fullCourtPlayoffRepository;
-      const { lock, coaching } = this.season;
-      for (let step = 0; step < count && !this.#isDisposed() && !this.stopRequested; step++) {
-        const userGameId = this.#nextOverallUserGameId();
-        const restThisGame =
-          restGameId !== null && userGameId === restGameId && restingPlayerIds.length > 0;
-        const matchupsThisGame =
-          matchupGameId !== null &&
-          matchupOpponentId !== null &&
-          userGameId === matchupGameId &&
-          matchupAssignments.length > 0;
-        const options = {
-          acceptForfeit: step === 0 && acceptForfeit,
-          rotation: fullCourtRotationInputForPlan(coaching),
-          tactics: coaching.tactics,
-          rules: coaching.rules,
-          hierarchy: coaching.hierarchy,
-          record: record && count === 1,
-          ...(restThisGame ? { restingPlayerIds } : {}),
-          ...(matchupsThisGame
-            ? {
-                defensiveMatchups: {
-                  gameId: matchupGameId,
-                  opponentTeamId: matchupOpponentId,
-                  assignments: [...matchupAssignments],
-                },
-              }
-            : {}),
-        };
-        const playoffs: PlayoffState | null = this.playoffs;
-        const current: SeasonState = this.season;
-        const outcome: AdvanceOutcome = playoffs
-          ? await advanceFullCourtPlayoffs(
-              { lock: playoffs.lock, expectedGames: playoffs.checkpoint.games.length, options },
-              { repository: playoffsRepo, simulateGame: (...args) => worker.simulateGame(...args) },
-            )
-          : await advanceFullCourtSeasonSlot(
-              { lock, expectedThroughSlot: current.checkpoint.completedThroughSlot, options },
-              { repository: regular, simulateSlot: (...args) => worker.simulateSlot(...args) },
-            );
-        if (this.#isDisposed()) return;
-        this.pendingForfeit = outcome.kind === 'decision' && outcome.reason === 'confirm-forfeit';
-        switch (outcome.kind) {
-          case 'simulated':
-            if (restGameId !== null && userGameId === restGameId) this.#clearRest();
-            if (matchupGameId !== null && userGameId === matchupGameId) {
-              this.#clearDefensiveMatchups();
-            }
-            this.practice = null;
-            if ('scores' in outcome) {
-              this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
-              if (
-                options.record &&
-                outcome.userGame.kind === 'played' &&
-                outcome.userGame.tape !== null
-              ) {
-                const userFixture = lock.season.games.find(
-                  (game) =>
-                    game.slot === outcome.checkpoint.completedThroughSlot &&
-                    (game.homeTeamId === lock.season.userTeamId ||
-                      game.awayTeamId === lock.season.userTeamId),
-                );
-                if (userFixture !== undefined) {
-                  this.savedReplay = buildFullCourtWatchedReplay({
-                    phase: 'regular',
-                    runId: lock.season.runId,
-                    seasonLockDigest: lock.digest,
-                    lockDigest: lock.digest,
-                    gameId: userFixture.gameId,
-                    slot: userFixture.slot,
-                    dayOffset: userFixture.dayOffset,
-                    userTeamId: lock.season.userTeamId,
-                    game: outcome.userGame,
-                  });
-                }
-              }
-              this.season = {
-                ...current,
-                checkpoint: outcome.checkpoint,
-                scores: [...current.scores, ...outcome.scores],
-              };
-              if (outcome.checkpoint.completedThroughSlot === CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
-                return;
-              }
-            } else if (playoffs !== null) {
-              const fixture = playoffs.view.nextGame;
-              if (
-                fixture &&
-                [fixture.homeTeamId, fixture.awayTeamId].includes(lock.season.userTeamId)
-              ) {
-                this.latestGame = outcome.game.kind === 'played' ? outcome.game : null;
-                if (
-                  options.record &&
-                  fixture.userSide !== null &&
-                  outcome.game.kind === 'played' &&
-                  outcome.game.tape !== null
-                ) {
-                  this.savedReplay = buildFullCourtWatchedReplay({
-                    phase: 'playoff',
-                    runId: lock.season.runId,
-                    seasonLockDigest: lock.digest,
-                    lockDigest: playoffs.lock.digest,
-                    gameId: fixture.gameId,
-                    slot: null,
-                    dayOffset: fixture.dayOffset,
-                    userTeamId: lock.season.userTeamId,
-                    game: outcome.game,
-                  });
-                }
-              }
-              const view = fullCourtPlayoffView(playoffs.lock, outcome.checkpoint);
-              this.playoffs = { ...playoffs, checkpoint: outcome.checkpoint, view };
-              if (view.nextGame === null) {
-                await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
-                return;
-              }
-            }
-            break;
-          case 'stale':
-            await this.#openRun(lock.season.runId);
-            this.error = 'This run advanced in another tab. The latest results are loaded.';
-            return;
-          case 'decision':
-            if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
-            return;
-          default:
-            return;
+      const input: AdvanceRunInput = {
+        count,
+        acceptForfeit,
+        record,
+        options,
+        lock,
+        coaching,
+        pinned,
+        worker,
+      };
+      const stop =
+        this.playoffs !== null
+          ? await this.#advancePlayoffGames(input)
+          : await this.#advanceRegularSeason(input);
+      if (this.#isDisposed() || stop === null) return;
+      const playerNames = new Map<string, string>(
+        (
+          lock.season.teams.find((team) => team.teamId === lock.season.userTeamId)?.roster ?? []
+        ).map((player) => [player.playerId, player.displayName]),
+      );
+      this.notice = fullCourtSimulationNotice(
+        stop,
+        (teamId) => lock.season.teams.find((team) => team.teamId === teamId)?.displayName ?? teamId,
+        (playerId) => playerNames.get(playerId) ?? playerId,
+      );
+    });
+  }
+
+  #slotOptions(input: {
+    readonly coaching: FullCourtCoachingPlan;
+    readonly pinned: PinnedGamePlan;
+    readonly userGameId: string | null;
+    readonly acceptForfeit: boolean;
+    readonly record: boolean;
+  }): FullCourtSeasonSlotOptions {
+    const { coaching, pinned, userGameId } = input;
+    const matchupGameId = pinned.matchupGameId;
+    const matchupOpponentId = pinned.matchupOpponentId;
+    return {
+      acceptForfeit: input.acceptForfeit,
+      rotation: fullCourtRotationInputForPlan(coaching),
+      tactics: coaching.tactics,
+      rules: coaching.rules,
+      hierarchy: coaching.hierarchy,
+      record: input.record,
+      ...(pinned.restGameId !== null &&
+      pinned.restGameId === userGameId &&
+      pinned.restingPlayerIds.length > 0
+        ? { restingPlayerIds: pinned.restingPlayerIds }
+        : {}),
+      ...(matchupGameId !== null &&
+      matchupOpponentId !== null &&
+      matchupGameId === userGameId &&
+      pinned.matchupAssignments.length > 0
+        ? {
+            defensiveMatchups: {
+              gameId: matchupGameId,
+              opponentTeamId: matchupOpponentId,
+              assignments: [...pinned.matchupAssignments],
+            },
+          }
+        : {}),
+    };
+  }
+
+  #regularInjuryStop(
+    outcome: RegularSimulatedOutcome,
+    lock: FullCourtSeasonLock,
+  ): FullCourtSimulationStop | null {
+    if (outcome.userGame.kind !== 'played') return null;
+    const userTeamId = lock.season.userTeamId;
+    const injuries = outcome.userGame.injuries.filter((injury) => injury.teamId === userTeamId);
+    if (injuries.length === 0) return null;
+    const nextFixture = fullCourtNextUserFixture(lock, outcome.checkpoint, null);
+    const actionable = injuries.filter(
+      (injury) => nextFixture === null || injury.availableFromDay > nextFixture.dayOffset,
+    );
+    if (actionable.length === 0) return null;
+    return {
+      kind: 'injury',
+      slot: outcome.checkpoint.completedThroughSlot,
+      playerIds: [...new Set(actionable.map((injury) => injury.playerId))],
+      availableFromDay: Math.max(...actionable.map((injury) => injury.availableFromDay)),
+    };
+  }
+
+  async #advanceRegularSeason(input: AdvanceRunInput): Promise<FullCourtSimulationStop | null> {
+    const { lock, coaching, pinned, worker } = input;
+    const userTeamId = lock.season.userTeamId;
+    const repository = this.#repositories.fullCourtSeasonRepository;
+    let acceptNextForfeit = input.acceptForfeit;
+    let played = 0;
+    while (!this.#isDisposed()) {
+      if (this.stopRequested) {
+        return { kind: 'stopped', userGames: played, bracketGames: 0 };
+      }
+      const season = this.season;
+      if (season === null) return null;
+      if (season.checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
+        return input.count > 1 && played > 0
+          ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
+          : null;
+      }
+      if (played >= input.count) {
+        return input.count > 1 && played > 0
+          ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
+          : null;
+      }
+      const slot = season.checkpoint.completedThroughSlot + 1;
+      const userFixture = lock.season.games.find(
+        (game) =>
+          game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+      );
+      const userGameId = userFixture?.gameId ?? null;
+      const slotOptions = this.#slotOptions({
+        coaching,
+        pinned,
+        userGameId,
+        acceptForfeit: acceptNextForfeit,
+        record: input.record && input.count === 1,
+      });
+      const outcome = await advanceFullCourtSeasonSlot(
+        { lock, expectedThroughSlot: season.checkpoint.completedThroughSlot, options: slotOptions },
+        { repository, simulateSlot: (...args) => worker.simulateSlot(...args) },
+      );
+      if (this.#isDisposed()) return null;
+      if (outcome.kind === 'decision') {
+        this.pendingForfeit = outcome.reason === 'confirm-forfeit';
+        if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
+        return null;
+      }
+      if (outcome.kind === 'stale') {
+        await this.#openRun(lock.season.runId);
+        this.error = 'This run advanced in another tab. The latest results are loaded.';
+        return null;
+      }
+      if (outcome.kind === 'season-complete') return null;
+
+      acceptNextForfeit = false;
+      played += 1;
+      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
+      this.practice = null;
+      this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
+      if (
+        slotOptions.record &&
+        outcome.userGame.kind === 'played' &&
+        outcome.userGame.tape !== null
+      ) {
+        const playedFixture = lock.season.games.find(
+          (game) =>
+            game.slot === outcome.checkpoint.completedThroughSlot &&
+            (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+        );
+        if (playedFixture !== undefined) {
+          this.savedReplay = buildFullCourtWatchedReplay({
+            phase: 'regular',
+            runId: lock.season.runId,
+            seasonLockDigest: lock.digest,
+            lockDigest: lock.digest,
+            gameId: playedFixture.gameId,
+            slot: playedFixture.slot,
+            dayOffset: playedFixture.dayOffset,
+            userTeamId,
+            game: outcome.userGame,
+          });
         }
       }
-    });
+      this.season = {
+        ...season,
+        checkpoint: outcome.checkpoint,
+        scores: [...season.scores, ...outcome.scores],
+      };
+      const completed = outcome.checkpoint.completedThroughSlot;
+      if (completed >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
+        if (input.options.stopAtReview === true) return { kind: 'review', slot: completed };
+        return input.count > 1 ? { kind: 'game-limit', userGames: played, bracketGames: 0 } : null;
+      }
+      if (input.options.stopAtInjury === true) {
+        const injury = this.#regularInjuryStop(outcome, lock);
+        if (injury !== null) return injury;
+      }
+      if (
+        input.options.stopAtReview === true &&
+        fullCourtNextReviewSlot(season.checkpoint.completedThroughSlot) === completed
+      ) {
+        return { kind: 'review', slot: completed };
+      }
+    }
+    return input.count > 1 && played > 0
+      ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
+      : null;
+  }
+
+  async #advancePlayoffGames(input: AdvanceRunInput): Promise<FullCourtSimulationStop | null> {
+    const { lock, coaching, pinned, worker } = input;
+    const userTeamId = lock.season.userTeamId;
+    const repository = this.#repositories.fullCourtPlayoffRepository;
+    let acceptNextForfeit = input.acceptForfeit;
+    let userGames = 0;
+    let bracketGames = 0;
+    while (!this.#isDisposed()) {
+      if (this.stopRequested) {
+        return { kind: 'stopped', userGames, bracketGames };
+      }
+      const playoffs = this.playoffs;
+      if (playoffs === null) return null;
+      const view = playoffs.view;
+      if (view.nextGame === null) {
+        await this.#archiveCompletedRun(playoffs.lock, playoffs.checkpoint);
+        return {
+          kind: 'playoffs-complete',
+          championTeamId: view.championTeamId ?? '',
+          userTeamId,
+        };
+      }
+      const userAlive = view.userOutcome.status === 'pending';
+      if (userAlive ? userGames >= input.count : bracketGames >= input.count) {
+        return input.count > 1 ? { kind: 'game-limit', userGames, bracketGames } : null;
+      }
+      const fixture = view.nextGame;
+      const nextIsUser = fixture.userSide !== null;
+      if (userAlive && nextIsUser && !input.record) {
+        const preview = fullCourtUserNextPlayoffMatchup({
+          userTeamId,
+          runSeed: lock.season.runSeed,
+          series: view.series,
+        });
+        const lastDecided = view.series
+          .filter(
+            (series) =>
+              (series.highTeamId === userTeamId || series.lowTeamId === userTeamId) &&
+              capRushSeriesWinner(series) !== null,
+          )
+          .at(-1);
+        const nextSeriesId =
+          preview === null ? null : capRushPlayoffSeriesId(preview.round, preview.seriesSlot);
+        if (
+          preview !== null &&
+          nextSeriesId !== null &&
+          preview.gameOrdinal === 1 &&
+          lastDecided !== undefined &&
+          lastDecided.seriesId !== nextSeriesId &&
+          this.#controlReturnedForSeriesId !== nextSeriesId
+        ) {
+          this.#controlReturnedForSeriesId = nextSeriesId;
+          return {
+            kind: 'opponent-change',
+            round: preview.round,
+            opponentTeamId: preview.opponentTeamId,
+            gameOrdinal: preview.gameOrdinal,
+          };
+        }
+      }
+      const userGameId = nextIsUser ? fixture.gameId : null;
+      const slotOptions = this.#slotOptions({
+        coaching,
+        pinned,
+        userGameId,
+        acceptForfeit: acceptNextForfeit && nextIsUser,
+        record: input.record && input.count === 1 && nextIsUser,
+      });
+      const outcome = await advanceFullCourtPlayoffs(
+        {
+          lock: playoffs.lock,
+          expectedGames: playoffs.checkpoint.games.length,
+          options: slotOptions,
+        },
+        { repository, simulateGame: (...args) => worker.simulateGame(...args) },
+      );
+      if (this.#isDisposed()) return null;
+      if (outcome.kind === 'decision') {
+        this.pendingForfeit = outcome.reason === 'confirm-forfeit';
+        if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
+        return null;
+      }
+      if (outcome.kind === 'stale') {
+        await this.#openRun(lock.season.runId);
+        this.error = 'This run advanced in another tab. The latest results are loaded.';
+        return null;
+      }
+      if (outcome.kind === 'playoffs-complete') {
+        return {
+          kind: 'playoffs-complete',
+          championTeamId: view.championTeamId ?? '',
+          userTeamId,
+        };
+      }
+
+      bracketGames += 1;
+      const nextView = fullCourtPlayoffView(playoffs.lock, outcome.checkpoint);
+      this.playoffs = { ...playoffs, checkpoint: outcome.checkpoint, view: nextView };
+      if (!nextIsUser) {
+        if (nextView.nextGame === null) {
+          await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
+          return {
+            kind: 'playoffs-complete',
+            championTeamId: nextView.championTeamId ?? '',
+            userTeamId,
+          };
+        }
+        continue;
+      }
+
+      userGames += 1;
+      acceptNextForfeit = false;
+      this.#controlReturnedForSeriesId = null;
+      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
+      this.practice = null;
+      this.latestGame = outcome.game.kind === 'played' ? outcome.game : null;
+      if (
+        slotOptions.record &&
+        fixture.userSide !== null &&
+        outcome.game.kind === 'played' &&
+        outcome.game.tape !== null
+      ) {
+        this.savedReplay = buildFullCourtWatchedReplay({
+          phase: 'playoff',
+          runId: lock.season.runId,
+          seasonLockDigest: lock.digest,
+          lockDigest: playoffs.lock.digest,
+          gameId: fixture.gameId,
+          slot: null,
+          dayOffset: fixture.dayOffset,
+          userTeamId,
+          game: outcome.game,
+        });
+      }
+      if (nextView.nextGame === null) {
+        await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
+        return {
+          kind: 'playoffs-complete',
+          championTeamId: nextView.championTeamId ?? '',
+          userTeamId,
+        };
+      }
+
+      const series = fullCourtUserSeries(nextView.series, userTeamId);
+      if (
+        series !== null &&
+        series.games.at(-1)?.gameId === fixture.gameId &&
+        capRushSeriesWinner(series) !== null
+      ) {
+        const opponentTeamId =
+          series.highTeamId === userTeamId ? series.lowTeamId : series.highTeamId;
+        return {
+          kind: 'series-complete',
+          round: series.round,
+          opponentTeamId,
+          won: capRushSeriesWinner(series) === userTeamId,
+          userWins: capRushSeriesWins(series, userTeamId),
+          opponentWins: capRushSeriesWins(series, opponentTeamId),
+        };
+      }
+
+      const nextPreview = fullCourtUserNextPlayoffMatchup({
+        userTeamId,
+        runSeed: lock.season.runSeed,
+        series: nextView.series,
+      });
+      const opponentSide = fixture.userSide === 'home' ? 'away' : 'home';
+      const applied = outcome.checkpoint.games.at(-1)?.adaptations?.[opponentSide];
+      if (
+        nextPreview?.adaptation !== null &&
+        nextPreview?.adaptation !== undefined &&
+        fullCourtPlayoffAdjustmentChanged(applied, nextPreview.adaptation)
+      ) {
+        return {
+          kind: 'opponent-adjustment',
+          round: nextPreview.round,
+          opponentTeamId: nextPreview.opponentTeamId,
+          gameOrdinal: nextPreview.gameOrdinal,
+          adaptation: nextPreview.adaptation,
+        };
+      }
+
+      if (userGames >= input.count && input.count > 1) {
+        return { kind: 'game-limit', userGames, bracketGames };
+      }
+    }
+    return { kind: 'stopped', userGames, bracketGames };
   }
 
   async #submit(command: FullCourtCommand): Promise<void> {
@@ -736,10 +1099,13 @@ export class FullCourtController {
 
   async #openRun(runId: string): Promise<void> {
     if (this.#assets === null || this.#isDisposed()) return;
+    await this.#nextGamePlanWrite;
     const draft = await this.#repositories.fullCourtDraftRepository.load(runId);
     if (this.#isDisposed()) return;
     this.draft = draft;
     this.pendingForfeit = false;
+    this.notice = null;
+    this.#controlReturnedForSeriesId = null;
     this.latestGame = null;
     this.practice = null;
     this.savedReplay = null;
@@ -801,6 +1167,7 @@ export class FullCourtController {
     this.savedReplay = savedReplay;
     if (playoffSave === null) this.playoffs = null;
     else await this.#openPlayoffs(lock);
+    if (!this.#isDisposed()) await this.#restoreNextGamePlan(runId);
   }
 
   async #openPlayoffs(lock: FullCourtSeasonLock): Promise<void> {
@@ -809,6 +1176,7 @@ export class FullCourtController {
       playoffs: this.#repositories.fullCourtPlayoffRepository,
     });
     if (this.#isDisposed()) return;
+    this.#controlReturnedForSeriesId = null;
     this.playoffs = state;
     if (state.view.nextGame === null) {
       await this.#archiveCompletedRun(state.lock, state.checkpoint);
@@ -831,6 +1199,7 @@ export class FullCourtController {
       },
       this.#repositories.fullCourtHistoryRepository,
     );
+    await this.#repositories.fullCourtNextGamePlanRepository.clear(draft.runId);
   }
 
   async #act(action: () => Promise<void>): Promise<void> {

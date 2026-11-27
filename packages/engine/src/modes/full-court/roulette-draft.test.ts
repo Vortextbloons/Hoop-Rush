@@ -67,6 +67,7 @@ function rouletteDraft(setup: FullCourtTestSetup, money = FULL_COURT_DEFAULT_MON
   let state = createFullCourtDraftState(
     { ...setup.createCommand, variant: 'roulette', money },
     setup.index,
+    { pool: 'open' },
   );
   for (const entry of [
     { slot: 'PG', overall: 60 },
@@ -163,6 +164,7 @@ function pickSix(
       money: FULL_COURT_DEFAULT_MONEY,
     },
     index,
+    { pool: 'open' },
   );
   for (const candidate of setup.catalog.candidates
     .filter((player) => player.positions.primary === 'PG')
@@ -493,6 +495,7 @@ describe('full court roulette draft commands', () => {
         money: FULL_COURT_DEFAULT_MONEY,
       },
       index,
+      { pool: 'open' },
     );
     const chosen = setup.catalog.candidates.filter((player) => player.positions.primary === 'PG');
     for (const candidate of chosen.slice(0, 6)) {

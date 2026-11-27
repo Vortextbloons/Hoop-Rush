@@ -3,6 +3,8 @@
   import Badge from '#lib/components/ui/Badge.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
   import type {
     FullCourtGameDayPlayerStatus,
     FullCourtGameDayReadiness,
@@ -13,11 +15,13 @@
     restingPlayerIds,
     busy = false,
     onRestingChange,
+    art = null,
   }: {
     readiness: FullCourtGameDayReadiness;
     restingPlayerIds: readonly string[];
     busy?: boolean;
     onRestingChange?: (playerIds: readonly string[]) => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   const selected = $derived(new Set(restingPlayerIds));
@@ -59,20 +63,27 @@
       No upcoming Full Court game. Availability appears when your next fixture is set.
     </p>
   {:else}
-    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-      <p class="text-xs text-muted-foreground">
-        <strong class="text-foreground">{readiness.eligibleCount}</strong> healthy
-        <span aria-hidden="true">·</span>
-        <strong
-          class={readiness.availableCount < readiness.requiredPlayers
-            ? 'text-negative'
-            : 'text-foreground'}>{readiness.availableCount}</strong
-        >
-        available after rest
+    <div
+      class="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line-soft bg-surface-1 px-3 py-2"
+    >
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <p class="text-xs text-muted-foreground">
+          <strong class="text-foreground">{readiness.eligibleCount}</strong> healthy
+          <span aria-hidden="true">·</span>
+          <strong
+            class={readiness.availableCount < readiness.requiredPlayers
+              ? 'text-negative'
+              : 'text-foreground'}>{readiness.availableCount}</strong
+          >
+          available after rest
+        </p>
+        {#if readiness.restingCount > 0}
+          <Badge tone="neutral">{readiness.restingCount} resting</Badge>
+        {/if}
+      </div>
+      <p class="font-mono text-[9px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+        {readiness.players.length} player{readiness.players.length === 1 ? '' : 's'} on the roster
       </p>
-      {#if readiness.restingCount > 0}
-        <Badge tone="neutral">{readiness.restingCount} resting</Badge>
-      {/if}
     </div>
 
     {#each readiness.warnings as warning (warning)}
@@ -84,8 +95,10 @@
     <ul class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Player availability">
       {#each readiness.players as player (player.playerId)}
         <li
-          class="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line-soft bg-surface-1 px-3 py-2"
+          class="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-l-2 border-line-soft bg-surface-1 px-3 py-2"
+          data-status={player.status}
         >
+          <FullCourtPortrait {player} {art} size="sm" eager />
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-semibold" title={player.displayName}>
               {player.displayName}
@@ -129,3 +142,19 @@
     {/if}
   {/if}
 </Panel>
+
+<style>
+  [data-status='ready'] {
+    border-left-color: color-mix(in oklab, var(--color-positive) 70%, var(--color-line-soft));
+  }
+  [data-status='fatigued'] {
+    border-left-color: color-mix(in oklab, var(--color-accent) 70%, var(--color-line-soft));
+  }
+  [data-status='injured'],
+  [data-status='unavailable'] {
+    border-left-color: color-mix(in oklab, var(--color-negative) 70%, var(--color-line-soft));
+  }
+  [data-status='resting'] {
+    border-left-color: color-mix(in oklab, var(--color-primary) 70%, var(--color-line-soft));
+  }
+</style>

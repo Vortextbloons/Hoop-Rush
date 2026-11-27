@@ -77,6 +77,7 @@ function stateWith(
   const picks = picksOf(setup, entries);
   return fullCourtDraftStateSchema.parse({
     ...setup.state,
+    pool: undefined,
     money: config,
     picks,
     spending: picks.map((pick) => ({

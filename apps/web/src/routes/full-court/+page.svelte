@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
+  import { ClipboardList, Dices } from '@lucide/svelte';
   import { onMount } from 'svelte';
-  import { defaultFullCourtCoachingRotation } from '@hoop-rush/engine';
+  import { fullCourtReportPriceDollars } from '@hoop-rush/data-contracts';
+  import { defaultFullCourtCoachingRotation, fullCourtAssessPurchase } from '@hoop-rush/engine';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
@@ -20,7 +24,10 @@
   } from '#lib/features/full-court/full-court-gamecast.js';
   import { FullCourtController } from '#lib/features/full-court/full-court-controller.svelte.js';
   import type { FullCourtMatchupEditorContext } from '#lib/features/full-court/full-court-matchup-presenter.js';
-  import { fullCourtNextUserFixture } from '#lib/features/full-court/full-court-season-presenter.js';
+  import {
+    fullCourtNextUserFixture,
+    fullCourtPlayoffAdaptationRead,
+  } from '#lib/features/full-court/full-court-season-presenter.js';
   import { openService } from '#lib/service-state.js';
 
   let controller = $state.raw<FullCourtController | null>(null);
@@ -73,6 +80,28 @@
       draft.roulette.status !== 'finalized',
   );
   const playoff = $derived(current?.playoffs?.view ?? null);
+  const playoffPreview = $derived(current?.nextPlayoffPreview() ?? null);
+  const opponentAdjustment = $derived(
+    playoffPreview?.adaptation == null
+      ? null
+      : fullCourtPlayoffAdaptationRead(playoffPreview.adaptation),
+  );
+  const campBooked = $derived(
+    draft?.reports?.some((report) => report.target.kind === 'training-camp') ?? false,
+  );
+  const campAvailable = $derived(
+    season?.checkpoint.completedThroughSlot === 0 &&
+      playoff === null &&
+      current?.practice == null &&
+      draft != null &&
+      current?.index != null &&
+      (campBooked ||
+        fullCourtAssessPurchase({
+          index: current.index,
+          state: draft,
+          priceDollars: fullCourtReportPriceDollars('training-camp'),
+        }).legal),
+  );
   const league = $derived(season?.lock.season);
   const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
   const health = $derived(
@@ -127,7 +156,13 @@
 
 <PageShell as="section" width="xl" padding="xl">
   {#if draft?.stage !== 'drafting'}
-    <PageHeader class="mb-6" eyebrow="Basketball simulation" title="Full Court" />
+    <PageHeader class="mb-6" eyebrow="Season mode" title="Full Court">
+      {#snippet actions()}
+        <ActionLink href={resolve('/full-court/history')} tone="secondary"
+          >Season history</ActionLink
+        >
+      {/snippet}
+    </PageHeader>
   {/if}
   {#if startupError !== null}
     <ServiceErrorPanel title="Full Court could not start" message={startupError} homeLink />
@@ -171,8 +206,34 @@
           >
         </div>
       {/if}
+      {#if section === 'home' && campAvailable}
+        <Alert
+          class="mb-4"
+          title={campBooked ? 'Training Camp is booked' : 'Training Camp is open'}
+        >
+          Scout your rotation and bench usage in a scrimmage before Game 1.
+          {#snippet icon()}
+            <ClipboardList size={18} />
+          {/snippet}
+          {#snippet actions()}
+            <Button size="sm" tone="secondary" onclick={() => selectSection('war-room')}>
+              Open War Room
+            </Button>
+          {/snippet}
+        </Alert>
+      {/if}
       {#if userTeam && defaultRotation}
         <div hidden={section !== 'team'}>
+          {#if opponentAdjustment !== null}
+            <Alert class="mb-4" title={`Opponent adjustment · ${opponentAdjustment.settingLabel}`}>
+              {opponentAdjustment.reasonLabel} · {opponentAdjustment.detailLabel}
+              {#snippet actions()}
+                <Button size="sm" tone="secondary" onclick={() => selectSection('war-room')}>
+                  Review opponent film
+                </Button>
+              {/snippet}
+            </Alert>
+          {/if}
           <FullCourtCoachingView
             roster={userTeam.roster}
             {defaultRotation}
@@ -199,7 +260,7 @@
             index={current.index}
             season={season.lock.season}
             nextFilmTarget={current.nextFilmTarget()}
-            playoffPreview={current.nextPlayoffPreview()}
+            {playoffPreview}
             busy={current.busy}
             practiceOpen={playoff === null && season.checkpoint.completedThroughSlot === 0}
             practice={current.practice}
@@ -221,9 +282,11 @@
           restingPlayerIds={current.restingPlayerIds}
           busy={current.busy}
           pendingForfeit={current.pendingForfeit}
-          onAdvance={(count, acceptForfeit) => {
+          notice={current.notice}
+          onDismissNotice={() => current.clearNotice()}
+          onAdvance={(count, acceptForfeit, options) => {
             activeGamecast = null;
-            void current.advance(count, acceptForfeit);
+            void current.advance(count, acceptForfeit, false, options);
           }}
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
@@ -321,19 +384,35 @@
     {:else if current.busy}
       <p role="status" class="text-sm text-muted-foreground">Opening Full Court…</p>
     {:else if current.index !== null && draft == null}
-      <Panel padding="lg" class="max-w-lg">
-        <SectionHeading title="Build your roster" level={2} size="sm" align="start" />
-        <p class="mt-2 text-sm text-muted-foreground">
-          Sign 6–12 historical player seasons, manage your payroll, and face 29 historical teams
-          across a full regular season and playoffs.
-        </p>
-        <Button class="mt-5" tone="primary" onclick={() => void current.startDraft()}>
-          Start draft
-        </Button>
-        <Button class="mt-2" tone="secondary" onclick={() => void current.startDraft('roulette')}>
-          Start Roulette draft
-        </Button>
-      </Panel>
+      <SectionHeading
+        title="Build your roster"
+        level={2}
+        size="md"
+        align="start"
+        description="Sign 6–12 historical players, set your rotation, and face 29 historical teams across an 82-game season and playoffs."
+      />
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <Panel padding="lg" class="flex flex-col items-start border-t-2 border-t-primary">
+          <ClipboardList class="mb-4 text-primary" size={24} aria-hidden="true" />
+          <SectionHeading title="Standard" level={3} size="sm" align="start" />
+          <p class="mt-2 mb-5 flex-1 text-sm text-muted-foreground">
+            Find your franchise player and build a rotation around them while managing payroll.
+          </p>
+          <Button tone="primary" onclick={() => void current.startDraft()}
+            >Start Standard draft</Button
+          >
+        </Panel>
+        <Panel padding="lg" class="flex flex-col items-start border-t-2 border-t-accent">
+          <Dices class="mb-4 text-accent" size={24} aria-hidden="true" />
+          <SectionHeading title="Roulette" level={3} size="sm" align="start" />
+          <p class="mt-2 mb-5 flex-1 text-sm text-muted-foreground">
+            Draft and lock your roster, then use spare War Chest funds to spin for player mutations.
+          </p>
+          <Button tone="secondary" onclick={() => void current.startDraft('roulette')}>
+            Start Roulette draft
+          </Button>
+        </Panel>
+      </div>
     {/if}
   {/if}
 </PageShell>

@@ -14,6 +14,7 @@ import {
 } from './draft-economy.ts';
 import {
   fullCourtDraftIndexOf,
+  fullCourtEligibleCandidates,
   fullCourtPlayerOf,
   fullCourtSalaryDollarsOf,
 } from './draft-catalog.ts';
@@ -255,7 +256,9 @@ describe('full court picking', () => {
       firstApronDollars: 82_000_000,
       hardLimitDollars: 85_000_000,
     });
-    const state = createFullCourtDraftState({ ...setup.createCommand, money }, setup.index);
+    const state = createFullCourtDraftState({ ...setup.createCommand, money }, setup.index, {
+      pool: 'open',
+    });
     const star = cheapest(setup, 99, 'PG').player;
     const outcome = applyFullCourtCommand(
       state,
@@ -499,5 +502,107 @@ describe('full court command determinism', () => {
     if (catalogued === null) throw new Error('missing catalogued player');
     expect(signed).toEqual(catalogued);
     expect(state.spending[0]?.commandId).toBe(commandId('cmd-pick-1', 1));
+  });
+});
+
+describe('full court seeded finite draft pool', () => {
+  it('assigns a versioned deterministic pool to both standard and roulette drafts', () => {
+    const setup = fullCourtTestSetup();
+    const standard = createFullCourtDraftState(setup.createCommand, setup.index);
+    const roulette = createFullCourtDraftState(
+      { ...setup.createCommand, variant: 'roulette' },
+      setup.index,
+    );
+
+    expect(standard.pool).toBeDefined();
+    expect(roulette.pool).toEqual(standard.pool);
+    expect(standard.pool?.playerVersionIds.length ?? 0).toBeGreaterThanOrEqual(60);
+    expect(standard.pool?.playerVersionIds.length ?? 0).toBeLessThanOrEqual(90);
+  });
+
+  it('rejects picks and player scouting outside the draft pool', () => {
+    const setup = fullCourtTestSetup();
+    const poolSet = new Set(setup.state.pool?.playerVersionIds ?? []);
+    const outside = setup.index.catalog.candidates.find(
+      (candidate) => !poolSet.has(candidate.playerVersionId),
+    );
+    expect(outside).toBeDefined();
+    if (outside === undefined) return;
+
+    const pickOutcome = applyFullCourtCommand(
+      setup.state,
+      {
+        command: 'pick-full-court-player',
+        commandId: commandId('cmd-outside-pick', setup.state.revision),
+        runId: setup.state.runId,
+        expectedRevision: setup.state.revision,
+        playerVersionId: outside.playerVersionId,
+      },
+      { index: setup.index },
+    );
+    expect(pickOutcome.result.status).toBe('rejected');
+    expect(pickOutcome.result.rejection?.code).toBe('player-unavailable');
+
+    const scoutOutcome = applyFullCourtCommand(
+      setup.state,
+      {
+        command: 'purchase-full-court-report',
+        commandId: commandId('cmd-outside-scout', setup.state.revision),
+        runId: setup.state.runId,
+        expectedRevision: setup.state.revision,
+        target: { kind: 'player-scouting', playerVersionId: outside.playerVersionId },
+      },
+      { index: setup.index },
+    );
+    expect(scoutOutcome.result.status).toBe('rejected');
+    expect(scoutOutcome.result.rejection?.code).toBe('player-unavailable');
+  });
+
+  it('preserves open catalog behavior for legacy saves without a pool', () => {
+    const setup = fullCourtTestSetup();
+    const legacy = createFullCourtDraftState(setup.createCommand, setup.index, { pool: 'open' });
+    expect(legacy.pool).toBeUndefined();
+
+    const anyCandidate = setup.index.catalog.candidates[0];
+    if (anyCandidate === undefined) throw new Error('Expected a candidate in the legacy catalog');
+    const pickOutcome = applyFullCourtCommand(
+      legacy,
+      {
+        command: 'pick-full-court-player',
+        commandId: commandId('cmd-legacy-pick', legacy.revision),
+        runId: legacy.runId,
+        expectedRevision: legacy.revision,
+        playerVersionId: anyCandidate.playerVersionId,
+      },
+      { index: setup.index },
+    );
+    expect(pickOutcome.result.status).toBe('accepted');
+  });
+
+  it('computes minimum completion and depth forecast from the pool rather than excluded catalog players', () => {
+    const setup = fullCourtTestSetup();
+    const poolVersion = setup.state.pool?.poolVersion;
+    if (poolVersion === undefined) throw new Error('Expected a seeded draft pool');
+
+    // A pool of only the 6 most expensive players in the pool cannot be cheaper than the global catalog.
+    const poolPlayers = fullCourtEligibleCandidates(setup.index, setup.state)
+      .slice()
+      .sort((a, b) => b.originalOverall - a.originalOverall)
+      .slice(0, 6);
+    const restrictedState = {
+      ...setup.state,
+      pool: {
+        poolVersion,
+        playerVersionIds: poolPlayers.map((p) => p.playerVersionId),
+      },
+    };
+    const poolForecast = fullCourtDepthForecast({ index: setup.index, state: restrictedState });
+    const openForecast = fullCourtDepthForecast({
+      index: setup.index,
+      state: { ...setup.state, pool: undefined },
+    });
+    expect(poolForecast.costDollars).not.toBeNull();
+    expect(openForecast.costDollars).not.toBeNull();
+    expect(poolForecast.costDollars ?? 0).toBeGreaterThan(openForecast.costDollars ?? 0);
   });
 });

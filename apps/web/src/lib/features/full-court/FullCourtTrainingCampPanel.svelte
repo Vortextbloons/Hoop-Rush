@@ -15,6 +15,8 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
   import { formatWarChestCr } from './full-court-draft-presentation.js';
 
   const CAMP_TARGET = { kind: 'training-camp' } as const satisfies FullCourtReportTarget;
@@ -30,6 +32,7 @@
     onPurchaseReport,
     onRunPractice,
     ariaLabel = 'Full Court War Room training camp',
+    art = null,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
@@ -40,6 +43,7 @@
     onPurchaseReport: (target: FullCourtReportTarget) => void;
     onRunPractice: () => void;
     ariaLabel?: string;
+    art?: FullCourtArt | null;
   } = $props();
 
   const campRecord = $derived(
@@ -185,7 +189,8 @@
 
           <ul class="mt-2 flex flex-col gap-1">
             {#each practice.rotation as player (player.playerId)}
-              <li class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+              <li class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                <FullCourtPortrait {player} {art} size="sm" />
                 <span class="min-w-0 flex-1 truncate font-semibold">{player.displayName}</span>
                 <span class="shrink-0 font-mono text-[8px] font-bold text-primary uppercase">
                   {player.kind === 'clone' ? 'Clone' : player.starter ? 'Starter' : 'Bench'}

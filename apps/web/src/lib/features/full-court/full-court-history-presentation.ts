@@ -39,6 +39,7 @@ const ACHIEVEMENT_NAMES: Readonly<Record<FullCourtHistoryRecord['achievements'][
 
 export interface FullCourtHistoryRosterRow {
   readonly playerId: string;
+  readonly playerVersionId: string;
   readonly displayName: string;
   readonly seasonKey: string;
   readonly position: string;
@@ -107,6 +108,7 @@ export function presentFullCourtHistoryEntry(
           : null;
       return {
         playerId: pick.player.playerId,
+        playerVersionId: pick.player.playerVersionId,
         displayName: pick.player.displayName,
         seasonKey: pick.player.seasonKey,
         position: pick.player.positions.join('/'),

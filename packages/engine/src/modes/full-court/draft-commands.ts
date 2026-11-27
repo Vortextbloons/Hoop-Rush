@@ -34,9 +34,11 @@ import {
 import {
   fullCourtMinimumCompletionDollars,
   fullCourtPlayerOf,
+  fullCourtPoolPlayerOf,
   fullCourtSalaryDollarsOf,
   type FullCourtCatalogIndex,
 } from './draft-catalog.ts';
+import { createFullCourtDraftPool } from './draft-pool.ts';
 import {
   acceptFullCourtCommand,
   rejectFullCourtCommand,
@@ -80,17 +82,28 @@ function salariesOf(
   return [...state.spending.filter((entry) => entry.kind !== 'salary'), ...salaries];
 }
 
+export interface CreateFullCourtDraftOptions {
+  /** Defaults to `'seeded'` for new runs; `'open'` preserves legacy open-catalog fixtures. */
+  readonly pool?: 'seeded' | 'open';
+}
+
 export function createFullCourtDraftState(
   command: FullCourtCreateDraftCommand,
   index: FullCourtCatalogIndex,
+  options: CreateFullCourtDraftOptions = {},
 ): FullCourtDraftState {
   const parsed = fullCourtCreateDraftCommandSchema.parse(command);
   assertCapRushCatalogSourceMatches(index.catalog.source, parsed.catalog);
   const money = parsed.money ?? FULL_COURT_DEFAULT_MONEY;
+  const pool =
+    options.pool === 'open'
+      ? undefined
+      : createFullCourtDraftPool({ runSeed: parsed.runSeed, index, money });
   const minimumPayroll = fullCourtMinimumCompletionDollars(
     index,
     new Set(),
     FULL_COURT_MIN_ROSTER_SIZE,
+    pool,
   );
   if (
     minimumPayroll === null ||
@@ -106,6 +119,7 @@ export function createFullCourtDraftState(
     variant: parsed.variant,
     catalog: parsed.catalog,
     money,
+    ...(pool === undefined ? {} : { pool }),
     stage: 'drafting',
     picks: [],
     spending: [],
@@ -181,13 +195,16 @@ function applyPickPlayer(
       `command ${command.commandId} already charged the War Chest`,
     );
   }
-  const player = fullCourtPlayerOf(environment.index, command.playerVersionId);
+  const player = fullCourtPoolPlayerOf(environment.index, state, command.playerVersionId);
   if (player === null) {
+    const inCatalog = fullCourtPlayerOf(environment.index, command.playerVersionId) !== null;
     return rejectFullCourtCommand(
       state,
       command,
       'player-unavailable',
-      `player version ${command.playerVersionId} is not in the loaded catalog`,
+      inCatalog
+        ? `player version ${command.playerVersionId} is not in this draft pool`
+        : `player version ${command.playerVersionId} is not in the loaded catalog`,
     );
   }
   const salaryDollars = fullCourtSalaryDollarsOf(player);
@@ -324,13 +341,16 @@ function applyPurchaseReport(
   }
   if (
     command.target.kind === 'player-scouting' &&
-    fullCourtPlayerOf(environment.index, command.target.playerVersionId) === null
+    fullCourtPoolPlayerOf(environment.index, state, command.target.playerVersionId) === null
   ) {
+    const inCatalog = fullCourtPlayerOf(environment.index, command.target.playerVersionId) !== null;
     return rejectFullCourtCommand(
       state,
       command,
       'player-unavailable',
-      `player version ${command.target.playerVersionId} is not in the loaded catalog`,
+      inCatalog
+        ? `player version ${command.target.playerVersionId} is not in this draft pool`
+        : `player version ${command.target.playerVersionId} is not in the loaded catalog`,
     );
   }
   const priceDollars = fullCourtReportPriceDollars(command.target.kind);

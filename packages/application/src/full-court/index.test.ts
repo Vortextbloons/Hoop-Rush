@@ -172,3 +172,32 @@ test('keeps an accepted purchase receipt once the durable phase closes', async (
   );
   expect(repository.commit).toHaveBeenCalledTimes(1);
 });
+
+test('creates new drafts with a deterministic seeded pool through the application entry point', async () => {
+  const catalog = buildCapRushTestCatalog();
+  const source = capRushTestCatalogSource(catalog);
+  const index = fullCourtDraftIndexOf(catalog, source);
+  const create = fullCourtCreateDraftCommandSchema.parse({
+    command: 'create-full-court-draft',
+    commandId: 'create-pooled',
+    runId: 'application-pooled-draft',
+    runSeed: '0123456789abcdef',
+    variant: 'standard',
+    catalog: source,
+  });
+  let committedState = null as FullCourtDraftState | null;
+  const repository = {
+    load: mock(() => Promise.resolve(committedState)),
+    getReceipt: mock(() => Promise.resolve(null)),
+    commit: mock<FullCourtDraftRepository['commit']>((_, state, result) => {
+      committedState = state;
+      return Promise.resolve(result);
+    }),
+  } satisfies FullCourtDraftRepository;
+
+  const result = await submitFullCourtDraftCommand(create, { repository, index });
+  expect(result.status).toBe('accepted');
+  expect(committedState?.pool).toBeDefined();
+  expect(committedState?.pool?.playerVersionIds.length).toBeGreaterThanOrEqual(60);
+  expect(committedState?.pool?.playerVersionIds.length).toBeLessThanOrEqual(90);
+});

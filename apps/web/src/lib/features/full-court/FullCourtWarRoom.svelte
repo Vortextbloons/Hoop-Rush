@@ -29,9 +29,11 @@
     fullCourtPlayoffFixtureLabel,
   } from './full-court-season-presenter.ts';
   import FullCourtDefensiveMatchupsPanel from './FullCourtDefensiveMatchupsPanel.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
   import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
   import FullCourtTrainingCampPanel from './FullCourtTrainingCampPanel.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
   import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
 
   type SeasonTeam = FullCourtRegularSeason['teams'][number];
@@ -88,6 +90,7 @@
     matchupContext = null,
     onMatchupsChange,
     onResetMatchups,
+    art = null,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
@@ -102,6 +105,7 @@
     matchupContext?: FullCourtMatchupEditorContext | null;
     onMatchupsChange?: (assignments: readonly FullCourtDefensiveMatchupAssignment[]) => void;
     onResetMatchups?: () => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   const reportsByTarget = $derived(
@@ -258,6 +262,7 @@
     {practice}
     {onPurchaseReport}
     {onRunPractice}
+    {art}
   />
 
   <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
@@ -361,7 +366,8 @@
             <p class="ui-label text-muted-foreground">Rotation</p>
             <ul class="mt-1.5 flex flex-col gap-1">
               {#each filmReport.rotation as player (player.playerVersionId)}
-                <li class="flex min-w-0 items-baseline gap-2 text-[11px]">
+                <li class="flex min-w-0 items-center gap-2 text-[11px]">
+                  <FullCourtPortrait {player} {art} size="sm" />
                   <span class="min-w-0 flex-1 truncate font-semibold">{player.displayName}</span>
                   {#if player.starter}
                     <span class="shrink-0 font-mono text-[8px] font-bold text-primary uppercase"

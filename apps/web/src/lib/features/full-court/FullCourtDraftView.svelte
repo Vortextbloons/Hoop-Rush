@@ -184,15 +184,24 @@
     if (profileVersionId === null) return null;
     const player = index.byVersionId.get(profileVersionId);
     if (player === undefined) return null;
-    const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
     return {
       player,
-      view: buildPlayerProfile(capRushProfileInput(player, teamLabel(player)), reference),
+      view: profileFor(player),
       face: faceFor(player),
       salaryDollars: fullCourtSalaryDollarsOf(player),
       signed: draft.picks.some((pick) => pick.player.playerVersionId === player.playerVersionId),
     };
   });
+  const catalogRoles = $derived(
+    new Map(
+      catalogPage.rows.map(({ player }) => [player.playerVersionId, profileFor(player).archetype]),
+    ),
+  );
+
+  function profileFor(player: CapRushSourcePlayer) {
+    const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
+    return buildPlayerProfile(capRushProfileInput(player, teamLabel(player)), reference);
+  }
 
   function updateSearch(value: string): void {
     search = value;
@@ -401,13 +410,19 @@
 
     <div class="draft-layout">
       <div class="draft-main">
-        <Panel as="section" padding="none" aria-label="Open player catalog">
+        <Panel
+          as="section"
+          padding="none"
+          aria-label={draft.pool === undefined ? 'Open player catalog' : 'Draft player pool'}
+        >
           <div class="border-b border-line-soft p-3 sm:p-4">
             <SectionHeading
               level={2}
               size="sm"
-              title="Open catalog"
-              description="Search every eligible historical season. Every position is legal."
+              title={draft.pool === undefined ? 'Open catalog' : 'Draft pool'}
+              description={draft.pool === undefined
+                ? 'Search every eligible historical season. Every position is legal.'
+                : `Curated ${String(draft.pool.playerVersionIds.length)}-player pool for this run. Every position is legal.`}
             >
               {#snippet actions()}
                 <span class="ui-micro">{catalogCountLabel}</span>
@@ -500,6 +515,9 @@
                           <span class="truncate uppercase"
                             >{row.player.seasonKey} · {teamLabel(row.player)}</span
                           >
+                        </p>
+                        <p class="mt-1 text-xs font-semibold text-foreground">
+                          {catalogRoles.get(row.player.playerVersionId)}
                         </p>
                         <div class="mt-1 flex flex-wrap gap-1">
                           {#each row.player.positions as slot (slot)}

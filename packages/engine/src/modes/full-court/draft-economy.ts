@@ -129,6 +129,7 @@ export function fullCourtAssessPick(input: {
     input.index,
     excluded,
     FULL_COURT_MIN_ROSTER_SIZE - rosterAfter,
+    input.state.pool,
   );
   if (minimumCompletionDollars === null) {
     return rejected('completion', null, null);
@@ -200,6 +201,7 @@ export function fullCourtAssessPurchase(input: {
     input.index,
     excluded,
     missingPlayers,
+    input.state.pool,
   );
   if (minimumCompletionDollars === null) {
     return { ...base, minimumCompletionDollars: null, legal: false, reason: 'completion' };
@@ -232,7 +234,7 @@ export function fullCourtDepthForecast(input: {
   const excluded = new Set(input.state.picks.map((pick) => pick.player.playerId));
   const places = Math.max(1, FULL_COURT_MIN_ROSTER_SIZE - rosterSize);
   return {
-    costDollars: fullCourtMinimumCompletionDollars(input.index, excluded, places),
+    costDollars: fullCourtMinimumCompletionDollars(input.index, excluded, places, input.state.pool),
     missingPlayers: Math.max(0, FULL_COURT_MIN_ROSTER_SIZE - rosterSize),
   };
 }

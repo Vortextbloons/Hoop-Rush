@@ -44,3 +44,8 @@ export {
   createFullCourtWatchedReplayRepository,
 } from './repositories/full-court-replay.ts';
 export * from './schemas/full-court-replay-record.ts';
+export {
+  DexieFullCourtNextGamePlanRepository,
+  createFullCourtNextGamePlanRepository,
+} from './repositories/full-court-next-game-plan.ts';
+export * from './schemas/full-court-next-game-plan-record.ts';

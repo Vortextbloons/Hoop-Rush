@@ -342,6 +342,7 @@ export {
 } from './modes/full-court/league.ts';
 export {
   fullCourtDraftIndexOf,
+  fullCourtEligibleCandidates,
   fullCourtSalaryDollarsOf,
   type FullCourtCatalogIndex,
 } from './modes/full-court/draft-catalog.ts';

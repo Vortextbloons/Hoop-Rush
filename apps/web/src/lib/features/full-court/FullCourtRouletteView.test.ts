@@ -32,6 +32,7 @@ function setup(): { index: FullCourtCatalogIndex; draft: FullCourtDraftState } {
       catalog: source,
     }),
     index,
+    { pool: 'open' },
   );
   const picks = index.catalog.candidates.slice(0, 6).map((player, pickOrdinal) => ({
     pickOrdinal,

@@ -50,11 +50,13 @@
     fullCourtSeriesGames,
     fullCourtUserSchedule,
     fullCourtUserSeries,
+    type FullCourtAdvanceOptions,
     type FullCourtBracketRound,
     type FullCourtHomeAction,
     type FullCourtMatchupSide,
     type FullCourtPlayoffView,
     type FullCourtSeasonSection,
+    type FullCourtSimulationNotice,
   } from './full-court-season-presenter.ts';
 
   let {
@@ -71,6 +73,8 @@
     restingPlayerIds = [],
     onRestingChange,
     section = 'home',
+    notice = null,
+    onDismissNotice,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -78,13 +82,16 @@
     playoff: FullCourtPlayoffView | null;
     pendingForfeit: boolean;
     busy: boolean;
-    onAdvance: (count: number, acceptForfeit?: boolean) => void;
+    onAdvance: (count: number, acceptForfeit?: boolean, options?: FullCourtAdvanceOptions) => void;
     onStartPlayoffs: () => void;
     onWatchNextGame?: () => void;
     health?: FullCourtTeamHealth | null;
     restingPlayerIds?: readonly string[];
     onRestingChange?: (playerIds: readonly string[]) => void;
     section?: FullCourtSeasonSection;
+    /** Typed stop feedback from the controller. */
+    notice?: FullCourtSimulationNotice | null;
+    onDismissNotice?: () => void;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -269,7 +276,10 @@
       return;
     }
     if (action.count <= 0) return;
-    onAdvance(action.count);
+    onAdvance(action.count, false, {
+      stopAtInjury: action.stopAtInjury,
+      stopAtReview: action.stopAtReview,
+    });
   }
 
   /**
@@ -562,6 +572,18 @@
               {#if game.forfeit && !game.doubleForfeit}
                 <span class="font-mono text-[8px] text-muted-foreground uppercase">Forfeit</span>
               {/if}
+              {#if game.opponentAdaptation !== null}
+                {@const adjustment = fullCourtPlayoffAdaptationRead(game.opponentAdaptation)}
+                <span
+                  class="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[8px] font-bold text-accent uppercase"
+                  title={`${adjustment.reasonLabel}: ${adjustment.detailLabel}`}
+                  aria-label={`Game ${game.gameOrdinal} opponent adjustment: ${adjustment.settingLabel}`}
+                  >{adjustment.settingLabel}</span
+                >
+              {/if}
+              {#if game.adjustmentResponse !== null}
+                <p class="basis-full text-xs text-muted-foreground">{game.adjustmentResponse}</p>
+              {/if}
             </li>
           {/each}
         </ol>
@@ -848,6 +870,15 @@
         {controls.status}
       </p>
     </div>
+
+    {#if notice !== null && !busy}
+      <Alert class="mt-3" tone={notice.tone} title={notice.title}>
+        <p>{notice.message}</p>
+        {#snippet actions()}
+          <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
+        {/snippet}
+      </Alert>
+    {/if}
 
     {#if pendingForfeit}
       <Alert class="mt-3" tone="warning" title="Confirm the forfeit">

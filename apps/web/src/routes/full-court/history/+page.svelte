@@ -11,6 +11,7 @@
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import { errorMessageOf } from '#lib/errors.js';
+  import FullCourtPortrait from '#lib/features/full-court/FullCourtPortrait.svelte';
   import {
     presentFullCourtHistoryEntry,
     type FullCourtHistoryEntryView,
@@ -169,12 +170,17 @@
                   <li
                     class="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-background px-2.5 py-1.5 text-xs"
                   >
-                    <span class="min-w-0 truncate font-medium" title={player.displayName}>
-                      {player.displayName}
-                      <span class="text-muted-foreground">
-                        ({player.position} · {player.seasonKey})
-                      </span>
-                    </span>
+                    <div class="flex min-w-0 items-center gap-2">
+                      <FullCourtPortrait {player} size="sm" />
+                      <div class="min-w-0">
+                        <p class="truncate font-semibold" title={player.displayName}>
+                          {player.displayName}
+                        </p>
+                        <p class="text-muted-foreground">
+                          {player.position} · {player.seasonKey}{player.starter ? ' · Starter' : ''}
+                        </p>
+                      </div>
+                    </div>
                     <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
                       {player.salaryLabel}
                       {#if player.minutesTarget !== null}

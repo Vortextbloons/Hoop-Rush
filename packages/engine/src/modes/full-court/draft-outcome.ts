@@ -97,5 +97,17 @@ export function validateFullCourtRunAndRevision(
       error instanceof Error ? error.message : 'the loaded catalog does not match this draft',
     );
   }
+  if (state.pool !== undefined) {
+    for (const playerVersionId of state.pool.playerVersionIds) {
+      if (!environment.index.byVersionId.has(playerVersionId)) {
+        return rejectFullCourtCommand(
+          state,
+          command,
+          'catalog-mismatch',
+          `draft pool player ${playerVersionId} is missing from the loaded catalog`,
+        );
+      }
+    }
+  }
   return null;
 }

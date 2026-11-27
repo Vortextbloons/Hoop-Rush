@@ -10,12 +10,14 @@ import {
   applyFullCourtCommand,
   createFullCourtDraftState,
   fullCourtDraftIndexOf,
+  fullCourtEligibleCandidates,
   fullCourtSalaryDollarsOf,
   fullCourtScoutPlayer,
   type FullCourtCatalogIndex,
 } from '@hoop-rush/engine';
 import { buildCapRushTestCatalog, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
 import { render } from 'svelte/server';
+import { fullCourtCatalogPage } from './full-court-draft-presentation.js';
 import FullCourtDraftView from './FullCourtDraftView.svelte';
 import FullCourtScoutReport from './FullCourtScoutReport.svelte';
 import { FULL_COURT_MIN_ROSTER_SIZE, fullCourtDraftStateSchema } from '@hoop-rush/data-contracts';
@@ -59,7 +61,7 @@ function completedState(
   index: FullCourtCatalogIndex,
   seed: FullCourtDraftState,
 ): FullCourtDraftState {
-  const players = index.catalog.candidates.slice(0, FULL_COURT_MIN_ROSTER_SIZE);
+  const players = fullCourtEligibleCandidates(index, seed).slice(0, FULL_COURT_MIN_ROSTER_SIZE);
   const picks = players.map((player, pickOrdinal) => ({
     pickOrdinal,
     player,
@@ -131,11 +133,14 @@ describe('FullCourtDraftView', () => {
   test('shows a signing cost and its blockers beside every sign action', () => {
     const { state, index } = setup();
     const body = renderView(state, index);
+    const firstPlayer = fullCourtCatalogPage(index, state).rows[0]?.player;
+    if (firstPlayer === undefined) throw new Error('Expected a player on the opening draft board');
 
     expect(body).toContain('Payroll after');
     expect(body).toContain('Room left');
     expect(body).toContain('War Chest after');
-    expect(body).toContain('aria-label="Sign PG 99"');
+    expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
+    expect(body).toContain('Draft pool');
   });
 
   test('gates the lock on the six-player minimum and links the roster from the action bar', () => {
@@ -162,20 +167,30 @@ describe('FullCourtDraftView', () => {
   test('prices player scouting per catalog version without replacing the catalog or profile actions', () => {
     const { state, index } = setup();
     const body = renderView(state, index, () => undefined);
+    const firstPlayer = fullCourtCatalogPage(index, state).rows[0]?.player;
+    if (firstPlayer === undefined) throw new Error('Expected a player on the opening draft board');
 
     expect(body).toContain('Scout 2 CR · Lifetime of this run');
-    expect(body).toContain('aria-label="Scout PG 99 for 2 CR"');
+    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} for 2 CR"`);
+    expect(body).toContain('Draft pool');
+    expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
+  });
+
+  test('renders Open catalog for legacy saves without a pool', () => {
+    const { state, index } = setup();
+    const body = renderView({ ...state, pool: undefined }, index);
+
     expect(body).toContain('Open catalog');
-    expect(body).toContain('aria-label="PG 99 details"');
   });
 
   test('marks a purchased scouting report as owned and opens it from the same row', () => {
     const { state, index } = setup();
-    const body = renderView(scoutedState(index, state, 'PG 97'), index, () => undefined);
+    const targetName = fullCourtCatalogPage(index, state).rows[0]?.player.displayName ?? '';
+    const body = renderView(scoutedState(index, state, targetName), index, () => undefined);
 
     expect(body).toContain('Scouting report · Lifetime of this run');
-    expect(body).toContain('aria-label="Open scouting report for PG 97"');
-    expect(body).not.toContain('aria-label="Scout PG 97 for 2 CR"');
+    expect(body).toContain(`aria-label="Open scouting report for ${targetName}"`);
+    expect(body).not.toContain(`aria-label="Scout ${targetName} for 2 CR"`);
   });
 
   test('blocks a scouting purchase when the War Chest cannot cover the cheapest legal finish', () => {

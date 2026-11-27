@@ -89,6 +89,7 @@ export * from './cap-rush-worker.ts';
 export * from './cap-rush-commands.ts';
 export * from './full-court-coaching.ts';
 export * from './full-court-matchups.ts';
+export * from './full-court-next-game-plan.ts';
 export * from './full-court-draft.ts';
 export * from './full-court-health.ts';
 export * from './full-court-history.ts';

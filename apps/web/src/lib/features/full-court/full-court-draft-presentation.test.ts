@@ -18,6 +18,7 @@ import {
 import {
   createFullCourtDraftState,
   fullCourtDraftIndexOf,
+  fullCourtEligibleCandidates,
   fullCourtSalaryDollarsOf,
   type FullCourtCatalogIndex,
 } from '@hoop-rush/engine';
@@ -123,12 +124,18 @@ describe('full court draft presentation', () => {
     expect(summary.depthForecastDollars).toBeNull();
   });
 
-  it('filters the catalog by search and optional position with a bounded page', () => {
+  it('filters the pool by search and optional position in mixed curated opening order', () => {
     const { index, state } = setup();
+    const eligible = fullCourtEligibleCandidates(index, state);
     const all = fullCourtCatalogPage(index, state);
     expect(all.rows).toHaveLength(FULL_COURT_CATALOG_PAGE_SIZE);
-    expect(all.total).toBe(index.catalog.candidates.length);
-    expect(all.rows[0]?.player.originalOverall).toBe(99);
+    expect(all.total).toBe(eligible.length);
+    expect(all.rows.map((row) => row.player.playerVersionId)).toEqual(
+      eligible.slice(0, FULL_COURT_CATALOG_PAGE_SIZE).map((player) => player.playerVersionId),
+    );
+    const firstPageOveralls = all.rows.map((row) => row.player.originalOverall);
+    expect(Math.max(...firstPageOveralls)).toBeGreaterThanOrEqual(85);
+    expect(Math.min(...firstPageOveralls)).toBeLessThan(76);
 
     const firstPage = fullCourtCatalogPage(index, state, { limit: 5 });
     const secondPage = fullCourtCatalogPage(index, state, { limit: 5, offset: 5 });
@@ -140,12 +147,12 @@ describe('full court draft presentation', () => {
 
     const pointGuards = fullCourtCatalogPage(index, state, {
       position: 'PG',
-      limit: index.catalog.candidates.length,
+      limit: eligible.length,
     });
     expect(pointGuards.total).toBeGreaterThan(0);
     expect(pointGuards.rows.every((row) => row.player.positions.includes('PG'))).toBe(true);
 
-    const target = index.catalog.candidates.find((player) => player.positions.includes('PG'));
+    const target = eligible.find((player) => player.positions.includes('PG'));
     if (target === undefined) throw new Error('missing test point guard');
     const searched = fullCourtCatalogPage(index, state, { search: target.displayName });
     expect(searched.rows.some((row) => row.player.playerVersionId === target.playerVersionId)).toBe(
@@ -153,9 +160,16 @@ describe('full court draft presentation', () => {
     );
   });
 
+  it('preserves open catalog OVR-descending order for legacy saves without a pool', () => {
+    const { index, state } = setup();
+    const all = fullCourtCatalogPage(index, { ...state, pool: undefined });
+    expect(all.total).toBe(index.catalog.candidates.length);
+    expect(all.rows[0]?.player.originalOverall).toBe(99);
+  });
+
   it('marks a rostered player version and blocks every version of that player', () => {
     const setupValue = setup();
-    const target = setupValue.index.catalog.candidates[0];
+    const target = fullCourtEligibleCandidates(setupValue.index, setupValue.state)[0];
     if (target === undefined) throw new Error('missing test player');
     const draft = fullCourtDraftStateSchema.parse({
       ...setupValue.state,

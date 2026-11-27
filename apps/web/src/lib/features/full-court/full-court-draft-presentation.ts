@@ -16,6 +16,7 @@ import {
   fullCourtAbsenceTolerance,
   fullCourtAssessPick,
   fullCourtDepthForecast,
+  fullCourtEligibleCandidates,
   fullCourtPayrollDollars,
   fullCourtPayrollStatus,
   fullCourtSalaryDollarsOf,
@@ -125,15 +126,19 @@ export function fullCourtCatalogPage(
   const position = query.position ?? null;
   const limit = Math.max(0, Math.trunc(query.limit ?? FULL_COURT_CATALOG_PAGE_SIZE));
   const offset = Math.max(0, Math.trunc(query.offset ?? 0));
-  const matched = index.catalog.candidates
-    .filter((player) => matchesCatalogQuery(player, search, position))
-    .sort(
-      (left, right) =>
-        right.originalOverall - left.originalOverall ||
-        compareText(left.displayName, right.displayName) ||
-        compareText(left.seasonKey, right.seasonKey) ||
-        compareText(left.playerVersionId, right.playerVersionId),
-    );
+  const filtered = fullCourtEligibleCandidates(index, draft).filter((player) =>
+    matchesCatalogQuery(player, search, position),
+  );
+  const matched =
+    draft.pool !== undefined
+      ? filtered
+      : [...filtered].sort(
+          (left, right) =>
+            right.originalOverall - left.originalOverall ||
+            compareText(left.displayName, right.displayName) ||
+            compareText(left.seasonKey, right.seasonKey) ||
+            compareText(left.playerVersionId, right.playerVersionId),
+        );
   const rosterPlayerIds = new Set(draft.picks.map((pick) => pick.player.playerId));
   const rosterVersionIds = new Set(draft.picks.map((pick) => pick.player.playerVersionId));
   const rows = matched.slice(offset, offset + limit).map((player): FullCourtCatalogRow => {

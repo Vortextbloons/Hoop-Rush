@@ -71,6 +71,7 @@ function setup(): {
       catalog: source,
     }),
     index,
+    { pool: 'open' },
   );
   const season = fullCourtTestSeasonLock().season;
   const fixture = season.games.find(

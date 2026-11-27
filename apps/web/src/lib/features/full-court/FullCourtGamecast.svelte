@@ -12,6 +12,8 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
   import { fullCourtGamecastFrames } from './full-court-gamecast.ts';
 
   let {
@@ -19,11 +21,13 @@
     userTeamId,
     replayNote = null,
     onClose,
+    art = null,
   }: {
     game: Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
     userTeamId: string;
     replayNote?: string | null;
     onClose: () => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   type PlayerLine = FullCourtGameResult['home']['players'][number];
@@ -168,20 +172,39 @@
       {#each teams as team, index (team.teamId)}
         {@const active = index === 0 ? frame.homeUnit : frame.awayUnit}
         {@const unitName = unitNameFor(team, active)}
-        <div>
-          <h4 class="text-sm font-semibold">
-            {team.displayName} on court{#if unitName !== null}<span class="text-accent">
-                · {unitName}</span
-              >{/if}
+        <section
+          class="rounded-xl border border-line-soft bg-surface-1 p-3"
+          aria-label={`${team.displayName} active five`}
+        >
+          <h4 class="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
+            <span>{team.displayName}</span>
+            <span class="text-xs font-normal text-muted-foreground">on court</span>
+            {#if unitName !== null}
+              <span class="text-xs font-normal text-accent">· {unitName}</span>
+            {/if}
           </h4>
-          <ul class="mt-1 space-y-1 text-xs text-muted-foreground">
+          <ul class="mt-2 grid grid-cols-5 gap-1.5">
             {#each active as id (id)}
-              <li>
-                {team.players.find((player) => player.playerId === id)?.displayName ?? 'Player'}
+              {@const player = team.players.find((entry) => entry.playerId === id)}
+              <li class="min-w-0 text-center">
+                <div class="flex justify-center">
+                  <FullCourtPortrait
+                    player={{ playerId: id, displayName: player?.displayName ?? 'Player' }}
+                    {art}
+                    size="sm"
+                    eager
+                  />
+                </div>
+                <span
+                  class="mt-1 block truncate text-[10px] font-semibold text-muted-foreground"
+                  title={player?.displayName ?? id}
+                >
+                  {player?.displayName ?? 'Player'}
+                </span>
               </li>
             {/each}
           </ul>
-        </div>
+        </section>
       {/each}
     </div>
     {#if visibleFeed.length > 0}
@@ -241,7 +264,14 @@
           {@const player = teams
             .find((team) => team.teamId === injury.teamId)
             ?.players.find((entry) => entry.playerId === injury.playerId)}
-          <li>{player?.displayName ?? 'Player'} is expected to miss {injury.gamesMissed} games.</li>
+          <li class="flex items-center gap-2">
+            {#if player !== undefined}
+              <FullCourtPortrait {player} {art} size="sm" />
+            {/if}
+            <span
+              >{player?.displayName ?? 'Player'} is expected to miss {injury.gamesMissed} games.</span
+            >
+          </li>
         {/each}
       </ul>
     {/if}
@@ -249,7 +279,12 @@
       <h4 class="mt-4 text-sm font-semibold">{team.displayName} box score</h4>
       <div class="overflow-x-auto">
         <PlayerStatsTable {columns} rows={team.players} rowKey={(player) => player.playerId}>
-          {#snippet identity(player)}{player.displayName}{/snippet}
+          {#snippet identity(player)}
+            <span class="flex min-w-0 items-center gap-2">
+              <FullCourtPortrait {player} {art} size="sm" />
+              <span class="truncate">{player.displayName}</span>
+            </span>
+          {/snippet}
         </PlayerStatsTable>
       </div>
     {/each}

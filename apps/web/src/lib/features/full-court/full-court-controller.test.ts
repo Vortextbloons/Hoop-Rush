@@ -15,6 +15,7 @@ import {
   idSchema,
   playerVersionId,
   seedSchema,
+  type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
   type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
@@ -30,6 +31,7 @@ import {
   simulateFullCourtSeasonSlot,
   simulateFullCourtTrainingCamp,
   type CapRushLeagueField,
+  type FullCourtInjuryEvent,
 } from '@hoop-rush/engine';
 import {
   DexieCapRushMultiplayerRepository,
@@ -45,6 +47,7 @@ import {
   createFullCourtBlueprintRepository,
   createFullCourtCoachingRepository,
   createFullCourtHistoryRepository,
+  createFullCourtNextGamePlanRepository,
   createFullCourtPlayoffRepository,
   createFullCourtSeasonRepository,
   createFullCourtWatchedReplayRepository,
@@ -125,6 +128,7 @@ function repositoriesFor(db: HoopRushDatabase): Persistence {
     fullCourtCoachingRepository: createFullCourtCoachingRepository(db),
     fullCourtHistoryRepository: createFullCourtHistoryRepository(db),
     fullCourtWatchedReplayRepository: createFullCourtWatchedReplayRepository(db),
+    fullCourtNextGamePlanRepository: createFullCourtNextGamePlanRepository(db),
     profileRepository: new DexieProfileRepository(db),
   };
 }
@@ -163,14 +167,20 @@ async function seedCompletedDraft(db: HoopRushDatabase) {
   );
   let draft = await repository.load(runId);
   if (draft === null) throw new Error('Missing created draft');
-  for (const candidate of base.candidates.filter((player) => player.positions.primary === 'PG')) {
+  const poolIds =
+    draft.pool?.playerVersionIds ??
+    base.candidates
+      .filter((player) => player.positions.primary === 'PG')
+      .map((player) => player.playerVersionId);
+  if (poolIds.length < 6) throw new Error('Full Court controller test needs a six-player pool');
+  for (const [pickIndex, playerVersionId] of poolIds.slice(0, 6).entries()) {
     await submitFullCourtDraftCommand(
       {
         command: 'pick-full-court-player',
-        commandId: commandIdSchema.parse(`fc-pick-${String(draft.revision)}`),
+        commandId: commandIdSchema.parse(`fc-pick-${String(pickIndex)}-${String(draft.revision)}`),
         runId: draft.runId,
         expectedRevision: draft.revision,
-        playerVersionId: candidate.playerVersionId,
+        playerVersionId,
       },
       { repository, index },
     );
@@ -199,6 +209,71 @@ async function seedCompletedDraft(db: HoopRushDatabase) {
   };
   const lock = lockFullCourtRegularSeason(buildFullCourtRegularSeason({ ...assets, draft }));
   return { runId, draft, assets, lock };
+}
+
+async function seedPlayoffReadyDraft(
+  db: HoopRushDatabase,
+  mode: 'mid-seed' | 'miss-playoffs' = 'mid-seed',
+): Promise<Awaited<ReturnType<typeof seedCompletedDraft>>> {
+  const seeded = await seedCompletedDraft(db);
+  const { lock } = seeded;
+  const userTeamId = lock.season.userTeamId;
+  const seasonRepo = createFullCourtSeasonRepository(db);
+  const initial = createFullCourtSeasonCheckpoint(lock);
+  await seasonRepo.create(initial);
+  const slot82Health = { ...initial.healthByTeam };
+  const allScores: FullCourtSeasonScore[] = [];
+  for (const fixture of lock.season.games) {
+    if (fixture.slot === CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
+      for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+        slot82Health[teamId] = {
+          teamId,
+          version: FULL_COURT_HEALTH_VERSION,
+          throughDay: fixture.dayOffset,
+          players: {},
+        };
+      }
+    }
+    const userInGame = fixture.homeTeamId === userTeamId || fixture.awayTeamId === userTeamId;
+    const homeWins =
+      mode === 'miss-playoffs'
+        ? userInGame
+          ? fixture.homeTeamId !== userTeamId
+          : fixture.homeTeamId < fixture.awayTeamId
+        : userInGame
+          ? fixture.slot % 4 !== 0
+            ? fixture.homeTeamId === userTeamId
+            : fixture.awayTeamId === userTeamId
+          : fixture.homeTeamId < fixture.awayTeamId;
+    allScores.push({
+      ...fixture,
+      outcome: {
+        kind: 'played',
+        homePoints: homeWins ? 100 : 90,
+        awayPoints: homeWins ? 90 : 100,
+      },
+    });
+  }
+  await db.fullCourtSeasonCheckpoints.put({
+    saveSchemaVersion: 1,
+    runId: lock.season.runId,
+    checkpoint: {
+      schemaVersion: 1,
+      runId: lock.season.runId,
+      lockDigest: lock.digest,
+      completedThroughSlot: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
+      healthByTeam: slot82Health,
+    },
+  });
+  await db.fullCourtSeasonScores.bulkPut(
+    allScores.map((score) => ({
+      saveSchemaVersion: 1,
+      runId: lock.season.runId,
+      gameId: score.gameId,
+      score,
+    })),
+  );
+  return seeded;
 }
 
 describe('FullCourtController durable watched replay', () => {
@@ -400,14 +475,10 @@ describe('FullCourtController durable watched replay', () => {
       await controller.startPlayoffs();
       expect(controller.playoffs).not.toBeNull();
 
-      // AI-only playoff games do not write a watched replay even if record=true.
-      while (controller.playoffs?.view.nextGame?.userSide === null) {
-        await controller.advance(1, false, true);
-        expect(controller.savedReplay).toBeNull();
-      }
-
-      // Watch opening user playoff game.
+      // Watching the next user game advances intervening AI games, then records only that game.
+      const gamesBeforeWatch = controller.playoffs?.checkpoint.games.length ?? 0;
       await controller.advance(1, false, true);
+      expect(controller.playoffs?.checkpoint.games.length).toBeGreaterThan(gamesBeforeWatch);
       expect(controller.savedReplay?.identity.phase).toBe('playoff');
       expect(controller.savedReplay?.identity.runId).toBe(runId);
       const watchedPlayoff = controller.savedReplay;
@@ -713,14 +784,11 @@ describe('FullCourtController durable watched replay', () => {
 
       controller.setRestingPlayers([bench.playerId]);
       expect(controller.restingForGameId).toBe(preview.gameId);
-      while (controller.playoffs?.view.nextGame?.userSide === null) {
-        await controller.advance(1);
-      }
-      expect(calls.every((resting) => resting === undefined)).toBe(true);
-      expect(controller.restingForGameId).toBe(preview.gameId);
-
+      const callsBefore = calls.length;
       await controller.advance(1);
-      expect(calls.at(-1)).toEqual([bench.playerId]);
+      const playoffCalls = calls.slice(callsBefore);
+      expect(playoffCalls.slice(0, -1).every((resting) => resting === undefined)).toBe(true);
+      expect(playoffCalls.at(-1)).toEqual([bench.playerId]);
       expect(controller.restingPlayerIds).toEqual([]);
       expect(controller.restingForGameId).toBeNull();
       controller.dispose();
@@ -937,7 +1005,7 @@ describe('FullCourtController durable watched replay', () => {
     }
   });
 
-  test('validates per-fixture defensive matchups, clears after user game, and skips AI-only playoff games ahead', async () => {
+  test('restores the next-game plan, clears it after the user game, and skips AI-only playoff games ahead', async () => {
     installTestEnvironment();
     const { first } = openTestDatabasePair('fc-controller-matchups');
     const slotCalls: Array<Parameters<FullCourtWorkerRunner['simulateSlot']>[2]> = [];
@@ -1023,6 +1091,13 @@ describe('FullCourtController durable watched replay', () => {
       expect(controller.setDefensiveMatchups([assignment])).toBe(true);
       expect(controller.defensiveMatchupsForGameId).toBe(slot1Fixture.gameId);
       expect(controller.defensiveMatchupsOpponentId).toBe(slot1OpponentId);
+      const restingPlayer = userTeam.roster.at(-1);
+      if (restingPlayer === undefined) throw new Error('Missing test bench player');
+      controller.setRestingPlayers([restingPlayer.playerId]);
+      await controller.load();
+      expect(controller.defensiveMatchupAssignments).toEqual([assignment]);
+      expect(controller.restingPlayerIds).toEqual([restingPlayer.playerId]);
+      expect(controller.restingForGameId).toBe(slot1Fixture.gameId);
 
       const checkpoint = controller.season?.checkpoint;
       if (checkpoint === undefined) throw new Error('Missing season checkpoint');
@@ -1052,6 +1127,10 @@ describe('FullCourtController durable watched replay', () => {
       expect(slotCalls[1]?.defensiveMatchups).toBeUndefined();
       expect(controller.defensiveMatchupAssignments).toEqual([]);
       expect(controller.defensiveMatchupsForGameId).toBeNull();
+      expect(slotCalls[0]?.restingPlayerIds).toEqual([restingPlayer.playerId]);
+      expect(
+        await repositoriesFor(first).fullCourtNextGamePlanRepository.load(lock.season.runId),
+      ).toBeNull();
 
       // Jump to completed regular season and start playoffs to test AI-only games ahead.
       const seasonRepo = createFullCourtSeasonRepository(first);
@@ -1121,14 +1200,13 @@ describe('FullCourtController durable watched replay', () => {
       expect(controller.setDefensiveMatchups([playoffAssignment])).toBe(true);
       expect(controller.defensiveMatchupsForGameId).toBe(preview.gameId);
 
-      while (controller.playoffs?.view.nextGame?.userSide === null) {
-        await controller.advance(1);
-      }
-      expect(playoffCalls.every((options) => options?.defensiveMatchups === undefined)).toBe(true);
-      expect(controller.defensiveMatchupsForGameId).toBe(preview.gameId);
-
+      const playoffCallsBefore = playoffCalls.length;
       await controller.advance(1);
-      expect(playoffCalls.at(-1)?.defensiveMatchups).toEqual({
+      const userAdvanceCalls = playoffCalls.slice(playoffCallsBefore);
+      expect(
+        userAdvanceCalls.slice(0, -1).every((options) => options?.defensiveMatchups === undefined),
+      ).toBe(true);
+      expect(userAdvanceCalls.at(-1)?.defensiveMatchups).toEqual({
         gameId: preview.gameId,
         opponentTeamId: preview.opponentTeamId,
         assignments: [playoffAssignment],
@@ -1178,11 +1256,12 @@ test('keeps a stale tab from paying for training camp after another tab commits 
     const staleFilm = stale.nextFilmTarget();
     if (staleFilm === null) throw new Error('Expected the opening film target');
 
-    const scout = assets.catalog.candidates[0];
-    if (scout === undefined) throw new Error('Missing catalog candidate');
+    const scoutId =
+      stale.draft?.pool?.playerVersionIds[0] ?? assets.catalog.candidates[0]?.playerVersionId;
+    if (scoutId === undefined) throw new Error('Missing draft pool candidate');
     await stale.purchaseReport({
       kind: 'player-scouting',
-      playerVersionId: scout.playerVersionId,
+      playerVersionId: scoutId,
     });
     expect(stale.error).toBeNull();
 
@@ -1291,4 +1370,312 @@ test('opens a practice report bought by another tab and refuses a new one after 
     first.close();
     second.close();
   }
+});
+
+describe('FullCourtController decision-aware simulation stops', () => {
+  test('pauses a regular-season batch at the next scheduled review', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-review-stop');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { assets, lock } = await seedCompletedDraft(first);
+      const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
+      for (const fixture of lock.season.games.filter((game) => game.slot === 19)) {
+        for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+          healthByTeam[teamId] = {
+            teamId,
+            version: FULL_COURT_HEALTH_VERSION,
+            throughDay: fixture.dayOffset,
+            players: {},
+          };
+        }
+      }
+      await first.fullCourtSeasonCheckpoints.put({
+        saveSchemaVersion: 1,
+        runId: lock.season.runId,
+        checkpoint: {
+          schemaVersion: 1,
+          runId: lock.season.runId,
+          lockDigest: lock.digest,
+          completedThroughSlot: 19,
+          healthByTeam,
+        },
+      });
+
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(19);
+
+      await controller.advance(25, false, false, { stopAtReview: true });
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(20);
+      expect(controller.notice?.stop).toEqual({ kind: 'review', slot: 20 });
+      expect(controller.notice?.title).toContain('Scheduled review');
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
+
+  test('pauses a regular-season batch after the first actionable user injury', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-injury-stop');
+    let injected = false;
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) => {
+        const outcome = simulateFullCourtSeasonSlot(
+          lock,
+          checkpoint,
+          createEngineContext(),
+          options,
+        );
+        if (injected || outcome.kind !== 'simulated' || outcome.userGame.kind !== 'played') {
+          return Promise.resolve(outcome);
+        }
+        const userTeamId = lock.season.userTeamId;
+        const userTeam = lock.season.teams.find((team) => team.teamId === userTeamId);
+        const player = userTeam?.roster[0];
+        const userHealth = outcome.checkpoint.healthByTeam[userTeamId];
+        if (player === undefined || userHealth === undefined) {
+          throw new Error('Missing injury test inputs');
+        }
+        const nextFixture = lock.season.games.find(
+          (game) =>
+            game.slot === outcome.checkpoint.completedThroughSlot + 1 &&
+            (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+        );
+        const availableFromDay = (nextFixture?.dayOffset ?? userHealth.throughDay) + 5;
+        const injury: FullCourtInjuryEvent = {
+          teamId: userTeamId,
+          playerId: player.playerId,
+          playerVersionId: player.playerVersionId ?? 'test-version',
+          cohortId: 'test-cohort',
+          onsetDay: userHealth.throughDay,
+          gamesMissed: 3,
+          availableFromDay,
+          projected: false,
+        };
+        injected = true;
+        return Promise.resolve({
+          ...outcome,
+          userGame: { ...outcome.userGame, injuries: [injury] },
+          checkpoint: {
+            ...outcome.checkpoint,
+            healthByTeam: {
+              ...outcome.checkpoint.healthByTeam,
+              [userTeamId]: {
+                ...userHealth,
+                players: {
+                  ...userHealth.players,
+                  [player.playerId]: { loadBasisPoints: 0, availableFromDay },
+                },
+              },
+            },
+          },
+        });
+      },
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { assets, lock } = await seedCompletedDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
+      const player = userTeam?.roster[0];
+      if (player === undefined) throw new Error('Missing user player');
+
+      await controller.advance(5, false, false, { stopAtInjury: true });
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
+      expect(controller.notice?.stop).toMatchObject({
+        kind: 'injury',
+        slot: 1,
+        playerIds: [player.playerId],
+      });
+      expect(controller.notice?.message).toContain('Out until day');
+
+      await controller.advance(2);
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(3);
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
+
+  test('playoff sims count user games and advance intervening AI games', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-playoff-user-games');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { assets, lock } = await seedPlayoffReadyDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      await controller.startPlayoffs();
+      expect(controller.playoffs?.checkpoint.games.length).toBe(0);
+
+      await controller.advance(2);
+      const games = controller.playoffs?.checkpoint.games ?? [];
+      const userGames = games.filter(
+        (game) =>
+          game.homeTeamId === lock.season.userTeamId || game.awayTeamId === lock.season.userTeamId,
+      );
+      expect(userGames).toHaveLength(2);
+      expect(games.length).toBeGreaterThan(userGames.length);
+      const stopKind = controller.notice?.stop.kind;
+      expect(stopKind === 'game-limit' || stopKind === 'opponent-adjustment').toBe(true);
+      expect(controller.latestGame?.tape).toBeNull();
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
+
+  test('returns control at series end and resolves the next opponent before its first game', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-playoff-series-stop');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { assets, lock } = await seedPlayoffReadyDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      await controller.startPlayoffs();
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await controller.advance(7);
+        if (controller.notice?.stop.kind === 'series-complete') break;
+      }
+      const stop = controller.notice?.stop;
+      expect(stop?.kind).toBe('series-complete');
+      if (stop?.kind !== 'series-complete') return;
+
+      const userTeamId = lock.season.userTeamId;
+      const userGamesAfterSeries = (controller.playoffs?.checkpoint.games ?? []).filter(
+        (game) => game.homeTeamId === userTeamId || game.awayTeamId === userTeamId,
+      ).length;
+      const gamesAfterSeries = controller.playoffs?.checkpoint.games.length ?? 0;
+
+      await controller.advance(1);
+      const gamesAfterAdvance = controller.playoffs?.checkpoint.games ?? [];
+      const userGamesAfterAdvance = gamesAfterAdvance.filter(
+        (game) => game.homeTeamId === userTeamId || game.awayTeamId === userTeamId,
+      ).length;
+      if (stop.won) {
+        expect(controller.notice?.stop.kind).toBe('opponent-change');
+        expect(userGamesAfterAdvance).toBe(userGamesAfterSeries);
+      } else {
+        expect(gamesAfterAdvance.length).toBeGreaterThan(gamesAfterSeries);
+        expect(userGamesAfterAdvance).toBe(userGamesAfterSeries);
+      }
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
+
+  test('batch-finishes AI-only bracket games after the user misses the playoffs', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-playoff-eliminated');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { assets, lock } = await seedPlayoffReadyDraft(first, 'miss-playoffs');
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      await controller.startPlayoffs();
+      expect(controller.playoffs?.view.userOutcome.status).toBe('not-qualified');
+
+      const before = controller.playoffs?.checkpoint.games.length ?? 0;
+      await controller.advance(5);
+      const games = controller.playoffs?.checkpoint.games ?? [];
+      expect(games.length - before).toBe(5);
+      expect(
+        games.every(
+          (game) =>
+            game.homeTeamId !== lock.season.userTeamId &&
+            game.awayTeamId !== lock.season.userTeamId,
+        ),
+      ).toBe(true);
+      expect(controller.notice?.stop.kind).toBe('game-limit');
+      expect(controller.latestGame).toBeNull();
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
 });

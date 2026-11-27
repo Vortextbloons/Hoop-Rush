@@ -12,7 +12,10 @@ import {
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
 import { render } from 'svelte/server';
-import type { FullCourtPlayoffView } from './full-court-season-presenter';
+import type {
+  FullCourtPlayoffView,
+  FullCourtSimulationNotice,
+} from './full-court-season-presenter';
 import { fullCourtTestPlayoffLock, fullCourtTestSeasonLock } from './full-court-test-support';
 import FullCourtSeasonView from './FullCourtSeasonView.svelte';
 
@@ -30,6 +33,7 @@ function renderView(input: {
   pendingForfeit?: boolean;
   health?: ReturnType<typeof fullCourtTeamHealthSchema.parse> | null;
   restingPlayerIds?: readonly string[];
+  notice?: FullCourtSimulationNotice | null;
 }): string {
   return render(FullCourtSeasonView, {
     props: {
@@ -44,6 +48,8 @@ function renderView(input: {
       busy: false,
       onAdvance: () => {},
       onStartPlayoffs: () => {},
+      notice: input.notice ?? null,
+      onDismissNotice: () => {},
       ...(input.section === undefined ? {} : { section: input.section }),
     },
   }).body;
@@ -390,4 +396,62 @@ test('shows opponent tactical adjustment in playoff preview only once series evi
   });
   expect(playoffsBody).toContain('aria-label="Playoff opponent adjustment"');
   expect(playoffsBody).toContain('Pressure');
+});
+
+test('home renders typed simulation stop feedback', () => {
+  const body = renderView({
+    section: 'home',
+    notice: {
+      stop: { kind: 'injury', slot: 4, playerIds: ['p1'], availableFromDay: 12 },
+      tone: 'warning',
+      title: 'Bench Guard is out',
+      message: 'Out until day 12. Adjust rest or rotation before continuing.',
+    },
+  });
+  expect(body).toContain('Bench Guard is out');
+  expect(body).toContain('Adjust rest or rotation before continuing.');
+  expect(body).toContain('Dismiss');
+});
+
+test('playoffs surfaces stored per-game opponent adjustments in the series list', () => {
+  const initial = bracketView();
+  const adaptation = {
+    defense: 'protect-paint' as const,
+    reason: 'persistent-inside-scoring' as const,
+    sampleGames: 2,
+    windowGames: 2,
+    observedShareBps: 5_000,
+    thresholdShareBps: 4_600,
+  };
+  const userSeries = initial.series.find(
+    (entry) => entry.highTeamId === userTeamId || entry.lowTeamId === userTeamId,
+  );
+  if (userSeries === undefined) throw new Error('missing user series');
+  const userIsHigh = userSeries.highTeamId === userTeamId;
+  const adaptedSeries = initial.series.map((entry) =>
+    entry.seriesId === userSeries.seriesId
+      ? {
+          ...entry,
+          games: [
+            {
+              gameId: `fcp-1-${String(entry.seriesSlot)}-1`,
+              dayOffset: 173,
+              homeTeamId: entry.highTeamId,
+              awayTeamId: entry.lowTeamId,
+              winnerTeamId: entry.highTeamId,
+              outcome: { kind: 'played' as const, homePoints: 102, awayPoints: 95 },
+              adaptations: userIsHigh ? { away: adaptation } : { home: adaptation },
+            },
+          ],
+        }
+      : entry,
+  );
+
+  const body = renderView({
+    section: 'playoffs',
+    checkpoint: completed,
+    playoff: { ...initial, series: adaptedSeries },
+  });
+  expect(body).toContain('Game 1 opponent adjustment: Protect paint');
+  expect(body).toContain('Persistent inside scoring');
 });

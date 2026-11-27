@@ -19,8 +19,10 @@
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import { formatWarChestCr } from './full-court-draft-presentation.js';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
   import FullCourtTrainingCampPanel from './FullCourtTrainingCampPanel.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
 
   let {
     draft,
@@ -30,6 +32,7 @@
     onSkipSpin,
     onFinalize,
     onPurchaseReport,
+    art = null,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex | null;
@@ -38,6 +41,7 @@
     onSkipSpin: () => void;
     onFinalize: () => void;
     onPurchaseReport: (target: FullCourtReportTarget) => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   const purchases = [
@@ -103,15 +107,20 @@
             {@const mutated = mutatedVersions.has(pick.player.playerVersionId)}
             <tr class="border-b border-border/60 align-top">
               <td class="py-3 pr-3">
-                <span class="font-medium">{pick.player.displayName}</span>
-                {#if mutated}
-                  {@const receipt = receipts.find(
-                    (entry) => entry.target.playerVersionId === pick.player.playerVersionId,
-                  )}
-                  <div class="mt-1 text-xs text-muted-foreground">
-                    {receipt?.entry.mutationId ?? 'Mutation'} · tier {receipt?.tier ?? '—'}
+                <div class="flex min-w-0 items-center gap-2">
+                  <FullCourtPortrait player={pick.player} {art} size="sm" />
+                  <div class="min-w-0">
+                    <span class="font-medium">{pick.player.displayName}</span>
+                    {#if mutated}
+                      {@const receipt = receipts.find(
+                        (entry) => entry.target.playerVersionId === pick.player.playerVersionId,
+                      )}
+                      <div class="mt-1 text-xs text-muted-foreground">
+                        {receipt?.entry.mutationId ?? 'Mutation'} · tier {receipt?.tier ?? '—'}
+                      </div>
+                    {/if}
                   </div>
-                {/if}
+                </div>
               </td>
               <td class="py-3 pr-3 text-muted-foreground">
                 {pick.player.positions.join(' / ')}
@@ -186,6 +195,7 @@
       {onPurchaseReport}
       onRunPractice={() => undefined}
       ariaLabel="Full Court Roulette training camp"
+      {art}
     />
   </div>
 {/if}

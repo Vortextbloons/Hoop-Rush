@@ -22,8 +22,10 @@
   import { formatPositions } from '#lib/player-positions.js';
   import FullCourtBlueprintPicker from './FullCourtBlueprintPicker.svelte';
   import FullCourtDefensiveMatchupsPanel from './FullCourtDefensiveMatchupsPanel.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRuleEditor from './FullCourtRuleEditor.svelte';
   import TeamCourtPreview from './TeamCourtPreview.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
   import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
   import {
     FULL_COURT_MAX_PLAYER_MINUTES,
@@ -64,6 +66,7 @@
     matchupContext = null,
     onMatchupsChange,
     onResetMatchups,
+    art = null,
   }: {
     roster: readonly SimulationPlayer[];
     defaultRotation: NonNullable<FullCourtCoachingPlan['rotation']>;
@@ -83,6 +86,7 @@
     matchupContext?: FullCourtMatchupEditorContext | null;
     onMatchupsChange?: (assignments: readonly FullCourtDefensiveMatchupAssignment[]) => void;
     onResetMatchups?: () => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   const SLOTS = [0, 1, 2, 3, 4] as const;
@@ -513,9 +517,11 @@
             <div class="mt-3">
               <TeamCourtPreview
                 starters={minutes.starters}
+                bench={minutes.bench}
                 {focusedSlot}
                 readOnly={locked || !editingRotation}
                 onFocusSlot={(slot) => (focusedSlot = slot)}
+                {art}
               />
             </div>
 
@@ -601,6 +607,7 @@
                           ? 'border-primary/50'
                           : 'border-line-soft'}"
                       >
+                        <FullCourtPortrait player={row.player} {art} size="sm" />
                         <span class="min-w-0 flex-1">
                           <span class="block truncate text-sm font-semibold">
                             {row.player.displayName}
@@ -698,7 +705,12 @@
               {/snippet}
             </SectionHeading>
             <div class="mt-3">
-              <TeamCourtPreview starters={minutes.starters} readOnly={true} />
+              <TeamCourtPreview
+                starters={minutes.starters}
+                bench={minutes.bench}
+                readOnly={true}
+                {art}
+              />
             </div>
             <p class="mt-3 text-[11px] leading-snug text-muted-foreground">
               {editingRotation && !readOnly
