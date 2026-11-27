@@ -10,21 +10,16 @@ import type {
 import {
   CAP_RUSH_PLAYOFF_ROUNDS,
   capRushConferenceStandingsEntries,
-  capRushPlayoffSeriesId,
   capRushSeriesConferenceOf,
   capRushSeriesComplete,
   capRushSeriesWins,
   capRushSeriesWinner,
 } from '@hoop-rush/data-contracts';
+import { conferenceOpeningSeries, playoffSeriesFields } from '../conference-playoffs.ts';
 import { capRushFinalsMvpOf, capRushNextPlayoffGamePlan } from './playoff-shared.ts';
 import { capRushFinalsHomeCourtOf } from './conference-standings.ts';
 
-export const CONFERENCE_OPENING_PAIRS: readonly (readonly [number, number])[] = [
-  [1, 8],
-  [4, 5],
-  [3, 6],
-  [2, 7],
-];
+export { CONFERENCE_OPENING_PAIRS } from '../conference-playoffs.ts';
 
 function entryOf(
   standings: CapRushConferenceStandings,
@@ -37,21 +32,15 @@ function entryOf(
   return entry;
 }
 
-function seriesOf(input: {
-  readonly round: number;
-  readonly seriesSlot: number;
-  readonly homeCourt: CapRushLeagueStandingsEntry;
-  readonly road: CapRushLeagueStandingsEntry;
-}): CapRushConferenceSeries {
+function seriesOf(
+  round: number,
+  seriesSlot: number,
+  homeCourt: CapRushLeagueStandingsEntry,
+  road: CapRushLeagueStandingsEntry,
+): CapRushConferenceSeries {
   return {
-    seriesId: capRushPlayoffSeriesId(input.round, input.seriesSlot),
-    round: input.round,
-    seriesSlot: input.seriesSlot,
-    conference: capRushSeriesConferenceOf(input.round, input.seriesSlot),
-    highSeed: input.homeCourt.seed,
-    lowSeed: input.road.seed,
-    highTeamId: input.homeCourt.teamId,
-    lowTeamId: input.road.teamId,
+    ...playoffSeriesFields(round, seriesSlot, homeCourt, road),
+    conference: capRushSeriesConferenceOf(round, seriesSlot),
     games: [],
   };
 }
@@ -59,20 +48,11 @@ function seriesOf(input: {
 export function capRushConferenceOpeningSeries(
   standings: CapRushConferenceStandings,
 ): CapRushConferenceSeries[] {
-  const series: CapRushConferenceSeries[] = [];
-  for (const conference of ['west', 'east'] as const) {
-    const table = conference === 'west' ? standings.west : standings.east;
-    const offset = conference === 'west' ? 0 : 4;
-    CONFERENCE_OPENING_PAIRS.forEach(([highSeed, lowSeed], index) => {
-      const home = table.entries[highSeed - 1];
-      const road = table.entries[lowSeed - 1];
-      if (home === undefined || road === undefined) {
-        throw new Error('cap rush bracket: opening seeds are missing');
-      }
-      series.push(seriesOf({ round: 1, seriesSlot: offset + index, homeCourt: home, road }));
-    });
-  }
-  return series;
+  return conferenceOpeningSeries(
+    [standings.west.entries, standings.east.entries],
+    (seriesSlot, homeCourt, road) => seriesOf(1, seriesSlot, homeCourt, road),
+    'cap rush bracket: opening seeds are missing',
+  );
 }
 
 export function capRushConferenceSeriesForTeam(
@@ -122,7 +102,7 @@ function createNextRound(input: {
     });
     const homeCourt = homeCourtId === west.teamId ? west : east;
     const road = homeCourtId === west.teamId ? east : west;
-    next.push(seriesOf({ round: currentRound + 1, seriesSlot: 0, homeCourt, road }));
+    next.push(seriesOf(currentRound + 1, 0, homeCourt, road));
   } else {
     for (let index = 0; index < winners.length; index += 2) {
       const first = winners[index];
@@ -130,14 +110,7 @@ function createNextRound(input: {
       if (first === undefined || second === undefined) break;
       const homeCourt = first.seed <= second.seed ? first : second;
       const road = first.seed <= second.seed ? second : first;
-      next.push(
-        seriesOf({
-          round: currentRound + 1,
-          seriesSlot: index / 2,
-          homeCourt,
-          road,
-        }),
-      );
+      next.push(seriesOf(currentRound + 1, index / 2, homeCourt, road));
     }
   }
   return next;

@@ -11,15 +11,20 @@ import {
   CAP_RUSH_CONFERENCE_SIZE,
   CAP_RUSH_LEAGUE_VERSION,
   CAP_RUSH_TAKEOVER_TEAMS,
-  capRushAlignmentOf,
   capRushConferenceStandingsSchema,
   capRushDivisionSchema,
 } from '@hoop-rush/data-contracts';
+import { ratioCompare } from '../conference-tiebreak.ts';
+import { finalsHomeCourtOf } from '../conference-playoffs.ts';
 import {
-  compareCodeUnits,
-  ratioCompare,
-  resolveConferenceTieGroup,
-} from '../conference-tiebreak.ts';
+  conferenceStandingOf,
+  createTeamTotals,
+  rankConferenceTeams,
+  recordPlayed,
+  type TeamTotals,
+} from '../conference-standings.ts';
+
+export { finalsHomeCourtOf } from '../conference-playoffs.ts';
 
 export interface CapRushStandingsTeam {
   readonly teamId: string;
@@ -35,20 +40,7 @@ export interface CapRushStandingsGame {
   readonly awayPoints: number;
 }
 
-interface TeamTotals {
-  readonly teamId: string;
-  readonly displayName: string;
-  readonly isUserTeam: boolean;
-  readonly conference: CapRushConference;
-  readonly division: CapRushLeagueStandingsEntry['division'];
-  wins: number;
-  losses: number;
-  conferenceWins: number;
-  conferenceLosses: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  headToHead: Map<string, { wins: number; losses: number }>;
-}
+type CapRushTeamTotals = TeamTotals & { readonly isUserTeam: boolean };
 
 function cutoffTieBreakOf(
   inside: TeamTotals,
@@ -89,23 +81,11 @@ export function buildCapRushConferenceStandings(input: {
       `cap rush standings: expected ${String(CAP_RUSH_TAKEOVER_TEAMS)} teams (got ${String(input.teams.length)})`,
     );
   }
-  const totals = new Map<string, TeamTotals>();
+  const totals = new Map<string, CapRushTeamTotals>();
   for (const team of input.teams) {
-    const alignment = capRushAlignmentOf(team.teamId);
-    totals.set(team.teamId, {
-      teamId: team.teamId,
-      displayName: team.displayName,
-      isUserTeam: team.isUserTeam,
-      conference: alignment.conference,
-      division: capRushDivisionSchema.parse(alignment.division),
-      wins: 0,
-      losses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      headToHead: new Map(),
-    });
+    const total = createTeamTotals(team);
+    capRushDivisionSchema.parse(total.division);
+    totals.set(team.teamId, { ...total, isUserTeam: team.isUserTeam });
   }
   if (input.games.length !== CAP_RUSH_CONFERENCE_GAMES) {
     throw new Error(
@@ -130,29 +110,7 @@ export function buildCapRushConferenceStandings(input: {
       throw new Error(`cap rush standings: duplicate game ${identity}`);
     }
     seen.add(identity);
-    const homeWon = game.homePoints > game.awayPoints;
-    home.wins += homeWon ? 1 : 0;
-    home.losses += homeWon ? 0 : 1;
-    away.wins += homeWon ? 0 : 1;
-    away.losses += homeWon ? 1 : 0;
-    home.pointsFor += game.homePoints;
-    home.pointsAgainst += game.awayPoints;
-    away.pointsFor += game.awayPoints;
-    away.pointsAgainst += game.homePoints;
-    if (home.conference === away.conference) {
-      home.conferenceWins += homeWon ? 1 : 0;
-      home.conferenceLosses += homeWon ? 0 : 1;
-      away.conferenceWins += homeWon ? 0 : 1;
-      away.conferenceLosses += homeWon ? 1 : 0;
-    }
-    const winnerTeam = homeWon ? home : away;
-    const loserTeam = homeWon ? away : home;
-    const winnerRecord = winnerTeam.headToHead.get(loserTeam.teamId) ?? { wins: 0, losses: 0 };
-    winnerRecord.wins += 1;
-    winnerTeam.headToHead.set(loserTeam.teamId, winnerRecord);
-    const loserRecord = loserTeam.headToHead.get(winnerTeam.teamId) ?? { wins: 0, losses: 0 };
-    loserRecord.losses += 1;
-    loserTeam.headToHead.set(winnerTeam.teamId, loserRecord);
+    recordPlayed(home, away, game.homePoints, game.awayPoints);
   }
   for (const team of totals.values()) {
     if (team.wins + team.losses !== CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
@@ -187,39 +145,16 @@ export function buildCapRushConferenceStandings(input: {
 
 function buildTable(
   conference: CapRushConference,
-  totals: ReadonlyMap<string, TeamTotals>,
+  totals: ReadonlyMap<string, CapRushTeamTotals>,
 ): CapRushConferenceTable {
   const teams = [...totals.values()].filter((team) => team.conference === conference);
   if (teams.length !== CAP_RUSH_CONFERENCE_SIZE) {
     throw new Error(`cap rush standings: ${conference} holds ${String(teams.length)} teams`);
   }
-  const byWins = new Map<number, TeamTotals[]>();
-  for (const team of teams) {
-    const group = byWins.get(team.wins) ?? [];
-    group.push(team);
-    byWins.set(team.wins, group);
-  }
-  const orderedWins = [...byWins.keys()].sort((left, right) => right - left);
-  const ordered: TeamTotals[] = [];
-  for (const wins of orderedWins) {
-    const group = byWins.get(wins) ?? [];
-    ordered.push(...resolveConferenceTieGroup(group, 'pairwise'));
-  }
+  const ordered = rankConferenceTeams(teams, 'pairwise');
   const entries: CapRushLeagueStandingsEntry[] = ordered.map((team, index) => ({
-    teamId: team.teamId,
-    displayName: team.displayName,
+    ...conferenceStandingOf(team, index + 1),
     isUserTeam: team.isUserTeam,
-    conference,
-    division: team.division,
-    wins: team.wins,
-    losses: team.losses,
-    conferenceWins: team.conferenceWins,
-    conferenceLosses: team.conferenceLosses,
-    pointsFor: team.pointsFor,
-    pointsAgainst: team.pointsAgainst,
-    pointDifferential: team.pointsFor - team.pointsAgainst,
-    seed: index + 1,
-    qualified: index + 1 <= CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
   }));
   const cutoff = entries[CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS - 1];
   if (cutoff === undefined) throw new Error('cap rush standings: missing conference cutoff');
@@ -268,26 +203,4 @@ export function capRushFinalsHomeCourtOf(input: {
     else rightWins += 1;
   }
   return finalsHomeCourtOf(left, right, leftWins, rightWins);
-}
-
-type FinalsStanding = Pick<
-  CapRushLeagueStandingsEntry,
-  'teamId' | 'wins' | 'pointDifferential' | 'pointsFor'
->;
-
-export function finalsHomeCourtOf(
-  left: FinalsStanding,
-  right: FinalsStanding,
-  leftWins: number,
-  rightWins: number,
-): string {
-  if (left.wins !== right.wins) return left.wins > right.wins ? left.teamId : right.teamId;
-  if (leftWins !== rightWins) return leftWins > rightWins ? left.teamId : right.teamId;
-  if (left.pointDifferential !== right.pointDifferential) {
-    return left.pointDifferential > right.pointDifferential ? left.teamId : right.teamId;
-  }
-  if (left.pointsFor !== right.pointsFor) {
-    return left.pointsFor > right.pointsFor ? left.teamId : right.teamId;
-  }
-  return compareCodeUnits(left.teamId, right.teamId) <= 0 ? left.teamId : right.teamId;
 }

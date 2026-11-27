@@ -4,7 +4,6 @@ import {
   CAP_RUSH_SERIES_WINS,
   FULL_COURT_PLAYOFFS_VERSION,
   canonicalJson,
-  capRushPlayoffSeriesId,
   capRushSeriesWinner,
   capRushSeriesWins,
   fullCourtPlayoffCheckpointSchema,
@@ -23,8 +22,11 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../sim/kernel.ts';
-import { CONFERENCE_OPENING_PAIRS } from '../cap-rush/conference-postseason.ts';
-import { finalsHomeCourtOf } from '../cap-rush/conference-standings.ts';
+import {
+  conferenceOpeningSeries,
+  finalsHomeCourtOf,
+  playoffSeriesFields,
+} from '../conference-playoffs.ts';
 import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
 import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, type FullCourtTeamGameInput } from './game.ts';
@@ -196,13 +198,7 @@ function seriesOf(
   low: FullCourtStandingsRow,
 ): FullCourtPlayoffSeries {
   return {
-    seriesId: capRushPlayoffSeriesId(round, seriesSlot),
-    round,
-    seriesSlot,
-    highSeed: high.seed,
-    lowSeed: low.seed,
-    highTeamId: high.teamId,
-    lowTeamId: low.teamId,
+    ...playoffSeriesFields(round, seriesSlot, high, low),
     games: [],
   };
 }
@@ -269,10 +265,10 @@ function playoffState(lock: FullCourtPlayoffLock, previous: FullCourtPlayoffChec
   if (checkpoint.runId !== season.runId || checkpoint.lockDigest !== lock.digest) {
     throw new Error('Full Court playoff checkpoint does not match the locked season');
   }
-  let current = [lock.standings.west, lock.standings.east].flatMap((rows, conference) =>
-    CONFERENCE_OPENING_PAIRS.map(([high, low], index) =>
-      seriesOf(1, conference * 4 + index, requireRow(rows[high - 1]), requireRow(rows[low - 1])),
-    ),
+  let current = conferenceOpeningSeries(
+    [lock.standings.west, lock.standings.east],
+    (slot, high, low) => seriesOf(1, slot, high, low),
+    'Missing Full Court playoff seed',
   );
   const series = [...current];
   let round = 1;
