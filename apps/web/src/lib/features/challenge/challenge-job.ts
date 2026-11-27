@@ -1,22 +1,37 @@
-import {
-  workerMessageSchema,
-  workerRequestSchema,
-  type WorkerMessage,
-} from '@hoop-rush/data-contracts';
+import { workerMessageSchema, workerRequestSchema } from '@hoop-rush/data-contracts';
 import type {
   ChallengeJobEvents,
   ChallengeJobPort,
   ChallengeJobSimulationInput,
 } from '@hoop-rush/application/challenge';
 import { newRequestId } from '#lib/ids.js';
+import { listenForWorkerReplies, stopWorker } from '#lib/workers/worker-protocol.js';
 
 export class ChallengeWorkerJob implements ChallengeJobPort {
   private worker: Worker | null = null;
   private requestId: string | null = null;
-  private events: ChallengeJobEvents | null = null;
 
   startSimulation(input: ChallengeJobSimulationInput, events: ChallengeJobEvents): void {
-    const { worker, requestId } = this.ensureWorker(events);
+    const worker = (this.worker ??= new Worker(
+      new URL('../../../workers/challenge-worker.ts', import.meta.url),
+      { type: 'module' },
+    ));
+    const requestId = (this.requestId ??= newRequestId());
+    listenForWorkerReplies(
+      worker,
+      workerMessageSchema,
+      requestId,
+      (message) => {
+        if (message.type === 'results') events.onResults(message.results);
+        else if (message.type === 'error') events.onError(message.message);
+      },
+      () => {
+        events.onError('the simulation worker returned an invalid message');
+      },
+      () => {
+        events.onError('the simulation worker crashed');
+      },
+    );
     worker.postMessage(
       workerRequestSchema.parse({
         schemaVersion: 1,
@@ -31,59 +46,12 @@ export class ChallengeWorkerJob implements ChallengeJobPort {
   }
 
   cancel(): void {
-    this.teardownWorker();
+    stopWorker(this.worker);
+    this.worker = null;
+    this.requestId = null;
   }
 
   dispose(): void {
-    this.teardownWorker();
-  }
-
-  private ensureWorker(events: ChallengeJobEvents): { worker: Worker; requestId: string } {
-    this.events = events;
-    if (this.worker === null || this.requestId === null) {
-      const worker = new Worker(new URL('../../../workers/challenge-worker.ts', import.meta.url), {
-        type: 'module',
-      });
-      this.worker = worker;
-      this.requestId = newRequestId();
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        this.handleMessage(event.data);
-      };
-      worker.onerror = () => {
-        this.events?.onError('the simulation worker crashed');
-      };
-    }
-    return { worker: this.worker, requestId: this.requestId };
-  }
-
-  private teardownWorker(): void {
-    if (this.worker !== null) {
-      this.worker.onmessage = null;
-      this.worker.onerror = null;
-      this.worker.terminate();
-      this.worker = null;
-    }
-    this.requestId = null;
-    this.events = null;
-  }
-
-  private handleMessage(raw: unknown): void {
-    const parsed = workerMessageSchema.safeParse(raw);
-    if (!parsed.success) {
-      this.events?.onError('the simulation worker returned an invalid message');
-      return;
-    }
-    const envelope: WorkerMessage = parsed.data;
-    if (this.requestId === null || envelope.requestId !== this.requestId) return;
-    switch (envelope.type) {
-      case 'results':
-        this.events?.onResults(envelope.results);
-        break;
-      case 'error':
-        this.events?.onError(envelope.message);
-        break;
-      case 'complete':
-        break;
-    }
+    this.cancel();
   }
 }

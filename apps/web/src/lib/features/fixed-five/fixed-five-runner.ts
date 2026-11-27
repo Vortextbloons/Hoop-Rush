@@ -14,11 +14,11 @@ import {
 import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
 import type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
 import { newRequestId } from '#lib/ids.js';
+import { listenForWorkerReplies, stopWorker } from '#lib/workers/worker-protocol.js';
 export type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
 export class FixedFiveRunner {
   private worker: Worker | null = null;
   private requestId: string | null = null;
-  private disposed = false;
   constructor(private readonly onEvent: (event: FixedFiveRunnerEvent) => void) {}
   runShared82(input: {
     rootSeed: Seed;
@@ -152,57 +152,56 @@ export class FixedFiveRunner {
     this.teardown();
   }
   dispose(): void {
-    this.disposed = true;
     this.teardown();
   }
   private start(request: FixedFiveWorkerRequest): void {
     this.cancel();
-    this.disposed = false;
     this.requestId = request.requestId;
     this.worker = new Worker(new URL('../../../workers/fixed-five-worker.ts', import.meta.url), {
       type: 'module',
     });
-    this.worker.onmessage = (event: MessageEvent<unknown>) => {
-      const parsed = fixedFiveWorkerMessageSchema.safeParse(event.data);
-      if (!parsed.success) {
+    listenForWorkerReplies(
+      this.worker,
+      fixedFiveWorkerMessageSchema,
+      request.requestId,
+      (message) => {
+        this.dispatch(message);
+      },
+      () => {
         this.onEvent({ kind: 'error', message: 'fixed-five worker returned an invalid message' });
-        return;
-      }
-      const message: FixedFiveWorkerMessage = parsed.data;
-      if (message.requestId !== this.requestId) return;
-      if (this.disposed) return;
-      if (message.type === 'fixed-five-progress') {
-        this.onEvent({
-          kind: 'progress',
-          completedGames: message.completedGames,
-          totalGames: message.totalGames,
-        });
-      } else if (message.type === 'fixed-five-results') {
-        this.onEvent({ kind: 'results', entries: message.entries });
-      } else if (message.type === 'fixed-five-duel-game') {
-        this.onEvent({ kind: 'duel-game', output: message.output });
-      } else if (message.type === 'fixed-five-shared82-h2h-game') {
-        this.onEvent({ kind: 'shared82-h2h-game', output: message.output });
-      } else if (message.type === 'fixed-five-complete') {
-        this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
-      } else if (message.type === 'fixed-five-verified') {
-        this.onEvent({ kind: 'verified', receipt: message.receipt });
-      } else if (message.type === 'fixed-five-verification-failed') {
-        this.onEvent({ kind: 'verification-failed', failures: message.failures });
-      } else {
-        this.onEvent({ kind: 'error', message: message.message });
-      }
-    };
-    this.worker.onerror = () => {
-      this.onEvent({ kind: 'error', message: 'the fixed-five worker crashed' });
-    };
+      },
+      () => {
+        this.onEvent({ kind: 'error', message: 'the fixed-five worker crashed' });
+      },
+    );
     this.worker.postMessage(fixedFiveWorkerRequestSchema.parse(request));
   }
-  private teardown(): void {
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
+  private dispatch(message: FixedFiveWorkerMessage): void {
+    if (message.type === 'fixed-five-progress') {
+      this.onEvent({
+        kind: 'progress',
+        completedGames: message.completedGames,
+        totalGames: message.totalGames,
+      });
+    } else if (message.type === 'fixed-five-results') {
+      this.onEvent({ kind: 'results', entries: message.entries });
+    } else if (message.type === 'fixed-five-duel-game') {
+      this.onEvent({ kind: 'duel-game', output: message.output });
+    } else if (message.type === 'fixed-five-shared82-h2h-game') {
+      this.onEvent({ kind: 'shared82-h2h-game', output: message.output });
+    } else if (message.type === 'fixed-five-complete') {
+      this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
+    } else if (message.type === 'fixed-five-verified') {
+      this.onEvent({ kind: 'verified', receipt: message.receipt });
+    } else if (message.type === 'fixed-five-verification-failed') {
+      this.onEvent({ kind: 'verification-failed', failures: message.failures });
+    } else {
+      this.onEvent({ kind: 'error', message: message.message });
     }
+  }
+  private teardown(): void {
+    stopWorker(this.worker);
+    this.worker = null;
     this.requestId = null;
   }
 }

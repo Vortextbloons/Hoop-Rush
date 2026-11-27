@@ -1,4 +1,5 @@
 import { newRequestId } from '#lib/ids.js';
+import { listenForWorkerReplies, stopWorker } from './worker-protocol.js';
 
 const DEFAULT_ONE_SHOT_TIMEOUT_MS = 60_000;
 
@@ -57,31 +58,32 @@ export class OneShotWorkerRunner<TPayload, TResponse extends { requestId: string
         this.fail(requestId, new Error(this.spec.errorMessages.timeout));
       }, this.spec.timeoutMs ?? DEFAULT_ONE_SHOT_TIMEOUT_MS);
       this.pending = { requestId, reject, timeout };
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        const parsed = this.spec.responseSchema.safeParse(event.data);
-        if (!parsed.success) {
+      listenForWorkerReplies(
+        worker,
+        this.spec.responseSchema,
+        requestId,
+        (message) => {
+          if (this.pending?.requestId !== requestId) return;
+          const result = this.spec.resultOf(message);
+          this.settle(requestId);
+          if (result.kind === 'output') {
+            resolve(result.output);
+          } else {
+            if (this.spec.reuseWorker) this.teardownWorker();
+            reject(new Error(result.message));
+          }
+        },
+        () => {
           this.fail(requestId, new Error(this.spec.errorMessages.invalidMessage));
-          return;
-        }
-        if (parsed.data.requestId !== requestId) return;
-        if (this.pending?.requestId !== requestId) return;
-        const result = this.spec.resultOf(parsed.data);
-        this.settle(requestId);
-        if (result.kind === 'output') {
-          resolve(result.output);
-          return;
-        }
-        if (this.spec.reuseWorker) this.teardownWorker();
-        reject(new Error(result.message));
-      };
-      worker.onerror = () => {
-        if (this.worker !== worker) return;
-        if (this.pending === null) {
-          if (this.spec.reuseWorker) this.teardownWorker();
-          return;
-        }
-        this.fail(requestId, new Error(this.spec.errorMessages.crashed));
-      };
+        },
+        () => {
+          if (this.pending === null) {
+            if (this.spec.reuseWorker) this.teardownWorker();
+          } else {
+            this.fail(requestId, new Error(this.spec.errorMessages.crashed));
+          }
+        },
+      );
       worker.postMessage(request);
     });
   }
@@ -115,9 +117,7 @@ export class OneShotWorkerRunner<TPayload, TResponse extends { requestId: string
   }
 
   private teardownWorker(): void {
-    if (this.worker !== null) {
-      this.worker.terminate();
-      this.worker = null;
-    }
+    stopWorker(this.worker);
+    this.worker = null;
   }
 }
