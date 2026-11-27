@@ -22,7 +22,25 @@ export {
   startFullCourtPlayoffs,
   type FullCourtPlayoffRepository,
 } from './playoffs.ts';
-export { saveFullCourtCoaching } from './coaching.ts';
+export {
+  applyFullCourtBlueprintToPlan,
+  saveFullCourtBlueprint,
+  saveFullCourtCoaching,
+  type ApplyFullCourtBlueprintResult,
+  type SaveFullCourtBlueprintOptions,
+} from './coaching.ts';
+export { FULL_COURT_HISTORICAL_PRESETS } from './coaching-presets.ts';
+export {
+  archiveFullCourtRun,
+  fullCourtHistoryFromSeason,
+  type FullCourtHistoryRepository,
+} from './history.ts';
+export {
+  buildFullCourtWatchedReplay,
+  type BuildFullCourtWatchedReplayInput,
+  type FullCourtPlayedGameOutcome,
+  type FullCourtWatchedReplayRepository,
+} from './replay.ts';
 
 export interface FullCourtDraftRepository {
   load(runId: string): Promise<FullCourtDraftState | null>;

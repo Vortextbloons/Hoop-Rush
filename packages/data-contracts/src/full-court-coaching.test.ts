@@ -3,18 +3,23 @@ import {
   FULL_COURT_COACHING_SCHEMA_VERSION,
   FULL_COURT_DEFAULT_COACHING_PLAN,
   FULL_COURT_DEFAULT_TACTICS,
+  fullCourtBlueprintSchema,
   fullCourtCoachingPlanSchema,
   fullCourtTacticsSchema,
+  normalizeFullCourtBlueprint,
 } from './full-court-coaching.ts';
 
 const STARTERS = ['p1', 'p2', 'p3', 'p4', 'p5'] as const;
 const FULL_MINUTES = Object.fromEntries(STARTERS.map((playerId) => [playerId, 48]));
 
-function plan(overrides: { rotation?: Record<string, unknown>; tactics?: unknown } = {}) {
+function plan(
+  overrides: { rotation?: Record<string, unknown>; tactics?: unknown; hierarchy?: unknown } = {},
+) {
   return {
     schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION,
     tactics: overrides.tactics ?? FULL_COURT_DEFAULT_TACTICS,
     ...(overrides.rotation === undefined ? {} : { rotation: overrides.rotation }),
+    ...(overrides.hierarchy === undefined ? {} : { hierarchy: overrides.hierarchy }),
   } satisfies Record<string, unknown>;
 }
 
@@ -181,10 +186,129 @@ describe('Full Court coaching plan', () => {
     ).toBe(false);
   });
 
+  it('accepts an optional distinct scoring hierarchy and rejects empty or repeated roles', () => {
+    expect(accepts(plan({ hierarchy: { primaryPlayerId: 'p1' } }))).toBe(true);
+    expect(
+      accepts(
+        plan({
+          hierarchy: {
+            primaryPlayerId: 'p1',
+            secondaryPlayerId: 'p2',
+            floorGeneralPlayerId: 'p3',
+          },
+        }),
+      ),
+    ).toBe(true);
+    expect(accepts(plan({ hierarchy: {} }))).toBe(false);
+    expect(accepts(plan({ hierarchy: { primaryPlayerId: 'p1', secondaryPlayerId: 'p1' } }))).toBe(
+      false,
+    );
+    expect(
+      accepts(
+        plan({
+          hierarchy: { primaryPlayerId: 'p1', floorGeneralPlayerId: 'p1' },
+        }),
+      ),
+    ).toBe(false);
+    expect(accepts(plan({ hierarchy: { primaryPlayerId: '' } }))).toBe(false);
+  });
+
   it('rejects unknown tactics and schema versions', () => {
     expect(
       accepts(plan({ tactics: { pace: 'warp', offense: 'balanced', defense: 'balanced' } })),
     ).toBe(false);
     expect(accepts({ ...plan(), schemaVersion: 2 })).toBe(false);
+  });
+});
+
+describe('Full Court blueprint schema', () => {
+  it('accepts older tactics-only blueprints and optional portable scoring roles', () => {
+    const legacy = fullCourtBlueprintSchema.parse({
+      schemaVersion: 1,
+      name: '  Fast Break  ',
+      tactics: { pace: 'fast', offense: 'perimeter', defense: 'pressure' },
+    });
+    expect(legacy).toEqual({
+      schemaVersion: 1,
+      name: 'Fast Break',
+      tactics: { pace: 'fast', offense: 'perimeter', defense: 'pressure' },
+    });
+    expect(normalizeFullCourtBlueprint(legacy)).toEqual(legacy);
+
+    const withHierarchy = normalizeFullCourtBlueprint(
+      fullCourtBlueprintSchema.parse({
+        schemaVersion: 1,
+        name: 'Motion Wing',
+        tactics: { pace: 'balanced', offense: 'ball-movement', defense: 'balanced' },
+        hierarchy: {
+          primary: {
+            kind: 'starter-slot',
+            slot: 2,
+            preferredPositions: ['SF', 'SG', 'SF'],
+            archetype: 'primaryCreator',
+          },
+          secondary: {
+            kind: 'bench-slot',
+            benchIndex: 0,
+            preferredPositions: ['SG'],
+            archetype: 'floorSpacer',
+          },
+          floorGeneral: {
+            kind: 'role-fit',
+            preferredPositions: ['PG'],
+            archetype: 'primaryCreator',
+          },
+        },
+      }),
+    );
+    expect(withHierarchy.hierarchy?.primary).toEqual({
+      kind: 'starter-slot',
+      slot: 2,
+      preferredPositions: ['SF', 'SG'],
+      archetype: 'primaryCreator',
+    });
+  });
+
+  it('rejects pinned run player IDs, duplicate slots, empty hierarchy, and empty role-fit refs', () => {
+    expect(
+      fullCourtBlueprintSchema.safeParse({
+        schemaVersion: 1,
+        name: 'Invalid Run ID',
+        tactics: FULL_COURT_DEFAULT_TACTICS,
+        hierarchy: { primaryPlayerId: 'p1' },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      fullCourtBlueprintSchema.safeParse({
+        schemaVersion: 1,
+        name: 'Empty Hierarchy',
+        tactics: FULL_COURT_DEFAULT_TACTICS,
+        hierarchy: {},
+      }).success,
+    ).toBe(false);
+
+    expect(
+      fullCourtBlueprintSchema.safeParse({
+        schemaVersion: 1,
+        name: 'Duplicate Starter Slot',
+        tactics: FULL_COURT_DEFAULT_TACTICS,
+        hierarchy: {
+          primary: { kind: 'starter-slot', slot: 0 },
+          floorGeneral: { kind: 'starter-slot', slot: 0 },
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      fullCourtBlueprintSchema.safeParse({
+        schemaVersion: 1,
+        name: 'Empty Role Fit',
+        tactics: FULL_COURT_DEFAULT_TACTICS,
+        hierarchy: {
+          primary: { kind: 'role-fit' },
+        },
+      }).success,
+    ).toBe(false);
   });
 });

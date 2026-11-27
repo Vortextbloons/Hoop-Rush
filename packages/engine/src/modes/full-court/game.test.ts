@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { FullCourtCoachingRule } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { fnv1a32 } from '../../sim/rng.ts';
 import {
@@ -275,6 +276,55 @@ describe('full court determinism and recording', () => {
     expect(plain.result).toEqual(recorded.result);
     const substitutions = recorded.tape.filter((event) => event.kind === 'substitution');
     expect(substitutions.length).toBeGreaterThan(0);
+  });
+
+  it('keeps legacy results when a plan carries no rules', () => {
+    const roster = fullCourtTestRoster('no-rules', 9);
+    const baseline = simulateFullCourtGame(
+      fullCourtTestInput({ seed: 'no-rules', homeRoster: roster }),
+      ctx,
+    );
+    const emptyRules = simulateFullCourtGame(
+      fullCourtTestInput({
+        seed: 'no-rules',
+        homeRoster: roster,
+        homeRotation: { rules: [] },
+      }),
+      ctx,
+    );
+    expect(emptyRules).toEqual(baseline);
+  });
+
+  it('runs an ordered closing lineup rule inside a recorded game', () => {
+    const roster = fullCourtTestRoster('rule-game', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'early-closing',
+        kind: 'closing-lineup',
+        secondsRemainingMax: FULL_COURT_REGULATION_SECONDS,
+        scoreMarginMax: 40,
+        lineup: ids.slice(4),
+      },
+    ];
+    const input = fullCourtTestInput({
+      seed: 'rule-game',
+      homeRoster: roster,
+      homeRotation: { startingFive: ids.slice(0, 5), rules },
+    });
+    const { result, tape } = simulateRecordedFullCourtGame(input, ctx);
+    expect(checkFullCourtGameResult(result)).toEqual([]);
+    const ruleSubstitutions = tape.filter(
+      (event) => event.kind === 'substitution' && event.reason === 'coach-rule',
+    );
+    expect(ruleSubstitutions.length).toBeGreaterThanOrEqual(4);
+    for (const playerId of ids.slice(4)) {
+      const line = result.home.players.find((player) => player.playerId === playerId);
+      expect(line?.seconds ?? 0).toBeGreaterThan(0);
+    }
+    const replay = simulateRecordedFullCourtGame(input, ctx);
+    expect(fullCourtGameDigest(replay.result)).toBe(fullCourtGameDigest(result));
+    expect(replay.tape).toEqual(tape);
   });
 
   it('limits tactical substitutions within a period to dead-ball trips', () => {

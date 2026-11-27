@@ -10,8 +10,16 @@
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
   import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
+  import FullCourtGamecast from '#lib/features/full-court/FullCourtGamecast.svelte';
+  import FullCourtRouletteView from '#lib/features/full-court/FullCourtRouletteView.svelte';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
+  import FullCourtWarRoom from '#lib/features/full-court/FullCourtWarRoom.svelte';
+  import {
+    fullCourtWatchedReplayOutcome,
+    fullCourtWatchedReplaySummary,
+  } from '#lib/features/full-court/full-court-gamecast.js';
   import { FullCourtController } from '#lib/features/full-court/full-court-controller.svelte.js';
+  import { fullCourtNextUserFixture } from '#lib/features/full-court/full-court-season-presenter.js';
   import { openService } from '#lib/service-state.js';
 
   let controller = $state.raw<FullCourtController | null>(null);
@@ -19,15 +27,27 @@
   const seasonSections = [
     { value: 'home', label: 'Overview' },
     { value: 'team', label: 'Team' },
+    { value: 'war-room', label: 'War Room' },
     { value: 'league', label: 'League' },
+    { value: 'stats', label: 'Stats' },
     { value: 'playoffs', label: 'Playoffs' },
   ] as const;
   let section = $state<(typeof seasonSections)[number]['value']>('home');
   let confirmNewDraft = $state(false);
+  let activeGamecast = $state<'latest' | 'saved' | null>(null);
 
   function selectSection(value: typeof section) {
     section = value;
     confirmNewDraft = false;
+  }
+
+  async function watchNextGame(instance: FullCourtController): Promise<void> {
+    const previous = instance.latestGame;
+    activeGamecast = null;
+    await instance.advance(1, false, true);
+    if (instance.latestGame !== previous && instance.latestGame?.tape != null) {
+      activeGamecast = 'latest';
+    }
   }
 
   onMount(() => {
@@ -45,6 +65,12 @@
   const current = $derived(controller);
   const draft = $derived(current?.draft);
   const season = $derived(current?.season);
+  const roulettePreparing = $derived(
+    draft?.stage === 'complete' &&
+      draft.variant === 'roulette' &&
+      draft.roulette !== undefined &&
+      draft.roulette.status !== 'finalized',
+  );
   const playoff = $derived(current?.playoffs?.view ?? null);
   const league = $derived(season?.lock.season);
   const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
@@ -55,7 +81,19 @@
         ]
       : undefined,
   );
+  const nextUserFixture = $derived(
+    season ? fullCourtNextUserFixture(season.lock, season.checkpoint, playoff) : null,
+  );
   const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
+  const savedReplay = $derived(current?.savedReplay ?? null);
+  const savedReplaySummary = $derived(
+    savedReplay === null ? null : fullCourtWatchedReplaySummary(savedReplay),
+  );
+  const latestMatchesSaved = $derived(
+    current?.latestGame != null &&
+      savedReplaySummary !== null &&
+      current.latestGame.result.seed === savedReplaySummary.gameSeed,
+  );
 </script>
 
 <svelte:head>
@@ -84,7 +122,7 @@
     {#if season}
       <nav
         aria-label="Full Court season"
-        class="mb-5 grid grid-cols-4 gap-1 rounded-xl border border-border p-1"
+        class="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-border p-1 sm:grid-cols-6"
       >
         {#each seasonSections as item (item.value)}
           <Button
@@ -116,24 +154,82 @@
             plan={season.coaching}
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
             health={health ?? null}
-            dayOffset={health?.throughDay ?? null}
+            dayOffset={nextUserFixture?.dayOffset ?? null}
             busy={current.busy}
             onSave={(plan) => current.saveCoaching(plan)}
+            onListBlueprints={() => current.listBlueprints()}
+            onSaveBlueprint={(name, tactics, options) =>
+              current.saveBlueprint(name, tactics, options)}
+            onRemoveBlueprint={(name) => current.removeBlueprint(name)}
           />
         </div>
       {/if}
-      {#if section !== 'team'}
+      {#if section === 'war-room'}
+        {#if draft && current.index}
+          <FullCourtWarRoom
+            {draft}
+            index={current.index}
+            season={season.lock.season}
+            nextFilmTarget={current.nextFilmTarget()}
+            playoffPreview={current.nextPlayoffPreview()}
+            busy={current.busy}
+            onPurchaseReport={(target) => void current.purchaseReport(target)}
+          />
+        {/if}
+      {:else if section !== 'team'}
         <FullCourtSeasonView
           {section}
           lock={season.lock}
           checkpoint={season.checkpoint}
           scores={season.scores}
           {playoff}
+          health={health ?? null}
+          restingPlayerIds={current.restingPlayerIds}
           busy={current.busy}
           pendingForfeit={current.pendingForfeit}
-          onAdvance={(count, acceptForfeit) => void current.advance(count, acceptForfeit)}
+          onAdvance={(count, acceptForfeit) => {
+            activeGamecast = null;
+            void current.advance(count, acceptForfeit);
+          }}
+          onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
+          onWatchNextGame={() => void watchNextGame(current)}
         />
+      {/if}
+      {#if (section === 'home' || section === 'playoffs') && (current.latestGame !== null || savedReplay !== null)}
+        <div class="mt-3 space-y-3">
+          {#if activeGamecast === 'latest' && current.latestGame !== null}
+            {#key current.latestGame.result.seed}
+              <FullCourtGamecast
+                game={current.latestGame}
+                userTeamId={season.lock.season.userTeamId}
+                onClose={() => (activeGamecast = null)}
+              />
+            {/key}
+          {:else if activeGamecast === 'saved' && savedReplay !== null && savedReplaySummary !== null}
+            {#key `saved:${savedReplaySummary.gameId}:${savedReplaySummary.gameSeed}`}
+              <FullCourtGamecast
+                game={fullCourtWatchedReplayOutcome(savedReplay)}
+                userTeamId={season.lock.season.userTeamId}
+                replayNote={savedReplaySummary.replayNote}
+                onClose={() => (activeGamecast = null)}
+              />
+            {/key}
+          {/if}
+
+          <div class="flex flex-wrap items-center gap-2">
+            {#if current.latestGame !== null && activeGamecast !== 'latest'}
+              <Button tone="secondary" onclick={() => (activeGamecast = 'latest')}>
+                Game report
+              </Button>
+            {/if}
+            {#if savedReplaySummary !== null && !latestMatchesSaved && activeGamecast !== 'saved'}
+              <Button tone="secondary" onclick={() => (activeGamecast = 'saved')}>
+                Watch saved replay · {savedReplaySummary.gameLabel} ({savedReplaySummary.scoreLabel})
+              </Button>
+            {/if}
+          </div>
+        </div>
       {/if}
       {#if section === 'home' && playoff !== null && playoff.nextGame === null}
         {#if confirmNewDraft}
@@ -150,6 +246,13 @@
               >
                 Start a new draft
               </Button>
+              <Button
+                tone="secondary"
+                loading={current.busy}
+                onclick={() => void current.startDraft('roulette')}
+              >
+                Start Roulette draft
+              </Button>
             {/snippet}
           </Alert>
         {:else}
@@ -158,6 +261,14 @@
           </Button>
         {/if}
       {/if}
+    {:else if roulettePreparing && draft}
+      <FullCourtRouletteView
+        {draft}
+        busy={current.busy}
+        onPurchaseSpin={(purchase, versionId) => void current.purchaseSpin(purchase, versionId)}
+        onSkipSpin={() => void current.skipSpin()}
+        onFinalize={() => void current.finalizeRoulette()}
+      />
     {:else if draft?.stage === 'drafting' && current.index !== null}
       <FullCourtDraftView
         {draft}
@@ -165,6 +276,7 @@
         busy={current.busy}
         onPick={(versionId) => void current.editDraft('pick-full-court-player', versionId)}
         onRemove={(versionId) => void current.editDraft('remove-full-court-player', versionId)}
+        onPurchaseReport={(target) => void current.purchaseReport(target)}
         onFinish={() => {
           selectSection('home');
           void current.editDraft('finish-full-court-draft');
@@ -181,6 +293,9 @@
         </p>
         <Button class="mt-5" tone="primary" onclick={() => void current.startDraft()}>
           Start draft
+        </Button>
+        <Button class="mt-2" tone="secondary" onclick={() => void current.startDraft('roulette')}>
+          Start Roulette draft
         </Button>
       </Panel>
     {/if}

@@ -9,6 +9,8 @@ import {
   fullCourtHealthProfileSetSchema,
   seasonDigestHex,
   seedSchema,
+  type FullCourtCoachingRule,
+  type FullCourtOffensiveHierarchy,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
   type FullCourtTactics,
@@ -23,8 +25,15 @@ import { checkFullCourtGameResult, FULL_COURT_SEED_VERSION } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
 import { FULL_COURT_INJURY_VERSION } from './injuries.ts';
 import type { FullCourtLeagueGame } from './league.ts';
-import { fullCourtRegularSeasonGameInput, type FullCourtRegularSeason } from './regular-season.ts';
+import { buildFullCourtGameLineups } from './report.ts';
+import {
+  fullCourtFutureDaysOf,
+  fullCourtRegularSeasonGameInput,
+  fullCourtSeasonIndexOf,
+  type FullCourtRegularSeason,
+} from './regular-season.ts';
 import { FULL_COURT_ROTATION_VERSION, type FullCourtRotationPlanInput } from './rotation.ts';
+import { fullCourtScoreOutcome } from './score.ts';
 
 export interface FullCourtSeasonLock {
   readonly digest: Seed;
@@ -35,6 +44,10 @@ export interface FullCourtSeasonLock {
 export interface FullCourtSeasonSlotOptions {
   readonly rotation?: FullCourtRotationPlanInput;
   readonly tactics?: FullCourtTactics;
+  /** Ordered conditional rules applied to the user team's game only. */
+  readonly rules?: readonly FullCourtCoachingRule[];
+  /** Per-player offensive hierarchy applied to the user team's game only. */
+  readonly hierarchy?: FullCourtOffensiveHierarchy;
   readonly restingPlayerIds?: readonly string[];
   readonly acceptForfeit?: boolean;
   readonly record?: boolean;
@@ -154,13 +167,13 @@ export function simulateFullCourtSeasonSlot(
 ): FullCourtSeasonSlotOutcome {
   const checkpoint = fullCourtSeasonCheckpointSchema.parse(previous);
   const { season } = lock;
+  const seasonIndex = fullCourtSeasonIndexOf(season);
   if (checkpoint.runId !== season.runId || checkpoint.lockDigest !== lock.digest) {
     throw new Error('Full Court checkpoint does not match the locked season');
   }
   const previousSlot = checkpoint.completedThroughSlot;
   if (previousSlot > 0) {
-    for (const game of season.games) {
-      if (game.slot !== previousSlot) continue;
+    for (const game of seasonIndex.gamesBySlot.get(previousSlot) ?? []) {
       if (
         checkpoint.healthByTeam[game.homeTeamId]?.throughDay !== game.dayOffset ||
         checkpoint.healthByTeam[game.awayTeamId]?.throughDay !== game.dayOffset
@@ -171,7 +184,7 @@ export function simulateFullCourtSeasonSlot(
   }
   if (previousSlot === CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) return { kind: 'season-complete' };
   const slot = previousSlot + 1;
-  const entries = season.games.filter((game) => game.slot === slot);
+  const entries = seasonIndex.gamesBySlot.get(slot) ?? [];
   const participants = new Set(entries.flatMap((game) => [game.homeTeamId, game.awayTeamId]));
   const userFixture = entries.find(
     (game) => game.homeTeamId === season.userTeamId || game.awayTeamId === season.userTeamId,
@@ -185,14 +198,8 @@ export function simulateFullCourtSeasonSlot(
   }
 
   const userSide = userFixture.homeTeamId === season.userTeamId ? 'home' : 'away';
-  function daysAfter(fixture: FullCourtLeagueGame, teamId: string): number[] {
-    return season.games
-      .filter(
-        (game) =>
-          game.slot > fixture.slot && (game.homeTeamId === teamId || game.awayTeamId === teamId),
-      )
-      .map((game) => game.dayOffset)
-      .sort((left, right) => left - right);
+  function daysAfter(fixture: FullCourtLeagueGame, teamId: string): readonly number[] {
+    return fullCourtFutureDaysOf(season, fixture, teamId);
   }
   function play(fixture: FullCourtLeagueGame, isUserGame: boolean) {
     const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
@@ -216,7 +223,9 @@ export function simulateFullCourtSeasonSlot(
       ...(isUserGame
         ? {
             restingPlayerIds: { [userSide]: options.restingPlayerIds },
-            record: options.record === true,
+            // The user game is always recorded internally so compact lineup
+            // facts can be derived; the tape is discarded unless it was asked for.
+            record: true,
           }
         : {}),
     });
@@ -233,6 +242,16 @@ export function simulateFullCourtSeasonSlot(
   ) {
     return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
   }
+  const userLineups =
+    userGame.kind === 'played' && userGame.tape !== null
+      ? buildFullCourtGameLineups({
+          kind: 'played',
+          gameId: userFixture.gameId,
+          userSide,
+          result: userGame.result,
+          tape: userGame.tape,
+        })
+      : undefined;
 
   const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
   const scores = entries.map((fixture) => {
@@ -249,20 +268,20 @@ export function simulateFullCourtSeasonSlot(
     }
     return fullCourtSeasonScoreSchema.parse({
       ...fixture,
-      outcome:
-        game.kind === 'forfeit'
-          ? { kind: 'forfeit', losingSides: game.sides }
-          : {
-              kind: 'played',
-              homePoints: game.result.home.box.points,
-              awayPoints: game.result.away.box.points,
-            },
+      outcome: fullCourtScoreOutcome(
+        game,
+        fixture === userFixture,
+        fixture === userFixture ? userLineups : undefined,
+      ),
     });
   });
   return {
     kind: 'simulated',
     checkpoint: { ...checkpoint, completedThroughSlot: slot, healthByTeam },
     scores,
-    userGame,
+    userGame:
+      userGame.kind === 'played' && options.record !== true
+        ? { ...userGame, tape: null }
+        : userGame,
   };
 }

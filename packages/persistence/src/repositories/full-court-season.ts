@@ -4,8 +4,10 @@ import {
   capRushLeagueGameId,
   fullCourtSeasonCheckpointSchema,
   fullCourtSeasonScoreSchema,
+  fullCourtWatchedReplaySchema,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
+  type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
 import {
   fullCourtSeasonCheckpointRecordSchema,
@@ -14,6 +16,7 @@ import {
   type StoredFullCourtSeasonScore,
 } from '../schemas/full-court-season-record.ts';
 import type { HoopRushDatabase } from './dexie.ts';
+import { putWatchedReplayRecord, verifyWatchedReplayRetry } from './full-court-replay.ts';
 import {
   assertSaveSchemaVersion,
   canonicalEquals,
@@ -113,6 +116,53 @@ function validateSlotScores(
   }
 }
 
+function validateSlotWatchedReplay(
+  checkpoint: FullCourtSeasonCheckpoint,
+  scores: readonly FullCourtSeasonScore[],
+  replay: FullCourtWatchedReplay,
+): void {
+  if (replay.identity.phase !== 'regular') {
+    throw new Error('Full Court season watched replay must belong to regular season');
+  }
+  if (
+    replay.identity.runId !== checkpoint.runId ||
+    replay.identity.lockDigest !== checkpoint.lockDigest ||
+    replay.identity.seasonLockDigest !== checkpoint.lockDigest
+  ) {
+    throw new Error('Full Court watched replay does not match the season checkpoint lock');
+  }
+  if (replay.identity.slot !== checkpoint.completedThroughSlot) {
+    throw new Error(
+      `Full Court watched replay slot ${String(replay.identity.slot)} does not match slot ${String(checkpoint.completedThroughSlot)}`,
+    );
+  }
+  const score = scores.find((entry) => entry.gameId === replay.identity.gameId);
+  if (
+    score === undefined ||
+    score.homeTeamId !== replay.identity.homeTeamId ||
+    score.awayTeamId !== replay.identity.awayTeamId
+  ) {
+    throw new Error(
+      `Full Court watched replay game ${replay.identity.gameId} is missing from committed slot scores`,
+    );
+  }
+  if (score.outcome.kind !== 'played') {
+    throw new Error('Forfeit games cannot carry a watched replay');
+  }
+  if (
+    score.outcome.homePoints !== replay.result.home.box.points ||
+    score.outcome.awayPoints !== replay.result.away.box.points
+  ) {
+    throw new Error('Full Court watched replay score disagrees with committed slot score');
+  }
+  if (
+    !canonicalEquals(checkpoint.healthByTeam[replay.identity.homeTeamId], replay.health.home) ||
+    !canonicalEquals(checkpoint.healthByTeam[replay.identity.awayTeamId], replay.health.away)
+  ) {
+    throw new Error('Full Court watched replay health disagrees with committed slot health');
+  }
+}
+
 export class DexieFullCourtSeasonRepository {
   private readonly db: HoopRushDatabase;
 
@@ -178,16 +228,28 @@ export class DexieFullCourtSeasonRepository {
   async commitSlot(
     checkpoint: FullCourtSeasonCheckpoint,
     scores: readonly FullCourtSeasonScore[],
+    options?: { readonly watchedReplay?: FullCourtWatchedReplay },
   ): Promise<FullCourtSeasonCommitResult> {
     const validated = fullCourtSeasonCheckpointSchema.parse(checkpoint);
     const validatedScores = scores.map((score) => fullCourtSeasonScoreSchema.parse(score));
+    const validatedReplay =
+      options?.watchedReplay === undefined
+        ? undefined
+        : fullCourtWatchedReplaySchema.parse(options.watchedReplay);
     if (validated.completedThroughSlot === 0) {
       throw new Error('Full Court season slot commits must advance past the initial checkpoint');
     }
-    const { fullCourtSeasonCheckpoints, fullCourtSeasonScores } = this.db;
+    if (validatedReplay !== undefined) {
+      validateSlotWatchedReplay(validated, validatedScores, validatedReplay);
+    }
+    const { fullCourtSeasonCheckpoints, fullCourtSeasonScores, fullCourtWatchedReplays } = this.db;
     const outcome = await this.db.transaction(
       'rw',
-      [fullCourtSeasonCheckpoints, fullCourtSeasonScores],
+      [
+        fullCourtSeasonCheckpoints,
+        fullCourtSeasonScores,
+        ...(validatedReplay === undefined ? [] : [fullCourtWatchedReplays]),
+      ],
       async (): Promise<SlotCommitOutcome> => {
         const existing = await this.getCheckpointRecord(validated.runId);
         if (existing === null) {
@@ -210,6 +272,13 @@ export class DexieFullCourtSeasonRepository {
             canonicalEquals(previous, validated) &&
             canonicalEquals(storedScores, sortScores(validatedScores))
           ) {
+            if (validatedReplay !== undefined) {
+              const conflict = await verifyWatchedReplayRetry(
+                fullCourtWatchedReplays,
+                validatedReplay,
+              );
+              if (conflict !== null) return rejected(conflict);
+            }
             return { kind: 'replayed' };
           }
           return rejected(
@@ -253,6 +322,9 @@ export class DexieFullCourtSeasonRepository {
             checkpoint: validated,
           }),
         );
+        if (validatedReplay !== undefined) {
+          await putWatchedReplayRecord(fullCourtWatchedReplays, validatedReplay);
+        }
         return { kind: 'committed' };
       },
     );

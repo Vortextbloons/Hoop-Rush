@@ -24,12 +24,205 @@ export type FullCourtSeasonCheckpoint = z.infer<typeof fullCourtSeasonCheckpoint
 
 const sideSchema = z.enum(['home', 'away']);
 
-export const fullCourtScoreOutcomeSchema = z.discriminatedUnion('kind', [
-  z.object({
+export const FULL_COURT_LINEUP_SUMMARY_VERSION = 1;
+/** Above this many distinct user lineups per game, the smallest groups are omitted and counted. */
+export const FULL_COURT_MAX_GAME_LINEUP_FACTS = 64;
+
+/**
+ * One actual five recorded for the user's game. `playerIds` is the canonical
+ * sorted identity, so a unit that breaks and returns is the same fact. Players
+ * are carried for display only; a generated Roulette clone is still its own id.
+ */
+export const fullCourtLineupFactSchema = z
+  .object({
+    playerIds: z.array(z.string().min(1).max(64)).min(5).max(10),
+    players: z
+      .array(
+        z.object({
+          playerId: z.string().min(1).max(64),
+          displayName: z.string().min(1).max(96),
+        }),
+      )
+      .min(5)
+      .max(10),
+    seconds: z.number().int().nonnegative(),
+    offensivePossessions: z.number().int().nonnegative(),
+    defensivePossessions: z.number().int().nonnegative(),
+    /** Signed because Roulette deductions and technicals are recorded in tape order. */
+    pointsFor: z.number().int(),
+    pointsAgainst: z.number().int(),
+  })
+  .superRefine((fact, context) => {
+    const sorted = [...fact.playerIds].sort();
+    if (fact.playerIds.some((playerId, index) => playerId !== sorted[index])) {
+      context.addIssue({
+        code: 'custom',
+        path: ['playerIds'],
+        message: 'Lineup player ids must use canonical sorted order',
+      });
+    }
+    if (new Set(fact.playerIds).size !== fact.playerIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['playerIds'],
+        message: 'Lineup player ids must be unique',
+      });
+    }
+    if (
+      fact.players.length !== fact.playerIds.length ||
+      fact.players.some((player, index) => player.playerId !== fact.playerIds[index])
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['players'],
+        message: 'Lineup players must match the canonical player ids in order',
+      });
+    }
+  });
+export type FullCourtLineupFact = z.infer<typeof fullCourtLineupFactSchema>;
+
+export const fullCourtLineupOmittedSchema = z.object({
+  lineups: z.number().int().nonnegative(),
+  seconds: z.number().int().nonnegative(),
+  offensivePossessions: z.number().int().nonnegative(),
+  defensivePossessions: z.number().int().nonnegative(),
+  pointsFor: z.number().int(),
+  pointsAgainst: z.number().int(),
+});
+export type FullCourtLineupOmitted = z.infer<typeof fullCourtLineupOmittedSchema>;
+
+/**
+ * Compact per-game lineup facts for the user fixture only. AI boxes and full
+ * tapes are never retained in season scores. `omitted` keeps dropped rows
+ * transparent so totals still reconcile.
+ */
+export const fullCourtGameLineupsSchema = z
+  .object({
+    version: z.literal(FULL_COURT_LINEUP_SUMMARY_VERSION),
+    side: sideSchema,
+    sampleThreshold: z.number().int().nonnegative(),
+    lineups: z.array(fullCourtLineupFactSchema).max(FULL_COURT_MAX_GAME_LINEUP_FACTS),
+    omitted: fullCourtLineupOmittedSchema,
+  })
+  .superRefine((summary, context) => {
+    const keys = new Set<string>();
+    for (const lineup of summary.lineups) {
+      const key = lineup.playerIds.join('|');
+      if (keys.has(key)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['lineups'],
+          message: `Lineup ${key} appears twice`,
+        });
+      }
+      keys.add(key);
+    }
+    if (summary.lineups.length === 0 && summary.omitted.lineups === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['lineups'],
+        message: 'A recorded lineup summary requires at least one lineup',
+      });
+    }
+  });
+export type FullCourtGameLineups = z.infer<typeof fullCourtGameLineupsSchema>;
+
+const signedSidePointsSchema = z.object({
+  home: z.number().int(),
+  away: z.number().int(),
+});
+
+const nonnegativeSidePointsSchema = z.object({
+  home: z.number().int().nonnegative(),
+  away: z.number().int().nonnegative(),
+});
+
+/**
+ * Player-attributed Roulette deductions can make a bench or starter subtotal
+ * negative. `starterPoints` is the explicit signed component contract for those
+ * records; without it the legacy nonnegative accounting checks still apply.
+ */
+const playedScoreSchema = z
+  .object({
     kind: z.literal('played'),
     homePoints: z.number().int().nonnegative(),
     awayPoints: z.number().int().nonnegative(),
-  }),
+    benchPoints: signedSidePointsSchema.optional(),
+    benchPlayers: nonnegativeSidePointsSchema.optional(),
+    teamBonusPoints: nonnegativeSidePointsSchema.optional(),
+    starterPoints: signedSidePointsSchema.optional(),
+    /** Present only on the user's played fixture; legacy scores omit it. */
+    lineups: fullCourtGameLineupsSchema.optional(),
+  })
+  .superRefine((score, context) => {
+    if (score.starterPoints !== undefined && score.benchPoints === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['starterPoints'],
+        message: 'Signed starter points require bench points',
+      });
+      return;
+    }
+    if (score.lineups !== undefined) {
+      const side = score.lineups.side;
+      const teamPoints = side === 'home' ? score.homePoints : score.awayPoints;
+      const opponentPoints = side === 'home' ? score.awayPoints : score.homePoints;
+      const pointsFor =
+        score.lineups.lineups.reduce((total, lineup) => total + lineup.pointsFor, 0) +
+        score.lineups.omitted.pointsFor;
+      const pointsAgainst =
+        score.lineups.lineups.reduce((total, lineup) => total + lineup.pointsAgainst, 0) +
+        score.lineups.omitted.pointsAgainst;
+      if (pointsFor !== teamPoints) {
+        context.addIssue({
+          code: 'custom',
+          path: ['lineups', side, 'pointsFor'],
+          message: 'Lineup points for must match the team score',
+        });
+      }
+      if (pointsAgainst !== opponentPoints) {
+        context.addIssue({
+          code: 'custom',
+          path: ['lineups', side, 'pointsAgainst'],
+          message: 'Lineup points against must match the opponent score',
+        });
+      }
+    }
+    for (const side of ['home', 'away'] as const) {
+      const benchPoints = score.benchPoints?.[side];
+      if (benchPoints === undefined) continue;
+      const teamPoints = side === 'home' ? score.homePoints : score.awayPoints;
+      const teamBonusPoints = score.teamBonusPoints?.[side] ?? 0;
+      const starterPoints = score.starterPoints?.[side];
+      if (starterPoints !== undefined) {
+        if (starterPoints + benchPoints + teamBonusPoints !== teamPoints) {
+          context.addIssue({
+            code: 'custom',
+            path: ['starterPoints', side],
+            message: 'Starter, bench, and team bonus points must sum to team points',
+          });
+        }
+        continue;
+      }
+      if (benchPoints < 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['benchPoints', side],
+          message: 'Signed bench points require starter points',
+        });
+      } else if (benchPoints + teamBonusPoints > teamPoints) {
+        context.addIssue({
+          code: 'custom',
+          path: ['benchPoints', side],
+          message:
+            'Bench scoring and team bonus cannot exceed team scoring without signed starter points',
+        });
+      }
+    }
+  });
+
+export const fullCourtScoreOutcomeSchema = z.discriminatedUnion('kind', [
+  playedScoreSchema,
   z.object({
     kind: z.literal('forfeit'),
     losingSides: z

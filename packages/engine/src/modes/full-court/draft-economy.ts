@@ -150,6 +150,66 @@ export function fullCourtAssessPick(input: {
   };
 }
 
+export type FullCourtPurchaseRejectionReason = 'cash' | 'completion';
+
+export interface FullCourtPurchaseAssessment {
+  readonly priceDollars: number;
+  readonly warChestAfterPurchase: number;
+  /** Reports never touch payroll, so this always equals the current draft payroll. */
+  readonly payrollDollars: number;
+  readonly payrollStatus: CapRushPayrollStatus;
+  readonly minimumCompletionDollars: number | null;
+  readonly legal: boolean;
+  readonly reason: FullCourtPurchaseRejectionReason | null;
+}
+
+/**
+ * Whether a War Room purchase keeps the run legal.
+ *
+ * Purchases are information, not salary: payroll and the apron stay exactly where they
+ * were. Before six picks, the remaining War Chest must still cover the cheapest legal
+ * distinct-player completion; from six picks on only the immediate balance has to hold.
+ */
+export function fullCourtAssessPurchase(input: {
+  readonly index: FullCourtCatalogIndex;
+  readonly state: FullCourtDraftState;
+  readonly priceDollars: number;
+}): FullCourtPurchaseAssessment {
+  if (!Number.isInteger(input.priceDollars) || input.priceDollars <= 0) {
+    throw new Error(
+      `full court purchase requires a positive integer dollar price (got ${String(input.priceDollars)})`,
+    );
+  }
+  const payrollDollars = fullCourtPayrollDollars(input.state.picks);
+  const warChestAfterPurchase = fullCourtWarChestDollars(input.state) - input.priceDollars;
+  const base = {
+    priceDollars: input.priceDollars,
+    warChestAfterPurchase,
+    payrollDollars,
+    payrollStatus: fullCourtPayrollStatus(payrollDollars, input.state.money),
+  };
+  if (warChestAfterPurchase < 0) {
+    return { ...base, minimumCompletionDollars: null, legal: false, reason: 'cash' };
+  }
+  const missingPlayers = Math.max(0, FULL_COURT_MIN_ROSTER_SIZE - input.state.picks.length);
+  if (missingPlayers === 0) {
+    return { ...base, minimumCompletionDollars: null, legal: true, reason: null };
+  }
+  const excluded = new Set(input.state.picks.map((pick) => pick.player.playerId));
+  const minimumCompletionDollars = fullCourtMinimumCompletionDollars(
+    input.index,
+    excluded,
+    missingPlayers,
+  );
+  if (minimumCompletionDollars === null) {
+    return { ...base, minimumCompletionDollars: null, legal: false, reason: 'completion' };
+  }
+  if (warChestAfterPurchase < minimumCompletionDollars) {
+    return { ...base, minimumCompletionDollars, legal: false, reason: 'cash' };
+  }
+  return { ...base, minimumCompletionDollars, legal: true, reason: null };
+}
+
 export interface FullCourtDepthForecast {
   /** Cheapest way to fill the open roster places, or to add one depth player. */
   readonly costDollars: number | null;

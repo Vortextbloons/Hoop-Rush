@@ -16,6 +16,7 @@ import {
   havocTeamInputSchema,
   playerIdSchema,
   playerVersionId,
+  seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import { capRushTestSetup } from './cap-rush-test-support.ts';
 import { buildCapRushLockedInputs } from './lock.ts';
@@ -556,6 +557,46 @@ describe('cap rush playoff application', () => {
 });
 
 describe('cap rush playoff simulation', () => {
+  it('loads a locked run when an opponent shares a player version under another season', () => {
+    const locked = lockedOf((season) => profile({ season: required(season, 'season') }));
+    const performance = required(locked.playoffPerformance, 'playoff performance');
+    const row = required(performance.players[0], 'playoff performance row');
+    const opponent = required(locked.opponents[0], 'opponent');
+    const starter = required(opponent.team.starters[0], 'opponent starter');
+    const withSharedVersion = (participant: typeof starter) => ({
+      ...participant,
+      source: {
+        ...participant.source,
+        playerId: row.playerId,
+        playerVersionId: row.playerVersionId,
+        seasonKey: seasonKeySchema.parse(row.seasonKey === '1999-00' ? '2000-01' : '1999-00'),
+      },
+    });
+    const sharedVersion = {
+      ...opponent,
+      team: {
+        ...opponent.team,
+        starters: opponent.team.starters.map((entry) =>
+          entry === starter ? withSharedVersion(entry) : entry,
+        ),
+        replacements: opponent.team.replacements.map((entry) =>
+          entry.ownerInstanceId === starter.instanceId ? withSharedVersion(entry) : entry,
+        ),
+      },
+    };
+    const saved = {
+      ...locked,
+      opponents: [sharedVersion, ...locked.opponents.slice(1)],
+      playoffPerformance: {
+        ...performance,
+        players: performance.players.filter(
+          (entry) => entry.playerVersionId !== starter.source.playerVersionId,
+        ),
+      },
+    };
+    expect(capRushLockedInputsSchema.parse(saved)).toEqual(saved);
+  });
+
   it('leaves every regular-season game identical', () => {
     const plain = lockedOf(undefined, { versioned: true });
     const withEvidence = lockedOf((season) =>

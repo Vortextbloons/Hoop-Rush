@@ -12,6 +12,7 @@ import {
   fullCourtCoachingPlanSchema,
   fullCourtSeasonCheckpointSchema,
   playerVersionId,
+  type FullCourtCoachingRule,
   type FullCourtHealthProfileSet,
   type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
@@ -24,7 +25,9 @@ import { fullCourtTestSetup } from './draft-test-support.ts';
 import { checkFullCourtGameResult } from './game.ts';
 import {
   buildFullCourtRegularSeason,
+  fullCourtFutureDaysOf,
   fullCourtRegularSeasonGameInput,
+  fullCourtSeasonIndexOf,
   simulateFullCourtRegularSeasonGame,
 } from './regular-season.ts';
 import {
@@ -33,6 +36,7 @@ import {
   lockFullCourtPlayoffs,
   simulateFullCourtPlayoffGame,
 } from './playoffs.ts';
+import { buildFullCourtSeasonStats } from './report-season.ts';
 import {
   createFullCourtSeasonCheckpoint,
   lockFullCourtRegularSeason,
@@ -102,6 +106,29 @@ function preparedSeason() {
   });
   return { season, chosen };
 }
+
+test('indexes every fixture and future day set for the locked season', () => {
+  const { season } = preparedSeason();
+  const index = fullCourtSeasonIndexOf(season);
+  expect(fullCourtSeasonIndexOf(season)).toBe(index);
+  expect(index.gameById.size).toBe(season.games.length);
+  expect(index.gamesBySlot.size).toBe(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
+  for (let slot = 1; slot <= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM; slot += 1) {
+    expect(index.gamesBySlot.get(slot)).toHaveLength(15);
+  }
+  for (const fixture of season.games.slice(0, 12)) {
+    for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+      const expected = season.games
+        .filter(
+          (game) =>
+            game.slot > fixture.slot && (game.homeTeamId === teamId || game.awayTeamId === teamId),
+        )
+        .map((game) => game.dayOffset)
+        .sort((left, right) => left - right);
+      expect(fullCourtFutureDaysOf(season, fixture, teamId)).toEqual(expected);
+    }
+  }
+});
 
 test('a confirmed six-guard roster plays a scheduled game against a historical rotation', () => {
   const { season, chosen } = preparedSeason();
@@ -187,7 +214,44 @@ test('simulates an entire slot, resumes serialized health, and pauses for decisi
   expect(watched.scores).toEqual(first.scores);
   expect(watched.checkpoint).toEqual(first.checkpoint);
   expect(watched.userGame.kind === 'played' ? watched.userGame.tape?.length : 0).toBeGreaterThan(0);
+  if (first.userGame.kind !== 'played') throw new Error('Expected a played user game');
+  expect(first.userGame.tape).toBeNull();
+  const detailedScores = first.scores.filter(
+    (score) => score.outcome.kind === 'played' && score.outcome.benchPoints !== undefined,
+  );
+  expect(detailedScores).toHaveLength(1);
+  const lineupScores = first.scores.filter(
+    (score) => score.outcome.kind === 'played' && score.outcome.lineups !== undefined,
+  );
+  expect(lineupScores).toHaveLength(1);
+  const { home, away } = first.userGame.result;
+  expect(detailedScores[0]).toMatchObject({
+    homeTeamId: home.teamId,
+    awayTeamId: away.teamId,
+    outcome: {
+      benchPoints: {
+        home: home.players
+          .filter((player) => !player.startedGame)
+          .reduce((sum, p) => sum + p.points, 0),
+        away: away.players
+          .filter((player) => !player.startedGame)
+          .reduce((sum, p) => sum + p.points, 0),
+      },
+      lineups: { side: home.teamId === season.userTeamId ? 'home' : 'away' },
+    },
+  });
   expect(Object.keys(first.checkpoint.healthByTeam)).toHaveLength(30);
+  const stats = buildFullCourtSeasonStats({
+    userTeamId: season.userTeamId,
+    regularScores: first.scores,
+  });
+  expect(stats.regular.playedGames).toBe(1);
+  expect(stats.lineups.gamesRecorded).toBe(1);
+  expect(stats.lineups.gamesExpected).toBe(1);
+  expect(stats.lineups.coverageComplete).toBe(true);
+  expect(stats.lineups.rows.reduce((total, row) => total + row.seconds, 0)).toBe(
+    home.teamId === season.userTeamId ? home.liveSeconds : away.liveSeconds,
+  );
 
   const restored = fullCourtSeasonCheckpointSchema.parse(
     JSON.parse(JSON.stringify(first.checkpoint)),
@@ -211,6 +275,28 @@ test('simulates an entire slot, resumes serialized health, and pauses for decisi
   expect(accepted.checkpoint.completedThroughSlot).toBe(2);
   expect(accepted.scores.filter((score) => score.outcome.kind === 'forfeit')).toHaveLength(1);
 });
+
+function closingRuleFor(
+  season: FullCourtSeasonLock['season'],
+  rotation: { readonly startingFive: readonly string[] },
+): FullCourtCoachingRule[] {
+  const team = season.teams.find(({ teamId }) => teamId === season.userTeamId);
+  if (team === undefined) throw new Error('Missing user roster');
+  const bench = team.roster
+    .map(({ playerId }) => playerId)
+    .filter((playerId) => !rotation.startingFive.includes(playerId));
+  const reserve = bench[0];
+  if (reserve === undefined) throw new Error('Missing user reserve');
+  return [
+    {
+      ruleId: 'closing',
+      kind: 'closing-lineup',
+      secondsRemainingMax: 48 * 60,
+      scoreMarginMax: 40,
+      lineup: [...rotation.startingFive.slice(0, 4), reserve],
+    },
+  ];
+}
 
 function customRotationFor(season: FullCourtSeasonLock['season']) {
   const team = season.teams.find(({ teamId }) => teamId === season.userTeamId);
@@ -257,6 +343,37 @@ test('applies lineup, minute targets, and tactics only to the user regular-seaso
     startedGame: true,
     plannedSeconds: (rotation.minuteTargets[reserveId] ?? 0) * 60,
   });
+});
+
+test('applies conditional rules to the user regular-season game and records them', () => {
+  const { season } = preparedSeason();
+  const { rotation } = customRotationFor(season);
+  const rules = closingRuleFor(season, rotation);
+  const lock = lockFullCourtRegularSeason(season);
+  const initial = createFullCourtSeasonCheckpoint(lock);
+  const context = createEngineContext();
+  const standard = simulateFullCourtSeasonSlot(lock, initial, context, { record: true });
+  const ruled = simulateFullCourtSeasonSlot(lock, initial, context, {
+    rotation,
+    rules,
+    record: true,
+  });
+  if (standard.kind !== 'simulated' || ruled.kind !== 'simulated') {
+    throw new Error('Expected a simulated opening slot');
+  }
+  if (standard.userGame.kind !== 'played' || ruled.userGame.kind !== 'played') {
+    throw new Error('Expected a played opening game');
+  }
+  const aiScores = (scores: readonly FullCourtSeasonScore[]) =>
+    scores.filter(
+      (score) => score.homeTeamId !== season.userTeamId && score.awayTeamId !== season.userTeamId,
+    );
+  expect(aiScores(ruled.scores)).toEqual(aiScores(standard.scores));
+  expect(
+    ruled.userGame.tape?.some(
+      (event) => event.kind === 'substitution' && event.reason === 'coach-rule',
+    ),
+  ).toBe(true);
 });
 
 function completedSeason() {
@@ -306,13 +423,23 @@ test('advances a serialized playoffs through four rounds and a champion', () => 
       expect(recorded.game.tape?.length).toBeGreaterThan(0);
       expect(recorded.checkpoint).toEqual(game.checkpoint);
       const { rotation, reserveId } = customRotationFor(lock.season);
-      const edited = simulateFullCourtPlayoffGame(playoffs, restored, context, { rotation });
+      const rules = closingRuleFor(lock.season, rotation);
+      const edited = simulateFullCourtPlayoffGame(playoffs, restored, context, {
+        rotation,
+        rules,
+        record: true,
+      });
       if (edited.kind !== 'simulated' || edited.game.kind !== 'played') {
         throw new Error('Expected a playoff game with the edited rotation');
       }
       expect(
         edited.game.result[userSide].players.find((player) => player.playerId === reserveId)
           ?.startedGame,
+      ).toBe(true);
+      expect(
+        edited.game.tape?.some(
+          (event) => event.kind === 'substitution' && event.reason === 'coach-rule',
+        ),
       ).toBe(true);
       watched = true;
     }
@@ -364,4 +491,65 @@ test('double forfeits go to the series home-court holder even when playing away'
     winnerTeamId: firstSeries.highTeamId,
     outcome: { kind: 'forfeit', losingSides: ['home', 'away'] },
   });
+});
+
+test('applies a scoring hierarchy only to the user regular-season game', () => {
+  const { season } = preparedSeason();
+  const { rotation } = customRotationFor(season);
+  const userTeam = season.teams.find(({ teamId }) => teamId === season.userTeamId);
+  if (userTeam === undefined) throw new Error('Missing user roster');
+  const hierarchy = { primaryPlayerId: userTeam.roster[0]?.playerId ?? '' };
+  const lock = lockFullCourtRegularSeason(season);
+  const initial = createFullCourtSeasonCheckpoint(lock);
+  const context = createEngineContext();
+  const standard = simulateFullCourtSeasonSlot(lock, initial, context, { rotation });
+  const edited = simulateFullCourtSeasonSlot(lock, initial, context, { rotation, hierarchy });
+  if (
+    standard.kind !== 'simulated' ||
+    standard.userGame.kind !== 'played' ||
+    edited.kind !== 'simulated' ||
+    edited.userGame.kind !== 'played'
+  ) {
+    throw new Error('Expected a simulated opening slot');
+  }
+  const aiScores = (scores: readonly FullCourtSeasonScore[]) =>
+    scores.filter(
+      (score) => score.homeTeamId !== season.userTeamId && score.awayTeamId !== season.userTeamId,
+    );
+  expect(aiScores(edited.scores)).toEqual(aiScores(standard.scores));
+  expect(edited.userGame).not.toEqual(standard.userGame);
+  expect(checkFullCourtGameResult(edited.userGame.result)).toEqual([]);
+});
+
+test('applies a scoring hierarchy only to the user playoff game', () => {
+  const { lock, regular, scores } = completedSeason();
+  const playoffs = lockFullCourtPlayoffs(lock, regular, scores);
+  const userTeam = lock.season.teams.find(({ teamId }) => teamId === lock.season.userTeamId);
+  if (userTeam === undefined) throw new Error('Missing user roster');
+  const hierarchy = { primaryPlayerId: userTeam.roster[0]?.playerId ?? '' };
+  const context = createEngineContext();
+  let checkpoint = createFullCourtPlayoffCheckpoint(playoffs);
+  for (let index = 0; index < 106; index += 1) {
+    const view = fullCourtPlayoffView(playoffs, checkpoint);
+    if (view.nextGame === null) break;
+    if (view.nextGame.userSide !== null) {
+      const standard = simulateFullCourtPlayoffGame(playoffs, structuredClone(checkpoint), context);
+      const edited = simulateFullCourtPlayoffGame(playoffs, structuredClone(checkpoint), context, {
+        hierarchy,
+      });
+      if (standard.kind !== 'simulated' || edited.kind !== 'simulated') {
+        throw new Error('Expected a simulated playoff game');
+      }
+      if (standard.game.kind !== 'played' || edited.game.kind !== 'played') {
+        throw new Error('Expected a played playoff game');
+      }
+      expect(edited.game).not.toEqual(standard.game);
+      expect(checkFullCourtGameResult(edited.game.result)).toEqual([]);
+      return;
+    }
+    const step = simulateFullCourtPlayoffGame(playoffs, checkpoint, context);
+    if (step.kind !== 'simulated') break;
+    checkpoint = step.checkpoint;
+  }
+  throw new Error('Expected a user playoff game');
 });

@@ -4,7 +4,11 @@ import {
   type FullCourtCommandResult,
   type FullCourtDraftState,
 } from '@hoop-rush/data-contracts';
-import { fullCourtSalaryDollarsOf, fullCourtStateDigest } from '@hoop-rush/engine';
+import {
+  assertFullCourtSpinReceiptDigests,
+  fullCourtSalaryDollarsOf,
+  fullCourtStateDigest,
+} from '@hoop-rush/engine';
 import {
   fullCourtDraftCommandRecordSchema,
   fullCourtDraftRecordSchema,
@@ -34,6 +38,7 @@ function validateDraftState(row: StoredFullCourtDraft): StoredFullCourtDraft {
   if (row.stateDigest !== fullCourtStateDigest(row.state)) {
     throw new Error('Invalid Full Court save: draft digest differs from its state');
   }
+  assertFullCourtSpinReceiptDigests(row.state);
   return row;
 }
 

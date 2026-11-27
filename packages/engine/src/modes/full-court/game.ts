@@ -1,5 +1,6 @@
 import type {
   EraSimulationProfile,
+  FullCourtOffensiveHierarchy,
   FullCourtTactics,
   PlayerDiagnostics,
   Seed,
@@ -44,8 +45,11 @@ import {
   type FullCourtRotationPlanInput,
   type FullCourtRotationSnapshot,
   type FullCourtRotationUnit,
+  type FullCourtRuleRuntimeState,
   type FullCourtSubstitutionReason,
 } from './rotation.ts';
+import { resolveFullCourtRouletteTeam, type FullCourtRouletteTeamInput } from './roulette.ts';
+import { FullCourtRouletteRuntime, type FullCourtMutationRollup } from './roulette-runtime.ts';
 import {
   applyFullCourtTacticsToPrep,
   fullCourtPaceMultiplier,
@@ -69,6 +73,7 @@ export {
   FULL_COURT_REGULATION_SECONDS,
   FULL_COURT_REGULATION_TEAM_SECONDS,
   FULL_COURT_ROTATION_VERSION,
+  FULL_COURT_RULE_COOLDOWN_SECONDS,
   FULL_COURT_SEVERE_FATIGUE_ENERGY,
   FULL_COURT_TIRED_ENERGY,
   FullCourtSetupError,
@@ -88,6 +93,8 @@ export {
   type FullCourtRotationPlanInput,
   type FullCourtRotationSnapshot,
   type FullCourtRotationUnit,
+  type FullCourtRulePlan,
+  type FullCourtRuleRuntimeState,
   type FullCourtSetupErrorCode,
   type FullCourtStaminaProfile,
   type FullCourtStaminaSource,
@@ -118,6 +125,10 @@ export interface FullCourtTeamGameInput {
   readonly availability?: readonly FullCourtAvailabilityEntry[];
   /** Optional per-game tactics; balanced settings leave the prepared game unchanged. */
   readonly tactics?: FullCourtTactics;
+  /** Optional per-player offensive hierarchy; absent leaves opportunity weights untouched. */
+  readonly hierarchy?: FullCourtOffensiveHierarchy;
+  /** Optional Full Court Roulette mutation attachments for this team. */
+  readonly roulette?: FullCourtRouletteTeamInput;
 }
 
 export interface FullCourtGameInput {
@@ -173,6 +184,12 @@ export interface FullCourtPlayerLine {
   readonly emergencyContinuation: boolean;
   /** Number of recorded lineup stints that include this player. */
   readonly stints: number;
+  /** Present on generated clone participants in Full Court Roulette. */
+  readonly kind?: 'roster' | 'clone';
+  /** Owner roster player id for generated clones. */
+  readonly ownerPlayerId?: string;
+  /** Charged personal fouls after Foul Thief relief, when distinct from committed fouls. */
+  readonly chargedFouls?: number;
 }
 
 export type FullCourtTeamBox = ReturnType<GameRecorder['seasonTeamBox']>;
@@ -192,6 +209,12 @@ export interface FullCourtTeamResult {
   readonly disqualifications: number;
   readonly notes: readonly FullCourtPlanNote[];
   readonly units: readonly FullCourtRotationUnit[];
+  /** Team-level bonus points awarded by Roulette mutations (e.g. opponent misses). */
+  readonly teamBonusPoints?: number;
+  /** Sum of player-attributed Roulette scoring adjustments. */
+  readonly pointAdjustments?: number;
+  /** Per-mutation trigger and delta summary in Roulette games. */
+  readonly mutationRollups?: readonly FullCourtMutationRollup[];
 }
 
 export interface FullCourtGameResult {
@@ -237,6 +260,8 @@ export type FullCourtTapeEvent =
       readonly shooterPlayerId: string;
       readonly made: boolean;
       readonly againstPlayerId: string;
+      readonly homeUnit?: readonly string[];
+      readonly awayUnit?: readonly string[];
     }
   | {
       readonly kind: 'trip';
@@ -269,11 +294,11 @@ interface LineupState {
   readonly team: SimulationTeam;
   readonly prep: TeamPrep;
   readonly units: readonly string[];
-  readonly key: number;
+  readonly key: number | string;
 }
 
 interface StintRecord {
-  readonly slots: readonly number[];
+  readonly playerIds: readonly string[];
   readonly startSeconds: number;
   readonly pointsAtStart: number;
   readonly possessionsAtStart: number;
@@ -294,6 +319,7 @@ class RotationRuntime {
   readonly stintSeconds: number[];
   readonly fouls: number[];
   readonly emergency: boolean[];
+  readonly ruleState: FullCourtRuleRuntimeState;
   readonly stints: FullCourtLineupStint[] = [];
   technicalFouls = 0;
   /** Exact live seconds this side has been on the floor. */
@@ -303,8 +329,11 @@ class RotationRuntime {
   private readonly profile: EraSimulationProfile;
   readonly tactics: FullCourtTactics;
   private readonly opponentDefense: FullCourtTactics['defense'];
+  private readonly hierarchy: FullCourtOffensiveHierarchy | undefined;
+  private readonly roulette: FullCourtRouletteRuntime | undefined;
+  private mutationEpoch = 0;
   private readonly playerCache: Array<Map<number, SimulationPlayer>>;
-  private readonly prepCache = new Map<number, LineupState>();
+  private readonly prepCache = new Map<number | string, LineupState>();
 
   constructor(
     plan: FullCourtRotationPlan,
@@ -314,6 +343,8 @@ class RotationRuntime {
     profile: EraSimulationProfile,
     tactics: FullCourtTactics,
     opponentDefense: FullCourtTactics['defense'],
+    hierarchy: FullCourtOffensiveHierarchy | undefined,
+    roulette?: FullCourtRouletteRuntime,
   ) {
     this.plan = plan;
     this.side = side;
@@ -322,16 +353,29 @@ class RotationRuntime {
     this.profile = profile;
     this.tactics = tactics;
     this.opponentDefense = opponentDefense;
+    this.hierarchy = hierarchy;
+    this.roulette = roulette;
+    this.mutationEpoch = roulette?.profileEpoch(side) ?? 0;
     this.slots = [...plan.startingSlots];
     this.energy = [...plan.startingEnergy];
     this.playedSeconds = plan.roster.map(() => 0);
     this.stintSeconds = plan.roster.map(() => 0);
     this.fouls = plan.roster.map(() => 0);
     this.emergency = plan.roster.map(() => false);
-    this.playerCache = plan.roster.map(() => new Map<number, SimulationPlayer>());
+    this.ruleState = {
+      activated: plan.rules.map(() => false),
+      cooldownsUntil: plan.rules.map(() => 0),
+      boundarySeconds: -1,
+      boundaryRuleIndex: -1,
+    };
+    const cacheCount = roulette?.recorderSize(side) ?? plan.roster.length;
+    this.playerCache = Array.from(
+      { length: cacheCount },
+      () => new Map<number, SimulationPlayer>(),
+    );
     this.lineup = this.buildLineup(this.lineupKey());
     this.stint = {
-      slots: [...this.slots],
+      playerIds: this.activePlayerIds(),
       startSeconds: 0,
       pointsAtStart: 0,
       possessionsAtStart: 0,
@@ -347,39 +391,88 @@ class RotationRuntime {
   }
 
   levelOf(index: number): number {
+    if (this.roulette !== undefined && index >= this.plan.roster.length) {
+      return this.roulette.cloneFatigueLevel(this.side, index);
+    }
     return fatigueLevelOf(this.energy[index] ?? 0);
   }
 
-  private lineupKey(): number {
-    let key = 0;
-    // Each active player's roster index and fatigue level fit in seven bits.
-    for (const index of this.slots) key = key * 128 + index * 8 + this.levelOf(index);
-    return key;
+  activeRecorderIndices(): readonly number[] {
+    if (this.roulette === undefined) return this.slots;
+    const clones = this.roulette.activeCloneRecorderIndices(this.side);
+    return clones.length === 0 ? this.slots : [...this.slots, ...clones];
   }
 
-  private buildLineup(key: number): LineupState {
+  activePlayerIds(): readonly string[] {
+    const rosterIds = this.slots.map((index) => this.playerAt(index).playerId);
+    if (this.roulette === undefined) return rosterIds;
+    const cloneIds = this.roulette.activeCloneIds(this.side);
+    return cloneIds.length === 0 ? rosterIds : [...rosterIds, ...cloneIds];
+  }
+
+  private lineupKey(): number | string {
+    const indices = this.activeRecorderIndices();
+    if (indices.length === 5 && this.roulette === undefined) {
+      let key = 0;
+      // Each active player's roster index and fatigue level fit in seven bits.
+      for (const index of indices) key = key * 128 + index * 8 + this.levelOf(index);
+      return key;
+    }
+    return `${String(this.mutationEpoch)}:${indices
+      .map((index) => `${String(index)}:${String(this.levelOf(index))}`)
+      .join(',')}`;
+  }
+
+  private buildLineup(key: number | string): LineupState {
     const cached = this.prepCache.get(key);
     if (cached !== undefined) return cached;
-    const players = this.slots.map((index) =>
-      fatiguedPlayer(this.playerAt(index), this.levelOf(index), this.playerCache[index]),
-    );
+    const roulette = this.roulette;
+    const indices = this.activeRecorderIndices();
+    const players =
+      roulette === undefined
+        ? indices.map((index) =>
+            fatiguedPlayer(this.playerAt(index), this.levelOf(index), this.playerCache[index]),
+          )
+        : indices.map((index) =>
+            roulette.effectiveSimulationPlayer(
+              this.side,
+              index,
+              this.levelOf(index),
+              this.playerCache[index],
+            ),
+          );
     const team: SimulationTeam = {
       teamId: this.teamId,
       displayName: this.displayName,
       players,
     };
+    const rawPrep =
+      roulette === undefined
+        ? prepareTeam(team, this.profile)
+        : prepareTeam(team, this.profile, {
+            keyOf: (player) => roulette.hooks.keyOf(player),
+            responsibilitySlotOf: (player) => roulette.hooks.responsibilitySlotOf(player),
+            evidenceOf: (player) => roulette.hooks.evidenceOf(player),
+            aggregateDivisor: roulette.hooks.aggregateDivisor(),
+            rebounderWeightScale: (player) => roulette.hooks.reboundWeightScale(player),
+            reboundMeanReach: (lineup) => roulette.hooks.reboundMeanReach(lineup),
+          });
     const prep = applyFullCourtTacticsToPrep(
-      prepareTeam(team, this.profile),
+      rawPrep,
       players,
       this.profile,
       this.tactics,
       this.opponentDefense,
+      this.hierarchy,
     );
     const lineup: LineupState = {
       players,
       team,
       prep,
-      units: this.slots.map((index) => this.plan.playerKeys[index] ?? ''),
+      units:
+        roulette === undefined
+          ? indices.map((index) => this.plan.playerKeys[index] ?? '')
+          : indices.map((index) => roulette.playerKeyForRecorderIndex(this.side, index)),
       key,
     };
     this.prepCache.set(key, lineup);
@@ -387,10 +480,17 @@ class RotationRuntime {
   }
 
   /**
-   * Rebuilds the lineup only when the on-court five or their fatigue level
-   * changed, so the kernel reuses one prepared layout across ordinary trips.
+   * Rebuilds the lineup only when the on-court unit, dynamic mutation profile,
+   * or fatigue level changed, so the kernel reuses one prepared layout across
+   * ordinary trips.
    */
   refreshLineup(): void {
+    const epoch = this.roulette?.profileEpoch(this.side) ?? 0;
+    if (epoch !== this.mutationEpoch) {
+      this.mutationEpoch = epoch;
+      for (const cache of this.playerCache) cache.clear();
+      this.prepCache.clear();
+    }
     const key = this.lineupKey();
     if (key !== this.lineup.key) this.lineup = this.buildLineup(key);
   }
@@ -409,7 +509,7 @@ class RotationRuntime {
 
   beginStint(globalSeconds: number, recorder: GameRecorder): void {
     this.stint = {
-      slots: [...this.slots],
+      playerIds: this.activePlayerIds(),
       startSeconds: globalSeconds,
       pointsAtStart: recorder.sides[this.side].points,
       possessionsAtStart: recorder.sides[this.side].possessions,
@@ -421,7 +521,7 @@ class RotationRuntime {
     const seconds = Math.max(0, globalSeconds - this.stint.startSeconds);
     const points = side.points - this.stint.pointsAtStart;
     const possessions = side.possessions - this.stint.possessionsAtStart;
-    const playerIds = this.stint.slots.map((index) => this.playerAt(index).playerId);
+    const playerIds = this.stint.playerIds;
     const previous = this.stints.at(-1);
     if (
       previous !== undefined &&
@@ -492,13 +592,22 @@ export function runFullCourtGame(
       `full court requires at least ${String(FULL_COURT_MIN_ROSTER)} players per roster`,
     );
   }
+  const hasRoulette = FullCourtRouletteRuntime.hasMutations(input.home, input.away);
+  const homeRoster =
+    input.home.roulette !== undefined
+      ? resolveFullCourtRouletteTeam(input.home).roster
+      : input.home.roster;
+  const awayRoster =
+    input.away.roulette !== undefined
+      ? resolveFullCourtRouletteTeam(input.away).roster
+      : input.away.roster;
   const homePlan = resolveRotationPlan(
-    input.home.roster,
+    homeRoster,
     input.home.rotation ?? {},
     input.home.availability ?? [],
   );
   const awayPlan = resolveRotationPlan(
-    input.away.roster,
+    awayRoster,
     input.away.rotation ?? {},
     input.away.availability ?? [],
   );
@@ -508,6 +617,16 @@ export function runFullCourtGame(
     input.profile,
     fullCourtPaceMultiplier([homeTactics, awayTactics]),
   );
+  const roulette = hasRoulette
+    ? new FullCourtRouletteRuntime({
+        seed: input.seed,
+        rngFactory: context.rngFactory,
+        homeTeam: input.home,
+        awayTeam: input.away,
+        homePlan,
+        awayPlan,
+      })
+    : undefined;
   const home = new RotationRuntime(
     homePlan,
     0,
@@ -516,6 +635,8 @@ export function runFullCourtGame(
     profile,
     homeTactics,
     awayTactics.defense,
+    input.home.hierarchy,
+    roulette,
   );
   const away = new RotationRuntime(
     awayPlan,
@@ -525,11 +646,21 @@ export function runFullCourtGame(
     profile,
     awayTactics,
     homeTactics.defense,
+    input.away.hierarchy,
+    roulette,
   );
+  roulette?.onTipoff([home.slots, away.slots]);
+  home.refreshLineup();
+  away.refreshLineup();
 
-  const recorder = new GameRecorder([homePlan.roster.length, awayPlan.roster.length]);
-  recorder.setActiveFive(0, home.slots);
-  recorder.setActiveFive(1, away.slots);
+  const recorder = new GameRecorder(
+    roulette === undefined
+      ? [homePlan.roster.length, awayPlan.roster.length]
+      : [roulette.recorderSize(0), roulette.recorderSize(1)],
+  );
+  roulette?.bindRecorder(recorder);
+  setRecorderActiveUnits(recorder, 0, home.activeRecorderIndices());
+  setRecorderActiveUnits(recorder, 1, away.activeRecorderIndices());
   const state = createGameState();
   const possessionRng = context.rngFactory(fullCourtStreamSeed(input.seed, 'possession'));
   const tipRng = context.rngFactory(fullCourtStreamSeed(input.seed, 'tip'));
@@ -558,6 +689,10 @@ export function runFullCourtGame(
   ctx.externalRng = context.rngFactory !== createRng;
   ctx.disqualificationLimit = FULL_COURT_FOUL_LIMIT;
   ctx.teamUnits = [home.lineup.units, away.lineup.units];
+  if (roulette !== undefined) {
+    ctx.havoc = roulette.hooks;
+    roulette.bindShotClock(() => ctx.shotClock?.remaining ?? null);
+  }
   effects?.setActiveUnits(home.lineup.units, away.lineup.units);
 
   const runtimes: readonly [RotationRuntime, RotationRuntime] = [home, away];
@@ -590,7 +725,7 @@ export function runFullCourtGame(
       } else {
         offense = period === 3 ? openingTipWinner : ((1 - openingTipWinner) as SideIndex);
       }
-      applyBreakRecovery(runtimes, period, effects);
+      applyBreakRecovery(runtimes, period, effects, roulette);
       tape?.push({
         kind: 'period',
         period,
@@ -609,6 +744,7 @@ export function runFullCourtGame(
           legalWindow: true,
         },
         tape,
+        roulette,
       );
       for (const runtime of runtimes) runtime.refreshLineup();
       syncKernel(ctx, runtimes, recorder, effects);
@@ -624,16 +760,24 @@ export function runFullCourtGame(
           legalWindow: true,
         },
         tape,
+        roulette,
       );
       for (const runtime of runtimes) runtime.refreshLineup();
       syncKernel(ctx, runtimes, recorder, effects);
     }
 
     let secondsRemaining = period < 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
+    let periodStart = true;
     while (secondsRemaining > 0) {
       state.secondsRemaining = secondsRemaining;
-      const homeUnit = home.lineup.units;
-      const awayUnit = away.lineup.units;
+      const homeUnit = home.activePlayerIds();
+      const awayUnit = away.activePlayerIds();
+      const foulUnits: readonly [readonly string[], readonly string[]] = [
+        home.lineup.units,
+        away.lineup.units,
+      ];
+      roulette?.beginPossession(offense, period, periodStart);
+      periodStart = false;
       const trip = resolveTrip(ctx, offense);
       if (!trip.ended && trip.secondsElapsed === 0 && state.secondsRemaining > 0) {
         if (state.secondsRemaining >= ENGINE_CONSTANTS.minimumStartSeconds) {
@@ -647,8 +791,23 @@ export function runFullCourtGame(
       const secondsElapsed = secondsRemaining - state.secondsRemaining;
       secondsRemaining = state.secondsRemaining;
       globalSeconds += secondsElapsed;
-      chargeTime(runtimes, secondsElapsed, effects);
+      chargeTime(runtimes, secondsElapsed, effects, roulette);
+      const keepOffense =
+        roulette?.afterTrip(offense, trip.ended, secondsRemaining, ctx.personalFouls, [
+          homePlan.playerKeys,
+          awayPlan.playerKeys,
+        ]) ?? false;
       const foulCharges = refreshFouls(runtimes, ctx, recorder);
+      if (roulette !== undefined) {
+        for (const runtime of runtimes) {
+          const exited = roulette.checkCloneFoulOuts(runtime.side, ctx.personalFouls[runtime.side]);
+          if (exited.length > 0) {
+            runtime.closeStint(globalSeconds, recorder);
+            runtime.refreshLineup();
+            syncKernel(ctx, runtimes, recorder, effects);
+          }
+        }
+      }
 
       tape?.push({
         kind: 'trip',
@@ -664,7 +823,7 @@ export function runFullCourtGame(
         awayUnit,
       });
 
-      if (trip.ended) offense = (1 - offense) as SideIndex;
+      if (trip.ended && !keepOffense) offense = (1 - offense) as SideIndex;
       // Forced disqualification exits apply at once; tactical changes wait for a
       // legal dead ball so live play never gains a fresh defender for free.
       const legalWindow = secondsRemaining > 0 && ctx.possessionStart === 'deadBall';
@@ -676,14 +835,20 @@ export function runFullCourtGame(
         legalWindow,
       };
       if (foulCharges.length > 0) {
-        resolveSubstitutions(runtimes, recorder, { ...boundary, legalWindow: false }, tape);
+        resolveSubstitutions(
+          runtimes,
+          recorder,
+          { ...boundary, legalWindow: false },
+          tape,
+          roulette,
+        );
         for (const runtime of runtimes) runtime.refreshLineup();
         syncKernel(ctx, runtimes, recorder, effects);
         awardEmergencyTechnicals(
           runtimes,
           recorder,
           foulCharges,
-          [homeUnit, awayUnit],
+          foulUnits,
           technicalRng,
           profile,
           period,
@@ -699,6 +864,7 @@ export function runFullCourtGame(
           scoreMargin: Math.abs(recorder.sides[0].points - recorder.sides[1].points),
         },
         tape,
+        roulette,
       );
       for (const runtime of runtimes) runtime.refreshLineup();
       syncKernel(ctx, runtimes, recorder, effects);
@@ -708,6 +874,7 @@ export function runFullCourtGame(
   }
 
   for (const runtime of runtimes) runtime.closeStint(globalSeconds, recorder);
+  roulette?.onGameEnd();
   const overtimePeriods = Math.max(0, recorder.sides[0].periodPoints.length - 4);
   const homeScore = recorder.sides[0].points;
   const awayScore = recorder.sides[1].points;
@@ -723,8 +890,8 @@ export function runFullCourtGame(
     engineVersion: context.engineVersion,
     dataVersion: input.dataVersion,
     profileVersion: profile.profileVersion,
-    home: teamResult(home, recorder),
-    away: teamResult(away, recorder),
+    home: teamResult(home, recorder, roulette),
+    away: teamResult(away, recorder, roulette),
     periodScores: {
       home: [...recorder.sides[0].periodPoints],
       away: [...recorder.sides[1].periodPoints],
@@ -736,10 +903,20 @@ export function runFullCourtGame(
   return { result, tape };
 }
 
+function setRecorderActiveUnits(
+  recorder: GameRecorder,
+  side: SideIndex,
+  indices: readonly number[],
+): void {
+  if (indices.length === 5) recorder.setActiveFive(side, indices);
+  else recorder.setActiveUnits(side, indices);
+}
+
 function chargeTime(
   runtimes: readonly RotationRuntime[],
   seconds: number,
   effects: EffectsHook | undefined,
+  roulette?: FullCourtRouletteRuntime,
 ): void {
   if (seconds <= 0) return;
   for (const runtime of runtimes) {
@@ -760,12 +937,9 @@ function chargeTime(
       runtime.playedSeconds[index] = (runtime.playedSeconds[index] ?? 0) + seconds;
       runtime.stintSeconds[index] = (runtime.stintSeconds[index] ?? 0) + seconds;
     }
+    roulette?.drainClones(runtime.side, exertionSeconds);
     runtime.teamSecondsPlayed += seconds;
-    effects?.recordStintSeconds(
-      runtime.side,
-      seconds,
-      runtime.slots.map((index) => runtime.plan.playerKeys[index] ?? ''),
-    );
+    effects?.recordStintSeconds(runtime.side, seconds, runtime.lineup.units);
   }
 }
 
@@ -773,12 +947,14 @@ function applyBreakRecovery(
   runtimes: readonly RotationRuntime[],
   period: number,
   effects: EffectsHook | undefined,
+  roulette?: FullCourtRouletteRuntime,
 ): void {
   const recovery = period === 2 ? FULL_COURT_HALFTIME_RECOVERY : FULL_COURT_PERIOD_BREAK_RECOVERY;
   for (const runtime of runtimes) {
     for (let index = 0; index < runtime.energy.length; index += 1) {
       runtime.energy[index] = Math.min(1, (runtime.energy[index] ?? 0) + recovery);
     }
+    roulette?.recoverClones(runtime.side, recovery);
   }
   if (period === 2) effects?.halftime();
 }
@@ -804,7 +980,7 @@ function refreshFouls(
       const count = current - Math.max(previous, FULL_COURT_FOUL_LIMIT - 1);
       if (count > 0) charges.push({ side: runtime.side, playerIndex: index, count });
     });
-    recorder.setActiveFive(runtime.side, runtime.slots);
+    setRecorderActiveUnits(recorder, runtime.side, runtime.activeRecorderIndices());
   }
   return charges;
 }
@@ -845,6 +1021,8 @@ function awardEmergencyTechnicals(
         shooterPlayerId: shooter.playerId,
         made,
         againstPlayerId: runtime.playerAt(charge.playerIndex).playerId,
+        homeUnit: runtimes[0].activePlayerIds(),
+        awayUnit: runtimes[1].activePlayerIds(),
       });
     }
   }
@@ -877,12 +1055,14 @@ function resolveSubstitutions(
   recorder: GameRecorder,
   request: BoundaryRequest,
   tape: FullCourtTapeEvent[] | null,
+  roulette?: FullCourtRouletteRuntime,
 ): void {
   const context: FullCourtRotationContext = {
     globalSeconds: request.globalSeconds,
     period: request.period,
     periodSecondsRemaining: request.periodSecondsRemaining,
     scoreMargin: request.scoreMargin,
+    legalWindow: request.legalWindow,
   };
   for (const runtime of runtimes) {
     const disqualified = runtime.slots.find(
@@ -892,7 +1072,7 @@ function resolveSubstitutions(
     const forced = disqualified !== undefined;
     if (!forced && !request.legalWindow) continue;
     for (let attempt = 0; attempt < MAX_SUBSTITUTIONS_PER_BOUNDARY; attempt += 1) {
-      const decision = planSubstitution(runtime.snapshot(), context);
+      const decision = planSubstitution(runtime.snapshot(), context, runtime.ruleState);
       if (decision.kind === 'none') break;
       if (decision.kind === 'emergency') {
         runtime.emergency[decision.playerIndex] = true;
@@ -901,7 +1081,16 @@ function resolveSubstitutions(
       if (!request.legalWindow && decision.reason !== 'foul-out') break;
       // Close the stint before the swap so minutes, points, and possessions belong
       // to the five that was actually on the floor.
-      applySwap(runtime, recorder, request.globalSeconds, decision.slot, decision.inIndex);
+      applySwap(
+        runtime,
+        recorder,
+        request.globalSeconds,
+        decision.slot,
+        decision.inIndex,
+        decision.outIndex,
+        decision.reason,
+        roulette,
+      );
       tape?.push({
         kind: 'substitution',
         period: request.period,
@@ -921,10 +1110,15 @@ function applySwap(
   globalSeconds: number,
   slot: number,
   inIndex: number,
+  outIndex: number,
+  reason: FullCourtSubstitutionReason,
+  roulette?: FullCourtRouletteRuntime,
 ): void {
   runtime.closeStint(globalSeconds, recorder);
+  roulette?.onPlayerExited(runtime.side, outIndex, reason === 'foul-out');
   runtime.stintSeconds[inIndex] = 0;
   runtime.slots[slot] = inIndex;
+  roulette?.onPlayerEntered(runtime.side, inIndex);
   runtime.beginStint(globalSeconds, recorder);
 }
 
@@ -938,12 +1132,16 @@ function syncKernel(
   ctx.teams = [home.lineup.team, away.lineup.team];
   ctx.preps = [home.lineup.prep, away.lineup.prep];
   ctx.teamUnits = [home.lineup.units, away.lineup.units];
-  recorder.setActiveFive(0, home.slots);
-  recorder.setActiveFive(1, away.slots);
+  setRecorderActiveUnits(recorder, 0, home.activeRecorderIndices());
+  setRecorderActiveUnits(recorder, 1, away.activeRecorderIndices());
   effects?.setActiveUnits(home.lineup.units, away.lineup.units);
 }
 
-function teamResult(runtime: RotationRuntime, recorder: GameRecorder): FullCourtTeamResult {
+function teamResult(
+  runtime: RotationRuntime,
+  recorder: GameRecorder,
+  roulette?: FullCourtRouletteRuntime,
+): FullCourtTeamResult {
   const box = recorder.seasonTeamBox(runtime.side, runtime.teamId);
   const started = new Set(runtime.plan.startingSlots);
   const liveSeconds = Math.round(runtime.teamSecondsPlayed);
@@ -966,6 +1164,8 @@ function teamResult(runtime: RotationRuntime, recorder: GameRecorder): FullCourt
     const energy = runtime.energy[index] ?? 0;
     const stintTotals = stintTotalsByPlayer.get(player.playerId);
     const played = stintTotals?.seconds ?? 0;
+    const charged =
+      roulette === undefined ? line.fouls : roulette.chargedFoulsFor(runtime.side, index);
     return {
       playerId: player.playerId,
       displayName: player.displayName,
@@ -991,8 +1191,45 @@ function teamResult(runtime: RotationRuntime, recorder: GameRecorder): FullCourt
       foulsOut: (runtime.fouls[index] ?? 0) >= FULL_COURT_FOUL_LIMIT,
       emergencyContinuation: runtime.emergency[index] === true,
       stints: stintTotals?.count ?? 0,
+      ...(charged !== line.fouls ? { chargedFouls: charged } : {}),
     };
   });
+  if (roulette !== undefined) {
+    for (const clone of roulette.spawnedClones(runtime.side)) {
+      const line = recorder.seasonPlayerBox(runtime.side, clone.recorderIndex);
+      const stintTotals = stintTotalsByPlayer.get(clone.playerId);
+      const played = stintTotals?.seconds ?? 0;
+      players.push({
+        playerId: clone.playerId as SimulationPlayer['playerId'],
+        displayName: clone.displayName,
+        startedGame: clone.startedGame,
+        available: true,
+        plannedSeconds: 0,
+        seconds: played,
+        minutes: Math.round((played / 60) * 10) / 10,
+        points: line.points,
+        fieldGoals: line.fieldGoals,
+        threes: line.threes,
+        freeThrows: line.freeThrows,
+        rebounds: line.rebounds,
+        assists: line.assists,
+        steals: line.steals,
+        blocks: line.blocks,
+        turnovers: line.turnovers,
+        fouls: line.fouls,
+        ...(line.deepFours === undefined ? {} : { deepFours: line.deepFours }),
+        diagnostics: line.diagnostics,
+        energyRemaining: Math.round(clone.energy * 1000) / 1000,
+        fatigueLevel: fatigueLevelOf(clone.energy),
+        foulsOut: clone.foulsOut,
+        emergencyContinuation: false,
+        stints: stintTotals?.count ?? 0,
+        kind: 'clone',
+        ownerPlayerId: clone.ownerPlayerId,
+      });
+    }
+  }
+  const meta = roulette?.teamMetadata(runtime.side);
   return {
     teamId: runtime.teamId,
     displayName: runtime.displayName,
@@ -1006,6 +1243,15 @@ function teamResult(runtime: RotationRuntime, recorder: GameRecorder): FullCourt
     disqualifications: players.filter((player) => player.foulsOut).length,
     notes: runtime.plan.notes,
     units: runtime.plan.units,
+    ...(meta !== undefined && meta.teamBonusPoints !== 0
+      ? { teamBonusPoints: meta.teamBonusPoints }
+      : {}),
+    ...(meta !== undefined && meta.pointAdjustments !== 0
+      ? { pointAdjustments: meta.pointAdjustments }
+      : {}),
+    ...(meta !== undefined && meta.mutationRollups.length > 0
+      ? { mutationRollups: meta.mutationRollups }
+      : {}),
   };
 }
 
@@ -1025,12 +1271,16 @@ export function fullCourtPlayerSecondCeiling(overtimePeriods: number): number {
 export function checkFullCourtGameResult(result: FullCourtGameResult): string[] {
   const failures: string[] = [];
   const expectedLiveSeconds = fullCourtTeamSeconds(result.overtimePeriods);
-  const expectedTeamSeconds = expectedLiveSeconds * FULL_COURT_MIN_ROSTER;
   const playerCeiling = fullCourtPlayerSecondCeiling(result.overtimePeriods);
 
   for (const side of ['home', 'away'] as const) {
     const team = result[side];
     const box = team.box;
+    const hasClones = team.players.some((player) => player.kind === 'clone');
+    const cloneSeconds = team.players
+      .filter((player) => player.kind === 'clone')
+      .reduce((sum, player) => sum + player.seconds, 0);
+    const expectedTeamSeconds = expectedLiveSeconds * FULL_COURT_MIN_ROSTER + cloneSeconds;
     const ids = new Set<string>(team.players.map((player) => player.playerId));
     if (ids.size !== team.players.length) failures.push(`${side}: duplicate player ids`);
     if (team.players.length < FULL_COURT_MIN_ROSTER) {
@@ -1064,16 +1314,19 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
         );
       }
       if (player.seconds < 0) failures.push(`${side}: ${player.playerId} has negative seconds`);
-      if (player.fouls > FULL_COURT_FOUL_LIMIT && !player.emergencyContinuation) {
+      const effectiveFouls = player.chargedFouls ?? player.fouls;
+      if (effectiveFouls > FULL_COURT_FOUL_LIMIT && !player.emergencyContinuation) {
         failures.push(
-          `${side}: ${player.playerId} has ${String(player.fouls)} fouls without emergency continuation`,
+          `${side}: ${player.playerId} has ${String(effectiveFouls)} fouls without emergency continuation`,
         );
       }
     }
+    const teamBonusPoints = team.teamBonusPoints ?? 0;
+    const pointAdjustments = team.pointAdjustments ?? 0;
     const playerPoints = team.players.reduce((sum, player) => sum + player.points, 0);
-    if (playerPoints !== box.points) {
+    if (playerPoints + teamBonusPoints !== box.points) {
       failures.push(
-        `${side}: player points (${String(playerPoints)}) != team points (${String(box.points)})`,
+        `${side}: player points (${String(playerPoints)}) + bonus (${String(teamBonusPoints)}) != team points (${String(box.points)})`,
       );
     }
     const deepMakes = box.deepFours?.made ?? 0;
@@ -1082,9 +1335,9 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
       box.threes.made * 3 +
       deepMakes * 4 +
       box.freeThrows.made;
-    if (box.points !== pointsIdentity) {
+    if (box.points !== pointsIdentity + pointAdjustments + teamBonusPoints) {
       failures.push(
-        `${side}: points ${String(box.points)} != 2*2fg + 3*3fg + 4*4fg + ft (${String(pointsIdentity)})`,
+        `${side}: points ${String(box.points)} != 2*2fg + 3*3fg + 4*4fg + ft + adjustments (${String(pointsIdentity + pointAdjustments + teamBonusPoints)})`,
       );
     }
     if (box.fieldGoals.made > box.fieldGoals.attempted) {
@@ -1174,7 +1427,11 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
     const stintSecondsByPlayer = new Map<string, number>();
     let stintSeconds = 0;
     for (const stint of team.stints) {
-      if (stint.playerIds.length !== FULL_COURT_MIN_ROSTER) {
+      const validStintSize = hasClones
+        ? stint.playerIds.length >= FULL_COURT_MIN_ROSTER &&
+          stint.playerIds.length <= FULL_COURT_MIN_ROSTER * 2
+        : stint.playerIds.length === FULL_COURT_MIN_ROSTER;
+      if (!validStintSize) {
         failures.push(`${side}: stint has ${String(stint.playerIds.length)} players`);
       }
       if (new Set(stint.playerIds).size !== stint.playerIds.length) {
@@ -1210,7 +1467,9 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
     }
   }
 
-  if (result.home.teamSeconds !== result.away.teamSeconds) {
+  const hasHomeClones = result.home.players.some((player) => player.kind === 'clone');
+  const hasAwayClones = result.away.players.some((player) => player.kind === 'clone');
+  if (!hasHomeClones && !hasAwayClones && result.home.teamSeconds !== result.away.teamSeconds) {
     failures.push('home and away team seconds differ');
   }
   if (result.home.liveSeconds !== result.away.liveSeconds) {

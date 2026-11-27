@@ -15,6 +15,7 @@ import {
   seedSchema,
   type CapRushPlayoffGamePlan,
   type CapRushPostseasonUserOutcome,
+  type FullCourtPlayoffAdaptation,
   type FullCourtPlayoffCheckpoint,
   type FullCourtPlayoffScore,
   type FullCourtSeasonCheckpoint,
@@ -26,8 +27,17 @@ import { CONFERENCE_OPENING_PAIRS } from '../cap-rush/conference-postseason.ts';
 import { finalsHomeCourtOf } from '../cap-rush/conference-standings.ts';
 import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
 import { withFullCourtCoaching } from './coaching.ts';
-import { checkFullCourtGameResult } from './game.ts';
+import { checkFullCourtGameResult, type FullCourtTeamGameInput } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
+import {
+  fullCourtPlayoffAdaptationForTeam,
+  fullCourtPlayoffAdaptationsEqual,
+  fullCourtPlayoffGameEvidence,
+  fullCourtPlayoffMatchupAdaptations,
+  fullCourtPlayoffSeriesEvidenceCount,
+} from './playoff-adaptation.ts';
+import { buildFullCourtGameLineups } from './report.ts';
+import { fullCourtScoreOutcome } from './score.ts';
 import {
   frozenCopy,
   type FullCourtSeasonLock,
@@ -38,6 +48,7 @@ import {
   type FullCourtStandings,
   type FullCourtStandingsRow,
 } from './standings.ts';
+import { resolveFullCourtTactics } from './tactics.ts';
 
 const ROUND_GAP_DAYS = 3;
 const SERIES_GAME_GAP_DAYS = 2;
@@ -65,6 +76,35 @@ export interface FullCourtPlayoffSeries {
 export interface FullCourtPlayoffFixture extends CapRushPlayoffGamePlan {
   readonly gameId: string;
   readonly dayOffset: number;
+}
+
+export interface FullCourtPlayoffOpponentPreview {
+  readonly gameId: string;
+  readonly round: number;
+  readonly seriesSlot: number;
+  readonly gameOrdinal: number;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly homeSeed: number;
+  readonly awaySeed: number;
+  readonly userSide: 'home' | 'away';
+  readonly opponentTeamId: string;
+  readonly priorPlayedGames: number;
+  readonly adaptation: FullCourtPlayoffAdaptation | null;
+}
+
+function applyAiAdaptation(
+  team: FullCourtTeamGameInput,
+  adaptation: FullCourtPlayoffAdaptation | undefined,
+): FullCourtTeamGameInput {
+  if (adaptation === undefined) return team;
+  return {
+    ...team,
+    tactics: {
+      ...resolveFullCourtTactics(team.tactics),
+      defense: adaptation.defense,
+    },
+  };
 }
 
 type ResolvedGame = Exclude<FullCourtGameHealthOutcome, { kind: 'rest-conflict' }>;
@@ -280,6 +320,23 @@ function playoffState(lock: FullCourtPlayoffLock, previous: FullCourtPlayoffChec
     ) {
       throw new Error(`Full Court playoff score does not match the bracket for ${game.gameId}`);
     }
+    if (game.outcome.kind === 'forfeit') {
+      if (game.evidence !== undefined || game.adaptations !== undefined) {
+        throw new Error(`Forfeit playoff game cannot carry adaptation data for ${game.gameId}`);
+      }
+    } else if (game.evidence !== undefined || game.adaptations !== undefined) {
+      const expectedAdaptations = fullCourtPlayoffMatchupAdaptations({
+        seriesGames: planned.series.games,
+        homeTeamId: planned.fixture.homeTeamId,
+        awayTeamId: planned.fixture.awayTeamId,
+        userTeamId: season.userTeamId,
+      });
+      if (!fullCourtPlayoffAdaptationsEqual(game.adaptations, expectedAdaptations)) {
+        throw new Error(
+          `Full Court playoff adaptation does not match series evidence for ${game.gameId}`,
+        );
+      }
+    }
     planned.series.games.push(game);
     lastDay = game.dayOffset;
     expectedDays.set(game.homeTeamId, game.dayOffset);
@@ -315,6 +372,50 @@ export function fullCourtPlayoffView(
   return { series, championTeamId: champion, userOutcome, nextGame: upcoming?.fixture ?? null };
 }
 
+export function fullCourtUserNextPlayoffMatchup(input: {
+  readonly userTeamId: string;
+  readonly runSeed: Seed;
+  readonly series: readonly FullCourtPlayoffSeries[];
+}): FullCourtPlayoffOpponentPreview | null {
+  const { userTeamId, runSeed, series } = input;
+  const userSeries = series
+    .filter((entry) => entry.highTeamId === userTeamId || entry.lowTeamId === userTeamId)
+    .at(-1);
+  if (userSeries === undefined || capRushSeriesWinner(userSeries) !== null) return null;
+  const playoffSeed = havocInstanceSeed(runSeed, 'full-court-playoffs-v1');
+  const plan = capRushNextPlayoffGamePlan({
+    series: userSeries,
+    runSeed: playoffSeed,
+    userTeamId,
+  });
+  if (plan.userSide === null) return null;
+  const opponentTeamId = plan.userSide === 'home' ? plan.awayTeamId : plan.homeTeamId;
+  return {
+    gameId: `fcp-${String(plan.round)}-${String(plan.seriesSlot)}-${String(plan.gameOrdinal)}`,
+    round: plan.round,
+    seriesSlot: plan.seriesSlot,
+    gameOrdinal: plan.gameOrdinal,
+    homeTeamId: plan.homeTeamId,
+    awayTeamId: plan.awayTeamId,
+    homeSeed: plan.homeSeed,
+    awaySeed: plan.awaySeed,
+    userSide: plan.userSide,
+    opponentTeamId,
+    priorPlayedGames: fullCourtPlayoffSeriesEvidenceCount(
+      userSeries.games,
+      opponentTeamId,
+      userTeamId,
+    ),
+    adaptation:
+      fullCourtPlayoffAdaptationForTeam({
+        seriesGames: userSeries.games,
+        adaptingTeamId: opponentTeamId,
+        opponentTeamId: userTeamId,
+        userTeamId,
+      }) ?? null,
+  };
+}
+
 export function simulateFullCourtPlayoffGame(
   lock: FullCourtPlayoffLock,
   previous: FullCourtPlayoffCheckpoint,
@@ -328,6 +429,12 @@ export function simulateFullCourtPlayoffGame(
   const home = season.teams.find((team) => team.teamId === fixture.homeTeamId);
   const away = season.teams.find((team) => team.teamId === fixture.awayTeamId);
   if (home === undefined || away === undefined) throw new Error('Missing Full Court playoff team');
+  const adaptations = fullCourtPlayoffMatchupAdaptations({
+    seriesGames: series.games,
+    homeTeamId: fixture.homeTeamId,
+    awayTeamId: fixture.awayTeamId,
+    userTeamId: season.userTeamId,
+  });
   const leadingWins = Math.max(
     capRushSeriesWins(series, series.highTeamId),
     capRushSeriesWins(series, series.lowTeamId),
@@ -344,8 +451,14 @@ export function simulateFullCourtPlayoffGame(
       gameNumber: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM + checkpoint.games.length + 1,
       dataVersion: season.catalog.dataVersion,
       profile: season.profile,
-      home: side === 'home' ? withFullCourtCoaching(home, options) : home,
-      away: side === 'away' ? withFullCourtCoaching(away, options) : away,
+      home:
+        side === 'home'
+          ? withFullCourtCoaching(home, options)
+          : applyAiAdaptation(home, adaptations?.home),
+      away:
+        side === 'away'
+          ? withFullCourtCoaching(away, options)
+          : applyAiAdaptation(away, adaptations?.away),
     },
     fixture.dayOffset,
     context,
@@ -361,7 +474,9 @@ export function simulateFullCourtPlayoffGame(
         ? {}
         : {
             restingPlayerIds: { [side]: options.restingPlayerIds },
-            record: options.record === true,
+            // User games are recorded internally for compact lineup facts. The
+            // tape only reaches the caller when a watch replay was requested.
+            record: true,
           }),
     },
   );
@@ -374,30 +489,40 @@ export function simulateFullCourtPlayoffGame(
   ) {
     return { kind: 'decision', reason: 'confirm-forfeit', fixture };
   }
+  let evidence: FullCourtPlayoffScore['evidence'];
   if (game.kind === 'played') {
     const failures = checkFullCourtGameResult(game.result);
     if (failures.length > 0)
       throw new Error(`Full Court playoff accounting: ${failures.join(', ')}`);
+    evidence = fullCourtPlayoffGameEvidence(game.result);
   }
+  const userLineups =
+    side !== null && game.kind === 'played' && game.tape !== null
+      ? buildFullCourtGameLineups({
+          kind: 'played',
+          gameId: fixture.gameId,
+          userSide: side,
+          result: game.result,
+          tape: game.tape,
+        })
+      : undefined;
   const score: Omit<FullCourtPlayoffScore, 'winnerTeamId'> = {
     gameId: fixture.gameId,
     dayOffset: fixture.dayOffset,
     homeTeamId: fixture.homeTeamId,
     awayTeamId: fixture.awayTeamId,
-    outcome:
-      game.kind === 'forfeit'
-        ? { kind: 'forfeit', losingSides: [...game.sides] }
-        : {
-            kind: 'played',
-            homePoints: game.result.home.box.points,
-            awayPoints: game.result.away.box.points,
-          },
+    outcome: fullCourtScoreOutcome(game, side !== null, userLineups),
+    ...(game.kind === 'played' && evidence !== undefined ? { evidence } : {}),
+    ...(game.kind === 'played' && adaptations !== undefined ? { adaptations } : {}),
   };
   const winnerTeamId = winnerOf(score, series.highTeamId);
   if (winnerTeamId === null) throw new Error('Missing Full Court playoff winner');
   return {
     kind: 'simulated',
-    game,
+    game:
+      side !== null && game.kind === 'played' && options.record !== true
+        ? { ...game, tape: null }
+        : game,
     checkpoint: {
       ...checkpoint,
       games: [...checkpoint.games, { ...score, winnerTeamId }],

@@ -64,8 +64,22 @@ the Python fetch layer (`bun run test:import-nba`).
 ## Full Court historical health
 
 Use the cached game and player tables with `scripts/import-nba/derive_full_court_health_evidence.py`.
-The command's `--help` lists the required paths. Fit profiles from its JSON
-output and the packaged draft catalog with the offline importer:
+The command's `--help` lists the required paths. Package the cached profiles into
+`apps/web/static/data/full-court-health-profiles.json`, then refresh the manifest:
+
+```text
+bun run hoop-rush import full-court-health
+bun run hoop-rush import manifest
+```
+
+The command validates the profile schema, the packaged draft catalog byte hash,
+and full version coverage before writing compact profile bytes. When local
+evidence is absent it preserves an existing matching pinned asset, and it
+refuses to overwrite a stale pinned asset instead of mixing old rates with a new
+catalog.
+
+Fit profiles from the evidence JSON and the packaged draft catalog with the
+offline importer when the cached profiles need regenerating:
 
 ```text
 bun packages/importer/src/full-court-health/index.ts apps/web/static/data/draft-catalog.json .raw_nba_cache/full-court-health-evidence.json .raw_nba_cache/full-court-health-profiles.json

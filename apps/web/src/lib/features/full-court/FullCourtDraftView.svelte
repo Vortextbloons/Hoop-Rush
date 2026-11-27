@@ -5,15 +5,23 @@
     HoopRushManifest,
     PlayersIndexEntry,
     Position,
+    FullCourtReportTarget,
   } from '@hoop-rush/data-contracts';
   import {
     FULL_COURT_MAX_ROSTER_SIZE,
     FULL_COURT_MIN_ROSTER_SIZE,
     POSITIONS,
+    fullCourtReportPriceDollars,
+    fullCourtReportScope,
+    fullCourtReportTargetKey,
   } from '@hoop-rush/data-contracts';
-  import { fullCourtSalaryDollarsOf, type FullCourtCatalogIndex } from '@hoop-rush/engine';
+  import {
+    fullCourtAssessPurchase,
+    fullCourtSalaryDollarsOf,
+    type FullCourtCatalogIndex,
+  } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, Lock, Users, X } from '@lucide/svelte';
+  import { Check, Eye, FileSearch, Lock, Users, X } from '@lucide/svelte';
   import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
@@ -51,6 +59,7 @@
     fullCourtVariantLabel,
     type FullCourtCatalogRow,
   } from './full-court-draft-presentation.js';
+  import FullCourtScoutDialog from './FullCourtScoutDialog.svelte';
 
   let {
     draft,
@@ -59,6 +68,7 @@
     onPick,
     onRemove,
     onFinish,
+    onPurchaseReport,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
@@ -66,6 +76,7 @@
     onPick: (versionId: string) => void;
     onRemove: (versionId: string) => void;
     onFinish: () => void;
+    onPurchaseReport?: (target: FullCourtReportTarget) => void;
   } = $props();
 
   const ROSTER_TICKS = Array.from({ length: FULL_COURT_MAX_ROSTER_SIZE }, (_, slot) => slot);
@@ -77,6 +88,7 @@
   let pageIndex = $state(0);
   let profileVersionId = $state<string | null>(null);
   let profileTab = $state<ProfileTab>('details');
+  let scoutVersionId = $state<string | null>(null);
 
   onMount(() => {
     let mounted = true;
@@ -147,6 +159,27 @@
     return `Absorbs ${String(tolerance)} simultaneous ${tolerance === 1 ? 'absence' : 'absences'} before dropping below five.`;
   });
   const lock = $derived(fullCourtLockCopy(draft, summary));
+  const scoutPrice = fullCourtReportPriceDollars('player-scouting');
+  const scoutScopeLabel = $derived(
+    fullCourtReportScope('player-scouting') === 'run' ? 'Lifetime of this run' : 'This game only',
+  );
+  const scoutAssessment = $derived(
+    fullCourtAssessPurchase({ index, state: draft, priceDollars: scoutPrice }),
+  );
+  const scoutRecords = $derived(
+    new Map(
+      (draft.reports ?? [])
+        .filter((report) => report.target.kind === 'player-scouting')
+        .map((report) => [fullCourtReportTargetKey(report.target), report]),
+    ),
+  );
+  const selectedScout = $derived.by(() => {
+    if (scoutVersionId === null) return null;
+    const player = index.byVersionId.get(scoutVersionId);
+    if (player === undefined) return null;
+    const record = scoutRecordFor(player.playerVersionId) ?? null;
+    return record === null ? null : { player, record };
+  });
   const selectedProfile = $derived.by(() => {
     if (profileVersionId === null) return null;
     const player = index.byVersionId.get(profileVersionId);
@@ -196,6 +229,34 @@
   function openProfile(versionId: string): void {
     profileVersionId = versionId;
     profileTab = 'details';
+  }
+
+  function scoutRecordFor(versionId: CapRushSourcePlayer['playerVersionId']) {
+    return (
+      scoutRecords.get(
+        fullCourtReportTargetKey({ kind: 'player-scouting', playerVersionId: versionId }),
+      ) ?? null
+    );
+  }
+
+  function scoutBlocker(assessment: ReturnType<typeof fullCourtAssessPurchase>): string | null {
+    if (assessment.legal) return null;
+    if (assessment.reason === 'completion') return 'No legal roster finish remains';
+    if (assessment.minimumCompletionDollars !== null) {
+      return `Needs ${formatWarChestCr(assessment.minimumCompletionDollars)} to finish`;
+    }
+    return 'War Chest short';
+  }
+
+  function buyScout(player: CapRushSourcePlayer): void {
+    if (onPurchaseReport === undefined || busy || !scoutAssessment.legal) return;
+    if (scoutRecordFor(player.playerVersionId) !== null) return;
+    onPurchaseReport({ kind: 'player-scouting', playerVersionId: player.playerVersionId });
+  }
+
+  function openScoutReport(player: CapRushSourcePlayer): void {
+    if (scoutRecordFor(player.playerVersionId) === null) return;
+    scoutVersionId = player.playerVersionId;
   }
 
   function statusTone(
@@ -378,6 +439,8 @@
                 {@const impact = fullCourtSigningImpact(row, draft.money)}
                 {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
                 {@const signable = row.assessment.legal && !row.onRoster && !complete}
+                {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
+                {@const scoutBlocked = scoutBlocker(scoutAssessment)}
                 <li class="min-w-0">
                   <article
                     class="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card {row.onRoster
@@ -461,6 +524,46 @@
                         )}">{capStatusShortLabel(row.statusAfterPick)}</span
                       >
                     </div>
+
+                    {#if onPurchaseReport !== undefined}
+                      <div
+                        class="mx-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-line-soft py-1.5"
+                      >
+                        <p class="min-w-0 flex-1 font-mono text-[9px] text-muted-foreground">
+                          {#if scoutRecord !== null}
+                            Scouting report · {scoutScopeLabel}
+                          {:else}
+                            Scout {formatWarChestCr(scoutPrice)} · {scoutScopeLabel}
+                            {#if scoutBlocked !== null}
+                              <span class="font-bold text-negative"> · {scoutBlocked}</span>
+                            {/if}
+                          {/if}
+                        </p>
+                        {#if scoutRecord !== null}
+                          <Button
+                            size="sm"
+                            tone="secondary"
+                            disabled={busy}
+                            aria-label={`Open scouting report for ${row.player.displayName}`}
+                            onclick={() => openScoutReport(row.player)}
+                          >
+                            <Eye size={13} aria-hidden="true" />
+                            Report
+                          </Button>
+                        {:else}
+                          <Button
+                            size="sm"
+                            tone="secondary"
+                            disabled={busy || !scoutAssessment.legal}
+                            aria-label={`Scout ${row.player.displayName} for ${formatWarChestCr(scoutPrice)}`}
+                            onclick={() => buyScout(row.player)}
+                          >
+                            <FileSearch size={13} aria-hidden="true" />
+                            Scout
+                          </Button>
+                        {/if}
+                      </div>
+                    {/if}
 
                     {#if signable}
                       <dl class="mx-2.5 grid gap-0.5 pb-2 font-mono text-[9px] leading-snug">
@@ -703,6 +806,17 @@
     open
     onOpenChange={(open) => {
       if (!open) profileVersionId = null;
+    }}
+  />
+{/if}
+
+{#if selectedScout !== null}
+  <FullCourtScoutDialog
+    player={selectedScout.player}
+    priceDollars={selectedScout.record.priceDollars}
+    purchasedRevision={selectedScout.record.purchasedRevision}
+    onclose={() => {
+      scoutVersionId = null;
     }}
   />
 {/if}

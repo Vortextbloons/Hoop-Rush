@@ -1,11 +1,13 @@
 import { afterEach, expect, test } from 'bun:test';
 import {
   FULL_COURT_DRAFT_SCHEMA_VERSION,
+  canonicalJson,
   commandIdSchema,
   fullCourtCreateDraftCommandSchema,
   fullCourtPickPlayerCommandSchema,
   idSchema,
   seedSchema,
+  seasonDigestHex,
   type FullCourtCommandResult,
 } from '@hoop-rush/data-contracts';
 import {
@@ -105,6 +107,16 @@ test('reopens a draft and serializes competing writes without charging a replay 
 
     const stored = await second.fullCourtDrafts.get(create.runId);
     if (stored === undefined) throw new Error('Missing committed draft');
+    const { reports, ...previousState } = stored.state;
+    expect(reports).toBeUndefined();
+    await second.table('fullCourtDrafts').put({
+      ...stored,
+      state: previousState,
+      stateDigest: seasonDigestHex(
+        `full-court-draft-state-v1\u0000${canonicalJson(previousState)}`,
+      ),
+    });
+    expect(await other.load(create.runId)).toEqual(winning.state);
     const wrongSalary = {
       ...stored.state,
       picks: stored.state.picks.map((pick) => ({ ...pick, salaryDollars: 1 })),

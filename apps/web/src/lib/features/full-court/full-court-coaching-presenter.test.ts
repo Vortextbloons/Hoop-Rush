@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   FULL_COURT_DEFAULT_COACHING_PLAN,
+  fullCourtBlueprintSchema,
   fullCourtCoachingPlanSchema,
   playerIdSchema,
   type FullCourtCoachingPlan,
@@ -8,6 +9,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import {
+  applyFullCourtBlueprintToDraft,
+  blueprintHierarchyFromDraft,
   defaultFullCourtCoachingDraft,
   fullCourtCoachingDraft,
   fullCourtCoachingPlan,
@@ -114,6 +117,95 @@ describe('Full Court coaching draft', () => {
     expect(draft.tactics).toEqual({ pace: 'balanced', offense: 'balanced', defense: 'balanced' });
     expect(draft.rotationMode).toBe('automatic');
     expect(draft.minuteTargets).toEqual(DEFAULT_ROTATION.minuteTargets);
+    expect(draft.interfaceLevel).toBe('remix');
+    expect(draft.rules).toEqual([]);
+  });
+
+  test('keeps a legacy plan clean and marks no false unsaved change', () => {
+    const legacy: FullCourtCoachingPlan = {
+      schemaVersion: 1,
+      tactics: { pace: 'fast', offense: 'perimeter', defense: 'pressure' },
+      rotation: { ...DEFAULT_ROTATION },
+    };
+    const draft = fullCourtCoachingDraft(legacy, DEFAULT_ROTATION, ROSTER_IDS);
+
+    expect(draft.interfaceLevel).toBe('remix');
+    expect(draft.rules).toEqual([]);
+    const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted).not.toHaveProperty('interfaceLevel');
+    expect(emitted).not.toHaveProperty('rules');
+    expect(fullCourtCoachingSignature(emitted)).toBe(fullCourtCoachingSignature(legacy));
+  });
+
+  test('seeds and emits the optional scoring hierarchy', () => {
+    const saved: FullCourtCoachingPlan = {
+      ...CUSTOM_PLAN,
+      hierarchy: {
+        primaryPlayerId: 'p2',
+        secondaryPlayerId: 'p3',
+        floorGeneralPlayerId: 'p1',
+      },
+    };
+    const draft = fullCourtCoachingDraft(saved, DEFAULT_ROTATION, ROSTER_IDS);
+
+    expect(draft.hierarchy).toEqual({
+      primaryPlayerId: 'p2',
+      secondaryPlayerId: 'p3',
+      floorGeneralPlayerId: 'p1',
+    });
+    const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted.hierarchy).toEqual(saved.hierarchy);
+    expect(fullCourtCoachingPlanSchema.parse(emitted)).toEqual(emitted);
+    expect(fullCourtCoachingSignature(emitted)).not.toBe(fullCourtCoachingSignature(CUSTOM_PLAN));
+  });
+
+  test('omits an unassigned hierarchy so legacy plans stay clean', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+
+    expect(draft.hierarchy).toEqual({
+      primaryPlayerId: null,
+      secondaryPlayerId: null,
+      floorGeneralPlayerId: null,
+    });
+    const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted).not.toHaveProperty('hierarchy');
+    expect(fullCourtCoachingSignature(emitted)).toBe(fullCourtCoachingSignature(CUSTOM_PLAN));
+  });
+
+  test('keeps and edits hierarchy roles across interface levels', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+    draft.interfaceLevel = 'mastermind';
+    draft.hierarchy.primaryPlayerId = 'p4';
+    const mastermind = fullCourtCoachingPlan(draft);
+    expect(mastermind.hierarchy).toEqual({ primaryPlayerId: 'p4' });
+
+    draft.interfaceLevel = 'quick';
+    const quick = fullCourtCoachingPlan(draft);
+    expect(quick.hierarchy).toEqual({ primaryPlayerId: 'p4' });
+    expect(quick.interfaceLevel).toBe('quick');
+  });
+
+  test('preserves rotation, tactics, and rules when switching interface level', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+    draft.interfaceLevel = 'mastermind';
+    draft.rules = [
+      {
+        ruleId: 'rule-1',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 6,
+        lineup: ['p1', 'p2', 'p3', 'p4', 'p6'],
+      },
+    ];
+    const plan = fullCourtCoachingPlan(draft);
+
+    expect(plan.interfaceLevel).toBe('mastermind');
+    expect(plan.rotation).toEqual(CUSTOM_PLAN.rotation);
+    expect(plan.rules).toHaveLength(1);
+    expect(fullCourtCoachingPlanSchema.parse(plan)).toEqual(plan);
+    expect(fullCourtCoachingSignature({ ...plan, interfaceLevel: 'quick' })).not.toBe(
+      fullCourtCoachingSignature(plan),
+    );
   });
 });
 
@@ -169,6 +261,64 @@ describe('Full Court coaching validation', () => {
     draft.startingFive = [];
     draft.minuteTargets = {};
 
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
+  });
+
+  test('validates ordered coaching rules', () => {
+    const draft = customDraft();
+    draft.rules = [
+      {
+        ruleId: 'rule-1',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 6,
+        lineup: ['p1', 'p2', 'p3', 'p4', 'p8'],
+      },
+      {
+        ruleId: 'rule-2',
+        kind: 'foul-trouble',
+        playerId: 'p2',
+        foulLimit: 4,
+        replacementPlayerId: 'p2',
+      },
+    ];
+
+    const validation = validateFullCourtCoachingDraft(draft, ROSTER_IDS);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors).toContain(
+      'Rule rule-2 needs a different replacement from your roster.',
+    );
+
+    draft.rules[1] = {
+      ruleId: 'rule-2',
+      kind: 'foul-trouble',
+      playerId: 'p2',
+      foulLimit: 4,
+      replacementPlayerId: 'p6',
+    };
+    const firstRule = draft.rules[0];
+    if (firstRule === undefined) throw new Error('expected a closing rule');
+    draft.rules.push({ ...firstRule });
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Every coaching rule needs a unique id.',
+    );
+  });
+
+  test('validates the scoring hierarchy against the roster and its own roles', () => {
+    const draft = customDraft();
+    draft.hierarchy.primaryPlayerId = 'missing-player';
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'The scoring hierarchy includes a player outside your roster.',
+    );
+
+    draft.hierarchy.primaryPlayerId = 'p2';
+    draft.hierarchy.secondaryPlayerId = 'p2';
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Each scoring role needs a different player.',
+    );
+
+    draft.hierarchy.secondaryPlayerId = 'p3';
+    draft.hierarchy.floorGeneralPlayerId = 'p1';
     expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
   });
 
@@ -280,5 +430,202 @@ describe('Full Court coaching signature', () => {
 
     const automatic = { ...base, rotation: undefined };
     expect(fullCourtCoachingSignature(automatic)).not.toBe(fullCourtCoachingSignature(base));
+  });
+});
+
+describe('Full Court blueprint presenter glue', () => {
+  test('extracts portable roles using the active rotation (automatic vs custom) without pinning player IDs', () => {
+    const draft = fullCourtCoachingDraft(
+      {
+        ...CUSTOM_PLAN,
+        interfaceLevel: 'mastermind',
+        hierarchy: {
+          primaryPlayerId: 'p1',
+          secondaryPlayerId: 'p6',
+          floorGeneralPlayerId: 'p2',
+        },
+      },
+      DEFAULT_ROTATION,
+      ROSTER_IDS,
+    );
+
+    const customHierarchy = blueprintHierarchyFromDraft(draft, ROSTER, DEFAULT_ROTATION);
+    expect(customHierarchy).toMatchObject({
+      primary: {
+        kind: 'starter-slot',
+        slot: 0,
+        preferredPositions: ['PG'],
+      },
+      secondary: {
+        kind: 'bench-slot',
+        benchIndex: 0,
+        preferredPositions: ['C'],
+      },
+      floorGeneral: {
+        kind: 'starter-slot',
+        slot: 1,
+        preferredPositions: ['PG'],
+      },
+    });
+    expect(typeof customHierarchy?.primary?.archetype).toBe('string');
+    expect(typeof customHierarchy?.secondary?.archetype).toBe('string');
+    expect(typeof customHierarchy?.floorGeneral?.archetype).toBe('string');
+
+    // When switching to automatic rotation, stale custom starter slots are ignored in favor of defaultRotation.
+    draft.rotationMode = 'automatic';
+    draft.startingFive = ['p8', 'p7', 'p6', 'p5', 'p4'];
+    const autoHierarchy = blueprintHierarchyFromDraft(draft, ROSTER, DEFAULT_ROTATION);
+    expect(autoHierarchy?.primary).toMatchObject({ kind: 'starter-slot', slot: 0 });
+  });
+
+  test('applies blueprint tactics and portable roles while preserving rotations, rules, and interface level', () => {
+    const draft = fullCourtCoachingDraft(
+      {
+        ...CUSTOM_PLAN,
+        interfaceLevel: 'quick',
+        rules: [
+          {
+            ruleId: 'rule-1',
+            kind: 'closing-lineup',
+            secondsRemainingMax: 300,
+            scoreMarginMax: 5,
+            lineup: ['p1', 'p2', 'p3', 'p4', 'p6'],
+          },
+        ],
+        hierarchy: {
+          primaryPlayerId: 'p1',
+        },
+      },
+      DEFAULT_ROTATION,
+      ROSTER_IDS,
+    );
+
+    // Tactics-only blueprint preserves existing hierarchy and rotation.
+    const legacyBlueprint = fullCourtBlueprintSchema.parse({
+      schemaVersion: 1,
+      name: 'Legacy Pace',
+      tactics: { pace: 'slow', offense: 'interior', defense: 'protect-paint' },
+    });
+    const afterLegacy = applyFullCourtBlueprintToDraft(
+      draft,
+      legacyBlueprint,
+      ROSTER,
+      DEFAULT_ROTATION,
+    );
+    expect(afterLegacy.changed).toBe(true);
+    expect(afterLegacy.draft.tactics).toEqual(legacyBlueprint.tactics);
+    expect(afterLegacy.draft.hierarchy).toEqual({
+      primaryPlayerId: 'p1',
+      secondaryPlayerId: null,
+      floorGeneralPlayerId: null,
+    });
+    expect(afterLegacy.draft.rotationMode).toBe('custom');
+    expect(afterLegacy.draft.startingFive).toEqual(DEFAULT_ROTATION.startingFive);
+    expect(afterLegacy.draft.rules).toEqual(draft.rules);
+    expect(afterLegacy.draft.interfaceLevel).toBe('quick');
+
+    // Blueprint with portable roles updates tactics and binds distinct roles, flagging ties deterministically.
+    const roleBlueprint = fullCourtBlueprintSchema.parse({
+      schemaVersion: 1,
+      name: 'Two Guard Plus Wing',
+      tactics: { pace: 'fast', offense: 'ball-movement', defense: 'pressure' },
+      hierarchy: {
+        primary: { kind: 'starter-slot', slot: 3, preferredPositions: ['SF'] },
+        secondary: { kind: 'bench-slot', benchIndex: 4, preferredPositions: ['PG'] },
+        floorGeneral: { kind: 'starter-slot', slot: 0, preferredPositions: ['PG'] },
+      },
+    });
+    const afterRoles = applyFullCourtBlueprintToDraft(
+      afterLegacy.draft,
+      roleBlueprint,
+      ROSTER,
+      DEFAULT_ROTATION,
+    );
+    expect(afterRoles.draft.tactics).toEqual(roleBlueprint.tactics);
+    expect(afterRoles.draft.rotationMode).toBe('custom');
+    expect(afterRoles.draft.startingFive).toEqual(DEFAULT_ROTATION.startingFive);
+    expect(afterRoles.draft.rules).toEqual(draft.rules);
+    expect(afterRoles.draft.interfaceLevel).toBe('quick');
+    expect(afterRoles.draft.hierarchy).toEqual({
+      primaryPlayerId: 'p4',
+      secondaryPlayerId: 'p2',
+      floorGeneralPlayerId: 'p1',
+    });
+    expect(afterRoles.preview.hasAmbiguous).toBe(true);
+    expect(afterRoles.preview.hasFallback).toBe(false);
+    expect(afterRoles.preview.hasMissingOrVacant).toBe(false);
+    expect(afterRoles.preview.bindings.map((b) => [b.role, b.status, b.playerId])).toEqual([
+      ['primary', 'matched', 'p4'],
+      ['secondary', 'ambiguous', 'p2'],
+      ['floorGeneral', 'matched', 'p1'],
+    ]);
+    expect(afterRoles.preview.bindings[1]?.tiedCandidates.map((p) => p.playerId)).toEqual([
+      playerIdSchema.parse('p2'),
+      playerIdSchema.parse('p3'),
+    ]);
+    expect(afterRoles.preview.bindings[1]?.reason).toContain('Bench 5 is not available');
+    expect(afterRoles.preview.bindings[1]?.reason).toContain('Ambiguous fallback');
+
+    // Clear fallback + vacant case on a distinct-rated 6-player roster.
+    const distinctSix: SimulationPlayer[] = [
+      buildSimulationPlayer({
+        playerId: playerIdSchema.parse('p1'),
+        displayName: 'Lead Guard',
+        positions: ['PG'],
+      }),
+      buildSimulationPlayer({
+        playerId: playerIdSchema.parse('p2'),
+        displayName: 'Shooting Guard',
+        positions: ['SG'],
+      }),
+      ...ROSTER.slice(2, 6).map((player, index) => {
+        const base = buildSimulationPlayer({
+          playerId: player.playerId,
+          displayName: player.displayName,
+          positions: [index === 0 ? 'SF' : index === 1 ? 'PF' : 'C'],
+        });
+        return {
+          ...base,
+          ratings: { ...base.ratings, passing: 35, ballHandling: 35 },
+        };
+      }),
+    ];
+    const sixRotation = {
+      startingFive: ['p1', 'p2', 'p3', 'p4', 'p5'],
+      minuteTargets: { p1: 42, p2: 42, p3: 42, p4: 42, p5: 42, p6: 30 },
+    };
+    const fallbackAndVacantBlueprint = fullCourtBlueprintSchema.parse({
+      schemaVersion: 1,
+      name: 'Fallback And Vacant',
+      tactics: { pace: 'balanced', offense: 'perimeter', defense: 'balanced' },
+      hierarchy: {
+        primary: { kind: 'starter-slot', slot: 0, preferredPositions: ['PG'] },
+        secondary: { kind: 'bench-slot', benchIndex: 4, preferredPositions: ['SG'] },
+        floorGeneral: { kind: 'bench-slot', benchIndex: 2, preferredPositions: ['PG'] },
+      },
+    });
+    const afterFallbackAndVacant = applyFullCourtBlueprintToDraft(
+      afterRoles.draft,
+      fallbackAndVacantBlueprint,
+      distinctSix,
+      sixRotation,
+    );
+    expect(afterFallbackAndVacant.preview.hasFallback).toBe(true);
+    expect(afterFallbackAndVacant.preview.hasMissingOrVacant).toBe(true);
+    expect(afterFallbackAndVacant.preview.hasAmbiguous).toBe(false);
+    expect(
+      afterFallbackAndVacant.preview.bindings.map((b) => [b.role, b.status, b.playerId]),
+    ).toEqual([
+      ['primary', 'matched', 'p1'],
+      ['secondary', 'fallback', 'p2'],
+      ['floorGeneral', 'vacant', null],
+    ]);
+    expect(afterFallbackAndVacant.draft.hierarchy).toEqual({
+      primaryPlayerId: 'p1',
+      secondaryPlayerId: 'p2',
+      floorGeneralPlayerId: null,
+    });
+    expect(afterFallbackAndVacant.draft.rules).toEqual(draft.rules);
+    expect(afterFallbackAndVacant.draft.interfaceLevel).toBe('quick');
   });
 });

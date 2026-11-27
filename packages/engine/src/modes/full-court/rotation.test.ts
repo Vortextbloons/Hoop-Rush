@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { SimulationPlayer } from '@hoop-rush/data-contracts';
+import type { FullCourtCoachingRule, SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
   FULL_COURT_FOUL_LIMIT,
   FULL_COURT_FATIGUE_STEPS,
@@ -9,6 +9,7 @@ import {
   FULL_COURT_PACE_DEVIATION_SECONDS,
   FULL_COURT_REGULATION_SECONDS,
   FULL_COURT_REGULATION_TEAM_SECONDS,
+  FULL_COURT_RULE_COOLDOWN_SECONDS,
   FULL_COURT_SEVERE_FATIGUE_ENERGY,
   FULL_COURT_TIRED_ENERGY,
   FullCourtSetupError,
@@ -25,6 +26,7 @@ import {
   type FullCourtRotationContext,
   type FullCourtRotationPlan,
   type FullCourtRotationSnapshot,
+  type FullCourtRuleRuntimeState,
   type FullCourtSetupErrorCode,
 } from './rotation.ts';
 import { fullCourtTestPlayer, fullCourtTestRoster } from './game-test-support.ts';
@@ -483,5 +485,350 @@ describe('substitution decisions', () => {
       { ...EARLY, globalSeconds: FULL_COURT_REGULATION_SECONDS * 0.25 },
     );
     expect(decision.kind).toBe('none');
+  });
+});
+
+function ruleStateOf(plan: FullCourtRotationPlan): FullCourtRuleRuntimeState {
+  return {
+    activated: plan.rules.map(() => false),
+    cooldownsUntil: plan.rules.map(() => 0),
+    boundarySeconds: -1,
+    boundaryRuleIndex: -1,
+  };
+}
+
+const RULE_CLOSING: FullCourtRotationContext = {
+  globalSeconds: FULL_COURT_REGULATION_SECONDS - 300,
+  period: 3,
+  periodSecondsRemaining: 300,
+  scoreMargin: 5,
+  legalWindow: true,
+};
+
+function idAt(ids: readonly string[], index: number): string {
+  const id = ids[index];
+  if (id === undefined) throw new Error('Full Court test roster is missing a player');
+  return id;
+}
+
+function lineupOf(ids: readonly string[], ...indexes: number[]): string[] {
+  return indexes.map((index) => idAt(ids, index));
+}
+
+describe('coaching rules', () => {
+  it('resolves the ordered first applicable rule and ignores the lower-priority rule', () => {
+    const roster = fullCourtTestRoster('rules', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'first',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+      {
+        ruleId: 'second',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 0, 1, 2, 3, 7),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const state = ruleStateOf(plan);
+    const decision = planSubstitution(snapshotOfPlan(plan), RULE_CLOSING, state);
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('coach-rule');
+    expect(decision.inIndex).toBe(5);
+    expect(state.boundaryRuleIndex).toBe(0);
+  });
+
+  it('activates a closing lineup once and supersedes lower closing rules', () => {
+    const roster = fullCourtTestRoster('rules-once', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'first',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+      {
+        ruleId: 'second',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 0, 1, 2, 3, 7),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const state = ruleStateOf(plan);
+    const slots = [...plan.startingSlots];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const decision = planSubstitution(
+        snapshotOfPlan(plan, { slots, energies: plan.roster.map(() => 1) }),
+        RULE_CLOSING,
+        state,
+      );
+      if (decision.kind !== 'swap') break;
+      slots[decision.slot] = decision.inIndex;
+    }
+    expect(new Set(slots)).toEqual(new Set([1, 2, 4, 5, 6]));
+    expect(state.activated).toEqual([true, true]);
+    expect(planSubstitution(snapshotOfPlan(plan, { slots }), RULE_CLOSING, state).kind).toBe(
+      'none',
+    );
+  });
+
+  it('keeps a lower closing rule live when only its time window, not its margin, is satisfied', () => {
+    const roster = fullCourtTestRoster('rules-margin', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'lead',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+      {
+        ruleId: 'one-possession',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 2,
+        lineup: lineupOf(ids, 0, 3, 5, 7, 8),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const state = ruleStateOf(plan);
+    const slots = [...plan.startingSlots];
+    const applyWindow = (context: FullCourtRotationContext): void => {
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const decision = planSubstitution(snapshotOfPlan(plan, { slots }), context, state);
+        if (decision.kind !== 'swap') return;
+        slots[decision.slot] = decision.inIndex;
+      }
+    };
+
+    // The higher rule owns a five-point game and is spent as a one-shot.
+    applyWindow(RULE_CLOSING);
+    expect(new Set(slots)).toEqual(new Set([1, 2, 4, 5, 6]));
+    // The lower rule's own margin condition did not hold, so it stays available.
+    expect(state.activated).toEqual([true, false]);
+
+    // A later dead ball inside the same time window is now a one-possession game.
+    applyWindow({
+      ...RULE_CLOSING,
+      globalSeconds: FULL_COURT_REGULATION_SECONDS - 200,
+      periodSecondsRemaining: 200,
+      scoreMargin: 1,
+    });
+    expect(new Set(slots)).toEqual(new Set([0, 3, 5, 7, 8]));
+    expect(state.activated).toEqual([true, true]);
+  });
+
+  it('keeps a chosen closing rule lineup through the same dead-ball boundary', () => {
+    const roster = fullCourtTestRoster('rules-boundary', 9);
+    const ids = roster.map((player) => player.playerId);
+    const ruleLineup = lineupOf(ids, 1, 2, 4, 5, 6);
+    const ruleIndices = [1, 2, 4, 5, 6];
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'lead',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: ruleLineup,
+      },
+    ];
+    const plan = resolveRotationPlan(roster, {
+      startingFive: ids.slice(0, 5),
+      closingFive: lineupOf(ids, 0, 3, 5, 7, 8),
+      rules,
+    });
+    const state = ruleStateOf(plan);
+    const slots = [...plan.startingSlots];
+    const lateWindow: FullCourtRotationContext = {
+      globalSeconds: FULL_COURT_REGULATION_SECONDS - 120,
+      period: 3,
+      periodSecondsRemaining: 120,
+      scoreMargin: 5,
+      legalWindow: true,
+    };
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const decision = planSubstitution(snapshotOfPlan(plan, { slots }), lateWindow, state);
+      if (decision.kind !== 'swap') break;
+      slots[decision.slot] = decision.inIndex;
+    }
+
+    expect(new Set(slots)).toEqual(new Set(ruleIndices));
+    // The staff closing five is also live here but must not replace the rule
+    // lineup at the same dead ball.
+    expect(planSubstitution(snapshotOfPlan(plan, { slots }), lateWindow, state).kind).toBe('none');
+    expect(new Set(slots)).toEqual(new Set(ruleIndices));
+  });
+
+  it('keeps forced disqualification exits ahead of a matching rule', () => {
+    const roster = fullCourtTestRoster('rules-forced', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'closing',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const fouls = plan.roster.map((_player, index) => (index === 0 ? FULL_COURT_FOUL_LIMIT : 0));
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { fouls }),
+      RULE_CLOSING,
+      ruleStateOf(plan),
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('foul-out');
+    expect(decision.outIndex).toBe(0);
+  });
+
+  it('skips a foul-trouble rule when its named reserve is unavailable', () => {
+    const roster = fullCourtTestRoster('rules-foul', 8);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'foul',
+        kind: 'foul-trouble',
+        playerId: idAt(ids, 0),
+        foulLimit: 4,
+        replacementPlayerId: idAt(ids, 5),
+      },
+    ];
+    const availability = roster.map((player, index) => ({
+      playerId: player.playerId,
+      available: index !== 5,
+    }));
+    const plan = resolveRotationPlan(
+      roster,
+      { startingFive: ids.slice(0, 5), rules },
+      availability,
+    );
+    const fouls = plan.roster.map((_player, index) => (index === 0 ? 4 : 0));
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { fouls }),
+      { ...EARLY, legalWindow: true },
+      ruleStateOf(plan),
+    );
+    expect(decision.kind).toBe('none');
+  });
+
+  it('replaces a player in foul trouble with the chosen reserve', () => {
+    const roster = fullCourtTestRoster('rules-foul-ok', 8);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'foul',
+        kind: 'foul-trouble',
+        playerId: idAt(ids, 0),
+        foulLimit: 4,
+        replacementPlayerId: idAt(ids, 5),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const fouls = plan.roster.map((_player, index) => (index === 0 ? 4 : 0));
+    const state = ruleStateOf(plan);
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { fouls }),
+      { ...EARLY, legalWindow: true },
+      state,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('coach-rule');
+    expect(decision.outIndex).toBe(plan.startingSlots[0] ?? -1);
+    expect(decision.inIndex).toBe(5);
+    expect(state.cooldownsUntil[0]).toBe(EARLY.globalSeconds + FULL_COURT_RULE_COOLDOWN_SECONDS);
+  });
+
+  it('does not run rules outside a legal substitution window', () => {
+    const roster = fullCourtTestRoster('rules-window', 9);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'closing',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5), rules });
+    const decision = planSubstitution(
+      snapshotOfPlan(plan),
+      { ...RULE_CLOSING, legalWindow: false },
+      ruleStateOf(plan),
+    );
+    expect(decision.kind).toBe('none');
+  });
+
+  it('rejects rules that name players outside the roster', () => {
+    const roster = fullCourtTestRoster('rules-unknown', 8);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'unknown',
+        kind: 'foul-trouble',
+        playerId: 'missing-player',
+        foulLimit: 4,
+      },
+    ];
+    expectSetupError(() => resolveRotationPlan(roster, { rules }), 'unknown-player');
+  });
+
+  it('rejects repeated players inside a rule lineup', () => {
+    const roster = fullCourtTestRoster('rules-dup', 8);
+    const ids = roster.map((player) => player.playerId);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'repeat',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 0, 1, 2, 3, 3),
+      },
+    ];
+    expectSetupError(() => resolveRotationPlan(roster, { rules }), 'invalid-lineup');
+  });
+});
+
+describe('coaching rule precedence', () => {
+  it('lets an already-satisfied higher rule suppress lower closing rules', () => {
+    const roster = fullCourtTestRoster('rules-satisfied', 9);
+    const ids = roster.map((player) => player.playerId);
+    const starting = ids.slice(0, 5);
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'already',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: starting,
+      },
+      {
+        ruleId: 'lower',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: lineupOf(ids, 1, 2, 4, 5, 6),
+      },
+    ];
+    const plan = resolveRotationPlan(roster, { startingFive: starting, rules });
+    const state = ruleStateOf(plan);
+    expect(planSubstitution(snapshotOfPlan(plan), RULE_CLOSING, state).kind).toBe('none');
+    expect(state.activated).toEqual([false, false]);
+    expect(state.boundaryRuleIndex).toBe(0);
   });
 });

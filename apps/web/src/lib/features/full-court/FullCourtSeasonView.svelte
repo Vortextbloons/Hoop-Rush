@@ -11,10 +11,16 @@
     capRushSeriesWins,
     type FullCourtSeasonCheckpoint,
     type FullCourtSeasonScore,
+    type FullCourtTeamHealth,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
-  import { fullCourtStandings, type FullCourtSeasonLock } from '@hoop-rush/engine';
+  import {
+    buildFullCourtSeasonStats,
+    fullCourtStandings,
+    fullCourtUserNextPlayoffMatchup,
+    type FullCourtSeasonLock,
+  } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
@@ -31,10 +37,14 @@
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { ScheduleCell } from '#lib/components/ui/types.js';
   import { getManifest } from '#lib/data.js';
+  import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
   import {
     fullCourtFinalRecap,
+    fullCourtGameDayReadiness,
     fullCourtHomeControls,
     fullCourtNextMatchup,
+    fullCourtNextUserFixture,
+    fullCourtPlayoffAdaptationRead,
     fullCourtPlayoffRounds,
     fullCourtPlayoffStatus,
     fullCourtSeriesGames,
@@ -56,6 +66,10 @@
     busy,
     onAdvance,
     onStartPlayoffs,
+    onWatchNextGame,
+    health = null,
+    restingPlayerIds = [],
+    onRestingChange,
     section = 'home',
   }: {
     lock: FullCourtSeasonLock;
@@ -66,6 +80,10 @@
     busy: boolean;
     onAdvance: (count: number, acceptForfeit?: boolean) => void;
     onStartPlayoffs: () => void;
+    onWatchNextGame?: () => void;
+    health?: FullCourtTeamHealth | null;
+    restingPlayerIds?: readonly string[];
+    onRestingChange?: (playerIds: readonly string[]) => void;
     section?: FullCourtSeasonSection;
   } = $props();
 
@@ -88,8 +106,26 @@
 
   const teamsById = $derived(new Map(lock.season.teams.map((team) => [team.teamId, team])));
   const userTeamId = $derived(lock.season.userTeamId);
-  const userTeamName = $derived(teamsById.get(userTeamId)?.displayName ?? userTeamId);
+  const userTeam = $derived(teamsById.get(userTeamId) ?? null);
+  const userTeamName = $derived(userTeam?.displayName ?? userTeamId);
+  const nextUserFixture = $derived(fullCourtNextUserFixture(lock, checkpoint, playoff));
+  const gameDayReadiness = $derived(
+    fullCourtGameDayReadiness({
+      roster: userTeam?.roster ?? [],
+      availability: userTeam?.availability ?? [],
+      health,
+      fixture: nextUserFixture,
+      restingPlayerIds,
+    }),
+  );
   const standings = $derived(fullCourtStandings(lock.season.teams, scores));
+  const seasonStats = $derived(
+    buildFullCourtSeasonStats({
+      userTeamId,
+      regularScores: scores,
+      ...(playoff === null ? {} : { series: playoff.series }),
+    }),
+  );
   const rowByTeam = $derived(
     new Map([...standings.west, ...standings.east].map((row) => [row.teamId, row])),
   );
@@ -151,11 +187,6 @@
         ? userSeries.lowTeamId
         : userSeries.highTeamId,
   );
-  const nextUserGame = $derived.by(() => {
-    const next = playoff?.nextGame ?? null;
-    if (next === null || userSeries === null) return null;
-    return next.seriesId === userSeries.seriesId ? next : null;
-  });
   const championId = $derived(playoff?.championTeamId ?? null);
   const postseasonStatus = $derived(
     playoff === null ? null : fullCourtPlayoffStatus(playoff, userTeamId, teamName),
@@ -167,7 +198,35 @@
   const activeRound = $derived(selectedRound ?? latestRound);
 
   const matchup = $derived(fullCourtNextMatchup(lock, checkpoint, playoff, teamName));
-  const controls = $derived(fullCourtHomeControls({ checkpoint, playoff, pendingForfeit, busy }));
+  const nextBracketGameHasUser = $derived(playoff === null || playoff.nextGame?.userSide !== null);
+  const userPlayoffPreview = $derived(
+    playoff === null
+      ? null
+      : fullCourtUserNextPlayoffMatchup({
+          userTeamId,
+          runSeed: lock.season.runSeed,
+          series: playoff.series,
+        }),
+  );
+  const nextUserGame = $derived(
+    userPlayoffPreview === null
+      ? null
+      : { gameOrdinal: userPlayoffPreview.gameOrdinal, userSide: userPlayoffPreview.userSide },
+  );
+  const userPlayoffAdjustment = $derived(
+    userPlayoffPreview?.adaptation == null
+      ? null
+      : fullCourtPlayoffAdaptationRead(userPlayoffPreview.adaptation),
+  );
+  const controls = $derived(
+    fullCourtHomeControls({
+      checkpoint,
+      playoff,
+      pendingForfeit,
+      busy,
+      restConflict: gameDayReadiness.restConflict,
+    }),
+  );
   const recap = $derived(fullCourtFinalRecap(lock, playoff, teamName));
 
   function teamName(teamId: string): string {
@@ -184,6 +243,14 @@
 
   function signed(value: number): string {
     return value > 0 ? `+${String(value)}` : String(value);
+  }
+
+  function rateLabel(value: number | null): string {
+    return value === null ? '—' : value.toFixed(1);
+  }
+
+  function possessionLabel(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
   }
 
   function sideMeta(side: FullCourtMatchupSide): string {
@@ -454,6 +521,21 @@
           >.
         </p>
       {/if}
+      {#if userSeriesActive && userPlayoffAdjustment !== null}
+        <div
+          class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
+          aria-label="Playoff opponent adjustment"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="ui-label text-muted-foreground">Opponent adjustment</p>
+            <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
+          </div>
+          <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
+          <p class="mt-0.5 text-[11px] text-muted-foreground">
+            {userPlayoffAdjustment.detailLabel}
+          </p>
+        </div>
+      {/if}
 
       {#if userSeriesGames.length > 0}
         <ol class="mt-3 flex flex-col gap-1.5" aria-label="Games in your playoff series">
@@ -696,12 +778,36 @@
             Your five {matchup.userSide === 'home' ? 'host this game' : 'travel for this game'}
           </p>
         {/if}
+        {#if matchup.phase === 'playoff' && matchup.userSide !== null && userPlayoffAdjustment !== null}
+          <div
+            class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
+            aria-label="Playoff opponent adjustment"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="ui-label text-muted-foreground">Opponent adjustment</p>
+              <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
+            </div>
+            <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">
+              {userPlayoffAdjustment.detailLabel}
+            </p>
+          </div>
+        {/if}
       </div>
     {:else if playoff !== null && championId === null}
       <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
         No game is ready for your five. The rest of the bracket is finishing.
       </p>
     {/if}
+
+    <div class="mt-4">
+      <FullCourtGameDayPanel
+        readiness={gameDayReadiness}
+        {restingPlayerIds}
+        {busy}
+        {onRestingChange}
+      />
+    </div>
 
     <div
       class="mt-5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-4"
@@ -733,6 +839,11 @@
           {action.label}
         </Button>
       {/each}
+      {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
+        <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
+          Watch next game
+        </Button>
+      {/if}
       <p class="text-[11px] text-muted-foreground" role="status">
         {controls.status}
       </p>
@@ -793,6 +904,144 @@
       </p>
     </Panel>
   {/if}
+{/snippet}
+
+{#snippet statsPanel()}
+  <Panel as="section" padding="md" aria-label="Full Court season stats">
+    <SectionHeading eyebrow="Stats" title="Your season so far" level={2} size="md">
+      {#snippet actions()}
+        <Badge tone={seasonStats.lineups.coverageComplete ? 'positive' : 'neutral'}>
+          {seasonStats.lineups.gamesRecorded} of {seasonStats.lineups.gamesExpected} games with lineup
+          facts
+        </Badge>
+      {/snippet}
+    </SectionHeading>
+    <p class="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+      {#if seasonStats.regular.playedGames === 0}
+        No played games yet. Bench scoring and lineup samples appear after your first result.
+      {:else}
+        Based on {seasonStats.regular.playedGames} played regular-season
+        {seasonStats.regular.playedGames === 1 ? 'game' : 'games'}{seasonStats.playoff.playedGames >
+        0
+          ? ` and ${seasonStats.playoff.playedGames} played playoff ${seasonStats.playoff.playedGames === 1 ? 'game' : 'games'}`
+          : ''}.
+      {/if}
+      Forfeits ({seasonStats.regular.forfeitGames + seasonStats.playoff.forfeitGames}) are excluded
+      from scoring, efficiency, and lineup samples.
+    </p>
+    <StatGrid class="mt-4" columns={4} mobile={2}>
+      <StatTile
+        label="Bench points"
+        size="md"
+        surface="tile"
+        tone={seasonStats.bench !== null && seasonStats.bench.totalBenchPoints < 0
+          ? 'negative'
+          : 'muted'}
+        value={seasonStats.bench === null || seasonStats.bench.gamesRecorded === 0
+          ? '—'
+          : signed(seasonStats.bench.totalBenchPoints)}
+      />
+      <StatTile
+        label="Bench per game"
+        size="md"
+        surface="tile"
+        value={seasonStats.bench === null || seasonStats.bench.gamesRecorded === 0
+          ? '—'
+          : seasonStats.bench.averageBenchPoints.toFixed(1)}
+      />
+      <StatTile
+        label="Regular points"
+        size="md"
+        surface="tile"
+        value={seasonStats.regular.playedGames === 0 ? '—' : seasonStats.regular.pointsFor}
+      />
+      <StatTile
+        label="Regular diff"
+        size="md"
+        surface="tile"
+        tone={seasonStats.regular.pointDifferential > 0
+          ? 'primary'
+          : seasonStats.regular.pointDifferential < 0
+            ? 'negative'
+            : 'muted'}
+        value={signed(seasonStats.regular.pointDifferential)}
+      />
+    </StatGrid>
+    {#if seasonStats.bench !== null && seasonStats.bench.bestGame !== null}
+      <p class="mt-3 text-xs text-muted-foreground">
+        Best bench game: {seasonStats.bench.bestGame.benchPoints} points in game
+        {seasonStats.bench.bestGame.gameNumber}.
+      </p>
+    {/if}
+  </Panel>
+
+  <Panel as="section" padding="md" aria-label="Full Court lineup lab">
+    <SectionHeading eyebrow="Lineup Lab" title="Actual fives" level={2} size="md">
+      {#snippet actions()}
+        <Badge tone="neutral">Sample floor {seasonStats.lineups.sampleThreshold} poss</Badge>
+      {/snippet}
+    </SectionHeading>
+    {#if seasonStats.lineups.rows.length > 0}
+      <p class="mt-2 text-xs text-muted-foreground">
+        Minutes, points for and against, and net rating use only facts recorded from lineup stints
+        and the exact possession tape at simulation time. A unit that breaks and returns is one row.
+        Rank is withheld below
+        {seasonStats.lineups.sampleThreshold} possessions; * marks a below-sample row.
+      </p>
+      <div class="overflow-x-auto">
+        <table class="ui-stats-table mt-3" aria-label="Full Court season lineups">
+          <thead>
+            <tr>
+              <th scope="col" data-align="start">Lineup</th>
+              <th scope="col">GP</th>
+              <th scope="col">MIN</th>
+              <th scope="col">PF</th>
+              <th scope="col">PA</th>
+              <th scope="col">POSS</th>
+              <th scope="col">NET RTG</th>
+              <th scope="col">RK</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each seasonStats.lineups.rows as lineup (lineup.key)}
+              <tr>
+                <th scope="row" data-align="start"
+                  >{lineup.players.map((player) => player.displayName).join(' · ')}</th
+                >
+                <td>{lineup.games}</td>
+                <td>{lineup.minutes.toFixed(1)}</td>
+                <td>{lineup.pointsFor}</td>
+                <td>{lineup.pointsAgainst}</td>
+                <td>{possessionLabel(lineup.pacePossessions)}</td>
+                <td>{rateLabel(lineup.netRatingPer100)}{lineup.sampleMet ? '' : ' *'}</td>
+                <td title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}
+                  >{lineup.rank ?? '—'}</td
+                >
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if seasonStats.lineups.omitted.lineups > 0}
+        <p class="mt-2 text-xs text-muted-foreground">
+          {seasonStats.lineups.omitted.lineups} low-usage
+          {seasonStats.lineups.omitted.lineups === 1 ? 'lineup was' : 'lineups were'} omitted from the
+          table in {seasonStats.lineups.omitted.games}
+          {seasonStats.lineups.omitted.games === 1 ? 'game' : 'games'}; their minutes and points
+          remain in the coverage totals, not in a row.
+        </p>
+      {/if}
+    {:else if seasonStats.lineups.gamesExpected > 0}
+      <Alert class="mt-3" tone="info" title="No lineup facts in this save">
+        <p>
+          This save has played games but no recorded lineup samples yet. Lineup detail is recorded
+          for newly simulated user games; bench totals above still use the saved compact results.
+        </p>
+      </Alert>
+    {:else}
+      <p class="mt-2 text-xs text-muted-foreground">Play a game to record the first actual five.</p>
+    {/if}
+  </Panel>
 {/snippet}
 
 {#snippet leaguePanel()}
@@ -869,6 +1118,8 @@
     {@render latestResultPanel()}
   {:else if section === 'league'}
     {@render leaguePanel()}
+  {:else if section === 'stats'}
+    {@render statsPanel()}
   {:else if playoff === null}
     <Panel as="section" padding="md" aria-label="Full Court postseason">
       <SectionHeading

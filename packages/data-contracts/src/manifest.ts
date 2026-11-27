@@ -88,6 +88,7 @@ export const hoopRushManifestSchema = z.object({
     .optional(),
   draftCatalog: seasonDraftCatalogAssetSchema.optional(),
   playoffProfiles: seasonArtifactIndexEntrySchema.optional(),
+  fullCourtHealthProfiles: seasonArtifactIndexEntrySchema.optional(),
   projection: z
     .object({
       model: seasonArtifactIndexEntrySchema,

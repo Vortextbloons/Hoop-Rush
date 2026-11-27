@@ -101,6 +101,96 @@ export function fullCourtTestSeasonLock(): FullCourtSeasonLock {
   );
 }
 
+/**
+ * A locked season whose user team carries one pinned Roulette mutation, built through
+ * the public draft commands so worker envelopes exercise the persisted shape.
+ */
+export function fullCourtTestRouletteSeasonLock(): FullCourtSeasonLock {
+  const field = fullCourtTestField();
+  const base = buildCapRushTestCatalog({ overalls: [70, 71, 72, 73, 74, 75] });
+  const catalog: SeasonDraftCatalog = {
+    ...base,
+    candidates: field.flatMap(({ teamId }) =>
+      base.candidates.map((player) => ({
+        ...player,
+        franchiseId: franchiseIdSchema.parse(teamId),
+        playerVersionId: playerVersionId(player.playerId, teamId, player.eraId, player.seasonKey),
+      })),
+    ),
+  };
+  const catalogSource = capRushTestCatalogSource(catalog);
+  const index = fullCourtDraftIndexOf(catalog, catalogSource);
+  let draft = createFullCourtDraftState(
+    fullCourtCreateDraftCommandSchema.parse({
+      command: 'create-full-court-draft',
+      commandId: commandIdSchema.parse('full-court-roulette-create'),
+      runId: 'full-court-roulette-test-run',
+      runSeed: seedSchema.parse('b'.repeat(32)),
+      variant: 'roulette',
+      catalog: catalogSource,
+    }),
+    index,
+  );
+  for (const candidate of base.candidates
+    .filter((player) => player.positions.primary === 'PG')
+    .slice(0, 6)) {
+    draft = applyFullCourtCommand(
+      draft,
+      {
+        command: 'pick-full-court-player',
+        commandId: commandIdSchema.parse(`full-court-roulette-pick-${String(draft.revision)}`),
+        runId: draft.runId,
+        expectedRevision: draft.revision,
+        playerVersionId: candidate.playerVersionId,
+      },
+      { index },
+    ).state;
+  }
+  draft = applyFullCourtCommand(
+    draft,
+    {
+      command: 'finish-full-court-draft',
+      commandId: commandIdSchema.parse('full-court-roulette-finish'),
+      runId: draft.runId,
+      expectedRevision: draft.revision,
+    },
+    { index },
+  ).state;
+  const target = draft.picks[5]?.player;
+  if (target === undefined) throw new Error('Full Court roulette test needs a bench target');
+  draft = applyFullCourtCommand(
+    draft,
+    {
+      command: 'purchase-full-court-spin',
+      commandId: commandIdSchema.parse('full-court-roulette-spin'),
+      runId: draft.runId,
+      expectedRevision: draft.revision,
+      purchase: 'standard',
+      targetPlayerVersionId: target.playerVersionId,
+    },
+    { index },
+  ).state;
+  draft = applyFullCourtCommand(
+    draft,
+    {
+      command: 'finalize-full-court-roulette',
+      commandId: commandIdSchema.parse('full-court-roulette-finalize'),
+      runId: draft.runId,
+      expectedRevision: draft.revision,
+    },
+    { index },
+  ).state;
+  return lockFullCourtRegularSeason(
+    buildFullCourtRegularSeason({
+      draft,
+      field,
+      catalog,
+      catalogSource,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+    }),
+  );
+}
+
 /** A completed regular season plus the opening playoff checkpoint. */
 export function fullCourtTestPlayoffLock(lock: FullCourtSeasonLock) {
   const regular = createFullCourtSeasonCheckpoint(lock);

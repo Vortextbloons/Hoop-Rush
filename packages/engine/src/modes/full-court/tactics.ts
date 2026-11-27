@@ -1,6 +1,7 @@
 import {
   FULL_COURT_DEFAULT_TACTICS,
   type EraSimulationProfile,
+  type FullCourtOffensiveHierarchy,
   type FullCourtTactics,
   type ShotZone,
   type SimulationPlayer,
@@ -11,7 +12,13 @@ import type { TeamPrep } from '../../sim/prepare.ts';
 import type { SideIndex } from '../../sim/recorder.ts';
 import { buildTrustedWeightedPickTable } from '../../sim/rng.ts';
 import { twoPointAnchorFactor } from '../../sim/shooting.ts';
-import { ACTION_TYPES, applyZonePulls, type ActionType, type ZonePrep } from '../../sim/usage.ts';
+import {
+  ACTION_TYPES,
+  applyZonePulls,
+  type ActionType,
+  type TeammateShots,
+  type ZonePrep,
+} from '../../sim/usage.ts';
 
 const PACE_SCALE: Readonly<Record<FullCourtTactics['pace'], number>> = {
   slow: 0.94,
@@ -64,6 +71,36 @@ const PRESSURE_MAKE_CONCESSION_MILLIONTHS = 6_000;
 const PROTECT_PAINT_DEFENSE_PRESSURE_DELTA = 0.05;
 const PROTECT_PAINT_STEAL_ABILITY_DELTA = 6;
 const PROTECT_PAINT_DEFENSIVE_REBOUND_SCALE = 1.04;
+
+type OffensiveHierarchyRole = 'primary' | 'secondary' | 'floor-general';
+
+interface OffensiveRoleScale {
+  readonly finish: number;
+  readonly initiate: number;
+  readonly pass: number;
+}
+
+const IDENTITY_ROLE_SCALE: OffensiveRoleScale = { finish: 1, initiate: 1, pass: 1 };
+
+/**
+ * Relative opportunity multipliers per role. A primary option takes a larger
+ * share of the same prepared tendencies; a floor general runs more possessions
+ * and passes more instead of shooting more. Each is a bounded weight, never a
+ * fixed attempt count or rating change.
+ */
+const HIERARCHY_ROLE_MULTIPLIERS: Readonly<Record<OffensiveHierarchyRole, OffensiveRoleScale>> = {
+  primary: { finish: 1.28, initiate: 1.12, pass: 0.92 },
+  secondary: { finish: 1.14, initiate: 1.05, pass: 0.97 },
+  'floor-general': { finish: 0.96, initiate: 1.22, pass: 1.08 },
+};
+
+const HIERARCHY_SCALE_FLOOR = 0.85;
+const HIERARCHY_SCALE_CEILING = 1.35;
+/** A role always nudges the source weights, but a low-usage player is not forced into a star load. */
+const HIERARCHY_READINESS_FLOOR = 0.7;
+const HIERARCHY_USAGE_REFERENCE = 40;
+const HIERARCHY_MATCHUP_FLOOR = 0.92;
+const HIERARCHY_MATCHUP_CEILING = 1.08;
 
 export function resolveFullCourtTactics(tactics: FullCourtTactics | undefined): FullCourtTactics {
   if (tactics === undefined) return FULL_COURT_DEFAULT_TACTICS;
@@ -120,6 +157,7 @@ export function applyFullCourtTacticsToPrep(
   profile: EraSimulationProfile,
   own: FullCourtTactics,
   opponentDefense: FullCourtTactics['defense'],
+  hierarchy?: FullCourtOffensiveHierarchy,
 ): TeamPrep {
   const zoneChanged =
     own.offense === 'perimeter' ||
@@ -127,7 +165,15 @@ export function applyFullCourtTacticsToPrep(
     opponentDefense === 'protect-paint';
   const pressure = own.defense === 'pressure';
   const protectPaint = own.defense === 'protect-paint';
-  if (!zoneChanged && own.offense !== 'ball-movement' && !pressure && !protectPaint) return prep;
+  if (
+    !zoneChanged &&
+    own.offense !== 'ball-movement' &&
+    !pressure &&
+    !protectPaint &&
+    hierarchy === undefined
+  ) {
+    return prep;
+  }
 
   let next = prep;
   if (zoneChanged) {
@@ -157,7 +203,130 @@ export function applyFullCourtTacticsToPrep(
       defensiveReboundMean: next.defensiveReboundMean * PROTECT_PAINT_DEFENSIVE_REBOUND_SCALE,
     };
   }
+  if (hierarchy !== undefined) {
+    next = applyFullCourtHierarchyToPrep(next, players, hierarchy, opponentDefense);
+  }
   return next;
+}
+
+/**
+ * Rescales who starts possessions, who finishes them, and how often a role
+ * passes. Only players currently prepared (the active five) are rewritten, so a
+ * bench assignment has no effect until that player is on the floor. The source
+ * tendencies stay the base of every weight; the roles shift shares within them.
+ */
+export function applyFullCourtHierarchyToPrep(
+  prep: TeamPrep,
+  players: readonly SimulationPlayer[],
+  hierarchy: FullCourtOffensiveHierarchy | undefined,
+  opponentDefense: FullCourtTactics['defense'],
+): TeamPrep {
+  if (hierarchy === undefined) return prep;
+  const roles = new Map<string, OffensiveHierarchyRole>();
+  if (hierarchy.primaryPlayerId !== undefined) {
+    roles.set(hierarchy.primaryPlayerId, 'primary');
+  }
+  if (hierarchy.secondaryPlayerId !== undefined) {
+    roles.set(hierarchy.secondaryPlayerId, 'secondary');
+  }
+  if (hierarchy.floorGeneralPlayerId !== undefined) {
+    roles.set(hierarchy.floorGeneralPlayerId, 'floor-general');
+  }
+  if (roles.size === 0) return prep;
+
+  const indexByKey = new Map<string, number>();
+  players.forEach((player, index) => indexByKey.set(prep.keyOf(player), index));
+  if (players.every((player) => !roles.has(player.playerId))) return prep;
+  const scales = players.map((player): OffensiveRoleScale => {
+    const role = roles.get(player.playerId);
+    return role === undefined ? IDENTITY_ROLE_SCALE : roleScaleFor(role, player, opponentDefense);
+  });
+
+  const initiatorWeights = prep.initiatorWeights.map(
+    (weight, index) => weight * (scales[index]?.initiate ?? 1),
+  );
+  const teammateShots = new Map<string, TeammateShots>();
+  for (const [key, shots] of prep.teammateShots) {
+    teammateShots.set(key, {
+      byAction: shots.byAction.map((action) => {
+        const weights = action.teammates.map((teammate, teammateIndex) => {
+          const index = indexByKey.get(prep.keyOf(teammate));
+          const finishScale = index === undefined ? 1 : (scales[index]?.finish ?? 1);
+          return (action.weights[teammateIndex] ?? 0) * finishScale;
+        });
+        return {
+          teammates: action.teammates,
+          weights,
+          pickTable: buildTrustedWeightedPickTable(weights),
+        };
+      }),
+    });
+  }
+  const passP = new Map<string, number[]>();
+  for (const [key, values] of prep.passP) {
+    const index = indexByKey.get(key);
+    const passScale = index === undefined ? 1 : (scales[index]?.pass ?? 1);
+    passP.set(
+      key,
+      values.map((value) => Math.min(0.97, Math.max(0.05, value * passScale))),
+    );
+  }
+  return {
+    ...prep,
+    initiatorWeights,
+    initiatorPickTable: buildTrustedWeightedPickTable(initiatorWeights),
+    teammateShots,
+    passP,
+  };
+}
+
+function roleScaleFor(
+  role: OffensiveHierarchyRole,
+  player: SimulationPlayer,
+  opponentDefense: FullCourtTactics['defense'],
+): OffensiveRoleScale {
+  const base = HIERARCHY_ROLE_MULTIPLIERS[role];
+  const readiness =
+    HIERARCHY_READINESS_FLOOR +
+    (1 - HIERARCHY_READINESS_FLOOR) *
+      Math.min(1, Math.max(0, player.tendencies.usageRate / HIERARCHY_USAGE_REFERENCE));
+  const matchup = hierarchyMatchupFactor(player, opponentDefense);
+  return {
+    finish: boundedHierarchyScale(1 + (base.finish - 1) * readiness * matchup),
+    initiate: boundedHierarchyScale(1 + (base.initiate - 1) * readiness),
+    pass: boundedHierarchyScale(1 + (base.pass - 1) * readiness),
+  };
+}
+
+/**
+ * A rim-heavy scorer loses some hierarchy volume against a paint-packing defense
+ * because the looks his tendencies create are the ones being conceded away.
+ */
+function hierarchyMatchupFactor(
+  player: SimulationPlayer,
+  opponentDefense: FullCourtTactics['defense'],
+): number {
+  if (opponentDefense !== 'protect-paint') return 1;
+  const tendencies = player.tendencies;
+  const total =
+    tendencies.rimFrequency +
+    tendencies.shortMidFrequency +
+    tendencies.longMidFrequency +
+    tendencies.cornerThreeFrequency +
+    tendencies.aboveBreakThreeFrequency;
+  if (total <= 0) return 1;
+  const share = (value: number): number => value / total;
+  const factor =
+    share(tendencies.rimFrequency) * PROTECT_PAINT_ZONE_SCALE.rim +
+    share(tendencies.shortMidFrequency) * PROTECT_PAINT_ZONE_SCALE.shortMid +
+    share(tendencies.longMidFrequency) * PROTECT_PAINT_ZONE_SCALE.longMid +
+    share(tendencies.cornerThreeFrequency) * PROTECT_PAINT_ZONE_SCALE.cornerThree +
+    share(tendencies.aboveBreakThreeFrequency) * PROTECT_PAINT_ZONE_SCALE.aboveBreakThree;
+  return Math.min(HIERARCHY_MATCHUP_CEILING, Math.max(HIERARCHY_MATCHUP_FLOOR, factor));
+}
+
+function boundedHierarchyScale(value: number): number {
+  return Math.min(HIERARCHY_SCALE_CEILING, Math.max(HIERARCHY_SCALE_FLOOR, value));
 }
 
 /**

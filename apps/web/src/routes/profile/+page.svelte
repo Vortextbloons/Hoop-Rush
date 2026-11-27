@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { resolve } from '$app/paths';
   import {
     achievementTitleFor,
     collectionAchievementIdSchema,
@@ -14,6 +15,7 @@
     profileRepository,
     selectedProfile,
   } from '#lib/features/profile/profile.js';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
 
@@ -78,6 +80,11 @@
   <p class="text-sm font-bold uppercase tracking-widest text-primary">Your basketball career</p>
   <h1 class="mt-2 font-display text-4xl font-extrabold">Player profile</h1>
   <p class="mt-2 text-muted-foreground">Keep your identity and achievements on this device.</p>
+  <div class="mt-4 flex flex-wrap gap-2">
+    <ActionLink href={resolve('/full-court/history')} tone="secondary" size="sm">
+      Full Court history
+    </ActionLink>
+  </div>
   {#if error}<Alert class="mt-4" tone="danger">{error}</Alert>{/if}
   {#if profile}
     <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">

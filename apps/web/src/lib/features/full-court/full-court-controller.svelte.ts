@@ -1,36 +1,62 @@
 import {
   advanceFullCourtPlayoffs,
   advanceFullCourtSeasonSlot,
+  archiveFullCourtRun,
+  buildFullCourtWatchedReplay,
+  saveFullCourtBlueprint,
   saveFullCourtCoaching,
   startFullCourtPlayoffs,
   startFullCourtSeason,
   submitFullCourtDraftCommand,
+  type SaveFullCourtBlueprintOptions,
 } from '@hoop-rush/application/full-court';
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   FULL_COURT_DEFAULT_COACHING_PLAN,
   idSchema,
+  type FullCourtBlueprint,
   type FullCourtCoachingPlan,
   type FullCourtCommand,
   type FullCourtDraftState,
+  type FullCourtPlayoffCheckpoint,
+  type FullCourtReportTarget,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
+  type FullCourtTactics,
+  type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
 import {
   buildFullCourtRegularSeason,
   assertFullCourtCoachingRoster,
   fullCourtDraftIndexOf,
   fullCourtPlayoffView,
-  lockFullCourtRegularSeason,
+  fullCourtUserNextPlayoffMatchup,
   type FullCourtCatalogIndex,
+  type FullCourtGameHealthOutcome,
+  type FullCourtPlayoffLock,
+  type FullCourtPlayoffOpponentPreview,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
-import { getPersistence } from '#lib/persistence.js';
+import { getPersistence, type Persistence } from '#lib/persistence.js';
 import { FULL_COURT_ACTIVE_RUN_KEY } from './full-court-active-run.js';
 import { loadFullCourtAssets } from './full-court-assets.js';
+import { loadFullCourtHealthProfiles } from './full-court-health-profiles.js';
+import { resolveFullCourtSeasonLock } from './full-court-season-lock.js';
+import {
+  fullCourtGameDayReadiness,
+  fullCourtNextUserFixture,
+  type FullCourtUserFixture,
+} from './full-court-season-presenter.js';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner.js';
+
+export interface FullCourtControllerDependencies {
+  readonly loadAssets?: typeof loadFullCourtAssets;
+  readonly loadHealthProfiles?: typeof loadFullCourtHealthProfiles;
+  readonly repositories?: Persistence;
+  readonly createWorker?: typeof createFullCourtWorkerRunner;
+}
 
 interface SeasonState {
   lock: FullCourtSeasonLock;
@@ -40,6 +66,7 @@ interface SeasonState {
 }
 
 type PlayoffState = Awaited<ReturnType<typeof startFullCourtPlayoffs>>;
+type PlayedGame = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
 type AdvanceOutcome = Awaited<
   ReturnType<typeof advanceFullCourtSeasonSlot> | ReturnType<typeof advanceFullCourtPlayoffs>
 >;
@@ -49,16 +76,30 @@ export class FullCourtController {
   draft = $state.raw<FullCourtDraftState | null>(null);
   season = $state.raw<SeasonState | null>(null);
   playoffs = $state.raw<PlayoffState | null>(null);
+  latestGame = $state.raw<PlayedGame | null>(null);
+  savedReplay = $state.raw<FullCourtWatchedReplay | null>(null);
   error = $state<string | null>(null);
   pendingForfeit = $state(false);
   busy = $state(false);
   simulating = $state(false);
   stopRequested = $state(false);
+  restingPlayerIds = $state.raw<readonly string[]>([]);
+  restingForGameId = $state.raw<string | null>(null);
 
   #disposed = false;
   #assets: Awaited<ReturnType<typeof loadFullCourtAssets>> | null = null;
-  #repositories = getPersistence();
+  #loadAssets: typeof loadFullCourtAssets;
+  #loadHealthProfiles: typeof loadFullCourtHealthProfiles;
+  #repositories: Persistence;
+  #createWorker: typeof createFullCourtWorkerRunner;
   #worker: ReturnType<typeof createFullCourtWorkerRunner> | null = null;
+
+  constructor(dependencies: FullCourtControllerDependencies = {}) {
+    this.#loadAssets = dependencies.loadAssets ?? loadFullCourtAssets;
+    this.#loadHealthProfiles = dependencies.loadHealthProfiles ?? loadFullCourtHealthProfiles;
+    this.#repositories = dependencies.repositories ?? getPersistence();
+    this.#createWorker = dependencies.createWorker ?? createFullCourtWorkerRunner;
+  }
 
   dispose(): void {
     this.#disposed = true;
@@ -71,7 +112,7 @@ export class FullCourtController {
 
   load(): Promise<void> {
     return this.#act(async () => {
-      const assets = (this.#assets ??= await loadFullCourtAssets());
+      const assets = (this.#assets ??= await this.#loadAssets());
       if (this.#isDisposed()) return;
       this.index ??= fullCourtDraftIndexOf(assets.catalog, assets.catalogSource);
       const runId = localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY);
@@ -79,7 +120,7 @@ export class FullCourtController {
     });
   }
 
-  startDraft(): Promise<void> {
+  startDraft(variant: 'standard' | 'roulette' = 'standard'): Promise<void> {
     return this.#act(async () => {
       if (this.#assets === null) return;
       const runId = idSchema.parse(newRequestId('full-court'));
@@ -88,7 +129,7 @@ export class FullCourtController {
         commandId: newSeasonId('command'),
         runId,
         runSeed: seasonRootSeed(),
-        variant: 'standard',
+        variant,
         catalog: this.#assets.catalogSource,
       });
       localStorage.setItem(FULL_COURT_ACTIVE_RUN_KEY, runId);
@@ -126,6 +167,214 @@ export class FullCourtController {
     if (this.simulating) this.stopRequested = true;
   }
 
+  /** Rest choices stay pinned to the next user fixture and clear once it is played. */
+  setRestingPlayers(playerIds: readonly string[]): void {
+    const fixture = this.#nextUserFixture();
+    if (fixture === null) {
+      if (playerIds.length > 0) this.error = 'No Full Court game is ready for rest choices.';
+      this.#clearRest();
+      return;
+    }
+    const team = this.#userTeam();
+    if (team === undefined) return;
+    const rosterIds = new Set<string>(team.roster.map((player) => player.playerId));
+    const unique = [...new Set(playerIds)];
+    if (unique.some((playerId) => !rosterIds.has(playerId))) {
+      this.error = 'A rest choice is not on your Full Court roster.';
+      return;
+    }
+    if (unique.length > 0) {
+      const readiness = this.#gameDayReadiness(fixture, unique);
+      if (readiness?.restConflict === true) {
+        this.error = `Resting ${String(unique.length)} players leaves fewer than five available. Choose a legal plan.`;
+        return;
+      }
+    }
+    this.restingForGameId = fixture.gameId;
+    this.restingPlayerIds = unique;
+    this.error = null;
+  }
+
+  #userTeam() {
+    const season = this.season;
+    if (season === null) return undefined;
+    return season.lock.season.teams.find((team) => team.teamId === season.lock.season.userTeamId);
+  }
+
+  #userTeamHealth() {
+    const season = this.season;
+    if (season === null) return null;
+    const userTeamId = season.lock.season.userTeamId;
+    return (
+      (this.playoffs?.checkpoint.healthByTeam ?? season.checkpoint.healthByTeam)[userTeamId] ?? null
+    );
+  }
+
+  #nextUserFixture() {
+    const season = this.season;
+    if (season === null) return null;
+    return fullCourtNextUserFixture(season.lock, season.checkpoint, this.playoffs?.view ?? null);
+  }
+
+  #gameDayReadiness(fixture: FullCourtUserFixture, restingPlayerIds: readonly string[]) {
+    const team = this.#userTeam();
+    if (team === undefined) return null;
+    return fullCourtGameDayReadiness({
+      roster: team.roster,
+      availability: team.availability,
+      health: this.#userTeamHealth(),
+      fixture,
+      restingPlayerIds,
+    });
+  }
+
+  #nextOverallUserGameId(): string | null {
+    const season = this.season;
+    if (season === null) return null;
+    if (this.playoffs !== null) {
+      const next = this.playoffs.view.nextGame;
+      return next !== null && next.userSide !== null ? next.gameId : null;
+    }
+    const slot = season.checkpoint.completedThroughSlot + 1;
+    const fixture = season.lock.season.games.find(
+      (game) =>
+        game.slot === slot &&
+        (game.homeTeamId === season.lock.season.userTeamId ||
+          game.awayTeamId === season.lock.season.userTeamId),
+    );
+    return fixture?.gameId ?? null;
+  }
+
+  #clearRest(): void {
+    this.restingPlayerIds = [];
+    this.restingForGameId = null;
+  }
+
+  nextPlayoffPreview(): FullCourtPlayoffOpponentPreview | null {
+    const season = this.season;
+    const playoffs = this.playoffs;
+    if (season === null || playoffs === null) return null;
+    return fullCourtUserNextPlayoffMatchup({
+      userTeamId: season.lock.season.userTeamId,
+      runSeed: season.lock.season.runSeed,
+      series: playoffs.view.series,
+    });
+  }
+
+  nextFilmTarget(): Extract<FullCourtReportTarget, { kind: 'opponent-film' }> | null {
+    const season = this.season;
+    if (season === null) return null;
+    if (this.playoffs !== null) {
+      const nextPlayoff = this.nextPlayoffPreview();
+      return nextPlayoff === null
+        ? null
+        : {
+            kind: 'opponent-film',
+            gameId: nextPlayoff.gameId,
+            opponentTeamId: nextPlayoff.opponentTeamId,
+          };
+    }
+    const { userTeamId, games } = season.lock.season;
+    const next = games.find(
+      (game) =>
+        game.slot === season.checkpoint.completedThroughSlot + 1 &&
+        (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+    );
+    if (!next) return null;
+    const opponentTeamId =
+      next.homeTeamId === userTeamId
+        ? next.awayTeamId
+        : next.awayTeamId === userTeamId
+          ? next.homeTeamId
+          : null;
+    return opponentTeamId === null
+      ? null
+      : { kind: 'opponent-film', gameId: next.gameId, opponentTeamId };
+  }
+
+  purchaseReport(target: FullCourtReportTarget): Promise<void> {
+    return this.#act(async () => {
+      const draft = this.draft;
+      if (draft === null) return;
+      if (target.kind === 'opponent-film') {
+        const next = this.nextFilmTarget();
+        if (next?.gameId !== target.gameId || next.opponentTeamId !== target.opponentTeamId) {
+          throw new Error('Film study is available for your next game.');
+        }
+      }
+      await this.#submit({
+        command: 'purchase-full-court-report',
+        commandId: newSeasonId('command'),
+        runId: draft.runId,
+        expectedRevision: draft.revision,
+        target,
+      });
+    });
+  }
+
+  purchaseSpin(purchase: 'standard' | 'surge', targetPlayerVersionId: string): Promise<void> {
+    return this.#act(async () => {
+      const draft = this.draft;
+      if (draft === null) return;
+      await this.#submit({
+        command: 'purchase-full-court-spin',
+        commandId: newSeasonId('command'),
+        runId: draft.runId,
+        expectedRevision: draft.revision,
+        purchase,
+        targetPlayerVersionId,
+      });
+    });
+  }
+
+  skipSpin(): Promise<void> {
+    return this.#act(async () => {
+      const draft = this.draft;
+      if (draft === null) return;
+      await this.#submit({
+        command: 'skip-full-court-spin',
+        commandId: newSeasonId('command'),
+        runId: draft.runId,
+        expectedRevision: draft.revision,
+      });
+    });
+  }
+
+  finalizeRoulette(): Promise<void> {
+    return this.#act(async () => {
+      const draft = this.draft;
+      if (draft === null) return;
+      await this.#submit({
+        command: 'finalize-full-court-roulette',
+        commandId: newSeasonId('command'),
+        runId: draft.runId,
+        expectedRevision: draft.revision,
+      });
+      await this.#openRun(draft.runId);
+    });
+  }
+
+  listBlueprints(): Promise<FullCourtBlueprint[]> {
+    return this.#repositories.fullCourtBlueprintRepository.list();
+  }
+
+  saveBlueprint(
+    name: string,
+    tactics: FullCourtTactics,
+    options?: SaveFullCourtBlueprintOptions,
+  ): Promise<FullCourtBlueprint> {
+    return saveFullCourtBlueprint(
+      name,
+      tactics,
+      this.#repositories.fullCourtBlueprintRepository,
+      options,
+    );
+  }
+
+  removeBlueprint(name: string): Promise<void> {
+    return this.#repositories.fullCourtBlueprintRepository.remove(name);
+  }
+
   async saveCoaching(plan: FullCourtCoachingPlan): Promise<boolean> {
     let saved = false;
     await this.#act(async () => {
@@ -144,19 +393,39 @@ export class FullCourtController {
     return saved;
   }
 
-  advance(count: number, acceptForfeit = false): Promise<void> {
+  advance(count: number, acceptForfeit = false, record = false): Promise<void> {
     return this.#act(async () => {
       if (this.season === null) return;
       this.simulating = true;
-      const worker = (this.#worker ??= createFullCourtWorkerRunner());
+      const nextFixture = this.#nextUserFixture();
+      if (this.restingForGameId !== null && this.restingForGameId !== nextFixture?.gameId) {
+        this.#clearRest();
+      }
+      if (nextFixture !== null && this.restingPlayerIds.length > 0) {
+        const readiness = this.#gameDayReadiness(nextFixture, this.restingPlayerIds);
+        if (readiness?.restConflict === true) {
+          this.error = 'Your rest plan leaves fewer than five available. Uncheck rest to continue.';
+          return;
+        }
+      }
+      const restGameId = this.restingForGameId;
+      const restingPlayerIds = this.restingPlayerIds;
+      const worker = (this.#worker ??= this.#createWorker());
       const regular = this.#repositories.fullCourtSeasonRepository;
       const playoffsRepo = this.#repositories.fullCourtPlayoffRepository;
       const { lock, coaching } = this.season;
       for (let step = 0; step < count && !this.#isDisposed() && !this.stopRequested; step++) {
+        const userGameId = this.#nextOverallUserGameId();
+        const restThisGame =
+          restGameId !== null && userGameId === restGameId && restingPlayerIds.length > 0;
         const options = {
           acceptForfeit: step === 0 && acceptForfeit,
           rotation: coaching.rotation,
           tactics: coaching.tactics,
+          rules: coaching.rules,
+          hierarchy: coaching.hierarchy,
+          record: record && count === 1,
+          ...(restThisGame ? { restingPlayerIds } : {}),
         };
         const playoffs: PlayoffState | null = this.playoffs;
         const current: SeasonState = this.season;
@@ -173,7 +442,34 @@ export class FullCourtController {
         this.pendingForfeit = outcome.kind === 'decision' && outcome.reason === 'confirm-forfeit';
         switch (outcome.kind) {
           case 'simulated':
+            if (restGameId !== null && userGameId === restGameId) this.#clearRest();
             if ('scores' in outcome) {
+              this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
+              if (
+                options.record &&
+                outcome.userGame.kind === 'played' &&
+                outcome.userGame.tape !== null
+              ) {
+                const userFixture = lock.season.games.find(
+                  (game) =>
+                    game.slot === outcome.checkpoint.completedThroughSlot &&
+                    (game.homeTeamId === lock.season.userTeamId ||
+                      game.awayTeamId === lock.season.userTeamId),
+                );
+                if (userFixture !== undefined) {
+                  this.savedReplay = buildFullCourtWatchedReplay({
+                    phase: 'regular',
+                    runId: lock.season.runId,
+                    seasonLockDigest: lock.digest,
+                    lockDigest: lock.digest,
+                    gameId: userFixture.gameId,
+                    slot: userFixture.slot,
+                    dayOffset: userFixture.dayOffset,
+                    userTeamId: lock.season.userTeamId,
+                    game: outcome.userGame,
+                  });
+                }
+              }
               this.season = {
                 ...current,
                 checkpoint: outcome.checkpoint,
@@ -183,9 +479,37 @@ export class FullCourtController {
                 return;
               }
             } else if (playoffs !== null) {
+              const fixture = playoffs.view.nextGame;
+              if (
+                fixture &&
+                [fixture.homeTeamId, fixture.awayTeamId].includes(lock.season.userTeamId)
+              ) {
+                this.latestGame = outcome.game.kind === 'played' ? outcome.game : null;
+                if (
+                  options.record &&
+                  fixture.userSide !== null &&
+                  outcome.game.kind === 'played' &&
+                  outcome.game.tape !== null
+                ) {
+                  this.savedReplay = buildFullCourtWatchedReplay({
+                    phase: 'playoff',
+                    runId: lock.season.runId,
+                    seasonLockDigest: lock.digest,
+                    lockDigest: playoffs.lock.digest,
+                    gameId: fixture.gameId,
+                    slot: null,
+                    dayOffset: fixture.dayOffset,
+                    userTeamId: lock.season.userTeamId,
+                    game: outcome.game,
+                  });
+                }
+              }
               const view = fullCourtPlayoffView(playoffs.lock, outcome.checkpoint);
               this.playoffs = { ...playoffs, checkpoint: outcome.checkpoint, view };
-              if (view.nextGame === null) return;
+              if (view.nextGame === null) {
+                await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
+                return;
+              }
             }
             break;
           case 'stale':
@@ -219,21 +543,49 @@ export class FullCourtController {
     if (this.#isDisposed()) return;
     this.draft = draft;
     this.pendingForfeit = false;
+    this.latestGame = null;
+    this.savedReplay = null;
+    this.#clearRest();
     if (draft?.stage !== 'complete') {
       this.season = null;
       this.playoffs = null;
       return;
     }
+    if (
+      draft.variant === 'roulette' &&
+      draft.roulette !== undefined &&
+      draft.roulette.status !== 'finalized'
+    ) {
+      this.season = null;
+      this.playoffs = null;
+      return;
+    }
 
+    const assets = this.#assets;
     const regular = this.#repositories.fullCourtSeasonRepository;
+    const reused = this.season?.lock.season.runId === runId ? this.season.lock : null;
+    const existing = reused === null ? await regular.load(runId) : null;
+    if (this.#isDisposed()) return;
     const lock =
-      this.season?.lock.season.runId === runId
-        ? this.season.lock
-        : lockFullCourtRegularSeason(buildFullCourtRegularSeason({ ...this.#assets, draft }));
-    const [checkpoint, savedCoaching] = await Promise.all([
+      reused ??
+      (await resolveFullCourtSeasonLock({
+        season: buildFullCourtRegularSeason({ ...assets, draft }),
+        checkpoint: existing,
+        catalogAssetHash: assets.catalogAssetHash,
+        loadProfiles: () => this.#loadHealthProfiles(assets.catalogAssetHash),
+      }));
+    const [checkpoint, savedCoaching, savedReplay] = await Promise.all([
       startFullCourtSeason(lock, regular),
       this.#repositories.fullCourtCoachingRepository.load(runId),
+      this.#repositories.fullCourtWatchedReplayRepository.load(runId),
     ]);
+    if (
+      savedReplay !== null &&
+      (savedReplay.identity.seasonLockDigest !== lock.digest ||
+        savedReplay.identity.userTeamId !== lock.season.userTeamId)
+    ) {
+      throw new Error('Full Court watched replay does not match the locked season');
+    }
     const coaching = savedCoaching ?? FULL_COURT_DEFAULT_COACHING_PLAN;
     const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
     if (userTeam === undefined) throw new Error('The Full Court roster is unavailable.');
@@ -247,6 +599,7 @@ export class FullCourtController {
         : null;
     if (this.#isDisposed()) return;
     this.season = { lock, checkpoint, scores, coaching };
+    this.savedReplay = savedReplay;
     if (playoffSave === null) this.playoffs = null;
     else await this.#openPlayoffs(lock);
   }
@@ -256,7 +609,29 @@ export class FullCourtController {
       regular: this.#repositories.fullCourtSeasonRepository,
       playoffs: this.#repositories.fullCourtPlayoffRepository,
     });
-    if (!this.#isDisposed()) this.playoffs = state;
+    if (this.#isDisposed()) return;
+    this.playoffs = state;
+    if (state.view.nextGame === null) {
+      await this.#archiveCompletedRun(state.lock, state.checkpoint);
+    }
+  }
+
+  async #archiveCompletedRun(
+    lock: FullCourtPlayoffLock,
+    checkpoint: FullCourtPlayoffCheckpoint,
+  ): Promise<void> {
+    const draft = this.draft;
+    const season = this.season;
+    if (draft === null || season === null || draft.runId !== lock.seasonLock.season.runId) return;
+    await archiveFullCourtRun(
+      {
+        draft,
+        coaching: season.coaching,
+        lock,
+        checkpoint,
+      },
+      this.#repositories.fullCourtHistoryRepository,
+    );
   }
 
   async #act(action: () => Promise<void>): Promise<void> {

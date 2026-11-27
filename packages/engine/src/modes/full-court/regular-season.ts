@@ -28,6 +28,8 @@ import {
   buildFullCourtLeagueSchedule,
   type FullCourtLeagueGame,
 } from './league.ts';
+import { adaptCapRushSpinsToFullCourt } from './roulette.ts';
+import { assertFullCourtSpinReceiptDigests } from './roulette-draft.ts';
 
 export interface FullCourtRegularSeasonTeam extends FullCourtTeamGameInput {
   readonly anchorSeason: SeasonKey | null;
@@ -79,9 +81,16 @@ export function buildFullCourtRegularSeason(input: {
 }): FullCourtRegularSeason {
   const { field, catalog, catalogSource } = input;
   const draft = fullCourtDraftStateSchema.parse(input.draft);
-  if (draft.stage !== 'complete' || draft.variant !== 'standard') {
-    throw new Error('A confirmed Full Court Standard roster is required to start the season');
+  if (draft.stage !== 'complete') {
+    throw new Error('A confirmed Full Court roster is required to start the season');
   }
+  if (draft.variant === 'roulette' && draft.roulette?.status === 'open') {
+    throw new Error('Finalize Full Court Roulette before starting the season');
+  }
+  if (draft.variant === 'roulette' && draft.roulette?.status === 'skipped') {
+    throw new Error('Finalize Full Court Roulette before starting the season');
+  }
+  assertFullCourtSpinReceiptDigests(draft);
   const profile = eraSimulationProfileSchema.parse(input.profile);
   assertCapRushCatalogSourceMatches(catalogSource, draft.catalog);
   const index = fullCourtDraftIndexOf(catalog, catalogSource);
@@ -112,13 +121,26 @@ export function buildFullCourtRegularSeason(input: {
     runSeed,
   });
   const apron = fullCourtPayrollStatus(fullCourtPayrollDollars(draft.picks), draft.money);
+  const userRoster = simulationRoster(chosen, apron);
+  const userSourceRoster = simulationRoster(chosen, 'under-cap');
+  const rouletteReceipts = draft.roulette?.receipts ?? [];
+  const userRoulette =
+    rouletteReceipts.length === 0
+      ? undefined
+      : adaptCapRushSpinsToFullCourt({
+          roster: userRoster,
+          sourceRoster: userSourceRoster,
+          receipts: rouletteReceipts,
+          payrollStatus: apron,
+        });
   const teams: FullCourtRegularSeasonTeam[] = [
     {
       teamId: assignment.franchiseId,
       displayName: assignment.displayName,
       anchorSeason: null,
-      roster: simulationRoster(chosen, apron),
+      roster: userRoster,
       availability: staminaAvailability(chosen),
+      ...(userRoulette === undefined ? {} : { roulette: userRoulette }),
     },
     ...opponents.map((team) => {
       const roster = simulationRoster(team.players, 'under-cap');
@@ -151,6 +173,62 @@ export function buildFullCourtRegularSeason(input: {
   };
 }
 
+export interface FullCourtSeasonIndex {
+  readonly gameById: ReadonlyMap<string, FullCourtLeagueGame>;
+  readonly gamesBySlot: ReadonlyMap<number, readonly FullCourtLeagueGame[]>;
+  readonly teamById: ReadonlyMap<string, FullCourtRegularSeasonTeam>;
+  readonly futureDaysByGameSide: ReadonlyMap<string, readonly number[]>;
+}
+
+const SEASON_INDEX_CACHE = new WeakMap<FullCourtRegularSeason, FullCourtSeasonIndex>();
+
+/** Derived fixture lookups for the immutable locked season; safe to reuse across slots. */
+export function fullCourtSeasonIndexOf(season: FullCourtRegularSeason): FullCourtSeasonIndex {
+  const cached = SEASON_INDEX_CACHE.get(season);
+  if (cached !== undefined) return cached;
+  const gameById = new Map<string, FullCourtLeagueGame>();
+  const gamesBySlot = new Map<number, FullCourtLeagueGame[]>();
+  for (const game of season.games) {
+    gameById.set(game.gameId, game);
+    const slotGames = gamesBySlot.get(game.slot);
+    if (slotGames === undefined) gamesBySlot.set(game.slot, [game]);
+    else slotGames.push(game);
+  }
+  const teamById = new Map(season.teams.map((team) => [team.teamId, team]));
+  const futureDaysByGameSide = new Map<string, readonly number[]>();
+  const gamesByTeam = new Map<string, FullCourtLeagueGame[]>();
+  for (const game of season.games) {
+    for (const teamId of [game.homeTeamId, game.awayTeamId]) {
+      const teamGames = gamesByTeam.get(teamId);
+      if (teamGames === undefined) gamesByTeam.set(teamId, [game]);
+      else teamGames.push(game);
+    }
+  }
+  for (const [teamId, teamGames] of gamesByTeam) {
+    teamGames.sort((left, right) => left.slot - right.slot || left.dayOffset - right.dayOffset);
+    const futureDays: number[] = [];
+    for (let index = teamGames.length - 1; index >= 0; index -= 1) {
+      const game = teamGames[index];
+      if (game === undefined) continue;
+      futureDaysByGameSide.set(`${game.gameId}:${teamId}`, [...futureDays]);
+      futureDays.unshift(game.dayOffset);
+    }
+  }
+  const index: FullCourtSeasonIndex = { gameById, gamesBySlot, teamById, futureDaysByGameSide };
+  SEASON_INDEX_CACHE.set(season, index);
+  return index;
+}
+
+export function fullCourtFutureDaysOf(
+  season: FullCourtRegularSeason,
+  fixture: FullCourtLeagueGame,
+  teamId: string,
+): readonly number[] {
+  return (
+    fullCourtSeasonIndexOf(season).futureDaysByGameSide.get(`${fixture.gameId}:${teamId}`) ?? []
+  );
+}
+
 export function fullCourtRegularSeasonGameInput(
   season: FullCourtRegularSeason,
   gameId: string,
@@ -174,7 +252,7 @@ export function simulateFullCourtRegularSeasonGame(
 }
 
 function scheduledGameOf(season: FullCourtRegularSeason, gameId: string): FullCourtLeagueGame {
-  const fixture = season.games.find((game) => game.gameId === gameId);
+  const fixture = fullCourtSeasonIndexOf(season).gameById.get(gameId);
   if (fixture === undefined) throw new Error(`Full Court game ${gameId} is not on the schedule`);
   return fixture;
 }
@@ -183,8 +261,9 @@ function gameInputOf(
   season: FullCourtRegularSeason,
   fixture: FullCourtLeagueGame,
 ): FullCourtGameInput {
-  const home = season.teams.find((team) => team.teamId === fixture.homeTeamId);
-  const away = season.teams.find((team) => team.teamId === fixture.awayTeamId);
+  const index = fullCourtSeasonIndexOf(season);
+  const home = index.teamById.get(fixture.homeTeamId);
+  const away = index.teamById.get(fixture.awayTeamId);
   if (home === undefined || away === undefined)
     throw new Error(`Full Court game ${fixture.gameId} has an unknown team`);
   return {

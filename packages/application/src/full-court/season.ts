@@ -1,10 +1,15 @@
-import type { FullCourtSeasonCheckpoint, FullCourtSeasonScore } from '@hoop-rush/data-contracts';
+import type {
+  FullCourtSeasonCheckpoint,
+  FullCourtSeasonScore,
+  FullCourtWatchedReplay,
+} from '@hoop-rush/data-contracts';
 import {
   createFullCourtSeasonCheckpoint,
   type FullCourtSeasonLock,
   type FullCourtSeasonSlotOptions,
   type FullCourtSeasonSlotOutcome,
 } from '@hoop-rush/engine';
+import { buildFullCourtWatchedReplay } from './replay.ts';
 
 export interface FullCourtSeasonRepository {
   load(runId: string): Promise<FullCourtSeasonCheckpoint | null>;
@@ -13,6 +18,7 @@ export interface FullCourtSeasonRepository {
   commitSlot(
     checkpoint: FullCourtSeasonCheckpoint,
     scores: readonly FullCourtSeasonScore[],
+    options?: { readonly watchedReplay?: FullCourtWatchedReplay },
   ): Promise<{ readonly status: 'committed' | 'replayed' }>;
 }
 
@@ -97,6 +103,31 @@ export async function advanceFullCourtSeasonSlot(
   ) {
     throw new Error('Full Court simulation returned scores outside the locked slot');
   }
-  await repository.commitSlot(outcome.checkpoint, outcome.scores);
+  const userFixture = [...fixtures.values()].find(
+    (game) =>
+      game.homeTeamId === lock.season.userTeamId || game.awayTeamId === lock.season.userTeamId,
+  );
+  const watchedReplay =
+    input.options?.record === true &&
+    userFixture !== undefined &&
+    outcome.userGame.kind === 'played' &&
+    outcome.userGame.tape !== null
+      ? buildFullCourtWatchedReplay({
+          phase: 'regular',
+          runId: lock.season.runId,
+          seasonLockDigest: lock.digest,
+          lockDigest: lock.digest,
+          gameId: userFixture.gameId,
+          slot,
+          dayOffset: userFixture.dayOffset,
+          userTeamId: lock.season.userTeamId,
+          game: outcome.userGame,
+        })
+      : undefined;
+  await repository.commitSlot(
+    outcome.checkpoint,
+    outcome.scores,
+    watchedReplay === undefined ? undefined : { watchedReplay },
+  );
   return outcome;
 }

@@ -76,3 +76,81 @@ test('saves the game and health together, reopens, and rejects conflicting repla
   expect(await reopened.load(before.runId)).toEqual(after);
   second.close();
 });
+
+test('persists, reloads, and retries playoff evidence and adaptations deterministically', async () => {
+  resetIndexedDb();
+  const { first, second } = openTestDatabasePair('full-court-playoffs-adaptation');
+  const before = fullCourtPlayoffCheckpointSchema.parse({
+    schemaVersion: FULL_COURT_PLAYOFFS_VERSION,
+    runId: 'playoffs-adaptation',
+    lockDigest: '0123456789abcdef',
+    games: [],
+    healthByTeam: Object.fromEntries(
+      CAP_RUSH_FRANCHISE_ALIGNMENT.map(
+        ({ franchiseId }) =>
+          [
+            franchiseId,
+            {
+              teamId: franchiseId,
+              version: FULL_COURT_HEALTH_VERSION,
+              throughDay: 170,
+              players: {},
+            },
+          ] as const,
+      ),
+    ),
+  });
+  const adapted = fullCourtPlayoffCheckpointSchema.parse({
+    ...before,
+    games: [
+      {
+        gameId: 'fcp-1-0-1',
+        dayOffset: 173,
+        homeTeamId: 'celtics',
+        awayTeamId: 'knicks',
+        winnerTeamId: 'celtics',
+        outcome: { kind: 'played', homePoints: 104, awayPoints: 96 },
+        evidence: {
+          home: {
+            fieldGoalAttempts: 84,
+            rimAttempts: 41,
+            leadUsageCentis: 2300,
+            teamUsageCentis: 10200,
+          },
+          away: {
+            fieldGoalAttempts: 82,
+            rimAttempts: 24,
+            leadUsageCentis: 2100,
+            teamUsageCentis: 9900,
+          },
+        },
+        adaptations: {
+          away: {
+            defense: 'protect-paint',
+            reason: 'persistent-inside-scoring',
+            sampleGames: 2,
+            windowGames: 2,
+            observedShareBps: 4881,
+            thresholdShareBps: 4600,
+          },
+        },
+      },
+    ],
+    healthByTeam: {
+      ...before.healthByTeam,
+      celtics: { ...before.healthByTeam.celtics, throughDay: 173 },
+      knicks: { ...before.healthByTeam.knicks, throughDay: 173 },
+    },
+  });
+
+  const repo = createFullCourtPlayoffRepository(first);
+  await repo.create(before);
+  await repo.commitGame(adapted);
+  await repo.commitGame(adapted);
+  first.close();
+
+  const reopened = createFullCourtPlayoffRepository(second);
+  expect(await reopened.load(before.runId)).toEqual(adapted);
+  await reopened.commitGame(adapted);
+  second.close();
+});

@@ -1,14 +1,24 @@
 import { describe, expect, test } from 'bun:test';
-import type { FullCourtPlayoffScore } from '@hoop-rush/data-contracts';
+import {
+  FULL_COURT_HEALTH_VERSION,
+  fullCourtTeamHealthSchema,
+  seedSchema,
+  type FullCourtPlayoffScore,
+} from '@hoop-rush/data-contracts';
 import {
   createFullCourtSeasonCheckpoint,
   fullCourtPlayoffView,
+  fullCourtUserNextPlayoffMatchup,
   type FullCourtPlayoffSeries,
 } from '@hoop-rush/engine';
 import {
+  FULL_COURT_REVIEW_SLOTS,
   fullCourtFinalRecap,
+  fullCourtGameDayReadiness,
   fullCourtHomeControls,
   fullCourtNextMatchup,
+  fullCourtNextReviewSlot,
+  fullCourtNextUserFixture,
   fullCourtResultOf,
   fullCourtSeriesGames,
 } from './full-court-season-presenter';
@@ -74,7 +84,36 @@ describe('full court home controls', () => {
       busy: false,
     });
     expect(controls.primary).toMatchObject({ kind: 'sim', count: 1 });
-    expect(controls.secondary.map((action) => action.count)).toEqual([5, 82]);
+    expect(controls.secondary.map((action) => action.count)).toEqual([5, 20, 82]);
+    expect(controls.secondary.map((action) => action.label)).toContain('Sim to next review');
+  });
+
+  test('offers quarterly review checkpoints and withholds illegal rest plans', () => {
+    expect(FULL_COURT_REVIEW_SLOTS).toEqual([20, 41, 61, 82]);
+    expect(fullCourtNextReviewSlot(0)).toBe(20);
+    expect(fullCourtNextReviewSlot(20)).toBe(41);
+    expect(fullCourtNextReviewSlot(61)).toBe(82);
+    expect(fullCourtNextReviewSlot(82)).toBeNull();
+
+    const review = fullCourtHomeControls({
+      checkpoint: { ...opened, completedThroughSlot: 61 },
+      playoff: null,
+      pendingForfeit: false,
+      busy: false,
+    });
+    expect(review.secondary.map((action) => action.label)).toEqual(['Sim 5', 'Sim to next review']);
+    expect(review.secondary.at(-1)?.count).toBe(21);
+
+    const blocked = fullCourtHomeControls({
+      checkpoint: opened,
+      playoff: null,
+      pendingForfeit: false,
+      busy: false,
+      restConflict: true,
+    });
+    expect(blocked.primary).toBeNull();
+    expect(blocked.secondary).toEqual([]);
+    expect(blocked.status).toContain('fewer than five');
   });
 
   test('withholds sim actions while a forfeit waits for confirmation', () => {
@@ -111,7 +150,7 @@ describe('full court home controls', () => {
     });
     expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
     expect(controls.secondary).toHaveLength(1);
-    expect(controls.status).toBe('Accepted results save immediately.');
+    expect(controls.status).toBe('AI-only bracket games finish before your next game.');
   });
 
   test('stops offering sim actions once a champion exists', () => {
@@ -143,11 +182,16 @@ describe('full court matchup', () => {
     expect(matchup?.series).toBeNull();
   });
 
-  test('reads the next playoff game with its seeds and series score', () => {
+  test('reads the next user playoff game even when AI-only games come first', () => {
     const playoffs = fullCourtTestPlayoffLock(lock);
     const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
-    const next = view.nextGame;
+    const next = fullCourtUserNextPlayoffMatchup({
+      userTeamId,
+      runSeed: lock.season.runSeed,
+      series: view.series,
+    });
     expect(next).not.toBeNull();
+    expect(view.nextGame?.userSide).toBeNull();
 
     const matchup = fullCourtNextMatchup(
       lock,
@@ -158,16 +202,186 @@ describe('full court matchup', () => {
     expect(matchup).toMatchObject({
       phase: 'playoff',
       label: `Game ${String(next?.gameOrdinal)} · First round`,
-      userSide: next?.homeTeamId === userTeamId ? 'home' : 'away',
+      userSide: next?.userSide,
     });
     expect(matchup?.home.seed).toBe(next?.homeSeed);
     expect(matchup?.away.seed).toBe(next?.awaySeed);
+    expect([matchup?.home.teamId, matchup?.away.teamId]).toEqual([
+      next?.homeTeamId,
+      next?.awayTeamId,
+    ]);
   });
 
   test('shows nothing to play once the regular season is complete', () => {
     expect(
       fullCourtNextMatchup(lock, { ...opened, completedThroughSlot: 82 }, null, teamNameOf),
     ).toBeNull();
+  });
+});
+
+describe('full court game-day readiness', () => {
+  const userTeam = lock.season.teams.find((team) => team.teamId === userTeamId);
+  if (userTeam === undefined) throw new Error('Missing user team');
+  const fixture = fullCourtNextUserFixture(lock, opened, null);
+  if (fixture === null) throw new Error('Missing next user fixture');
+  const rosterIds = userTeam.roster.map((player) => player.playerId);
+  const firstId = rosterIds[0];
+  const secondId = rosterIds[1];
+  if (firstId === undefined || secondId === undefined) {
+    throw new Error('Full Court readiness test needs two players');
+  }
+
+  test('reads availability at the next fixture day so a return-day player can play', () => {
+    const health = fullCourtTeamHealthSchema.parse({
+      version: FULL_COURT_HEALTH_VERSION,
+      teamId: userTeamId,
+      throughDay: fixture.dayOffset - 1,
+      players: {
+        [firstId]: {
+          loadBasisPoints: 6_000,
+          availableFromDay: fixture.dayOffset,
+        },
+      },
+    });
+    const ready = fullCourtGameDayReadiness({
+      roster: userTeam.roster,
+      availability: userTeam.availability,
+      health,
+      fixture,
+      restingPlayerIds: [],
+    });
+    expect(ready.players[0]).toMatchObject({
+      status: 'ready',
+      statusLabel: 'Ready',
+    });
+
+    const stillOut = fullCourtGameDayReadiness({
+      roster: userTeam.roster,
+      availability: userTeam.availability,
+      health: fullCourtTeamHealthSchema.parse({
+        ...health,
+        players: {
+          [firstId]: {
+            loadBasisPoints: 6_000,
+            availableFromDay: fixture.dayOffset + 1,
+          },
+        },
+      }),
+      fixture,
+      restingPlayerIds: [],
+    });
+    expect(stillOut.players[0]).toMatchObject({
+      status: 'injured',
+      statusLabel: 'Out',
+    });
+  });
+
+  test('recovers workload across rest days before the next fixture', () => {
+    const throughDay = Math.max(0, fixture.dayOffset - 2);
+    const recoveryDays = fixture.dayOffset - throughDay;
+    const health = fullCourtTeamHealthSchema.parse({
+      version: FULL_COURT_HEALTH_VERSION,
+      teamId: userTeamId,
+      throughDay,
+      players: {
+        [firstId]: {
+          loadBasisPoints: 3_000 + recoveryDays * 3_500,
+          availableFromDay: null,
+        },
+      },
+    });
+    const readiness = fullCourtGameDayReadiness({
+      roster: userTeam.roster,
+      availability: userTeam.availability,
+      health,
+      fixture,
+      restingPlayerIds: [],
+    });
+    expect(readiness.players[0]).toMatchObject({
+      status: 'ready',
+      detail: '30% carried into this game',
+    });
+  });
+
+  test('warns when injuries leave fewer than five and when rest would do the same', () => {
+    const health = fullCourtTeamHealthSchema.parse({
+      version: FULL_COURT_HEALTH_VERSION,
+      teamId: userTeamId,
+      throughDay: fixture.dayOffset - 1,
+      players: {
+        [firstId]: { loadBasisPoints: 0, availableFromDay: fixture.dayOffset + 5 },
+        [secondId]: { loadBasisPoints: 0, availableFromDay: fixture.dayOffset + 5 },
+      },
+    });
+    const short = fullCourtGameDayReadiness({
+      roster: userTeam.roster,
+      availability: userTeam.availability,
+      health,
+      fixture,
+      restingPlayerIds: [],
+    });
+    expect(short.eligibleCount).toBe(rosterIds.length - 2);
+    expect(short.forfeitLikely).toBe(true);
+    expect(short.warnings[0]).toContain('forfeit is unavoidable');
+
+    const oneOut = fullCourtGameDayReadiness({
+      roster: userTeam.roster,
+      availability: userTeam.availability,
+      health: fullCourtTeamHealthSchema.parse({
+        ...health,
+        players: {
+          [firstId]: { loadBasisPoints: 0, availableFromDay: fixture.dayOffset + 5 },
+        },
+      }),
+      fixture,
+      restingPlayerIds: [secondId],
+    });
+    expect(oneOut.eligibleCount).toBe(rosterIds.length - 1);
+    expect(oneOut.availableCount).toBe(rosterIds.length - 2);
+    expect(oneOut.restConflict).toBe(true);
+    expect(oneOut.warnings[0]).toContain('leaves');
+  });
+
+  test('uses the next user playoff fixture when AI-only games are scheduled first', () => {
+    const playoffs = fullCourtTestPlayoffLock(lock);
+    const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
+    const userSeries = view.series.find(
+      (series) => series.highTeamId === userTeamId || series.lowTeamId === userTeamId,
+    );
+    const aiSeries = view.series.find(
+      (series) => series.highTeamId !== userTeamId && series.lowTeamId !== userTeamId,
+    );
+    if (userSeries === undefined || aiSeries === undefined) {
+      throw new Error('Missing playoff series');
+    }
+    const nextUser = fullCourtNextUserFixture(
+      lock,
+      { ...opened, completedThroughSlot: 82 },
+      {
+        ...view,
+        nextGame: {
+          seriesId: aiSeries.seriesId,
+          round: aiSeries.round,
+          seriesSlot: aiSeries.seriesSlot,
+          gameOrdinal: 1,
+          homeTeamId: aiSeries.highTeamId,
+          awayTeamId: aiSeries.lowTeamId,
+          homeSeed: aiSeries.highSeed,
+          awaySeed: aiSeries.lowSeed,
+          userSide: null,
+          isFinals: false,
+          seed: seedSchema.parse('a'.repeat(32)),
+          gameId: `fcp-${String(aiSeries.round)}-${String(aiSeries.seriesSlot)}-1`,
+          dayOffset: 250,
+        },
+      },
+    );
+    expect(nextUser).toMatchObject({
+      phase: 'playoff',
+      gameId: `fcp-${String(userSeries.round)}-${String(userSeries.seriesSlot)}-1`,
+      userSide: userSeries.highTeamId === userTeamId ? 'home' : 'away',
+      dayOffset: Math.max(...lock.season.games.map((game) => game.dayOffset)) + 3,
+    });
   });
 });
 

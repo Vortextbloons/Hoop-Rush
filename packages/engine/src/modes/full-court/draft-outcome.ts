@@ -11,10 +11,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { CapRushCatalogIndex } from '../cap-rush/catalog.ts';
 import { assertCapRushCatalogSourceMatches } from '../cap-rush/catalog.ts';
+import type { Rng } from '../../sim/rng.ts';
 import { fullCourtStateDigest } from './state-digest.ts';
 
 export interface FullCourtCommandEnvironment {
   readonly index: CapRushCatalogIndex;
+  readonly rngFactory?: (seed: string) => Rng;
 }
 
 export type FullCourtCommandOutcome = CommandOutcome<FullCourtDraftState, FullCourtCommandResult>;

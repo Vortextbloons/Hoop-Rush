@@ -13,3 +13,4 @@ export * as eraProfile from './era-profile/index.ts';
 export * as manifest from './manifest/index.ts';
 export * as opponent from './opponent/index.ts';
 export * as freeze from './freeze/index.ts';
+export * as fullCourtHealth from './full-court-health/artifact.ts';

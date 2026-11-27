@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { FullCourtTactics, ShotZone } from '@hoop-rush/data-contracts';
+import type { FullCourtTactics, ShotZone, SimulationPlayer } from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../../domain/zones.ts';
 import type { EffectsHook } from '../../game/effects.ts';
 import { createEngineContext } from '../../sim/kernel.ts';
@@ -183,6 +183,55 @@ function passValues(prep: ReturnType<typeof prepareTeam>): number[] {
   return [...prep.passP.values()].flat();
 }
 
+const ACTION_INDEX_NAMES = [
+  'isolation',
+  'pickAndRoll',
+  'pickAndRollRoll',
+  'postUp',
+  'spotUp',
+  'cut',
+  'transition',
+] as const;
+
+function initiatorWeightOf(
+  prep: ReturnType<typeof prepareTeam>,
+  players: readonly SimulationPlayer[],
+  index: number,
+): number {
+  const player = players[index];
+  if (player === undefined) return 0;
+  const slot = prep.slotByPlayerId.get(prep.keyOf(player));
+  return slot === undefined ? 0 : (prep.initiatorWeights[slot] ?? 0);
+}
+
+function finishingWeightOf(
+  prep: ReturnType<typeof prepareTeam>,
+  players: readonly SimulationPlayer[],
+  initiatorIndex: number,
+  targetIndex: number,
+  action: (typeof ACTION_INDEX_NAMES)[number] = 'spotUp',
+): number {
+  const initiator = players[initiatorIndex];
+  const target = players[targetIndex];
+  if (initiator === undefined || target === undefined) return 0;
+  const entry = prep.teammateShots.get(prep.keyOf(initiator))?.byAction[
+    ACTION_INDEX_NAMES.indexOf(action)
+  ];
+  if (entry === undefined) return 0;
+  const position = entry.teammates.findIndex((mate) => prep.keyOf(mate) === prep.keyOf(target));
+  return position < 0 ? 0 : (entry.weights[position] ?? 0);
+}
+
+function passProbabilityOf(
+  prep: ReturnType<typeof prepareTeam>,
+  players: readonly SimulationPlayer[],
+  index: number,
+): number {
+  const player = players[index];
+  if (player === undefined) return 0;
+  return prep.passP.get(prep.keyOf(player))?.[ACTION_INDEX_NAMES.indexOf('isolation')] ?? 0;
+}
+
 describe('full court tactics API', () => {
   it('defaults absent or partial tactics to balanced', () => {
     expect(resolveFullCourtTactics(undefined)).toEqual(BALANCED);
@@ -302,6 +351,123 @@ describe('full court tactics API', () => {
     }
     expect(movement.zonePrep).toBe(basePrep.zonePrep);
     expect(movement.twoPointAnchor).toBe(basePrep.twoPointAnchor);
+  });
+
+  it('leaves the prepared lineup untouched when no offensive hierarchy is assigned', () => {
+    const prep = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      undefined,
+    );
+    expect(prep).toBe(basePrep);
+    const absent = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      { primaryPlayerId: 'not-in-this-lineup' },
+    );
+    expect(absent).toBe(basePrep);
+  });
+
+  it('shifts opportunity weight to a primary option without changing ratings', () => {
+    const snapshot = JSON.stringify(homeRoster);
+    const hierarchy = { primaryPlayerId: homeRoster[1]?.playerId };
+    const primary = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      hierarchy,
+    );
+
+    expect(primary).not.toBe(basePrep);
+    expect(initiatorWeightOf(primary, homeRoster, 1)).toBeGreaterThan(
+      initiatorWeightOf(basePrep, homeRoster, 1),
+    );
+    expect(finishingWeightOf(primary, homeRoster, 0, 1)).toBeGreaterThan(
+      finishingWeightOf(basePrep, homeRoster, 0, 1),
+    );
+    expect(passProbabilityOf(primary, homeRoster, 1)).toBeLessThan(
+      passProbabilityOf(basePrep, homeRoster, 1),
+    );
+    expect(initiatorWeightOf(primary, homeRoster, 0)).toBe(
+      initiatorWeightOf(basePrep, homeRoster, 0),
+    );
+    expect(JSON.stringify(homeRoster)).toBe(snapshot);
+    expect(primary.zonePrep).toBe(basePrep.zonePrep);
+  });
+
+  it('gives a floor general creation and passing weight instead of shots', () => {
+    const hierarchy = { floorGeneralPlayerId: homeRoster[0]?.playerId };
+    const general = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      hierarchy,
+    );
+
+    expect(initiatorWeightOf(general, homeRoster, 0)).toBeGreaterThan(
+      initiatorWeightOf(basePrep, homeRoster, 0),
+    );
+    expect(passProbabilityOf(general, homeRoster, 0)).toBeGreaterThan(
+      passProbabilityOf(basePrep, homeRoster, 0),
+    );
+    expect(finishingWeightOf(general, homeRoster, 1, 0)).toBeLessThan(
+      finishingWeightOf(basePrep, homeRoster, 1, 0),
+    );
+  });
+
+  it('bounds the hierarchy shift and tempers it against a paint-packing matchup', () => {
+    const rimHeavy: SimulationPlayer[] = homeRoster.map((player, index) =>
+      index === 0
+        ? {
+            ...player,
+            tendencies: {
+              ...player.tendencies,
+              rimFrequency: 90,
+              shortMidFrequency: 10,
+              longMidFrequency: 0,
+              cornerThreeFrequency: 0,
+              aboveBreakThreeFrequency: 0,
+            },
+          }
+        : player,
+    );
+    const rimTeam = { teamId: 'rim', displayName: 'Rim', players: rimHeavy };
+    const rimPrep = prepareTeam(rimTeam, tacticsProfile);
+    const hierarchy = { primaryPlayerId: rimHeavy[0]?.playerId };
+    const open = applyFullCourtTacticsToPrep(
+      rimPrep,
+      rimHeavy,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      hierarchy,
+    );
+    const packed = applyFullCourtTacticsToPrep(
+      rimPrep,
+      rimHeavy,
+      tacticsProfile,
+      BALANCED,
+      'protect-paint',
+      hierarchy,
+    );
+    const before = finishingWeightOf(rimPrep, rimHeavy, 1, 0);
+    const openAfter = finishingWeightOf(open, rimHeavy, 1, 0);
+    const packedAfter = finishingWeightOf(packed, rimHeavy, 1, 0);
+
+    expect(openAfter / before).toBeLessThanOrEqual(1.35);
+    expect(openAfter / before).toBeGreaterThan(1);
+    expect(packedAfter / before).toBeLessThan(openAfter / before);
+    expect(packedAfter).toBeGreaterThan(before);
   });
 
   it('layers tactical effects over an optional caller hook', () => {

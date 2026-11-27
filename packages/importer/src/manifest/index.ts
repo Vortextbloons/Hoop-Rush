@@ -30,6 +30,10 @@ import { DATA_VERSION } from '../data-version.ts';
 export { DATA_VERSION };
 import { classifyUnattempted, loadCoverageReport } from '../pools/compute.ts';
 import {
+  FULL_COURT_HEALTH_PROFILES_ASSET,
+  validateFullCourtHealthProfiles,
+} from '../full-court-health/artifact.ts';
+import {
   MANIFEST_PATH,
   importerManifestSchema,
   loadManifest,
@@ -160,6 +164,7 @@ function rebuildDraftCatalog(pools: readonly FranchiseEraPool[], dataDir: string
       contentHash: sha256File(path),
       identityHash,
     },
+    candidates: baseCatalog.candidates,
     playoffProfiles:
       playoffArtifact === null ? null : writePlayoffProfiles(dataDir, playoffArtifact),
   };
@@ -458,6 +463,21 @@ export function run(dataDir = PUBLIC_DATA): void {
     if (draftAssets.playoffProfiles !== null) {
       manifest.playoffProfiles = draftAssets.playoffProfiles;
     }
+  }
+  const healthProfilesPath = join(dataDir, FULL_COURT_HEALTH_PROFILES_ASSET);
+  if (fileExists(healthProfilesPath)) {
+    if (draftAssets === null) {
+      throw new Error('Full Court health profiles require a packaged draft catalog');
+    }
+    validateFullCourtHealthProfiles(
+      readJson(healthProfilesPath),
+      draftAssets,
+      draftAssets.catalog.contentHash,
+    );
+    manifest.fullCourtHealthProfiles = {
+      url: FULL_COURT_HEALTH_PROFILES_ASSET,
+      contentHash: sha256File(healthProfilesPath),
+    };
   }
   if (previousCollection !== undefined) {
     manifest.collection = previousCollection;

@@ -169,6 +169,10 @@ Commands:
                           (annotation stays in scripts/annotate-markers.mjs)
   import era-profile     Derive era simulation profiles from packaged stints +
                          Lakers pool anchors. --era 1990s,1980s (default all)
+  import full-court-health
+                         Package Full Court historical injury profiles from the
+                         cached derivation, or reuse a matching pinned asset when
+                         local evidence is absent. --profiles <path> --evidence <path>
   import manifest        Refresh manifest content hashes for pools, era profiles,
                          opponents, and the bracket artifact
   import freeze          Freeze a calibrate-run baseline into the era profile.

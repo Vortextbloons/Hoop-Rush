@@ -1,4 +1,4 @@
-import type { SimulationPlayer } from '@hoop-rush/data-contracts';
+import type { FullCourtCoachingRule, SimulationPlayer } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { clamp } from '../../domain/math.ts';
 import { canPlay } from '../../domain/positions.ts';
@@ -41,6 +41,8 @@ export const FULL_COURT_PACE_DEVIATION_SECONDS = 150;
 export const FULL_COURT_PACE_REPLACEMENT_SECONDS = 60;
 export const FULL_COURT_PACE_MIN_RESERVE_ENERGY = 0.35;
 export const FULL_COURT_MIN_STINT_SECONDS = 90;
+/** A foul-trouble rule waits this long before it may replace the same player again. */
+export const FULL_COURT_RULE_COOLDOWN_SECONDS = 180;
 
 const NEUTRAL_MINUTES_PER_GAME = 24;
 const MIN_CAPACITY_SCALE = 0.55;
@@ -98,6 +100,35 @@ export interface FullCourtRotationPlanInput {
   readonly substitutionPriority?: Readonly<Record<string, number>>;
   readonly closingFive?: readonly string[];
   readonly units?: readonly FullCourtRotationUnitInput[];
+  readonly rules?: readonly FullCourtCoachingRule[];
+}
+
+export type FullCourtRulePlan =
+  | {
+      readonly ruleId: string;
+      readonly kind: 'closing-lineup';
+      readonly secondsRemainingMax: number;
+      readonly scoreMarginMax: number;
+      readonly lineup: readonly number[];
+    }
+  | {
+      readonly ruleId: string;
+      readonly kind: 'foul-trouble';
+      readonly playerIndex: number;
+      readonly foulLimit: number;
+      readonly replacementIndex: number | null;
+    };
+
+/**
+ * Per-game rule memory. Closing rules activate once; foul-trouble rules cool
+ * down after firing. `boundarySeconds` keeps lower-priority rules from reacting
+ * to the same decision window the winning rule already handled.
+ */
+export interface FullCourtRuleRuntimeState {
+  readonly activated: boolean[];
+  readonly cooldownsUntil: number[];
+  boundarySeconds: number;
+  boundaryRuleIndex: number;
 }
 
 export type FullCourtPlanNoteCode =
@@ -155,6 +186,7 @@ export interface FullCourtRotationPlan {
   readonly startingSlots: readonly number[];
   readonly closingSlots: readonly number[];
   readonly units: readonly FullCourtRotationUnit[];
+  readonly rules: readonly FullCourtRulePlan[];
   readonly notes: readonly FullCourtPlanNote[];
 }
 
@@ -668,6 +700,49 @@ export function resolveRotationPlan(
     units.push({ name: unit.name, rosterIndices });
   }
 
+  const rules: FullCourtRulePlan[] = [];
+  const ruleIds = new Set<string>();
+  for (const rule of input.rules ?? []) {
+    if (ruleIds.has(rule.ruleId)) {
+      throw new FullCourtSetupError('invalid-lineup', `coaching rule ${rule.ruleId} is repeated`);
+    }
+    ruleIds.add(rule.ruleId);
+    if (rule.kind === 'closing-lineup') {
+      if (new Set(rule.lineup).size !== rule.lineup.length) {
+        throw new FullCourtSetupError(
+          'invalid-lineup',
+          `coaching rule ${rule.ruleId} repeats a player`,
+        );
+      }
+      rules.push({
+        ruleId: rule.ruleId,
+        kind: rule.kind,
+        secondsRemainingMax: rule.secondsRemainingMax,
+        scoreMarginMax: rule.scoreMarginMax,
+        lineup: rule.lineup.map((id) => requireRulePlayer(indexById, rule.ruleId, id)),
+      });
+      continue;
+    }
+    const playerIndex = requireRulePlayer(indexById, rule.ruleId, rule.playerId);
+    const replacementIndex =
+      rule.replacementPlayerId === undefined
+        ? null
+        : requireRulePlayer(indexById, rule.ruleId, rule.replacementPlayerId);
+    if (replacementIndex === playerIndex) {
+      throw new FullCourtSetupError(
+        'invalid-lineup',
+        `coaching rule ${rule.ruleId} names the same replacement as its player`,
+      );
+    }
+    rules.push({
+      ruleId: rule.ruleId,
+      kind: rule.kind,
+      playerIndex,
+      foulLimit: rule.foulLimit,
+      replacementIndex,
+    });
+  }
+
   return {
     roster,
     playerKeys: roster.map((player) => player.playerVersionId ?? player.playerId),
@@ -680,8 +755,24 @@ export function resolveRotationPlan(
     startingSlots,
     closingSlots,
     units,
+    rules,
     notes,
   };
+}
+
+function requireRulePlayer(
+  indexById: ReadonlyMap<string, number>,
+  ruleId: string,
+  playerId: string,
+): number {
+  const index = indexById.get(playerId);
+  if (index === undefined) {
+    throw new FullCourtSetupError(
+      'unknown-player',
+      `coaching rule ${ruleId} names ${playerId}, which is not on the roster`,
+    );
+  }
+  return index;
 }
 
 export function unitNameFor(plan: FullCourtRotationPlan, slots: readonly number[]): string | null {
@@ -694,7 +785,12 @@ export function unitNameFor(plan: FullCourtRotationPlan, slots: readonly number[
 }
 
 export type FullCourtSubstitutionReason =
-  'foul-out' | 'fatigue' | 'minute-target' | 'closing-five' | 'emergency-continuation';
+  | 'foul-out'
+  | 'fatigue'
+  | 'minute-target'
+  | 'closing-five'
+  | 'coach-rule'
+  | 'emergency-continuation';
 
 export interface FullCourtRotationSnapshot {
   readonly plan: FullCourtRotationPlan;
@@ -717,6 +813,8 @@ export interface FullCourtRotationContext {
   readonly periodSecondsRemaining: number;
   /** Absolute score difference at the moment of evaluation. */
   readonly scoreMargin: number;
+  /** Conditional rules only run at dead-ball or period-break windows. */
+  readonly legalWindow?: boolean;
 }
 
 export type FullCourtSubstitutionDecision =
@@ -823,16 +921,181 @@ function pickFreshest(
   return best;
 }
 
+function closingRuleSwap(
+  snapshot: FullCourtRotationSnapshot,
+  rule: Extract<FullCourtRulePlan, { kind: 'closing-lineup' }>,
+  bench: readonly number[],
+): FullCourtSubstitutionDecision | null {
+  const onCourt = new Set(snapshot.slots);
+  const benchSet = new Set(bench);
+  for (const target of rule.lineup) {
+    if (onCourt.has(target)) continue;
+    // An unavailable or spent target invalidates the whole rule rather than
+    // leaving a partial lineup on the floor.
+    if (!benchSet.has(target)) return null;
+    if ((snapshot.energies[target] ?? 0) <= FULL_COURT_CLOSING_MIN_ENERGY) return null;
+  }
+  const incoming = rule.lineup.find((target) => !onCourt.has(target));
+  if (incoming === undefined) return null;
+  let outSlot = -1;
+  let outIndex = -1;
+  for (const [slot, index] of snapshot.slots.entries()) {
+    if (rule.lineup.includes(index)) continue;
+    if (!mayLeave(snapshot, index)) continue;
+    if (outIndex === -1 || priorityOf(snapshot, index) < priorityOf(snapshot, outIndex)) {
+      outSlot = slot;
+      outIndex = index;
+    }
+  }
+  if (outSlot === -1) return null;
+  return { kind: 'swap', slot: outSlot, outIndex, inIndex: incoming, reason: 'coach-rule' };
+}
+
+function foulTroubleRuleSwap(
+  snapshot: FullCourtRotationSnapshot,
+  rule: Extract<FullCourtRulePlan, { kind: 'foul-trouble' }>,
+  bench: readonly number[],
+): FullCourtSubstitutionDecision | null {
+  const slot = snapshot.slots.indexOf(rule.playerIndex);
+  if (slot === -1) return null;
+  const fouls = snapshot.fouls[rule.playerIndex] ?? 0;
+  if (fouls < rule.foulLimit || fouls >= FULL_COURT_FOUL_LIMIT) return null;
+  if (!mayLeave(snapshot, rule.playerIndex)) return null;
+  if (bench.length === 0) return null;
+  let incoming: number | null;
+  if (rule.replacementIndex === null) {
+    const byNeed = pickHighestNeed(snapshot, bench);
+    incoming =
+      byNeed !== null && needSeconds(snapshot, byNeed) > 0
+        ? byNeed
+        : pickByPriority(snapshot, bench);
+  } else {
+    // A named reserve who is unavailable, spent, or already on the floor leaves
+    // the rule inactive so the staff rotation can handle the possession.
+    if (!bench.includes(rule.replacementIndex)) return null;
+    incoming = rule.replacementIndex;
+  }
+  if (incoming === null) return null;
+  return {
+    kind: 'swap',
+    slot,
+    outIndex: rule.playerIndex,
+    inIndex: incoming,
+    reason: 'coach-rule',
+  };
+}
+
+/**
+ * Marks a closing rule spent. Lower closing rules that are also live in this
+ * window (time and score margin both satisfied) lose the same conflict and are
+ * spent too; rules whose own condition does not hold right now stay available
+ * for a later window. Closing rules are one-shot by design, so a spent rule
+ * never re-triggers after the staff changes the lineup again. Foul-trouble rules
+ * use a cooldown instead because the same player can return to foul trouble.
+ */
+function activateClosingRule(
+  rules: readonly FullCourtRulePlan[],
+  index: number,
+  state: FullCourtRuleRuntimeState,
+  regulationSecondsRemaining: number,
+  scoreMargin: number,
+): void {
+  state.activated[index] = true;
+  for (const [later, candidate] of rules.entries()) {
+    if (later <= index || candidate.kind !== 'closing-lineup') continue;
+    if (
+      regulationSecondsRemaining <= candidate.secondsRemainingMax &&
+      scoreMargin <= candidate.scoreMarginMax
+    ) {
+      state.activated[later] = true;
+    }
+  }
+}
+
+/**
+ * Evaluates the ordered coaching rules. Forced exits and severe fatigue run
+ * before this, and the first applicable rule wins a decision window.
+ */
+function evaluateCoachingRules(
+  snapshot: FullCourtRotationSnapshot,
+  context: FullCourtRotationContext,
+  state: FullCourtRuleRuntimeState,
+): FullCourtSubstitutionDecision {
+  if (context.legalWindow === false || snapshot.plan.rules.length === 0) return { kind: 'none' };
+  const regulationSecondsRemaining = Math.max(
+    0,
+    FULL_COURT_REGULATION_SECONDS - context.globalSeconds,
+  );
+  const bench = benchCandidates(snapshot);
+  for (const [index, rule] of snapshot.plan.rules.entries()) {
+    if (state.activated[index] === true) continue;
+    if ((state.cooldownsUntil[index] ?? 0) > context.globalSeconds) continue;
+    if (state.boundarySeconds === context.globalSeconds && state.boundaryRuleIndex !== index) {
+      continue;
+    }
+    if (rule.kind === 'closing-lineup') {
+      if (
+        regulationSecondsRemaining > rule.secondsRemainingMax ||
+        context.scoreMargin > rule.scoreMarginMax
+      ) {
+        continue;
+      }
+      const onCourt = new Set(snapshot.slots);
+      if (rule.lineup.every((target) => onCourt.has(target))) {
+        // The higher-priority lineup is already on the floor. Claim this window
+        // so a lower rule cannot change it, without spending the rule.
+        state.boundarySeconds = context.globalSeconds;
+        state.boundaryRuleIndex = index;
+        return { kind: 'none' };
+      }
+      const decision = closingRuleSwap(snapshot, rule, bench);
+      if (decision === null || decision.kind !== 'swap') continue;
+      state.boundarySeconds = context.globalSeconds;
+      state.boundaryRuleIndex = index;
+      const nextSlots = snapshot.slots.map((slot, position) =>
+        position === decision.slot ? decision.inIndex : slot,
+      );
+      const nextOnCourt = new Set(nextSlots);
+      if (rule.lineup.every((target) => nextOnCourt.has(target))) {
+        // One-shot activation: a later staff substitution does not re-trigger it.
+        activateClosingRule(
+          snapshot.plan.rules,
+          index,
+          state,
+          regulationSecondsRemaining,
+          context.scoreMargin,
+        );
+      }
+      return decision;
+    }
+    const decision = foulTroubleRuleSwap(snapshot, rule, bench);
+    if (decision === null) continue;
+    state.boundarySeconds = context.globalSeconds;
+    state.boundaryRuleIndex = index;
+    state.cooldownsUntil[index] = context.globalSeconds + FULL_COURT_RULE_COOLDOWN_SECONDS;
+    return decision;
+  }
+  return { kind: 'none' };
+}
+
 /**
  * Chooses at most one change per call. Forced disqualification exits come first,
- * then severe fatigue, then the closing five or minute-target pace, then ordinary
- * fatigue. Equal candidates resolve by priority and then roster order.
+ * then severe fatigue, then ordered coaching rules, then the closing five or
+ * minute-target pace, then ordinary fatigue. Equal candidates resolve by
+ * priority and then roster order.
  */
 export function planSubstitution(
   snapshot: FullCourtRotationSnapshot,
   context: FullCourtRotationContext,
+  ruleState?: FullCourtRuleRuntimeState,
 ): FullCourtSubstitutionDecision {
   const bench = benchCandidates(snapshot);
+  const rules: FullCourtRuleRuntimeState = ruleState ?? {
+    activated: snapshot.plan.rules.map(() => false),
+    cooldownsUntil: snapshot.plan.rules.map(() => 0),
+    boundarySeconds: -1,
+    boundaryRuleIndex: -1,
+  };
 
   for (const [slot, outIndex] of snapshot.slots.entries()) {
     if ((snapshot.fouls[outIndex] ?? 0) < FULL_COURT_FOUL_LIMIT) continue;
@@ -855,6 +1118,12 @@ export function planSubstitution(
     if (replacement === null) continue;
     return { kind: 'swap', slot, outIndex, inIndex: replacement, reason: 'fatigue' };
   }
+
+  const ruleDecision = evaluateCoachingRules(snapshot, context, rules);
+  if (ruleDecision.kind !== 'none') return ruleDecision;
+  // A rule already handled this window; do not let the staff closing five or
+  // pace logic immediately undo it at the same dead ball.
+  if (rules.boundarySeconds === context.globalSeconds) return { kind: 'none' };
 
   if (isClosingWindow(context)) {
     const closing = snapshot.plan.closingSlots;

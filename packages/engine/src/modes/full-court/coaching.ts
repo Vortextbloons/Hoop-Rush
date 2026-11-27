@@ -1,5 +1,7 @@
 import type {
   FullCourtCoachingPlan,
+  FullCourtCoachingRule,
+  FullCourtOffensiveHierarchy,
   FullCourtTactics,
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
@@ -39,23 +41,79 @@ export function assertFullCourtCoachingRoster(
   plan: FullCourtCoachingPlan,
   roster: readonly SimulationPlayer[],
 ): void {
-  if (plan.rotation === undefined) return;
   const ids = new Set<string>(roster.map((player) => player.playerId));
-  for (const id of Object.keys(plan.rotation.minuteTargets)) {
-    if (!ids.has(id)) throw new Error('The saved rotation includes a player outside your roster.');
+  const outside = (id: string): boolean => !ids.has(id);
+  if (plan.rotation !== undefined) {
+    for (const id of Object.keys(plan.rotation.minuteTargets)) {
+      if (outside(id)) throw new Error('The saved rotation includes a player outside your roster.');
+    }
+  }
+  for (const rule of plan.rules ?? []) {
+    const ruleIds = rule.kind === 'closing-lineup' ? rule.lineup : [rule.playerId];
+    if (rule.kind === 'foul-trouble' && rule.replacementPlayerId !== undefined) {
+      ruleIds.push(rule.replacementPlayerId);
+    }
+    if (ruleIds.some(outside)) {
+      throw new Error('The saved coaching rule includes a player outside your roster.');
+    }
+  }
+  assertHierarchyRoster(plan.hierarchy, ids);
+}
+
+function hierarchyPlayerIds(hierarchy: FullCourtOffensiveHierarchy): string[] {
+  return [
+    hierarchy.primaryPlayerId,
+    hierarchy.secondaryPlayerId,
+    hierarchy.floorGeneralPlayerId,
+  ].filter((playerId): playerId is string => playerId !== undefined);
+}
+
+function assertHierarchyRoster(
+  hierarchy: FullCourtOffensiveHierarchy | undefined,
+  rosterIds: ReadonlySet<string>,
+): void {
+  if (hierarchy === undefined) return;
+  if (hierarchyPlayerIds(hierarchy).some((playerId) => !rosterIds.has(playerId))) {
+    throw new Error('The saved scoring hierarchy includes a player outside your roster.');
   }
 }
 
 export function withFullCourtCoaching(
   team: FullCourtTeamGameInput,
-  options: { readonly rotation?: FullCourtRotationPlanInput; readonly tactics?: FullCourtTactics },
+  options: {
+    readonly rotation?: FullCourtRotationPlanInput;
+    readonly tactics?: FullCourtTactics;
+    readonly rules?: readonly FullCourtCoachingRule[];
+    readonly hierarchy?: FullCourtOffensiveHierarchy;
+  },
 ): FullCourtTeamGameInput {
-  const { rotation, tactics } = options;
-  return rotation === undefined && tactics === undefined
-    ? team
-    : {
-        ...team,
-        ...(rotation === undefined ? {} : { rotation }),
-        ...(tactics === undefined ? {} : { tactics }),
-      };
+  const { rotation, tactics, rules, hierarchy } = options;
+  const activeRules = rules !== undefined && rules.length > 0 ? rules : undefined;
+  if (
+    rotation === undefined &&
+    tactics === undefined &&
+    activeRules === undefined &&
+    hierarchy === undefined
+  ) {
+    return team;
+  }
+  if (hierarchy !== undefined) {
+    assertHierarchyRoster(hierarchy, new Set(team.roster.map((player) => player.playerId)));
+  }
+  let rotationInput: FullCourtRotationPlanInput | undefined = rotation;
+  if (activeRules !== undefined) {
+    // Rules live beside the saved rotation in the coaching plan, but the engine
+    // plan takes them with the rotation input, so keep any team rotation intact.
+    const base = rotation ?? team.rotation;
+    rotationInput = {
+      ...(base ?? {}),
+      rules: [...(base?.rules ?? []), ...activeRules],
+    };
+  }
+  return {
+    ...team,
+    ...(rotationInput === undefined ? {} : { rotation: rotationInput }),
+    ...(tactics === undefined ? {} : { tactics }),
+    ...(hierarchy === undefined ? {} : { hierarchy }),
+  };
 }

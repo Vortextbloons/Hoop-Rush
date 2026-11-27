@@ -3,6 +3,12 @@ import { commandIdSchema, idSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
 import { capRushSourcePlayerSchema } from './cap-rush-draft.ts';
+import {
+  fullCourtFinalizeRouletteCommandSchema,
+  fullCourtPurchaseSpinCommandSchema,
+  fullCourtSkipSpinCommandSchema,
+  fullCourtSpinReceiptSchema,
+} from './full-court-roulette.ts';
 
 export const FULL_COURT_DRAFT_SCHEMA_VERSION = 1;
 export const FULL_COURT_MONEY_VERSION = 'full-court-money-v1';
@@ -94,6 +100,81 @@ export const fullCourtSpendingEntrySchema = z
   });
 export type FullCourtSpendingEntry = z.infer<typeof fullCourtSpendingEntrySchema>;
 
+export const fullCourtReportKindSchema = z.enum(['player-scouting', 'lineup-fit', 'opponent-film']);
+export type FullCourtReportKind = z.infer<typeof fullCourtReportKindSchema>;
+
+/**
+ * War Room prices in integer dollars. Scouting buys information only: it never enters
+ * payroll, so it cannot move the apron. Tuning stays here so previews and command
+ * validation quote the same number.
+ */
+export const FULL_COURT_REPORT_PRICES_DOLLARS = {
+  'player-scouting': 2_000_000,
+  'lineup-fit': 5_000_000,
+  'opponent-film': 3_000_000,
+} as const satisfies Record<FullCourtReportKind, number>;
+
+export function fullCourtReportPriceDollars(kind: FullCourtReportKind): number {
+  return FULL_COURT_REPORT_PRICES_DOLLARS[kind];
+}
+
+/** Player scouting and lineup fit last for the run; film lasts through its fixture. */
+export function fullCourtReportScope(kind: FullCourtReportKind): 'run' | 'game' {
+  return kind === 'opponent-film' ? 'game' : 'run';
+}
+
+export const FULL_COURT_MAX_REPORTS = 32;
+
+const fullCourtGameReferenceSchema = z.string().min(1).max(64);
+
+export const fullCourtReportTargetSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('player-scouting'),
+    playerVersionId: playerVersionIdSchema,
+  }),
+  z.object({ kind: z.literal('lineup-fit') }),
+  z.object({
+    kind: z.literal('opponent-film'),
+    gameId: fullCourtGameReferenceSchema,
+    opponentTeamId: fullCourtGameReferenceSchema,
+  }),
+]);
+export type FullCourtReportTarget = z.infer<typeof fullCourtReportTargetSchema>;
+
+/** Stable ownership key: one purchase per target, regardless of retries. */
+export function fullCourtReportTargetKey(target: FullCourtReportTarget): string {
+  switch (target.kind) {
+    case 'player-scouting':
+      return `player-scouting:${target.playerVersionId}`;
+    case 'lineup-fit':
+      return 'lineup-fit';
+    case 'opponent-film':
+      return `opponent-film:${target.opponentTeamId}:${target.gameId}`;
+  }
+}
+
+/**
+ * One paid report and its matching War Chest charge. `reportId` is also the scouting
+ * spending entry's id, so a report has exactly one receipt and a retry cannot charge twice.
+ * The stored price is the receipt, not a lookup: retuning the defaults never invalidates
+ * an existing draft.
+ */
+export const fullCourtReportRecordSchema = z
+  .object({
+    reportId: fullCourtSpendingIdSchema,
+    kind: fullCourtReportKindSchema,
+    target: fullCourtReportTargetSchema,
+    priceDollars: z.number().int().positive(),
+    commandId: commandIdSchema,
+    purchasedRevision: z.number().int().nonnegative(),
+  })
+  .superRefine((report, ctx) => {
+    if (report.target.kind !== report.kind) {
+      ctx.addIssue({ code: 'custom', message: 'report target does not match its kind' });
+    }
+  });
+export type FullCourtReportRecord = z.infer<typeof fullCourtReportRecordSchema>;
+
 export const fullCourtDraftPickSchema = z.object({
   pickOrdinal: z
     .number()
@@ -108,6 +189,15 @@ export type FullCourtDraftPick = z.infer<typeof fullCourtDraftPickSchema>;
 export const fullCourtDraftStageSchema = z.enum(['drafting', 'complete']);
 export type FullCourtDraftStage = z.infer<typeof fullCourtDraftStageSchema>;
 
+export const fullCourtRouletteStatusSchema = z.enum(['open', 'skipped', 'finalized']);
+export type FullCourtRouletteStatus = z.infer<typeof fullCourtRouletteStatusSchema>;
+
+export const fullCourtRouletteDraftStateSchema = z.object({
+  status: fullCourtRouletteStatusSchema,
+  receipts: z.array(fullCourtSpinReceiptSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
+});
+export type FullCourtRouletteDraftState = z.infer<typeof fullCourtRouletteDraftStateSchema>;
+
 export const fullCourtDraftStateSchema = z
   .object({
     schemaVersion: z.literal(FULL_COURT_DRAFT_SCHEMA_VERSION),
@@ -120,6 +210,8 @@ export const fullCourtDraftStateSchema = z
     stage: fullCourtDraftStageSchema,
     picks: z.array(fullCourtDraftPickSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
     spending: z.array(fullCourtSpendingEntrySchema).max(64),
+    reports: z.array(fullCourtReportRecordSchema).max(FULL_COURT_MAX_REPORTS).optional(),
+    roulette: fullCourtRouletteDraftStateSchema.optional(),
   })
   .superRefine((state, ctx) => {
     const seenPeople = new Set<string>();
@@ -187,6 +279,40 @@ export const fullCourtDraftStateSchema = z
       ctx.addIssue({ code: 'custom', message: 'salary entries and roster picks must correspond' });
     }
 
+    const seenReports = new Set<string>();
+    const seenReportTargets = new Set<string>();
+    const seenReportCommands = new Set<string>();
+    for (const report of state.reports ?? []) {
+      if (seenReports.has(report.reportId)) {
+        ctx.addIssue({ code: 'custom', message: `report ${report.reportId} appears twice` });
+      }
+      seenReports.add(report.reportId);
+      if (report.purchasedRevision > state.revision) {
+        ctx.addIssue({ code: 'custom', message: 'a report cannot be purchased in the future' });
+      }
+      const targetKey = fullCourtReportTargetKey(report.target);
+      if (seenReportTargets.has(targetKey)) {
+        ctx.addIssue({ code: 'custom', message: `report target ${targetKey} is owned twice` });
+      }
+      seenReportTargets.add(targetKey);
+      if (seenReportCommands.has(report.commandId)) {
+        ctx.addIssue({ code: 'custom', message: 'one command cannot buy two reports' });
+      }
+      seenReportCommands.add(report.commandId);
+      const charge = state.spending.find((entry) => entry.commandId === report.commandId);
+      if (
+        charge === undefined ||
+        charge.kind !== 'scouting' ||
+        charge.entryId !== report.reportId ||
+        charge.dollars !== report.priceDollars
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `report ${report.reportId} has no matching War Chest charge`,
+        });
+      }
+    }
+
     const payroll = state.picks.reduce((total, pick) => total + pick.salaryDollars, 0);
     if (payroll > state.money.hardLimitDollars) {
       ctx.addIssue({
@@ -194,6 +320,79 @@ export const fullCourtDraftStateSchema = z
         message: `payroll $${String(payroll)} exceeds the hard limit`,
       });
     }
+
+    if (state.roulette !== undefined && state.variant !== 'roulette') {
+      ctx.addIssue({ code: 'custom', message: 'Standard runs cannot hold Roulette receipts' });
+    }
+    if (state.roulette !== undefined && state.stage !== 'complete') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Roulette spins open after the roster is confirmed',
+      });
+    }
+    const rouletteReceipts = state.roulette?.receipts ?? [];
+    if (rouletteReceipts.length > 0 && state.variant !== 'roulette') {
+      ctx.addIssue({ code: 'custom', message: 'Standard runs cannot buy spins' });
+    }
+    const spinCharges = state.spending.filter((entry) => entry.kind === 'spin');
+    if (spinCharges.length !== rouletteReceipts.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'every Roulette receipt needs exactly one spin charge',
+      });
+    }
+    let spinPayroll = payroll;
+    const spinTargets = new Set<string>();
+    const spinCommands = new Set<string>();
+    for (const receipt of rouletteReceipts) {
+      const pick = state.picks.find(
+        (entry) => entry.player.playerVersionId === receipt.target.playerVersionId,
+      );
+      if (
+        pick === undefined ||
+        pick.player.playerId !== receipt.target.playerId ||
+        !pick.player.positions.includes(receipt.target.slot)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'spin receipts must target a rostered player at a playable position',
+        });
+      }
+      if (spinTargets.has(receipt.target.playerVersionId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `player version ${receipt.target.playerVersionId} has two mutations`,
+        });
+      }
+      spinTargets.add(receipt.target.playerVersionId);
+      if (spinCommands.has(receipt.commandId)) {
+        ctx.addIssue({ code: 'custom', message: 'one spin command cannot buy two mutations' });
+      }
+      spinCommands.add(receipt.commandId);
+      if (receipt.payrollDollars !== spinPayroll) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'spin receipts must account for prior spin spending',
+        });
+      }
+      if (receipt.payrollDollars + receipt.priceDollars > state.money.capLineDollars) {
+        ctx.addIssue({ code: 'custom', message: 'a spin must fit under the normal cap line' });
+      }
+      spinPayroll += receipt.priceDollars;
+      const charge = state.spending.find((entry) => entry.commandId === receipt.commandId);
+      if (
+        charge === undefined ||
+        charge.kind !== 'spin' ||
+        charge.dollars !== receipt.priceDollars ||
+        charge.entryId !== `fcs-${receipt.receiptDigest}`
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `spin ${receipt.receiptDigest} has no matching War Chest charge`,
+        });
+      }
+    }
+
     const spent = state.spending.reduce((total, entry) => total + entry.dollars, 0);
     if (spent > state.money.startingWarChestDollars) {
       ctx.addIssue({
@@ -248,11 +447,24 @@ export const fullCourtFinishDraftCommandSchema = z.object({
 });
 export type FullCourtFinishDraftCommand = z.infer<typeof fullCourtFinishDraftCommandSchema>;
 
+export const fullCourtPurchaseReportCommandSchema = z.object({
+  command: z.literal('purchase-full-court-report'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  target: fullCourtReportTargetSchema,
+});
+export type FullCourtPurchaseReportCommand = z.infer<typeof fullCourtPurchaseReportCommandSchema>;
+
 export const fullCourtCommandSchema = z.discriminatedUnion('command', [
   fullCourtCreateDraftCommandSchema,
   fullCourtPickPlayerCommandSchema,
   fullCourtRemovePlayerCommandSchema,
   fullCourtFinishDraftCommandSchema,
+  fullCourtPurchaseReportCommandSchema,
+  fullCourtPurchaseSpinCommandSchema,
+  fullCourtSkipSpinCommandSchema,
+  fullCourtFinalizeRouletteCommandSchema,
 ]);
 export type FullCourtCommand = z.infer<typeof fullCourtCommandSchema>;
 
@@ -268,6 +480,12 @@ export const fullCourtCommandRejectionCodeSchema = z.enum([
   'budget-rejected',
   'player-not-rostered',
   'roster-too-small',
+  'report-owned',
+  'report-unavailable',
+  'spin-unavailable',
+  'spin-ineligible',
+  'spin-owned',
+  'spin-draw-unavailable',
 ]);
 export type FullCourtCommandRejectionCode = z.infer<typeof fullCourtCommandRejectionCodeSchema>;
 

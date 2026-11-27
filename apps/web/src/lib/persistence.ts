@@ -9,9 +9,12 @@ import {
   DexieHavocRepository,
   DexieProfileRepository,
   HoopRushDatabase,
+  createFullCourtBlueprintRepository,
   createFullCourtCoachingRepository,
+  createFullCourtHistoryRepository,
   createFullCourtPlayoffRepository,
   createFullCourtSeasonRepository,
+  createFullCourtWatchedReplayRepository,
 } from '@hoop-rush/persistence';
 
 export interface Persistence {
@@ -26,7 +29,10 @@ export interface Persistence {
   fullCourtDraftRepository: DexieFullCourtDraftRepository;
   fullCourtSeasonRepository: ReturnType<typeof createFullCourtSeasonRepository>;
   fullCourtPlayoffRepository: ReturnType<typeof createFullCourtPlayoffRepository>;
+  fullCourtBlueprintRepository: ReturnType<typeof createFullCourtBlueprintRepository>;
   fullCourtCoachingRepository: ReturnType<typeof createFullCourtCoachingRepository>;
+  fullCourtHistoryRepository: ReturnType<typeof createFullCourtHistoryRepository>;
+  fullCourtWatchedReplayRepository: ReturnType<typeof createFullCourtWatchedReplayRepository>;
   profileRepository: DexieProfileRepository;
 }
 
@@ -47,7 +53,10 @@ export function getPersistence(): Persistence {
       fullCourtDraftRepository: new DexieFullCourtDraftRepository(db),
       fullCourtSeasonRepository: createFullCourtSeasonRepository(db),
       fullCourtPlayoffRepository: createFullCourtPlayoffRepository(db),
+      fullCourtBlueprintRepository: createFullCourtBlueprintRepository(db),
       fullCourtCoachingRepository: createFullCourtCoachingRepository(db),
+      fullCourtHistoryRepository: createFullCourtHistoryRepository(db),
+      fullCourtWatchedReplayRepository: createFullCourtWatchedReplayRepository(db),
       profileRepository: new DexieProfileRepository(db),
     };
   }

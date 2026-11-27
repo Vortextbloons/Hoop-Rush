@@ -2,7 +2,7 @@ import { capRushValidateLeagueField } from '@hoop-rush/engine';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
-import { pools } from '@hoop-rush/importer';
+import { pools, fullCourtHealth } from '@hoop-rush/importer';
 import {
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
@@ -971,6 +971,64 @@ async function auditCollectionCatalog(
   );
   return { ok: failures.length === 0, details, failures };
 }
+async function auditFullCourtHealthProfiles(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const entry = manifest.fullCourtHealthProfiles;
+  if (entry === undefined) {
+    details.push('full-court health: none packaged');
+    return { ok: true, details, failures };
+  }
+  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+  let content: Buffer;
+  try {
+    content = await readFile(assetPath);
+  } catch {
+    failures.push(`full-court health: asset missing (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  if (sha256Hex(content) !== entry.contentHash) {
+    failures.push(`full-court health: content hash mismatch (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  if (verbose) details.push(`full-court health: hash verified (${assetPath})`);
+  const catalogEntry = manifest.draftCatalog;
+  if (catalogEntry === undefined) {
+    failures.push('full-court health: manifest has no draftCatalog entry to pin against');
+    return { ok: false, details, failures };
+  }
+  const catalogPath = isAbsolute(catalogEntry.url)
+    ? catalogEntry.url
+    : resolve(manifestDir, catalogEntry.url);
+  try {
+    const catalogContent = await readFile(catalogPath);
+    if (sha256Hex(catalogContent) !== catalogEntry.contentHash) {
+      failures.push(`full-court health: draft catalog content hash mismatch (${catalogPath})`);
+      return { ok: false, details, failures };
+    }
+    const catalog = seasonDraftCatalogSchema.parse(
+      JSON.parse(catalogContent.toString('utf8')) as unknown,
+    );
+    const profiles = fullCourtHealth.validateFullCourtHealthProfiles(
+      JSON.parse(content.toString('utf8')) as unknown,
+      catalog,
+      catalogEntry.contentHash,
+    );
+    const playerSeason = Object.values(profiles.players).filter(
+      (profile) => profile.playerEvidence.source === 'player-season',
+    ).length;
+    details.push(
+      `full-court health: ${String(Object.keys(profiles.players).length)} profiles (${String(playerSeason)} player-season, ${String(Object.keys(profiles.players).length - playerSeason)} population)`,
+    );
+  } catch (error) {
+    failures.push(`full-court health: ${String(error)}`);
+  }
+  return { ok: failures.length === 0, details, failures };
+}
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
   let raw: string;
   try {
@@ -1015,6 +1073,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
+    await auditFullCourtHealthProfiles(manifest, manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];

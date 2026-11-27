@@ -86,6 +86,9 @@ import type {
 } from '../schemas/full-court-season-record.ts';
 import type { StoredFullCourtPlayoffs } from '../schemas/full-court-playoff-record.ts';
 import type { StoredFullCourtCoaching } from '../schemas/full-court-coaching-record.ts';
+import type { StoredFullCourtBlueprint } from '../schemas/full-court-blueprint-record.ts';
+import type { StoredFullCourtHistory } from '../schemas/full-court-history-record.ts';
+import type { StoredFullCourtWatchedReplay } from '../schemas/full-court-replay-record.ts';
 import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -193,9 +196,37 @@ export const HOOP_RUSH_DATABASE_STORES_V19: Record<string, string> = {
  * Version 20 adds the per-run Full Court coaching plan; opening a version-19
  * database only creates that table and keeps every existing record.
  */
-export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+export const HOOP_RUSH_DATABASE_STORES_V20: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V19,
   fullCourtCoaching: 'runId',
+};
+
+/**
+ * Version 21 adds the Full Court tactics blueprint library; opening a
+ * version-20 database only creates that table and keeps every existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES_V21: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V20,
+  fullCourtBlueprints: 'key',
+};
+
+/**
+ * Version 22 adds the durable Full Court completed run history; opening a
+ * version-21 database only creates that table and keeps every existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES_V22: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V21,
+  fullCourtHistory: 'runId, completedAtIso',
+};
+
+/**
+ * Version 23 adds the bounded latest watched replay table for Full Court;
+ * opening a version-22 database only creates that table and keeps every
+ * existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V22,
+  fullCourtWatchedReplays: 'runId',
 };
 
 export class HoopRushDatabase extends Dexie {
@@ -254,9 +285,12 @@ export class HoopRushDatabase extends Dexie {
   fullCourtSeasonScores!: Table<StoredFullCourtSeasonScore, [string, string]>;
   fullCourtPlayoffs!: EntityTable<StoredFullCourtPlayoffs, 'runId'>;
   fullCourtCoaching!: EntityTable<StoredFullCourtCoaching, 'runId'>;
+  fullCourtBlueprints!: EntityTable<StoredFullCourtBlueprint, 'key'>;
+  fullCourtHistory!: EntityTable<StoredFullCourtHistory, 'runId'>;
+  fullCourtWatchedReplays!: EntityTable<StoredFullCourtWatchedReplay, 'runId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    // Versions below 15 are unsupported and reset. Versions 15 through 19 keep
+    // Versions below 15 are unsupported and reset. Versions 15 through 22 keep
     // every record and only gain the tables and indexes added after them.
     this.version(15)
       .stores(HOOP_RUSH_DATABASE_STORES_V15)
@@ -271,7 +305,10 @@ export class HoopRushDatabase extends Dexie {
     this.version(17).stores(HOOP_RUSH_DATABASE_STORES_V17);
     this.version(18).stores(HOOP_RUSH_DATABASE_STORES_V18);
     this.version(19).stores(HOOP_RUSH_DATABASE_STORES_V19);
-    this.version(20).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(20).stores(HOOP_RUSH_DATABASE_STORES_V20);
+    this.version(21).stores(HOOP_RUSH_DATABASE_STORES_V21);
+    this.version(22).stores(HOOP_RUSH_DATABASE_STORES_V22);
+    this.version(23).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {

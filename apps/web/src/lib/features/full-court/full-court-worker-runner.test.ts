@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
 import { describe, expect, it } from 'bun:test';
-import { idSchema, seedSchema } from '@hoop-rush/data-contracts';
+import { idSchema, seedSchema, type FullCourtCoachingRule } from '@hoop-rush/data-contracts';
 import { createFullCourtSeasonCheckpoint } from '@hoop-rush/engine';
 import type { FullCourtWorkerMessage } from './full-court-worker-protocol';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner';
@@ -124,6 +124,68 @@ describe('FullCourtWorkerRunner', () => {
     expect(postedRequest(fake, 3)).toHaveProperty('lock', otherRun);
     fake.emit(slotResult('full-court-test-4'));
     await fourth;
+  });
+
+  it('validates and forwards ordered coaching rules in slot options', async () => {
+    const fake = new FakeWorker();
+    const runner = createFullCourtWorkerRunner({
+      createWorker: () => fake.asWorker(),
+      newRequestId: requestIds(),
+    });
+    const userTeam = LOCK.season.teams.find(({ teamId }) => teamId === LOCK.season.userTeamId);
+    if (userTeam === undefined) throw new Error('missing user team');
+    const rules: FullCourtCoachingRule[] = [
+      {
+        ruleId: 'closing',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 8,
+        lineup: userTeam.roster.slice(0, 5).map(({ playerId }) => playerId),
+      },
+    ];
+    const pending = runner.simulateSlot(LOCK, CHECKPOINT, { rules });
+    expect(postedRequest(fake, 0)).toMatchObject({ options: { rules } });
+    fake.emit(slotResult('full-court-test-1'));
+    await pending;
+
+    const invalid = runner.simulateSlot(LOCK, CHECKPOINT, {
+      rules: [
+        {
+          ruleId: 'bad',
+          kind: 'foul-trouble',
+          playerId: 'p1',
+          foulLimit: 9,
+        } as unknown as FullCourtCoachingRule,
+      ],
+    });
+    await expect(invalid).rejects.toThrow('invalid full court worker request');
+  });
+
+  it('validates and forwards an offensive hierarchy in slot options', async () => {
+    const fake = new FakeWorker();
+    const runner = createFullCourtWorkerRunner({
+      createWorker: () => fake.asWorker(),
+      newRequestId: requestIds(),
+    });
+    const userTeam = LOCK.season.teams.find(({ teamId }) => teamId === LOCK.season.userTeamId);
+    if (userTeam === undefined) throw new Error('missing user team');
+    const hierarchy = {
+      primaryPlayerId: userTeam.roster[0]?.playerId ?? '',
+      secondaryPlayerId: userTeam.roster[1]?.playerId ?? '',
+      floorGeneralPlayerId: userTeam.roster[2]?.playerId ?? '',
+    };
+    const pending = runner.simulateSlot(LOCK, CHECKPOINT, { hierarchy });
+    expect(postedRequest(fake, 0)).toMatchObject({ options: { hierarchy } });
+    fake.emit(slotResult('full-court-test-1'));
+    await pending;
+
+    const duplicated = runner.simulateSlot(LOCK, CHECKPOINT, {
+      hierarchy: { primaryPlayerId: 'p1', secondaryPlayerId: 'p1' },
+    });
+    await expect(duplicated).rejects.toThrow('invalid full court worker request');
+
+    const empty = runner.simulateSlot(LOCK, CHECKPOINT, { hierarchy: {} });
+    await expect(empty).rejects.toThrow('invalid full court worker request');
   });
 
   it('bootstraps playoff inputs with the season lock, then only references the cache', async () => {

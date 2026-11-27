@@ -186,23 +186,16 @@ const capRushLockedInputsValueSchema = z
       }
     }
     if (locked.playoffPerformance !== undefined) {
-      const participantByVersion = new Map(
-        [locked.human, ...locked.opponents.map((entry) => entry.team)].flatMap((team) =>
-          [...team.starters, ...team.replacements, ...team.clones].flatMap((participant) =>
-            participant.source.playerVersionId === null || participant.source.seasonKey === null
-              ? []
-              : [
-                  [
-                    participant.source.playerVersionId,
-                    {
-                      playerId: participant.source.playerId,
-                      seasonKey: participant.source.seasonKey,
-                    },
-                  ] as const,
-                ],
-          ),
-        ),
-      );
+      const sourcesByVersion = new Map<string, Set<string>>();
+      for (const team of [locked.human, ...locked.opponents.map((entry) => entry.team)]) {
+        for (const { source } of [...team.starters, ...team.replacements, ...team.clones]) {
+          const { playerVersionId, playerId, seasonKey } = source;
+          if (playerVersionId === null || seasonKey === null) continue;
+          const identities = sourcesByVersion.get(playerVersionId) ?? new Set<string>();
+          identities.add(JSON.stringify([playerId, seasonKey]));
+          sourcesByVersion.set(playerVersionId, identities);
+        }
+      }
       const seenVersions = new Set<string>();
       for (const row of locked.playoffPerformance.players) {
         if (seenVersions.has(row.playerVersionId)) {
@@ -213,15 +206,15 @@ const capRushLockedInputsValueSchema = z
           continue;
         }
         seenVersions.add(row.playerVersionId);
-        const participant = participantByVersion.get(row.playerVersionId);
-        if (participant === undefined) {
+        const identities = sourcesByVersion.get(row.playerVersionId);
+        if (identities === undefined) {
           ctx.addIssue({
             code: 'custom',
             message: `playoff performance references unknown player version ${row.playerVersionId}`,
           });
           continue;
         }
-        if (participant.playerId !== row.playerId || participant.seasonKey !== row.seasonKey) {
+        if (!identities.has(JSON.stringify([row.playerId, row.seasonKey]))) {
           ctx.addIssue({
             code: 'custom',
             message: `playoff performance does not match player version ${row.playerVersionId}`,

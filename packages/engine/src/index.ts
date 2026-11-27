@@ -352,6 +352,7 @@ export {
 export {
   fullCourtAbsenceTolerance,
   fullCourtAssessPick,
+  fullCourtAssessPurchase,
   fullCourtDepthForecast,
   fullCourtPayrollDollars,
   fullCourtPayrollStatus,
@@ -359,15 +360,33 @@ export {
 } from './modes/full-court/draft-economy.ts';
 export { fullCourtStateDigest } from './modes/full-court/state-digest.ts';
 export {
+  assertFullCourtSpinReceiptDigests,
+  buildFullCourtSpinReceipt,
+  fullCourtRouletteReceipts,
+  fullCourtSpinEligibility,
+  fullCourtSpinPayrollDollars,
+  fullCourtSpinReceiptDigest,
+  type FullCourtSpinEligibility,
+} from './modes/full-court/roulette-draft.ts';
+export {
   assertFullCourtCoachingRoster,
   defaultFullCourtCoachingRotation,
 } from './modes/full-court/coaching.ts';
+export {
+  buildFullCourtBlueprintHierarchy,
+  resolveFullCourtBlueprintHierarchy,
+  type FullCourtBlueprintBindingPreview,
+  type FullCourtBlueprintRoleBinding,
+  type FullCourtBlueprintRoleBindingStatus,
+  type FullCourtBlueprintRotationRef,
+} from './modes/full-court/blueprint.ts';
 export {
   simulateFullCourtGame,
   simulateRecordedFullCourtGame,
   type FullCourtGameInput,
   type FullCourtGameResult,
   type FullCourtRecordedGameOutput,
+  type FullCourtTapeEvent,
 } from './modes/full-court/game.ts';
 export {
   buildFullCourtRegularSeason,
@@ -389,6 +408,28 @@ export {
 } from './modes/full-court/season-slot.ts';
 export { type FullCourtInjuryEvent } from './modes/full-court/injuries.ts';
 export {
+  fullCourtFreePlayerReport,
+  fullCourtLineupFitReport,
+  fullCourtScoutPlayer,
+} from './modes/full-court/scouting.ts';
+export { fullCourtFilmReport, type FullCourtFilmPlayer } from './modes/full-court/opponent-film.ts';
+export {
+  buildFullCourtGameLineups,
+  buildFullCourtGameReport,
+  type FullCourtCompletedGameFacts,
+  type FullCourtLineupFactsOptions,
+} from './modes/full-court/report.ts';
+export {
+  buildFullCourtSeasonStats,
+  buildFullCourtSeasonSummary,
+  type FullCourtSeasonLineupOmitted,
+  type FullCourtSeasonLineupRow,
+  type FullCourtSeasonLineupSummary,
+  type FullCourtSeasonPlayoffStats,
+  type FullCourtSeasonStatsInput,
+  type FullCourtSeasonStatsSummary,
+} from './modes/full-court/report-season.ts';
+export {
   fullCourtPlayoffSeeds,
   fullCourtStandings,
   type FullCourtPlayoffSeeds,
@@ -399,12 +440,28 @@ export {
   lockFullCourtPlayoffs,
   createFullCourtPlayoffCheckpoint,
   fullCourtPlayoffView,
+  fullCourtUserNextPlayoffMatchup,
   simulateFullCourtPlayoffGame,
   type FullCourtPlayoffFixture,
   type FullCourtPlayoffGameOutcome,
   type FullCourtPlayoffLock,
+  type FullCourtPlayoffOpponentPreview,
   type FullCourtPlayoffSeries,
 } from './modes/full-court/playoffs.ts';
+export {
+  FULL_COURT_INSIDE_SCORING_GAME_FLOOR_BPS,
+  FULL_COURT_INSIDE_SCORING_THRESHOLD_BPS,
+  FULL_COURT_OPPORTUNITY_CONCENTRATION_GAME_FLOOR_BPS,
+  FULL_COURT_OPPORTUNITY_CONCENTRATION_THRESHOLD_BPS,
+  FULL_COURT_PLAYOFF_ADAPTATION_MIN_GAMES,
+  FULL_COURT_PLAYOFF_ADAPTATION_MIN_GAME_FGA,
+  FULL_COURT_PLAYOFF_ADAPTATION_MIN_GAME_USAGE_CENTIS,
+  FULL_COURT_PLAYOFF_ADAPTATION_WINDOW_GAMES,
+  fullCourtPlayoffAdaptationForTeam,
+  fullCourtPlayoffGameEvidence,
+  fullCourtPlayoffMatchupAdaptations,
+  fullCourtPlayoffSeriesEvidenceCount,
+} from './modes/full-court/playoff-adaptation.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {

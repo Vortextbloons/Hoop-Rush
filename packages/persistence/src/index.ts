@@ -29,3 +29,18 @@ export {
   createFullCourtCoachingRepository,
 } from './repositories/full-court-coaching.ts';
 export * from './schemas/full-court-coaching-record.ts';
+export {
+  DexieFullCourtBlueprintRepository,
+  createFullCourtBlueprintRepository,
+} from './repositories/full-court-blueprint.ts';
+export * from './schemas/full-court-blueprint-record.ts';
+export {
+  DexieFullCourtHistoryRepository,
+  createFullCourtHistoryRepository,
+} from './repositories/full-court-history.ts';
+export * from './schemas/full-court-history-record.ts';
+export {
+  DexieFullCourtWatchedReplayRepository,
+  createFullCourtWatchedReplayRepository,
+} from './repositories/full-court-replay.ts';
+export * from './schemas/full-court-replay-record.ts';

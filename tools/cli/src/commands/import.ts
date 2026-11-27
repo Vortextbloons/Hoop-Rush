@@ -1,7 +1,9 @@
 import {
   DEFAULT_SEASONS,
+  PUBLIC_DATA,
   eraProfile,
   freeze,
+  fullCourtHealth,
   manifest,
   pools,
   ratings,
@@ -110,6 +112,37 @@ export function importEraProfile(args: { era?: string | null }): CliReport {
       details: ['era simulation profiles written'],
     },
   );
+}
+export function importFullCourtHealth(args: {
+  profiles?: string | null;
+  evidence?: string | null;
+}): CliReport {
+  try {
+    const result = fullCourtHealth.packageFullCourtHealthProfiles({
+      dataDir: PUBLIC_DATA,
+      ...(args.profiles ? { profilesPath: args.profiles } : {}),
+      ...(args.evidence ? { evidencePath: args.evidence } : {}),
+    });
+    const estimated = Object.values(result.profiles.players).filter(
+      (profile) => profile.playerEvidence.source === 'player-season',
+    ).length;
+    return makeReport(
+      'import full-court-health',
+      { status: result.status },
+      {
+        details: [
+          `${result.status} ${result.asset.url} (${result.asset.contentHash.slice(0, 8)}…)`,
+          `${String(Object.keys(result.profiles.players).length)} profiles (${String(estimated)} player-season, ${String(Object.keys(result.profiles.players).length - estimated)} population)`,
+        ],
+      },
+    );
+  } catch (error) {
+    return usageFailure(
+      'import full-court-health',
+      {},
+      `full-court health failed: ${(error as Error).message}`,
+    );
+  }
 }
 export function importManifest(): CliReport {
   try {

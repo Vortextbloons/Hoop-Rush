@@ -71,6 +71,7 @@ projection benchmark
 import ratings
 import pools
 import era-profile
+import full-court-health
 import manifest
 import freeze
 import run-all`.split('\n');

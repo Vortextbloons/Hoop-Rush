@@ -4,14 +4,19 @@ import {
   CAP_RUSH_PLAYOFF_TEAMS,
   CAP_RUSH_SERIES_GAMES,
   capRushConferenceRoundName,
+  capRushPlayoffSeriesId,
   capRushSeriesWinner,
   capRushSeriesWins,
   franchiseAbbreviation,
+  type FullCourtPlayoffAdaptation,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
+  type FullCourtTeamHealth,
+  type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import {
   fullCourtPlayoffView,
+  fullCourtUserNextPlayoffMatchup,
   type FullCourtPlayoffSeries,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
@@ -20,9 +25,10 @@ export type FullCourtPlayoffView = ReturnType<typeof fullCourtPlayoffView>;
 
 /**
  * Parent-owned tab selection. `home` is the matchup-led overview, `league` holds
- * the schedule and standings, and `playoffs` holds the series and bracket.
+ * the schedule and standings, `stats` holds the honest season sample, and
+ * `playoffs` holds the series and bracket.
  */
-export type FullCourtSeasonSection = 'home' | 'league' | 'playoffs';
+export type FullCourtSeasonSection = 'home' | 'league' | 'stats' | 'playoffs';
 
 export interface FullCourtResultView {
   readonly won: boolean;
@@ -324,14 +330,18 @@ export function fullCourtNextMatchup(
 ): FullCourtMatchupView | null {
   const { userTeamId, games } = lock.season;
   if (playoff !== null) {
-    const next = playoff.nextGame;
-    if (next !== null) {
+    const preview = fullCourtUserNextPlayoffMatchup({
+      userTeamId,
+      runSeed: lock.season.runSeed,
+      series: playoff.series,
+    });
+    if (preview !== null) {
       return {
         phase: 'playoff',
-        label: `Game ${String(next.gameOrdinal)} · ${capRushConferenceRoundName(next.round)}`,
-        home: sideOf(next.homeTeamId, teamNameOf, next.homeSeed),
-        away: sideOf(next.awayTeamId, teamNameOf, next.awaySeed),
-        userSide: next.homeTeamId === userTeamId ? 'home' : 'away',
+        label: `Game ${String(preview.gameOrdinal)} · ${capRushConferenceRoundName(preview.round)}`,
+        home: sideOf(preview.homeTeamId, teamNameOf, preview.homeSeed),
+        away: sideOf(preview.awayTeamId, teamNameOf, preview.awaySeed),
+        userSide: preview.userSide,
         series: null,
       };
     }
@@ -372,6 +382,288 @@ export function fullCourtNextMatchup(
   };
 }
 
+export interface FullCourtUserFixture {
+  readonly gameId: string;
+  readonly phase: 'regular' | 'playoff';
+  readonly label: string;
+  readonly dayOffset: number;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly userSide: 'home' | 'away';
+}
+
+/** Engine bracket spacing, mirrored here only to label the next user fixture day. */
+const FULL_COURT_PLAYOFF_ROUND_GAP_DAYS = 3;
+const FULL_COURT_PLAYOFF_GAME_GAP_DAYS = 2;
+
+function fullCourtPlayoffSeriesStartDay(
+  lock: FullCourtSeasonLock,
+  playoff: FullCourtPlayoffView,
+  round: number,
+): number | null {
+  if (round <= 1) {
+    return (
+      Math.max(...lock.season.games.map((game) => game.dayOffset)) +
+      FULL_COURT_PLAYOFF_ROUND_GAP_DAYS
+    );
+  }
+  const priorGames = playoff.series
+    .filter((series) => series.round === round - 1)
+    .flatMap((series) => series.games);
+  if (priorGames.length === 0) return null;
+  return Math.max(...priorGames.map((game) => game.dayOffset)) + FULL_COURT_PLAYOFF_ROUND_GAP_DAYS;
+}
+
+function fullCourtPlayoffUserGameDay(
+  lock: FullCourtSeasonLock,
+  playoff: FullCourtPlayoffView,
+  series: FullCourtPlayoffSeries,
+  gameOrdinal: number,
+): number | null {
+  const lastGame = series.games.at(-1);
+  if (lastGame !== undefined) {
+    return lastGame.dayOffset + FULL_COURT_PLAYOFF_GAME_GAP_DAYS;
+  }
+  const startDay = fullCourtPlayoffSeriesStartDay(lock, playoff, series.round);
+  return startDay === null ? null : startDay + (gameOrdinal - 1) * FULL_COURT_PLAYOFF_GAME_GAP_DAYS;
+}
+
+/**
+ * The next fixture the user actually plays. Playoff brackets can schedule
+ * AI-only games first, so this reads the next user series game rather than the
+ * next bracket game.
+ */
+export function fullCourtNextUserFixture(
+  lock: FullCourtSeasonLock,
+  checkpoint: FullCourtSeasonCheckpoint,
+  playoff: FullCourtPlayoffView | null,
+): FullCourtUserFixture | null {
+  const { userTeamId } = lock.season;
+  if (playoff !== null) {
+    const preview = fullCourtUserNextPlayoffMatchup({
+      userTeamId,
+      runSeed: lock.season.runSeed,
+      series: playoff.series,
+    });
+    if (preview === null) return null;
+    const series = playoff.series.find(
+      (entry) => entry.seriesId === capRushPlayoffSeriesId(preview.round, preview.seriesSlot),
+    );
+    if (series === undefined) return null;
+    const dayOffset = fullCourtPlayoffUserGameDay(lock, playoff, series, preview.gameOrdinal);
+    if (dayOffset === null) return null;
+    return {
+      gameId: preview.gameId,
+      phase: 'playoff',
+      label: `Game ${String(preview.gameOrdinal)} · ${capRushConferenceRoundName(preview.round)}`,
+      dayOffset,
+      homeTeamId: preview.homeTeamId,
+      awayTeamId: preview.awayTeamId,
+      userSide: preview.userSide,
+    };
+  }
+  if (checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) return null;
+  const slot = checkpoint.completedThroughSlot + 1;
+  const fixture = lock.season.games.find(
+    (game) =>
+      game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+  );
+  if (fixture === undefined) return null;
+  return {
+    gameId: fixture.gameId,
+    phase: 'regular',
+    label: `Game ${String(slot)} of ${String(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM)}`,
+    dayOffset: fixture.dayOffset,
+    homeTeamId: fixture.homeTeamId,
+    awayTeamId: fixture.awayTeamId,
+    userSide: fixture.homeTeamId === userTeamId ? 'home' : 'away',
+  };
+}
+
+export type FullCourtGameDayPlayerStatus =
+  'ready' | 'fatigued' | 'injured' | 'unavailable' | 'resting';
+
+export interface FullCourtGameDayPlayerView {
+  readonly playerId: string;
+  readonly displayName: string;
+  readonly positions: readonly string[];
+  readonly status: FullCourtGameDayPlayerStatus;
+  readonly statusLabel: string;
+  readonly detail: string | null;
+  readonly resting: boolean;
+  readonly canRest: boolean;
+}
+
+export interface FullCourtGameDayReadiness {
+  readonly fixture: FullCourtUserFixture | null;
+  readonly players: readonly FullCourtGameDayPlayerView[];
+  /** Healthy players before voluntary rest. */
+  readonly eligibleCount: number;
+  /** Healthy players after voluntary rest. */
+  readonly availableCount: number;
+  readonly restingCount: number;
+  readonly requiredPlayers: number;
+  readonly canRest: boolean;
+  readonly restConflict: boolean;
+  readonly forfeitLikely: boolean;
+  readonly warnings: readonly string[];
+}
+
+export interface FullCourtGameDayAvailabilityEntry {
+  readonly playerId: string;
+  readonly available: boolean;
+  readonly reason?: string;
+}
+
+const FULL_COURT_GAME_DAY_MIN_PLAYERS = 5;
+const FULL_COURT_GAME_DAY_HEAVY_LOAD = 6_000;
+const FULL_COURT_GAME_DAY_RECOVERY_PER_DAY = 3_500;
+
+function fullCourtGameDayLoad(loadBasisPoints: number): number {
+  return Math.round((loadBasisPoints / 100) * 10) / 10;
+}
+
+/**
+ * Reads the saved health row at the next user fixture's day. Injury returns on
+ * that day are available, and workload recovers by the calendar days between
+ * the last committed game and the fixture.
+ */
+export function fullCourtGameDayReadiness(input: {
+  readonly roster: readonly SimulationPlayer[];
+  readonly availability?: readonly FullCourtGameDayAvailabilityEntry[];
+  readonly health: FullCourtTeamHealth | null;
+  readonly fixture: FullCourtUserFixture | null;
+  readonly restingPlayerIds: readonly string[];
+}): FullCourtGameDayReadiness {
+  const { roster, availability = [], health, fixture, restingPlayerIds } = input;
+  const availabilityById = new Map(availability.map((entry) => [entry.playerId, entry]));
+  const resting = new Set(restingPlayerIds);
+  const fixtureDay = fixture?.dayOffset ?? null;
+  const recoveryDays =
+    fixtureDay === null || health === null ? 0 : Math.max(0, fixtureDay - health.throughDay);
+
+  const baseRows = roster.map((player) => {
+    const playerHealth = health?.players[player.playerId];
+    const base = availabilityById.get(player.playerId);
+    const baseAvailable = base?.available ?? true;
+    const returnDay = playerHealth?.availableFromDay ?? null;
+    const injured = returnDay !== null && (fixtureDay === null || returnDay > fixtureDay);
+    const restingThisGame = resting.has(player.playerId) && baseAvailable && !injured;
+    const projectedLoad = Math.max(
+      0,
+      (playerHealth?.loadBasisPoints ?? 0) - recoveryDays * FULL_COURT_GAME_DAY_RECOVERY_PER_DAY,
+    );
+    const loadPercent = fullCourtGameDayLoad(projectedLoad);
+    return {
+      player,
+      base,
+      baseAvailable,
+      returnDay,
+      injured,
+      resting: restingThisGame,
+      loadPercent,
+      eligible: baseAvailable && !injured,
+    };
+  });
+
+  const eligibleCount = baseRows.filter((row) => row.eligible).length;
+  const restingCount = baseRows.filter((row) => row.resting).length;
+  const availableCount = eligibleCount - restingCount;
+  const canRest = eligibleCount > FULL_COURT_GAME_DAY_MIN_PLAYERS;
+  const restConflict =
+    restingCount > 0 &&
+    availableCount < FULL_COURT_GAME_DAY_MIN_PLAYERS &&
+    eligibleCount >= FULL_COURT_GAME_DAY_MIN_PLAYERS;
+  const forfeitLikely = fixture !== null && eligibleCount < FULL_COURT_GAME_DAY_MIN_PLAYERS;
+
+  const players = baseRows.map((row): FullCourtGameDayPlayerView => {
+    const common = {
+      playerId: row.player.playerId,
+      displayName: row.player.displayName,
+      positions: row.player.positions,
+      resting: row.resting,
+      canRest: row.eligible && (row.resting || availableCount > FULL_COURT_GAME_DAY_MIN_PLAYERS),
+    };
+    if (row.injured) {
+      return {
+        ...common,
+        status: 'injured',
+        statusLabel: 'Out',
+        detail: row.returnDay === null ? null : `Back on day ${String(row.returnDay)}`,
+      };
+    }
+    if (!row.baseAvailable) {
+      return {
+        ...common,
+        status: 'unavailable',
+        statusLabel: 'Unavailable',
+        detail: row.base?.reason ?? null,
+      };
+    }
+    if (row.resting) {
+      return {
+        ...common,
+        status: 'resting',
+        statusLabel: 'Resting',
+        detail: 'Clears after this game',
+      };
+    }
+    if (row.loadPercent >= FULL_COURT_GAME_DAY_HEAVY_LOAD / 100) {
+      return {
+        ...common,
+        status: 'fatigued',
+        statusLabel: 'Heavy load',
+        detail: `${String(row.loadPercent)}% carried into this game`,
+      };
+    }
+    return {
+      ...common,
+      status: 'ready',
+      statusLabel: 'Ready',
+      detail: row.loadPercent > 0 ? `${String(row.loadPercent)}% carried into this game` : null,
+    };
+  });
+
+  const warnings: string[] = [];
+  if (fixture === null) {
+    warnings.push(
+      'No upcoming Full Court game. Availability appears when your next fixture is set.',
+    );
+  } else if (forfeitLikely) {
+    warnings.push(
+      `Only ${String(eligibleCount)} healthy ${eligibleCount === 1 ? 'player is' : 'players are'} available for ${fixture.label}. A forfeit is unavoidable; confirm it when the game is simulated.`,
+    );
+  } else if (restConflict) {
+    warnings.push(
+      `Resting ${String(restingCount)} ${restingCount === 1 ? 'player' : 'players'} leaves ${String(availableCount)} available. Uncheck rest until at least five players can play.`,
+    );
+  } else if (eligibleCount === FULL_COURT_GAME_DAY_MIN_PLAYERS && restingCount === 0) {
+    warnings.push(
+      `All five healthy players are needed for ${fixture.label}. Voluntary rest is unavailable.`,
+    );
+  }
+
+  return {
+    fixture,
+    players,
+    eligibleCount,
+    availableCount,
+    restingCount,
+    requiredPlayers: FULL_COURT_GAME_DAY_MIN_PLAYERS,
+    canRest,
+    restConflict,
+    forfeitLikely,
+    warnings,
+  };
+}
+
+/** Roughly quarterly season reviews use the same committed-game stop path. */
+export const FULL_COURT_REVIEW_SLOTS = [20, 41, 61, 82] as const;
+
+export function fullCourtNextReviewSlot(completedThroughSlot: number): number | null {
+  return FULL_COURT_REVIEW_SLOTS.find((slot) => slot > completedThroughSlot) ?? null;
+}
+
 /**
  * The home screen owns the one primary action for the current season state.
  * Regular season sims, the playoff seeding step, forfeit confirmation, and
@@ -382,8 +674,9 @@ export function fullCourtHomeControls(input: {
   readonly playoff: FullCourtPlayoffView | null;
   readonly pendingForfeit: boolean;
   readonly busy: boolean;
+  readonly restConflict?: boolean;
 }): FullCourtHomeControls {
-  const { checkpoint, playoff, pendingForfeit, busy } = input;
+  const { checkpoint, playoff, pendingForfeit, busy, restConflict = false } = input;
   const played = Math.min(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM, checkpoint.completedThroughSlot);
   const remaining = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - played;
   const regularComplete = remaining === 0;
@@ -400,6 +693,12 @@ export function fullCourtHomeControls(input: {
       'The next game cannot continue until the forfeit is accepted.',
     );
   }
+  if (restConflict) {
+    return withStatus(
+      { primary: null, secondary: [] },
+      'Your rest plan leaves fewer than five available. Uncheck rest to continue.',
+    );
+  }
   if (playoff !== null) {
     if (playoff.championTeamId !== null || playoff.nextGame === null) {
       return withStatus({ primary: null, secondary: [] }, 'The bracket and champion are saved.');
@@ -414,7 +713,9 @@ export function fullCourtHomeControls(input: {
             : sim('Sim remaining games', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
         ],
       },
-      'Accepted results save immediately.',
+      playoff.nextGame.userSide === null
+        ? 'AI-only bracket games finish before your next game.'
+        : 'Accepted results save immediately.',
     );
   }
   if (regularComplete) {
@@ -430,15 +731,25 @@ export function fullCourtHomeControls(input: {
       'The 82-game regular season is complete. Seed the bracket.',
     );
   }
+  const reviewSlot = fullCourtNextReviewSlot(played);
+  const reviewCount = reviewSlot === null ? null : reviewSlot - played;
+  const shortCount = Math.min(5, remaining);
+  const secondary: FullCourtHomeAction[] = [];
+  if (reviewCount !== null && reviewCount === shortCount) {
+    secondary.push(sim('Sim to next review', reviewCount));
+  } else {
+    secondary.push(sim(`Sim ${String(shortCount)}`, shortCount));
+    if (reviewCount !== null) secondary.push(sim('Sim to next review', reviewCount));
+  }
+  if (remaining !== shortCount && remaining !== reviewCount) {
+    secondary.push(sim('Sim remaining games', remaining));
+  }
   return withStatus(
     {
       primary: sim('Sim next game', 1),
-      secondary: [
-        sim(`Sim ${String(Math.min(5, remaining))}`, Math.min(5, remaining)),
-        sim('Sim remaining games', remaining),
-      ],
+      secondary,
     },
-    'One game, five games, or the rest of the regular season.',
+    'Sim one game, to the next quarterly review, or through the regular season.',
   );
 }
 
@@ -482,4 +793,45 @@ export function fullCourtFinalRecap(
     message: status.message,
     series,
   };
+}
+
+export interface FullCourtPlayoffAdaptationRead {
+  readonly settingLabel: string;
+  readonly reasonLabel: string;
+  readonly detailLabel: string;
+}
+
+function formatBpsPercent(bps: number): string {
+  const pct = bps / 100;
+  return `${Number.isInteger(pct) ? String(pct) : pct.toFixed(1)}%`;
+}
+
+export function fullCourtPlayoffAdaptationRead(
+  adaptation: FullCourtPlayoffAdaptation,
+): FullCourtPlayoffAdaptationRead {
+  const settingLabel = adaptation.defense === 'protect-paint' ? 'Protect paint' : 'Pressure';
+  const observed = formatBpsPercent(adaptation.observedShareBps);
+  const threshold = formatBpsPercent(adaptation.thresholdShareBps);
+  if (adaptation.reason === 'persistent-inside-scoring') {
+    return {
+      settingLabel,
+      reasonLabel: 'Persistent inside scoring',
+      detailLabel: `${observed} rim share across ${String(adaptation.sampleGames)} played games (threshold ${threshold}).`,
+    };
+  }
+  return {
+    settingLabel,
+    reasonLabel: 'Persistent opportunity concentration',
+    detailLabel: `${observed} lead-player opportunity share across ${String(adaptation.sampleGames)} played games (threshold ${threshold}).`,
+  };
+}
+
+const PLAYOFF_GAME_ID_PATTERN = /^fcp-([1-4])-([0-7])-([1-7])$/;
+
+export function fullCourtPlayoffFixtureLabel(gameId: string): string | null {
+  const match = PLAYOFF_GAME_ID_PATTERN.exec(gameId);
+  if (match === null) return null;
+  const round = Number(match[1]);
+  const ordinal = Number(match[3]);
+  return `Game ${String(ordinal)} · ${capRushConferenceRoundName(round)}`;
 }

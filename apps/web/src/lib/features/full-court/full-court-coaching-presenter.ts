@@ -1,26 +1,53 @@
 import {
   FULL_COURT_COACHING_SCHEMA_VERSION,
   FULL_COURT_DEFAULT_TACTICS,
+  FULL_COURT_MAX_COACHING_RULES,
+  type FullCourtBlueprint,
+  type FullCourtBlueprintHierarchy,
+  type FullCourtClosingLineupRule,
   type FullCourtCoachingPlan,
+  type FullCourtCoachingRule,
+  type FullCourtFoulTroubleRule,
+  type FullCourtInterfaceLevel,
   type FullCourtPlayerHealth,
   type FullCourtTactics,
   type FullCourtTeamHealth,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
+import {
+  buildFullCourtBlueprintHierarchy,
+  resolveFullCourtBlueprintHierarchy,
+  type FullCourtBlueprintBindingPreview,
+  type FullCourtBlueprintRotationRef,
+} from '@hoop-rush/engine';
 
 export const FULL_COURT_MINUTE_TOTAL = 240;
 export const FULL_COURT_MAX_PLAYER_MINUTES = 48;
 export const FULL_COURT_STARTER_SLOTS = 5;
+export const FULL_COURT_MAX_RULES = FULL_COURT_MAX_COACHING_RULES;
+export const FULL_COURT_DEFAULT_RULE_SECONDS_REMAINING = 6 * 60;
+export const FULL_COURT_DEFAULT_RULE_SCORE_MARGIN = 8;
+export const FULL_COURT_DEFAULT_FOUL_LIMIT = 4;
 
 type CoachingRotation = NonNullable<FullCourtCoachingPlan['rotation']>;
 export type FullCourtRotationMode = 'automatic' | 'custom';
 
+/** Editor form of the optional offensive hierarchy; `null` is an unassigned role. */
+export interface FullCourtOffensiveHierarchyDraft {
+  primaryPlayerId: string | null;
+  secondaryPlayerId: string | null;
+  floorGeneralPlayerId: string | null;
+}
+
 export interface FullCourtCoachingDraft {
   tactics: FullCourtTactics;
+  interfaceLevel: FullCourtInterfaceLevel;
   rotationMode: FullCourtRotationMode;
   startingFive: string[];
   minuteTargets: Record<string, number>;
   closingFive: string[] | null;
+  rules: FullCourtCoachingRule[];
+  hierarchy: FullCourtOffensiveHierarchyDraft;
 }
 
 export interface FullCourtCoachingValidation {
@@ -55,6 +82,47 @@ function normalizeFive(
   return isRosterFive(candidate, rosterIds) ? [...candidate] : [...fallback];
 }
 
+function cloneRule(rule: FullCourtCoachingRule): FullCourtCoachingRule {
+  return rule.kind === 'closing-lineup' ? { ...rule, lineup: [...rule.lineup] } : { ...rule };
+}
+
+/** A stable, collision-free id for a rule added in the editor. */
+export function nextFullCourtRuleId(rules: readonly FullCourtCoachingRule[]): string {
+  const taken = new Set(rules.map((rule) => rule.ruleId));
+  for (let index = 1; ; index += 1) {
+    const candidate = `rule-${String(index)}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+export function newFullCourtClosingRule(
+  ruleId: string,
+  rosterIds: readonly string[],
+): FullCourtClosingLineupRule {
+  return {
+    ruleId,
+    kind: 'closing-lineup',
+    secondsRemainingMax: FULL_COURT_DEFAULT_RULE_SECONDS_REMAINING,
+    scoreMarginMax: FULL_COURT_DEFAULT_RULE_SCORE_MARGIN,
+    lineup: [...rosterIds.slice(0, FULL_COURT_STARTER_SLOTS)],
+  };
+}
+
+export function newFullCourtFoulTroubleRule(
+  ruleId: string,
+  rosterIds: readonly string[],
+): FullCourtFoulTroubleRule {
+  const playerId = rosterIds[0] ?? '';
+  const replacementPlayerId = rosterIds[FULL_COURT_STARTER_SLOTS];
+  return {
+    ruleId,
+    kind: 'foul-trouble',
+    playerId,
+    foulLimit: FULL_COURT_DEFAULT_FOUL_LIMIT,
+    ...(replacementPlayerId === undefined ? {} : { replacementPlayerId }),
+  };
+}
+
 /** Seeds the editable draft, using the saved rotation when one exists. */
 export function fullCourtCoachingDraft(
   plan: FullCourtCoachingPlan,
@@ -69,10 +137,17 @@ export function fullCourtCoachingDraft(
       : null;
   return {
     tactics: { ...plan.tactics },
+    interfaceLevel: plan.interfaceLevel ?? 'remix',
     rotationMode: plan.rotation === undefined ? 'automatic' : 'custom',
     startingFive: normalizeFive(rotation.startingFive, defaultRotation.startingFive, rosterIdSet),
     minuteTargets: rosterMinuteTargets(rosterIds, rotation),
     closingFive,
+    rules: (plan.rules ?? []).map(cloneRule),
+    hierarchy: {
+      primaryPlayerId: plan.hierarchy?.primaryPlayerId ?? null,
+      secondaryPlayerId: plan.hierarchy?.secondaryPlayerId ?? null,
+      floorGeneralPlayerId: plan.hierarchy?.floorGeneralPlayerId ?? null,
+    },
   };
 }
 
@@ -83,18 +158,46 @@ export function defaultFullCourtCoachingDraft(
 ): FullCourtCoachingDraft {
   return {
     tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+    interfaceLevel: 'remix',
     rotationMode: 'automatic',
     startingFive: [...defaultRotation.startingFive],
     minuteTargets: rosterMinuteTargets(rosterIds, defaultRotation),
     closingFive:
       defaultRotation.closingFive === undefined ? null : [...defaultRotation.closingFive],
+    rules: [],
+    hierarchy: {
+      primaryPlayerId: null,
+      secondaryPlayerId: null,
+      floorGeneralPlayerId: null,
+    },
   };
+}
+
+/** Emits the contract hierarchy, or `undefined` when no role is assigned. */
+export function fullCourtOffensiveHierarchy(
+  draft: FullCourtOffensiveHierarchyDraft,
+): FullCourtCoachingPlan['hierarchy'] {
+  const hierarchy = {
+    ...(draft.primaryPlayerId === null ? {} : { primaryPlayerId: draft.primaryPlayerId }),
+    ...(draft.secondaryPlayerId === null ? {} : { secondaryPlayerId: draft.secondaryPlayerId }),
+    ...(draft.floorGeneralPlayerId === null
+      ? {}
+      : { floorGeneralPlayerId: draft.floorGeneralPlayerId }),
+  };
+  return Object.keys(hierarchy).length === 0 ? undefined : hierarchy;
 }
 
 export function fullCourtCoachingPlan(draft: FullCourtCoachingDraft): FullCourtCoachingPlan {
   const tactics: FullCourtTactics = { ...draft.tactics };
+  const rules = draft.rules.map(cloneRule);
+  const hierarchy = fullCourtOffensiveHierarchy(draft.hierarchy);
+  const trailing = {
+    ...(rules.length === 0 ? {} : { rules }),
+    ...(hierarchy === undefined ? {} : { hierarchy }),
+    ...(draft.interfaceLevel === 'remix' ? {} : { interfaceLevel: draft.interfaceLevel }),
+  };
   if (draft.rotationMode === 'automatic') {
-    return { schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION, tactics };
+    return { schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION, tactics, ...trailing };
   }
   return {
     schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION,
@@ -104,6 +207,7 @@ export function fullCourtCoachingPlan(draft: FullCourtCoachingDraft): FullCourtC
       minuteTargets: { ...draft.minuteTargets },
       ...(draft.closingFive === null ? {} : { closingFive: [...draft.closingFive] }),
     },
+    ...trailing,
   };
 }
 
@@ -117,6 +221,59 @@ export function validateFullCourtCoachingDraft(
   );
   const remainingMinutes = FULL_COURT_MINUTE_TOTAL - totalMinutes;
   const errors: string[] = [];
+  const rosterIdSet = new Set(rosterIds);
+
+  if (draft.rules.length > FULL_COURT_MAX_RULES) {
+    errors.push(`Use ${String(FULL_COURT_MAX_RULES)} coaching rules or fewer.`);
+  }
+  if (new Set(draft.rules.map((rule) => rule.ruleId)).size !== draft.rules.length) {
+    errors.push('Every coaching rule needs a unique id.');
+  }
+  const hierarchyIds = [
+    draft.hierarchy.primaryPlayerId,
+    draft.hierarchy.secondaryPlayerId,
+    draft.hierarchy.floorGeneralPlayerId,
+  ].filter((playerId): playerId is string => playerId !== null);
+  if (hierarchyIds.some((playerId) => !rosterIdSet.has(playerId))) {
+    errors.push('The scoring hierarchy includes a player outside your roster.');
+  }
+  if (new Set(hierarchyIds).size !== hierarchyIds.length) {
+    errors.push('Each scoring role needs a different player.');
+  }
+  for (const rule of draft.rules) {
+    if (rule.kind === 'closing-lineup') {
+      if (!isRosterFive(rule.lineup, rosterIdSet)) {
+        errors.push(`Rule ${rule.ruleId} needs five different players from your roster.`);
+      }
+      if (
+        !Number.isInteger(rule.secondsRemainingMax) ||
+        rule.secondsRemainingMax < 0 ||
+        rule.secondsRemainingMax > 48 * 60 ||
+        !Number.isInteger(rule.scoreMarginMax) ||
+        rule.scoreMarginMax < 0 ||
+        rule.scoreMarginMax > 40
+      ) {
+        errors.push(`Rule ${rule.ruleId} has an out-of-range time or score margin.`);
+      }
+    } else {
+      if (!rosterIdSet.has(rule.playerId)) {
+        errors.push(`Rule ${rule.ruleId} names a player outside your roster.`);
+      }
+      if (
+        rule.replacementPlayerId !== undefined &&
+        (!rosterIdSet.has(rule.replacementPlayerId) || rule.replacementPlayerId === rule.playerId)
+      ) {
+        errors.push(`Rule ${rule.ruleId} needs a different replacement from your roster.`);
+      }
+      if (
+        !Number.isInteger(rule.foulLimit) ||
+        rule.foulLimit < 1 ||
+        rule.foulLimit > FULL_COURT_STARTER_SLOTS
+      ) {
+        errors.push(`Rule ${rule.ruleId} needs a foul limit between 1 and 5.`);
+      }
+    }
+  }
 
   if (draft.rotationMode === 'custom') {
     const rosterIdSet = new Set(rosterIds);
@@ -174,11 +331,22 @@ export function fullCourtCoachingSignature(plan: FullCourtCoachingPlan): string 
     left < right ? -1 : left > right ? 1 : 0,
   );
   return JSON.stringify({
+    interfaceLevel: plan.interfaceLevel ?? 'remix',
     tactics: [plan.tactics.pace, plan.tactics.offense, plan.tactics.defense],
     rotation:
       rotation === undefined
         ? null
         : [rotation.startingFive, minutes, rotation.closingFive ?? null],
+    rules: (plan.rules ?? []).map((rule) =>
+      rule.kind === 'closing-lineup'
+        ? [rule.ruleId, rule.kind, rule.secondsRemainingMax, rule.scoreMarginMax, [...rule.lineup]]
+        : [rule.ruleId, rule.kind, rule.playerId, rule.foulLimit, rule.replacementPlayerId ?? null],
+    ),
+    hierarchy: [
+      plan.hierarchy?.primaryPlayerId ?? null,
+      plan.hierarchy?.secondaryPlayerId ?? null,
+      plan.hierarchy?.floorGeneralPlayerId ?? null,
+    ],
   });
 }
 
@@ -279,5 +447,82 @@ export function fullCourtTeamMinutes(
     bench,
     starterMinutes: total(starters),
     benchMinutes: total(bench),
+  };
+}
+
+export function activeRotationForBlueprint(
+  draft: FullCourtCoachingDraft,
+  defaultRotation: CoachingRotation,
+): FullCourtBlueprintRotationRef {
+  return draft.rotationMode === 'custom'
+    ? { startingFive: draft.startingFive, minuteTargets: draft.minuteTargets }
+    : defaultRotation;
+}
+
+export function blueprintHierarchyFromDraft(
+  draft: FullCourtCoachingDraft,
+  roster: readonly SimulationPlayer[],
+  defaultRotation: CoachingRotation,
+): FullCourtBlueprintHierarchy | undefined {
+  const hierarchy = fullCourtOffensiveHierarchy(draft.hierarchy);
+  if (hierarchy === undefined) return undefined;
+  return buildFullCourtBlueprintHierarchy({
+    hierarchy,
+    roster,
+    rotation: activeRotationForBlueprint(draft, defaultRotation),
+  });
+}
+
+export interface ApplyFullCourtBlueprintDraftResult {
+  readonly draft: FullCourtCoachingDraft;
+  readonly preview: FullCourtBlueprintBindingPreview;
+  readonly changed: boolean;
+}
+
+/**
+ * Applies a saved blueprint to the current coaching draft, binding any portable
+ * scoring roles to the active roster while keeping existing rotations, rules,
+ * and editor view depth intact.
+ */
+export function applyFullCourtBlueprintToDraft(
+  draft: FullCourtCoachingDraft,
+  blueprint: FullCourtBlueprint,
+  roster: readonly SimulationPlayer[],
+  defaultRotation: CoachingRotation,
+): ApplyFullCourtBlueprintDraftResult {
+  const preview = resolveFullCourtBlueprintHierarchy({
+    blueprint,
+    roster,
+    rotation: activeRotationForBlueprint(draft, defaultRotation),
+  });
+  const nextHierarchy: FullCourtOffensiveHierarchyDraft =
+    blueprint.hierarchy === undefined
+      ? { ...draft.hierarchy }
+      : {
+          primaryPlayerId: preview.hierarchy?.primaryPlayerId ?? null,
+          secondaryPlayerId: preview.hierarchy?.secondaryPlayerId ?? null,
+          floorGeneralPlayerId: preview.hierarchy?.floorGeneralPlayerId ?? null,
+        };
+  const tacticsChanged =
+    blueprint.tactics.pace !== draft.tactics.pace ||
+    blueprint.tactics.offense !== draft.tactics.offense ||
+    blueprint.tactics.defense !== draft.tactics.defense;
+  const hierarchyChanged =
+    nextHierarchy.primaryPlayerId !== draft.hierarchy.primaryPlayerId ||
+    nextHierarchy.secondaryPlayerId !== draft.hierarchy.secondaryPlayerId ||
+    nextHierarchy.floorGeneralPlayerId !== draft.hierarchy.floorGeneralPlayerId;
+
+  return {
+    preview,
+    changed: tacticsChanged || hierarchyChanged,
+    draft: {
+      ...draft,
+      tactics: { ...blueprint.tactics },
+      startingFive: [...draft.startingFive],
+      minuteTargets: { ...draft.minuteTargets },
+      closingFive: draft.closingFive === null ? null : [...draft.closingFive],
+      rules: draft.rules.map(cloneRule),
+      hierarchy: nextHierarchy,
+    },
   };
 }

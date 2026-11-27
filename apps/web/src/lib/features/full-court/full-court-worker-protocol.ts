@@ -9,8 +9,11 @@ import {
   capRushLeagueGameIdSchema,
   capRushPlayoffGamePlanSchema,
   eraSimulationProfileSchema,
+  fullCourtCoachingRulesSchema,
   fullCourtHealthProfileSetSchema,
+  fullCourtOffensiveHierarchySchema,
   fullCourtPlayoffCheckpointSchema,
+  fullCourtRouletteTeamSchema,
   fullCourtSeasonCheckpointSchema,
   fullCourtSeasonScoreSchema,
   fullCourtTacticsSchema,
@@ -66,6 +69,7 @@ const fullCourtRotationPlanInputSchema = z.object({
     )
     .max(20)
     .optional(),
+  rules: fullCourtCoachingRulesSchema.optional(),
 });
 
 const fullCourtSeasonTeamSchema = z.object({
@@ -76,6 +80,7 @@ const fullCourtSeasonTeamSchema = z.object({
   rotation: fullCourtRotationPlanInputSchema.optional(),
   tactics: fullCourtTacticsSchema.optional(),
   availability: z.array(fullCourtAvailabilitySchema).max(12).optional(),
+  roulette: fullCourtRouletteTeamSchema.optional(),
 });
 
 const fullCourtLeagueGameSchema = z.object({
@@ -147,6 +152,8 @@ export type FullCourtWorkerSeasonLock = z.infer<typeof fullCourtSeasonLockSchema
 const fullCourtSeasonSlotOptionsSchema = z.object({
   rotation: fullCourtRotationPlanInputSchema.optional(),
   tactics: fullCourtTacticsSchema.optional(),
+  rules: fullCourtCoachingRulesSchema.optional(),
+  hierarchy: fullCourtOffensiveHierarchySchema.optional(),
   restingPlayerIds: z.array(z.string().min(1).max(64)).max(12).optional(),
   acceptForfeit: z.boolean().optional(),
   record: z.boolean().optional(),

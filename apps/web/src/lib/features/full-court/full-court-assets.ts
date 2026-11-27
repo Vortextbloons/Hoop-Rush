@@ -14,6 +14,8 @@ import { loadRunPreamble } from '#lib/run-preamble.js';
 export interface FullCourtAssets {
   readonly catalog: SeasonDraftCatalog;
   readonly catalogSource: CapRushCatalogSource;
+  /** Byte hash of the packaged catalog asset, pinned by health profiles. */
+  readonly catalogAssetHash: string;
   readonly field: readonly CapRushLeagueField[];
   readonly profile: EraSimulationProfile;
 }
@@ -76,6 +78,7 @@ async function loadFullCourtAssetsUncached(
   return {
     catalog,
     catalogSource,
+    catalogAssetHash: catalogEntry.contentHash,
     field: capRushLeagueFieldOf(preamble.bracket),
     profile: preamble.profile,
   };

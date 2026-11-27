@@ -3,6 +3,7 @@ import { hasOption } from '../args.ts';
 import {
   importEraProfile,
   importFreeze,
+  importFullCourtHealth,
   importManifest,
   importPools,
   importRatings,
@@ -63,6 +64,15 @@ export const importCommands: CommandSpec[] = [
     help: `  import manifest        Refresh manifest content hashes for pools, era profiles,
                          opponents, and the bracket artifact`,
     run: () => importManifest(),
+  },
+  {
+    name: 'import full-court-health',
+    options: { profiles: 'string', evidence: 'string' },
+    help: `  import full-court-health
+                         Package Full Court historical injury profiles from the
+                         cached derivation, or reuse a matching pinned asset when
+                         local evidence is absent. --profiles <path> --evidence <path>`,
+    run: (args) => importFullCourtHealth(pick(args, ['profiles', 'evidence'])),
   },
   {
     name: 'import freeze',

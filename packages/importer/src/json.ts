@@ -19,6 +19,13 @@ export function writeJson(path: string, value: unknown, newline = false): void {
   writeFileSync(temporaryPath, jsonText(value, newline), 'utf8');
   renameSync(temporaryPath, path);
 }
+/** Compact bytes for large packaged assets where indentation is pure overhead. */
+export function writeJsonCompact(path: string, value: unknown): void {
+  ensureDir(dirname(path));
+  const temporaryPath = `${path}.tmp-${String(process.pid)}`;
+  writeFileSync(temporaryPath, `${JSON.stringify(value)}\n`, 'utf8');
+  renameSync(temporaryPath, path);
+}
 function retrySync<T>(fn: () => T, attempts = 12): T {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {

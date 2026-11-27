@@ -6,21 +6,30 @@ import type {
   FullCourtDraftState,
   FullCourtFinishDraftCommand,
   FullCourtPickPlayerCommand,
+  FullCourtPurchaseReportCommand,
   FullCourtRemovePlayerCommand,
+  FullCourtReportTarget,
   FullCourtSpendingEntry,
 } from '@hoop-rush/data-contracts';
 import {
   FULL_COURT_DEFAULT_MONEY,
   FULL_COURT_DRAFT_SCHEMA_VERSION,
+  FULL_COURT_MAX_REPORTS,
   FULL_COURT_MAX_ROSTER_SIZE,
   FULL_COURT_MIN_ROSTER_SIZE,
   canonicalJson,
   fullCourtCreateDraftCommandSchema,
   fullCourtDraftStateSchema,
+  fullCourtReportPriceDollars,
+  fullCourtReportTargetKey,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { assertCapRushCatalogSourceMatches } from '../cap-rush/catalog.ts';
-import { fullCourtAssessPick, type FullCourtPickAssessment } from './draft-economy.ts';
+import {
+  fullCourtAssessPick,
+  fullCourtAssessPurchase,
+  type FullCourtPickAssessment,
+} from './draft-economy.ts';
 import {
   fullCourtMinimumCompletionDollars,
   fullCourtPlayerOf,
@@ -34,9 +43,16 @@ import {
   type FullCourtCommandEnvironment,
   type FullCourtCommandOutcome,
 } from './draft-outcome.ts';
+import { applyFullCourtRouletteCommand } from './roulette-draft.ts';
 
 function salaryEntryIdOf(runId: string, playerVersionId: string): string {
   return `fcs-${seasonDigestHex(canonicalJson({ runId, playerVersionId }))}`;
+}
+
+function reportEntryIdOf(runId: string, target: FullCourtReportTarget): string {
+  return `fcs-${seasonDigestHex(
+    canonicalJson({ runId, report: fullCourtReportTargetKey(target) }),
+  )}`;
 }
 
 function salariesOf(
@@ -256,6 +272,110 @@ function applyFinishDraft(
     ...state,
     revision: state.revision + 1,
     stage: 'complete',
+    ...(state.variant === 'roulette'
+      ? { roulette: { status: 'open' as const, receipts: [] } }
+      : {}),
+  });
+  return acceptFullCourtCommand(state, command, nextState);
+}
+
+function applyPurchaseReport(
+  state: FullCourtDraftState,
+  command: FullCourtPurchaseReportCommand,
+  environment: FullCourtCommandEnvironment,
+): FullCourtCommandOutcome {
+  const mismatch = validateFullCourtRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.spending.some((entry) => entry.commandId === command.commandId)) {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'command-conflict',
+      `command ${command.commandId} already charged the War Chest`,
+    );
+  }
+  if (command.target.kind !== 'player-scouting' && state.stage !== 'complete') {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'report-unavailable',
+      'confirm the roster before buying lineup or opponent reports',
+    );
+  }
+  const targetKey = fullCourtReportTargetKey(command.target);
+  if (
+    (state.reports ?? []).some((report) => fullCourtReportTargetKey(report.target) === targetKey)
+  ) {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'report-owned',
+      `this run already bought ${command.target.kind} for that target`,
+    );
+  }
+  if ((state.reports?.length ?? 0) >= FULL_COURT_MAX_REPORTS) {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'report-unavailable',
+      'this run has reached its scouting report limit',
+    );
+  }
+  if (
+    command.target.kind === 'player-scouting' &&
+    fullCourtPlayerOf(environment.index, command.target.playerVersionId) === null
+  ) {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'player-unavailable',
+      `player version ${command.target.playerVersionId} is not in the loaded catalog`,
+    );
+  }
+  const priceDollars = fullCourtReportPriceDollars(command.target.kind);
+  const assessment = fullCourtAssessPurchase({
+    index: environment.index,
+    state,
+    priceDollars,
+  });
+  if (!assessment.legal) {
+    return rejectFullCourtCommand(
+      state,
+      command,
+      'budget-rejected',
+      assessment.reason === 'completion'
+        ? 'the catalog cannot complete a legal roster after this purchase'
+        : assessment.minimumCompletionDollars === null
+          ? `the War Chest cannot afford this ${command.target.kind} report`
+          : `the War Chest cannot cover this report and the cheapest legal completion ($${String(
+              assessment.minimumCompletionDollars,
+            )} reserve)`,
+    );
+  }
+  const reportId = reportEntryIdOf(state.runId, command.target);
+  const nextState = fullCourtDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    spending: [
+      ...state.spending,
+      {
+        entryId: reportId,
+        kind: 'scouting' as const,
+        dollars: priceDollars,
+        commandId: command.commandId,
+      },
+    ],
+    reports: [
+      ...(state.reports ?? []),
+      {
+        reportId,
+        kind: command.target.kind,
+        target: command.target,
+        priceDollars,
+        commandId: command.commandId,
+        purchasedRevision: state.revision + 1,
+      },
+    ],
   });
   return acceptFullCourtCommand(state, command, nextState);
 }
@@ -288,5 +408,11 @@ export function applyFullCourtDraftCommand(
       return applyRemovePlayer(state, command, environment);
     case 'finish-full-court-draft':
       return applyFinishDraft(state, command, environment);
+    case 'purchase-full-court-report':
+      return applyPurchaseReport(state, command, environment);
+    case 'purchase-full-court-spin':
+    case 'skip-full-court-spin':
+    case 'finalize-full-court-roulette':
+      return applyFullCourtRouletteCommand(state, command, environment);
   }
 }

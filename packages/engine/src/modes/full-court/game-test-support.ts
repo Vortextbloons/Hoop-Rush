@@ -5,11 +5,19 @@ import {
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type {
-  FullCourtAvailabilityEntry,
-  FullCourtGameInput,
-  FullCourtRotationPlanInput,
+import { createEngineContext, type EngineContext } from '../../sim/kernel.ts';
+import { createRng } from '../../sim/rng.ts';
+import { HAVOC_MUTATION_DEFINITIONS } from '../havoc/mutations.ts';
+import { materializeHavocBundle } from '../havoc/offers.ts';
+import { applyHavocMutationPackage } from '../havoc/transform.ts';
+import {
+  simulateRecordedFullCourtGame,
+  type FullCourtAvailabilityEntry,
+  type FullCourtGameInput,
+  type FullCourtRecordedGameOutput,
+  type FullCourtRotationPlanInput,
 } from './game.ts';
+import { adaptCapRushSpinsToFullCourt, type FullCourtRouletteSpinReceiptLike } from './roulette.ts';
 
 export const FULL_COURT_TEST_POSITIONS: SimulationPlayer['positions'][] = [
   ['PG'],
@@ -147,4 +155,104 @@ export function staminaOf(
     available: true,
     stamina: stamina(index),
   }));
+}
+
+function buzzerBanditEntry(seedTag: string) {
+  const definition = HAVOC_MUTATION_DEFINITIONS.find(
+    (entry) => entry.mutationId === 'buzzer-bandit',
+  );
+  if (definition === undefined) throw new Error('full court test: missing buzzer bandit');
+  const [entry] = materializeHavocBundle(
+    { tier: definition.tier, mutationIds: [definition.mutationId] },
+    createRng(`${seedTag}:phys:buzzer-bandit`),
+    createRng(`${seedTag}:spec:buzzer-bandit`),
+    HAVOC_MUTATION_DEFINITIONS,
+  );
+  if (entry === undefined) throw new Error('full court test: failed to materialize buzzer bandit');
+  return entry;
+}
+
+function buzzerBanditReceipts(
+  roster: readonly SimulationPlayer[],
+  seedTag: string,
+): FullCourtRouletteSpinReceiptLike[] {
+  const slots = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+  return roster.slice(0, 5).map((player, index) => {
+    if (player.playerVersionId === undefined) {
+      throw new Error('full court test: buzzer bandit target needs a player version');
+    }
+    const slot = slots[index];
+    if (slot === undefined) throw new Error('full court test: missing buzzer bandit slot');
+    const sourcePlayer = buildSimulationPlayer({ ...player });
+    const entry = buzzerBanditEntry(`${seedTag}-${String(index)}`);
+    const effective = applyHavocMutationPackage(
+      {
+        playerId: sourcePlayer.playerId,
+        playerVersionId: sourcePlayer.playerVersionId ?? null,
+        displayName: sourcePlayer.displayName,
+        franchiseId: null,
+        eraId: null,
+        seasonKey: null,
+        positions: [...sourcePlayer.positions],
+        originalOverall: sourcePlayer.overall ?? 75,
+        overallSource: 'catalog',
+        profile: {
+          ratings: sourcePlayer.ratings,
+          tendencies: sourcePlayer.tendencies,
+          ...(sourcePlayer.anchors === undefined ? {} : { anchors: sourcePlayer.anchors }),
+        },
+        physical: {
+          heightInches: sourcePlayer.heightInches,
+          weightLbs: sourcePlayer.weightLbs,
+        },
+      },
+      [entry],
+      { slot },
+    );
+    return {
+      target: {
+        slot,
+        playerVersionId: player.playerVersionId,
+        playerId: player.playerId,
+      },
+      entry,
+      effective,
+    };
+  });
+}
+
+/**
+ * A 10-player-per-side game with Buzzer Bandit on five starters each way, which
+ * can deduct a point before a team has scored and therefore record negative live
+ * trip and period scores.
+ */
+export function simulateFullCourtBuzzerBanditTestGame(input: {
+  readonly seed: string;
+  readonly gameNumber?: number;
+  readonly context?: EngineContext;
+}): FullCourtRecordedGameOutput {
+  const homeRoster = fullCourtTestRoster('bz-home', 10);
+  const awayRoster = fullCourtTestRoster('bz-away', 10);
+  const base = fullCourtTestInput({ seed: input.seed, homeRoster, awayRoster });
+  return simulateRecordedFullCourtGame(
+    {
+      ...base,
+      ...(input.gameNumber === undefined ? {} : { gameNumber: input.gameNumber }),
+      home: {
+        ...base.home,
+        roulette: adaptCapRushSpinsToFullCourt({
+          roster: homeRoster,
+          receipts: buzzerBanditReceipts(homeRoster, `${input.seed}-home`),
+        }),
+      },
+      away: {
+        ...base.away,
+        roulette: adaptCapRushSpinsToFullCourt({
+          roster: awayRoster,
+          receipts: buzzerBanditReceipts(awayRoster, `${input.seed}-away`),
+        }),
+      },
+    },
+    input.context ?? createEngineContext(),
+  );
 }

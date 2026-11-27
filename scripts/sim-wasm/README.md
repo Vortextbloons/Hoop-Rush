@@ -129,6 +129,23 @@ browser or phone claims.
 Games without playback use the kernel's numeric event/scoring ledger directly.
 The full tape path is unchanged for watched and replay games.
 
+## Full Court season benchmark
+
+```sh
+bun scripts/sim-wasm/full-court-season-benchmark.ts
+```
+
+Builds a six-player and twelve-player locked Full Court season from the packaged
+historical catalog with injury profiles enabled, warms one full season per size,
+then measures `HOOP_BENCH_SAMPLES` (default 3) warm 82-slot, 1,230-fixture
+season runs. Each sample starts from an empty checkpoint and auto-accepts batch
+forfeits. The report includes median and p95 slot latency, median season wall
+time, forfeit counts, and a season digest for reproducibility. It covers
+locked-season fixture lookups, health preparation, simulation, accounting,
+compact score parsing, and checkpoint construction; it excludes browser worker
+structured cloning, IndexedDB writes, UI publication, and browser or phone
+execution. Set `HOOP_BENCH_SIZES` to override the roster sizes.
+
 ## Solo validation benchmark
 
 ```sh

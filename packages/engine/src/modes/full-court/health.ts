@@ -118,7 +118,7 @@ function prepareTeamHealth(
 
 function addWorkload(health: FullCourtTeamHealth, result: FullCourtTeamResult): void {
   for (const player of result.players) {
-    if (player.seconds === 0) continue;
+    if (player.kind === 'clone' || player.seconds === 0) continue;
     const prior = health.players[player.playerId];
     const minutesLoad = Math.round(
       (player.seconds / FULL_COURT_REGULATION_SECONDS) * REGULATION_LOAD,
@@ -184,7 +184,7 @@ export function runFullCourtGameWithHealth(
         teamId: prepared[side].team.teamId,
         participants: fullCourtInjuryParticipants(
           prepared[side].team.roster,
-          run.result[side].players,
+          run.result[side].players.filter((player) => player.kind !== 'clone'),
         ),
         profiles,
         futureDays: options.futureGameDays?.[side],
