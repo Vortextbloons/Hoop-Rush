@@ -25,33 +25,16 @@ import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
-  commandRowsToAppend,
+  appendRoomCommandRows,
+  averageDraftOverall,
   deleteWhereEquals,
   getParsedRecord,
   listCompletedHistory,
   putResultPreservingVerified,
-  rowsWhereEquals,
+  saveActiveVerification,
 } from './support.ts';
 
 const SERIES_ACHIEVEMENT_LABEL = 'Draft Duel';
-
-function averageOriginalOverall(draft: StoredDraftDuelActive['draft']): { p1: number; p2: number } {
-  if (!draft || draft.status !== 'complete') {
-    return { p1: Number.NaN, p2: Number.NaN };
-  }
-  const totals = { p1: 0, p2: 0 };
-  const counts = { p1: 0, p2: 0 };
-  for (const round of draft.rounds) {
-    for (const pick of round.picks) {
-      totals[pick.participantId] += pick.card.overall;
-      counts[pick.participantId] += 1;
-    }
-  }
-  return {
-    p1: counts.p1 === 5 ? totals.p1 / 5 : Number.NaN,
-    p2: counts.p2 === 5 ? totals.p2 / 5 : Number.NaN,
-  };
-}
 
 function verifiedScores(
   active: StoredDraftDuelActive,
@@ -90,36 +73,33 @@ export class DexieDraftDuelRepository {
   async appendCommands(roomId: string, commands: readonly DraftDuelCommand[]): Promise<void> {
     if (commands.length === 0) return;
     const updatedAtIso = new Date().toISOString();
-    const rows = commands
-      .map((command) => {
-        if (command.roomId !== roomId) {
-          throw new Error(
-            `appendCommands: command ${String(command.commandId)} does not belong to room ${roomId}`,
-          );
-        }
-        return storedDraftDuelCommandRowSchema.parse({
-          saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
-          roomId,
-          ordinal: command.ordinal,
-          command,
-          updatedAtIso,
-        });
-      })
-      .sort((a, b) => a.ordinal - b.ordinal);
-    await this.db.transaction('rw', this.db.draftDuelCommands, async () => {
-      const existingRows = await rowsWhereEquals(this.db.draftDuelCommands, 'roomId', roomId);
-      const append = commandRowsToAppend({
-        existing: existingRows.map((row) => storedDraftDuelCommandRowSchema.parse(row)),
-        incoming: rows,
-        ordinalOf: (row) => row.ordinal,
+    const rows = commands.map((command) => {
+      if (command.roomId !== roomId) {
+        throw new Error(
+          `appendCommands: command ${String(command.commandId)} does not belong to room ${roomId}`,
+        );
+      }
+      return storedDraftDuelCommandRowSchema.parse({
+        saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+        roomId,
+        ordinal: command.ordinal,
+        command,
+        updatedAtIso,
+      });
+    });
+    await appendRoomCommandRows(
+      this.db.draftDuelCommands,
+      roomId,
+      rows,
+      (row) => storedDraftDuelCommandRowSchema.parse(row),
+      {
         matches: (stored, incoming) => commandReceiptMatches(stored.command, incoming.command),
         conflict: (_kind, row) =>
           new Error(
             `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
           ),
-      });
-      for (const row of append) await this.db.draftDuelCommands.put(row);
-    });
+      },
+    );
   }
   async loadCommands(roomId: string): Promise<DraftDuelCommand[]> {
     const rows = await this.db.draftDuelCommands.where('roomId').equals(roomId).sortBy('ordinal');
@@ -128,21 +108,19 @@ export class DexieDraftDuelRepository {
   async saveResult(output: DraftDuelGameOutput): Promise<void> {
     const validated = draftDuelGameOutputSchema.parse(output);
     const key: [string, number] = [validated.roomId, validated.gameNumber];
-    await this.db.transaction('rw', this.db.draftDuelResults, async () => {
-      await putResultPreservingVerified({
-        table: this.db.draftDuelResults,
-        key,
-        parse: (row) => storedDraftDuelResultRowSchema.parse(row),
-        build: (verified) =>
-          storedDraftDuelResultRowSchema.parse({
-            saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
-            roomId: validated.roomId,
-            gameNumber: validated.gameNumber,
-            output: validated,
-            verified,
-            storedAtIso: new Date().toISOString(),
-          }),
-      });
+    await putResultPreservingVerified({
+      table: this.db.draftDuelResults,
+      key,
+      parse: (row) => storedDraftDuelResultRowSchema.parse(row),
+      build: (verified) =>
+        storedDraftDuelResultRowSchema.parse({
+          saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+          roomId: validated.roomId,
+          gameNumber: validated.gameNumber,
+          output: validated,
+          verified,
+          storedAtIso: new Date().toISOString(),
+        }),
     });
   }
   async loadResults(roomId: string): Promise<StoredDraftDuelResultRow[]> {
@@ -158,15 +136,9 @@ export class DexieDraftDuelRepository {
       'rw',
       [this.db.draftDuelActive, this.db.draftDuelResults],
       async () => {
-        const active = await this.db.draftDuelActive.get(roomId);
-        if (active !== undefined) {
-          const parsed = storedDraftDuelActiveSchema.parse(active);
-          await this.db.draftDuelActive.put({
-            ...parsed,
-            verification,
-            updatedAtIso: new Date().toISOString(),
-          });
-        }
+        await saveActiveVerification(this.db.draftDuelActive, roomId, verification, (row) =>
+          storedDraftDuelActiveSchema.parse(row),
+        );
         for (const entry of verification) {
           const row = await this.db.draftDuelResults.get([roomId, entry.gameNumber]);
           if (row === undefined) continue;
@@ -246,7 +218,12 @@ export class DexieDraftDuelRepository {
               seriesId: SERIES_ACHIEVEMENT_LABEL,
               participantId: participant,
               games: achievementGames,
-              averageOriginalOverall: averageOriginalOverall(active.draft),
+              averageOriginalOverall: averageDraftOverall(
+                active.draft?.status === 'complete'
+                  ? active.draft.rounds.flatMap((round) => round.picks)
+                  : [],
+                (pick) => pick.card.overall,
+              ),
             }),
           );
         }

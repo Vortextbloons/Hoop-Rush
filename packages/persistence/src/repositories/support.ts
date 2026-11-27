@@ -148,15 +148,64 @@ export function commandRowsToAppend<TRow>(
   });
 }
 
+export async function appendRoomCommandRows<TRow extends { ordinal: number }>(
+  table: Table<TRow, [string, number]>,
+  roomId: string,
+  incoming: TRow[],
+  parse: (row: unknown) => TRow,
+  dedupe: Omit<CommandRowDedupe<TRow>, 'ordinalOf'>,
+): Promise<void> {
+  incoming.sort((left, right) => left.ordinal - right.ordinal);
+  await table.db.transaction('rw', table, async () => {
+    const existing = await rowsWhereEquals(table, 'roomId', roomId);
+    const append = commandRowsToAppend({
+      ...dedupe,
+      existing: existing.map(parse),
+      incoming,
+      ordinalOf: (row) => row.ordinal,
+    });
+    for (const row of append) await table.put(row);
+  });
+}
+
+export async function saveActiveVerification<
+  TRow extends { updatedAtIso: string; verification: unknown },
+>(
+  table: Table<TRow, string>,
+  roomId: string,
+  verification: TRow['verification'],
+  parse: (row: unknown) => TRow,
+): Promise<void> {
+  const row = await table.get(roomId);
+  if (row !== undefined) {
+    await table.put({ ...parse(row), verification, updatedAtIso: new Date().toISOString() });
+  }
+}
+
 /** Upserts a result row while retaining the verification flag of the stored row. */
 export async function putResultPreservingVerified<TRow extends { verified: boolean }, TKey>(input: {
-  table: Pick<Table<TRow, TKey>, 'get' | 'put'>;
+  table: Table<TRow, TKey>;
   key: TKey;
   parse: (row: unknown) => TRow;
   build: (verified: boolean) => TRow;
 }): Promise<void> {
-  const existing = await input.table.get(input.key);
-  await input.table.put(
-    input.build(existing === undefined ? false : input.parse(existing).verified),
-  );
+  await input.table.db.transaction('rw', input.table, async () => {
+    const existing = await input.table.get(input.key);
+    await input.table.put(
+      input.build(existing === undefined ? false : input.parse(existing).verified),
+    );
+  });
+}
+
+export function averageDraftOverall<T extends { participantId: 'p1' | 'p2' }>(
+  picks: readonly T[],
+  overallOf: (pick: T) => number,
+): { p1: number; p2: number } {
+  const averageFor = (participantId: 'p1' | 'p2'): number => {
+    const roster = picks.filter((pick) => pick.participantId === participantId);
+    return roster.length === 5
+      ? roster.reduce((sum, pick) => sum + overallOf(pick), 0) / 5
+      : Number.NaN;
+  };
+  return { p1: averageFor('p1'), p2: averageFor('p2') };
 }

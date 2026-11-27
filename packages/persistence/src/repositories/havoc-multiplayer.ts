@@ -30,12 +30,14 @@ import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
-  commandRowsToAppend,
+  appendRoomCommandRows,
+  averageDraftOverall,
   deleteWhereEquals,
   getParsedRecord,
   listCompletedHistory,
   putResultPreservingVerified,
   rowsWhereEquals,
+  saveActiveVerification,
 } from './support.ts';
 
 function commandRowMatches(
@@ -57,25 +59,6 @@ function commandRowMatches(
 }
 
 const SERIES_ACHIEVEMENT_LABEL = 'Havoc Multiplayer';
-
-function averageOriginalOverall(draft: StoredHavocMultiplayerActive['snapshot']['draft']): {
-  p1: number;
-  p2: number;
-} {
-  if (!draft || draft.status !== 'complete') {
-    return { p1: Number.NaN, p2: Number.NaN };
-  }
-  const totals = { p1: 0, p2: 0 };
-  const counts = { p1: 0, p2: 0 };
-  for (const pick of draft.picks) {
-    totals[pick.participantId] += pick.card.source.originalOverall;
-    counts[pick.participantId] += 1;
-  }
-  return {
-    p1: counts.p1 === 5 ? totals.p1 / 5 : Number.NaN,
-    p2: counts.p2 === 5 ? totals.p2 / 5 : Number.NaN,
-  };
-}
 
 // A room marks a game verified only after both participants confirm the same
 // result digest, so the stored score is trusted only when it matches that digest.
@@ -112,34 +95,28 @@ export class DexieHavocMultiplayerRepository {
   ): Promise<void> {
     if (entries.length === 0) return;
     const storedAtIso = new Date().toISOString();
-    const rows = entries
-      .map((entry) => {
-        if (entry.command.roomId !== roomId) {
-          throw new Error(
-            `appendCommands: command ${String(entry.command.commandId)} does not belong to room ${roomId}`,
-          );
-        }
-        return storedHavocMultiplayerCommandRowSchema.parse({
-          saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-          roomId,
-          ordinal: entry.ordinal,
-          commandId: entry.command.commandId,
-          actorParticipantId: entry.command.actorParticipantId,
-          payload: entry.command.payload,
-          storedAtIso,
-        });
-      })
-      .sort((a, b) => a.ordinal - b.ordinal);
-    await this.db.transaction('rw', this.db.havocMultiplayerCommands, async () => {
-      const existingRows = await rowsWhereEquals(
-        this.db.havocMultiplayerCommands,
-        'roomId',
+    const rows = entries.map((entry) => {
+      if (entry.command.roomId !== roomId) {
+        throw new Error(
+          `appendCommands: command ${String(entry.command.commandId)} does not belong to room ${roomId}`,
+        );
+      }
+      return storedHavocMultiplayerCommandRowSchema.parse({
+        saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
         roomId,
-      );
-      const append = commandRowsToAppend({
-        existing: existingRows.map((row) => storedHavocMultiplayerCommandRowSchema.parse(row)),
-        incoming: rows,
-        ordinalOf: (row) => row.ordinal,
+        ordinal: entry.ordinal,
+        commandId: entry.command.commandId,
+        actorParticipantId: entry.command.actorParticipantId,
+        payload: entry.command.payload,
+        storedAtIso,
+      });
+    });
+    await appendRoomCommandRows(
+      this.db.havocMultiplayerCommands,
+      roomId,
+      rows,
+      (row) => storedHavocMultiplayerCommandRowSchema.parse(row),
+      {
         identityOf: (row) => row.commandId,
         matches: commandRowMatches,
         conflict: (kind, row) =>
@@ -150,9 +127,8 @@ export class DexieHavocMultiplayerRepository {
             : new Error(
                 `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
               ),
-      });
-      for (const row of append) await this.db.havocMultiplayerCommands.put(row);
-    });
+      },
+    );
   }
   async loadCommands(roomId: string): Promise<HavocMultiplayerCommand[]> {
     const rows = await this.db.havocMultiplayerCommands
@@ -173,26 +149,24 @@ export class DexieHavocMultiplayerRepository {
   async saveResult(output: HavocMultiplayerGameOutput): Promise<void> {
     const validated = havocMultiplayerGameOutputSchema.parse(output);
     const key: [string, number] = [validated.roomId, validated.gameNumber];
-    await this.db.transaction('rw', this.db.havocMultiplayerResults, async () => {
-      await putResultPreservingVerified({
-        table: this.db.havocMultiplayerResults,
-        key,
-        parse: (row) => storedHavocMultiplayerResultRowSchema.parse(row),
-        build: (verified) =>
-          storedHavocMultiplayerResultRowSchema.parse({
-            saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-            roomId: validated.roomId,
-            gameNumber: validated.gameNumber,
-            winner: validated.winner,
-            result: validated.result,
-            tape: validated.tape,
-            inputDigest: validated.inputDigest,
-            resultDigest: validated.resultDigest,
-            tapeDigest: validated.tapeDigest,
-            verified,
-            storedAtIso: new Date().toISOString(),
-          }),
-      });
+    await putResultPreservingVerified({
+      table: this.db.havocMultiplayerResults,
+      key,
+      parse: (row) => storedHavocMultiplayerResultRowSchema.parse(row),
+      build: (verified) =>
+        storedHavocMultiplayerResultRowSchema.parse({
+          saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+          roomId: validated.roomId,
+          gameNumber: validated.gameNumber,
+          winner: validated.winner,
+          result: validated.result,
+          tape: validated.tape,
+          inputDigest: validated.inputDigest,
+          resultDigest: validated.resultDigest,
+          tapeDigest: validated.tapeDigest,
+          verified,
+          storedAtIso: new Date().toISOString(),
+        }),
     });
   }
   async loadResults(roomId: string): Promise<StoredHavocMultiplayerResultRow[]> {
@@ -211,15 +185,9 @@ export class DexieHavocMultiplayerRepository {
       'rw',
       [this.db.havocMultiplayerActive, this.db.havocMultiplayerResults],
       async () => {
-        const active = await this.db.havocMultiplayerActive.get(roomId);
-        if (active !== undefined) {
-          const parsed = storedHavocMultiplayerActiveSchema.parse(active);
-          await this.db.havocMultiplayerActive.put({
-            ...parsed,
-            verification,
-            updatedAtIso: new Date().toISOString(),
-          });
-        }
+        await saveActiveVerification(this.db.havocMultiplayerActive, roomId, verification, (row) =>
+          storedHavocMultiplayerActiveSchema.parse(row),
+        );
         const verifiedDigests = new Set(verification.map((entry) => entry.resultDigest));
         const rows = await rowsWhereEquals(this.db.havocMultiplayerResults, 'roomId', roomId);
         for (const row of rows) {
@@ -272,6 +240,7 @@ export class DexieHavocMultiplayerRepository {
         if (participant) {
           const activeRow = await this.db.havocMultiplayerActive.get(validated.roomId);
           const active = activeRow ? storedHavocMultiplayerActiveSchema.parse(activeRow) : null;
+          const draft = active?.snapshot.draft;
           const profileRepo = new DexieProfileRepository(this.db);
           const achievementGames: SeriesAchievementFacts['games'][number][] = [];
           for (const game of validated.games) {
@@ -304,7 +273,10 @@ export class DexieHavocMultiplayerRepository {
               seriesId: SERIES_ACHIEVEMENT_LABEL,
               participantId: participant,
               games: achievementGames,
-              averageOriginalOverall: averageOriginalOverall(active?.snapshot.draft ?? null),
+              averageOriginalOverall: averageDraftOverall(
+                draft?.status === 'complete' ? draft.picks : [],
+                (pick) => pick.card.source.originalOverall,
+              ),
             }),
           );
         }
