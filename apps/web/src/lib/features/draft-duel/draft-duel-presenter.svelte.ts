@@ -1,6 +1,5 @@
 import type {
   DraftDuelCard,
-  DraftDuelCommand,
   DraftDuelDraft,
   DraftDuelGameOutput,
   DraftDuelOfferedPick,
@@ -28,10 +27,10 @@ import {
   draftDuelSeriesStandoutsOf,
   type DraftDuelSession,
   type DraftDuelSessionAssets,
+  type DraftDuelSessionView,
   type ReactionKey,
 } from '@hoop-rush/application/draft-duel';
 import { createDraftDuelSession } from './draft-duel-session';
-import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
   gamecastVisibleEventCount,
   gamecastVisibleState,
@@ -40,34 +39,25 @@ import {
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
 import {
   reactionFromTransient,
-  rematchRequested,
   RoomConsiderationTimer,
-  RoomPlaybackLoop,
 } from '#lib/features/multiplayer/room-presenter-plumbing.js';
+import { RoomPresenterCore } from '#lib/features/multiplayer/room-presenter-core.svelte.js';
 
 function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParticipantId {
   return participantId === 'p1' ? 'p2' : 'p1';
 }
 
-export class DraftDuelPresenter {
-  readonly session: DraftDuelSession;
-
+export class DraftDuelPresenter extends RoomPresenterCore<
+  DraftDuelParticipantId,
+  DraftDuelTransientEvent,
+  DraftDuelSessionView,
+  DraftDuelSession
+> {
   assets = $state.raw<DraftDuelSessionAssets | null>(null);
   snapshot = $state.raw<DraftDuelRoomSnapshot | null>(null);
-  participantId = $state<DraftDuelParticipantId | null>(null);
   draft = $state.raw<DraftDuelDraft | null>(null);
   outputs = $state.raw<Record<number, DraftDuelGameOutput>>({});
   verification = $state.raw<DraftDuelPartiallyVerified[]>([]);
-  busy = $state(false);
-  connection = $state<RoomConnection>('idle');
-  notice = $state<string | null>(null);
-  integrityFailed = $state(false);
-  progress = $state(0);
-  awaitingContinue = $state(false);
-  localReady = $state(false);
-  opponentReady = $state(false);
-  readyCountdownMs = $state<number | null>(null);
-  deadlineMsLeft = $state<number | null>(null);
   consideration = $state<{ displayName: string; seasonKey: string } | null>(null);
   reaction = $state<{
     participantId: DraftDuelParticipantId;
@@ -75,12 +65,7 @@ export class DraftDuelPresenter {
     atMs: number;
   } | null>(null);
   muted = $state(false);
-  private commands = $state.raw<DraftDuelCommand[]>([]);
   private completedRecap = $state.raw<DraftDuelCompletionRecap | null>(null);
-  private errorState = $state<string | null>(null);
-  private unsubscribe: (() => void) | null = null;
-  private unsubscribeTransient: (() => void) | null = null;
-  private readonly playback = new RoomPlaybackLoop();
   private readonly considerationTimer = new RoomConsiderationTimer<{
     displayName: string;
     seasonKey: string;
@@ -90,25 +75,10 @@ export class DraftDuelPresenter {
     },
     () => this.consideration,
   );
-  private disposed = false;
 
   constructor(session: DraftDuelSession = createDraftDuelSession()) {
-    this.session = session;
-    this.unsubscribe = session.subscribe(() => {
-      this.mirror();
-    });
-    this.unsubscribeTransient = session.subscribeTransient((event) => {
-      this.onTransient(event);
-    });
-    this.mirror();
-  }
-
-  get error(): string | null {
-    return this.errorState;
-  }
-
-  set error(message: string | null) {
-    this.session.setError(message);
+    super(session);
+    this.connect();
   }
 
   phase = $derived(this.snapshot?.phase ?? 'lobby');
@@ -201,22 +171,7 @@ export class DraftDuelPresenter {
       completedRecap: this.completedRecap,
     }),
   );
-  rivalRematchRequested = $derived(rematchRequested(this.commands, this.participantId, false));
-  myRematchRequested = $derived(rematchRequested(this.commands, this.participantId, true));
   successorRoomId = $derived(this.snapshot?.successorRoomId ?? null);
-
-  attach(roomId: string): Promise<void> {
-    return this.session.attach(roomId);
-  }
-
-  /** Retry the whole room attachment after a failed load. */
-  retryAttach(): Promise<void> {
-    return this.session.retryAttach();
-  }
-
-  refresh(): Promise<void> {
-    return this.session.refresh();
-  }
 
   createRoom(
     fairness: 'fair' | 'unfair',
@@ -292,35 +247,6 @@ export class DraftDuelPresenter {
     }
   }
 
-  readyForNextGame(): Promise<void> {
-    return this.session.readyForNextGame();
-  }
-
-  startBroadcast(auto = false): Promise<void> {
-    return this.session.startBroadcast(auto);
-  }
-
-  requestRematch(): Promise<void> {
-    return this.session.requestRematch();
-  }
-
-  confirmRematch(): Promise<void> {
-    return this.session.confirmRematch();
-  }
-
-  followRematch(): Promise<Id | null> {
-    return this.session.followRematch();
-  }
-
-  removeGuest(): Promise<void> {
-    return this.session.removeGuest();
-  }
-
-  async leaveRoom(): Promise<void> {
-    await this.session.leaveRoom();
-    this.playback.stop();
-  }
-
   async consider(card: DraftDuelCard | null): Promise<void> {
     if (!this.snapshot || !this.participantId || !this.draft) return;
     this.consideration = null;
@@ -337,76 +263,28 @@ export class DraftDuelPresenter {
     this.muted = muted;
   }
 
-  continueAfterGame(): void {
-    this.session.continueAfterGame();
-  }
-
   seriesGameEntries(): DraftDuelSeriesGame[] {
     return this.series?.games ?? [];
   }
 
-  dispose(): void {
-    this.disposed = true;
-    this.playback.stop();
-    this.considerationTimer.clear();
-    this.unsubscribe?.();
-    this.unsubscribe = null;
-    this.unsubscribeTransient?.();
-    this.unsubscribeTransient = null;
-    this.session.dispose();
+  protected participantIdOf(view: DraftDuelSessionView): DraftDuelParticipantId | null {
+    return view.participantId;
   }
 
-  private mirror(): void {
-    if (this.disposed) return;
-    const view = this.session.getSnapshot();
-    const previousBroadcastGame = this.snapshot?.broadcast?.gameNumber ?? null;
+  protected mirrorView(view: DraftDuelSessionView): void {
     this.assets = view.assets;
     this.snapshot = view.snapshot;
-    this.participantId = view.participantId;
     this.draft = view.draft;
     this.outputs = view.outputs;
     this.verification = view.verification;
-    this.commands = view.commands;
     this.completedRecap = view.completedRecap;
-    this.busy = view.busy;
-    this.connection = view.connection;
-    this.errorState = view.error;
-    this.notice = view.notice;
-    this.integrityFailed = view.integrityFailed;
-    this.progress = view.progress;
-    this.awaitingContinue = view.awaitingContinue;
-    this.localReady = view.localReady;
-    this.opponentReady = view.opponentReady;
-    this.readyCountdownMs = view.readyCountdownMs;
-    this.deadlineMsLeft = view.deadlineMsLeft;
-    const broadcastGame = view.snapshot?.broadcast?.gameNumber ?? null;
-    if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
-      this.startPlayback();
-    }
-    if (view.snapshot?.broadcast == null && this.playback.active) {
-      this.playback.stop();
-    }
   }
 
-  private stopPlayback(): void {
-    this.playback.stop();
+  protected onDispose(): void {
+    this.considerationTimer.clear();
   }
 
-  private startPlayback(): void {
-    this.playback.start({
-      isDisposed: () => this.disposed,
-      hasBroadcast: () => this.snapshot?.broadcast != null,
-      beginPlayback: () => {
-        this.session.beginPlayback();
-      },
-      advancePlayback: (advanceMs) => {
-        this.session.advancePlayback(advanceMs);
-      },
-      progress: () => this.session.getSnapshot().progress,
-    });
-  }
-
-  private onTransient(event: DraftDuelTransientEvent): void {
+  protected onTransient(event: DraftDuelTransientEvent): void {
     if (this.disposed || event.participantId === this.participantId) return;
     if (event.kind === 'consideration') {
       const assets = this.assets;

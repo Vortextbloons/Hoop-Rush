@@ -1,6 +1,5 @@
 import type {
   HavocDraftCard,
-  HavocMultiplayerCommand,
   HavocMultiplayerDraftState,
   HavocMultiplayerMemberSnapshot,
   HavocMultiplayerParticipantId,
@@ -22,10 +21,10 @@ import type {
   HavocMultiplayerGameVerification,
   HavocMultiplayerSession,
   HavocMultiplayerSessionAssets,
+  HavocMultiplayerSessionView,
   ReactionKey,
 } from '@hoop-rush/application/havoc-multiplayer';
 import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
-import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
   gamecastBattleFeedCursor,
   gamecastBattlePlaybackFold,
@@ -38,10 +37,9 @@ import {
 } from '#lib/gamecast/gamecast-battle-playback.js';
 import {
   reactionFromTransient,
-  rematchRequested,
   RoomConsiderationTimer,
-  RoomPlaybackLoop,
 } from '#lib/features/multiplayer/room-presenter-plumbing.js';
+import { RoomPresenterCore } from '#lib/features/multiplayer/room-presenter-core.svelte.js';
 
 export interface HavocMultiplayerConsideration {
   displayName: string;
@@ -54,60 +52,32 @@ export interface HavocMultiplayerReaction {
   atMs: number;
 }
 
-export class HavocMultiplayerPresenter {
-  readonly session: HavocMultiplayerSession;
-
+export class HavocMultiplayerPresenter extends RoomPresenterCore<
+  HavocMultiplayerParticipantId,
+  HavocMultiplayerTransientEvent,
+  HavocMultiplayerSessionView,
+  HavocMultiplayerSession
+> {
   assets = $state.raw<HavocMultiplayerSessionAssets | null>(null);
   snapshot = $state.raw<HavocMultiplayerRoomSnapshot | null>(null);
-  participantId = $state.raw<HavocMultiplayerParticipantId | null>(null);
   draft = $state.raw<HavocMultiplayerDraftState | null>(null);
   outputs = $state.raw<Record<number, HavocMultiplayerGameOutput>>({});
   verification = $state.raw<HavocMultiplayerGameVerification[]>([]);
   mvp = $state.raw<HavocMultiplayerSeriesMvp | null>(null);
-  busy = $state(false);
-  connection = $state<RoomConnection>('idle');
-  notice = $state<string | null>(null);
-  integrityFailed = $state(false);
-  progress = $state(0);
-  awaitingContinue = $state(false);
-  localReady = $state(false);
-  opponentReady = $state(false);
-  readyCountdownMs = $state<number | null>(null);
-  deadlineMsLeft = $state<number | null>(null);
   consideration = $state<HavocMultiplayerConsideration | null>(null);
   reaction = $state<HavocMultiplayerReaction | null>(null);
   muted = $state(false);
   completedRecap = $state.raw<HavocMultiplayerCompletionRecap | null>(null);
-  private commands = $state.raw<HavocMultiplayerCommand[]>([]);
-  private errorState = $state<string | null>(null);
-  private unsubscribe: (() => void) | null = null;
-  private unsubscribeTransient: (() => void) | null = null;
-  private readonly playback = new RoomPlaybackLoop();
   private readonly considerationTimer = new RoomConsiderationTimer<HavocMultiplayerConsideration>(
     (value) => {
       this.consideration = value;
     },
     () => this.consideration,
   );
-  private disposed = false;
 
   constructor(session: HavocMultiplayerSession = createHavocMultiplayerSession()) {
-    this.session = session;
-    this.unsubscribe = session.subscribe(() => {
-      this.mirror();
-    });
-    this.unsubscribeTransient = session.subscribeTransient((event) => {
-      this.onTransient(event);
-    });
-    this.mirror();
-  }
-
-  get error(): string | null {
-    return this.errorState;
-  }
-
-  set error(message: string | null) {
-    this.session.setError(message);
+    super(session);
+    this.connect();
   }
 
   phase = $derived<HavocMultiplayerPhase>(this.snapshot?.phase ?? 'lobby');
@@ -160,22 +130,7 @@ export class HavocMultiplayerPresenter {
       this.draft.activeParticipantId === this.participantId &&
       !this.busy,
   );
-  myRematchRequested = $derived(rematchRequested(this.commands, this.participantId, true));
-  rivalRematchRequested = $derived(rematchRequested(this.commands, this.participantId, false));
   successorRoomId = $derived(this.snapshot?.successorRoomId ?? null);
-
-  attach(roomId: string): Promise<void> {
-    return this.session.attach(roomId);
-  }
-
-  /** Retry the whole room attachment after a failed load. */
-  retryAttach(): Promise<void> {
-    return this.session.retryAttach();
-  }
-
-  refresh(): Promise<void> {
-    return this.session.refresh();
-  }
 
   createRoom(
     variant: HavocMultiplayerVariant = 'standard',
@@ -207,35 +162,6 @@ export class HavocMultiplayerPresenter {
     return this.session.rerollOffer();
   }
 
-  readyForNextGame(): Promise<void> {
-    return this.session.readyForNextGame();
-  }
-
-  startBroadcast(auto = false): Promise<void> {
-    return this.session.startBroadcast(auto);
-  }
-
-  requestRematch(): Promise<void> {
-    return this.session.requestRematch();
-  }
-
-  confirmRematch(): Promise<void> {
-    return this.session.confirmRematch();
-  }
-
-  followRematch(): Promise<Id | null> {
-    return this.session.followRematch();
-  }
-
-  removeGuest(): Promise<void> {
-    return this.session.removeGuest();
-  }
-
-  async leaveRoom(): Promise<void> {
-    await this.session.leaveRoom();
-    this.playback.stop();
-  }
-
   async consider(card: HavocDraftCard | null): Promise<void> {
     if (!this.snapshot || !this.participantId || !this.draft) return;
     this.consideration = null;
@@ -252,70 +178,28 @@ export class HavocMultiplayerPresenter {
     this.muted = muted;
   }
 
-  continueAfterGame(): void {
-    this.session.continueAfterGame();
-  }
-
   seriesGameEntries(): HavocMultiplayerSeriesGame[] {
     return this.series?.games ?? [];
   }
 
-  dispose(): void {
-    this.disposed = true;
-    this.playback.stop();
-    this.considerationTimer.clear();
-    this.unsubscribe?.();
-    this.unsubscribe = null;
-    this.unsubscribeTransient?.();
-    this.unsubscribeTransient = null;
-    this.session.dispose();
+  protected participantIdOf(
+    view: HavocMultiplayerSessionView,
+  ): HavocMultiplayerParticipantId | null {
+    return view.localRole;
   }
 
-  private mirror(): void {
-    if (this.disposed) return;
-    const view = this.session.getSnapshot();
-    const previousBroadcastGame = this.snapshot?.broadcast?.gameNumber ?? null;
+  protected mirrorView(view: HavocMultiplayerSessionView): void {
     this.assets = view.assets;
     this.snapshot = view.snapshot;
-    this.participantId = view.localRole;
     this.draft = view.draft;
     this.outputs = view.outputs;
     this.verification = view.verification;
     this.mvp = view.mvp;
-    this.commands = view.commands;
     this.completedRecap = view.completedRecap;
-    this.busy = view.busy;
-    this.connection = view.connection;
-    this.errorState = view.error;
-    this.notice = view.notice;
-    this.integrityFailed = view.integrityFailed;
-    this.progress = view.progress;
-    this.awaitingContinue = view.awaitingContinue;
-    this.localReady = view.localReady;
-    this.opponentReady = view.opponentReady;
-    this.readyCountdownMs = view.readyCountdownMs;
-    this.deadlineMsLeft = view.deadlineMsLeft;
-    const broadcastGame = view.snapshot?.broadcast?.gameNumber ?? null;
-    if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
-      this.startPlayback();
-    }
-    if (view.snapshot?.broadcast == null && this.playback.active) {
-      this.playback.stop();
-    }
   }
 
-  private startPlayback(): void {
-    this.playback.start({
-      isDisposed: () => this.disposed,
-      hasBroadcast: () => this.currentBroadcast != null,
-      beginPlayback: () => {
-        this.session.beginPlayback();
-      },
-      advancePlayback: (advanceMs) => {
-        this.session.advancePlayback(advanceMs);
-      },
-      progress: () => this.session.getSnapshot().progress,
-    });
+  protected onDispose(): void {
+    this.considerationTimer.clear();
   }
 
   private draftCardOf(cardId: string): HavocDraftCard | null {
@@ -326,7 +210,7 @@ export class HavocMultiplayerPresenter {
     return picked?.card ?? null;
   }
 
-  private onTransient(event: HavocMultiplayerTransientEvent): void {
+  protected onTransient(event: HavocMultiplayerTransientEvent): void {
     if (this.disposed || event.participantId === this.participantId) return;
     if (event.kind === 'consideration') {
       const card = this.draftCardOf(event.cardId);

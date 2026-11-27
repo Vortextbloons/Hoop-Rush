@@ -375,6 +375,7 @@ describe('Draft Duel ready check progression', () => {
   it('advances broadcast playback uniformly at a fixed rate', () => {
     const tick = stubManualRaf();
     applyBroadcastSnapshot(Date.now());
+    expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(1);
     tick();
     expect(controller.progress).toBe(0);
 
