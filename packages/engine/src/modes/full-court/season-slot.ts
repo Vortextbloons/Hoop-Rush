@@ -286,6 +286,7 @@ export function simulateFullCourtSeasonSlot(
         game,
         fixture === userFixture,
         fixture === userFixture ? userLineups : undefined,
+        true,
       ),
     });
   });

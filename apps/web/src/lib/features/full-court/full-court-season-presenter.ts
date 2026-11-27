@@ -93,12 +93,14 @@ export interface FullCourtMatchupView {
 
 export type FullCourtHomeActionKind = 'sim' | 'start-playoffs';
 
-/** Optional interruptions for a regular-season batch. */
+/** Optional interruptions for a regular-season or playoff batch. */
 export interface FullCourtAdvanceOptions {
   /** Stop after the first user injury that would affect the next fixture. */
   readonly stopAtInjury?: boolean;
   /** Stop after a scheduled quarterly review slot. */
   readonly stopAtReview?: boolean;
+  /** In playoffs, sim through opponent adjustments until the series finishes. */
+  readonly ignoreOpponentAdjustment?: boolean;
 }
 
 export interface FullCourtHomeAction extends FullCourtAdvanceOptions {
@@ -694,19 +696,44 @@ export function fullCourtNextReviewSlot(completedThroughSlot: number): number | 
   return FULL_COURT_REVIEW_SLOTS.find((slot) => slot > completedThroughSlot) ?? null;
 }
 
+/** Returns the number of games until the user's next back-to-back game, or null if none remain. */
+export function fullCourtGamesToNextBackToBack(
+  lock: FullCourtSeasonLock,
+  completedThroughSlot: number,
+): number | null {
+  const { userTeamId, games } = lock.season;
+  const userGames = games
+    .filter((game) => game.homeTeamId === userTeamId || game.awayTeamId === userTeamId)
+    .sort((a, b) => a.slot - b.slot);
+  for (let i = 1; i < userGames.length; i += 1) {
+    const prev = userGames[i - 1];
+    const curr = userGames[i];
+    if (
+      prev !== undefined &&
+      curr !== undefined &&
+      curr.slot > completedThroughSlot &&
+      curr.dayOffset - prev.dayOffset === 1
+    ) {
+      return curr.slot - completedThroughSlot;
+    }
+  }
+  return null;
+}
+
 /**
  * The home screen owns the one primary action for the current season state.
  * Regular season sims, the playoff seeding step, forfeit confirmation, and
  * terminal recap are mutually exclusive so the card never offers a stale action.
  */
 export function fullCourtHomeControls(input: {
+  readonly lock?: FullCourtSeasonLock;
   readonly checkpoint: FullCourtSeasonCheckpoint;
   readonly playoff: FullCourtPlayoffView | null;
   readonly pendingForfeit: boolean;
   readonly busy: boolean;
   readonly restConflict?: boolean;
 }): FullCourtHomeControls {
-  const { checkpoint, playoff, pendingForfeit, busy, restConflict = false } = input;
+  const { lock, checkpoint, playoff, pendingForfeit, busy, restConflict = false } = input;
   const played = Math.min(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM, checkpoint.completedThroughSlot);
   const remaining = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - played;
   const regularComplete = remaining === 0;
@@ -744,12 +771,12 @@ export function fullCourtHomeControls(input: {
         primary: sim('Sim next game', 1),
         secondary: [
           userAlive
-            ? sim('Sim next five', 5)
-            : sim('Sim remaining games', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
+            ? sim('Sim series', CAP_RUSH_SERIES_GAMES, { ignoreOpponentAdjustment: true })
+            : sim('Sim rest of bracket', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
         ],
       },
       userAlive
-        ? 'Sims count your games; AI-only bracket games advance automatically.'
+        ? 'Play game-by-game or sim the full series; AI bracket games advance automatically.'
         : 'Your run is over. Sim the remaining bracket to crown a champion.',
     );
   }
@@ -768,6 +795,7 @@ export function fullCourtHomeControls(input: {
   }
   const reviewSlot = fullCourtNextReviewSlot(played);
   const reviewCount = reviewSlot === null ? null : reviewSlot - played;
+  const backToBackCount = lock === undefined ? null : fullCourtGamesToNextBackToBack(lock, played);
   const shortCount = Math.min(5, remaining);
   const interrupted: FullCourtAdvanceOptions = { stopAtInjury: true, stopAtReview: true };
   const secondary: FullCourtHomeAction[] = [];
@@ -776,6 +804,15 @@ export function fullCourtHomeControls(input: {
   } else {
     secondary.push(sim(`Sim ${String(shortCount)}`, shortCount, interrupted));
     if (reviewCount !== null) secondary.push(sim('Sim to next review', reviewCount, interrupted));
+  }
+  if (
+    backToBackCount !== null &&
+    backToBackCount > 1 &&
+    backToBackCount !== shortCount &&
+    backToBackCount !== reviewCount &&
+    backToBackCount !== remaining
+  ) {
+    secondary.push(sim('Sim to back-to-back', backToBackCount - 1, interrupted));
   }
   if (remaining !== shortCount && remaining !== reviewCount) {
     secondary.push(sim('Sim remaining games', remaining));

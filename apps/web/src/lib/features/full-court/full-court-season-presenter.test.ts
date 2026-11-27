@@ -153,8 +153,12 @@ describe('full court home controls', () => {
     });
     expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
     expect(controls.secondary).toHaveLength(1);
+    expect(controls.secondary[0]).toMatchObject({
+      label: 'Sim series',
+      ignoreOpponentAdjustment: true,
+    });
     expect(controls.status).toBe(
-      'Sims count your games; AI-only bracket games advance automatically.',
+      'Play game-by-game or sim the full series; AI bracket games advance automatically.',
     );
   });
 
@@ -169,7 +173,7 @@ describe('full court home controls', () => {
     });
     expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
     expect(controls.secondary[0]).toMatchObject({
-      label: 'Sim remaining games',
+      label: 'Sim rest of bracket',
     });
     expect(controls.status).toContain('Your run is over');
   });
@@ -533,8 +537,9 @@ describe('full court simulation interruptions', () => {
       busy: false,
     });
     expect(controls.primary?.stopAtInjury).toBeUndefined();
-    expect(controls.secondary[0]?.label).toBe('Sim next five');
-    expect(controls.secondary[0]?.count).toBe(5);
+    expect(controls.secondary[0]?.label).toBe('Sim series');
+    expect(controls.secondary[0]?.count).toBe(7);
+    expect(controls.secondary[0]?.ignoreOpponentAdjustment).toBe(true);
   });
 
   test('regular-season batches stay uninterrupted once the season is over', () => {

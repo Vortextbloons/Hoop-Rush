@@ -3,7 +3,13 @@
   import { ClipboardList, Dices } from '@lucide/svelte';
   import { onMount } from 'svelte';
   import { fullCourtReportPriceDollars } from '@hoop-rush/data-contracts';
-  import { defaultFullCourtCoachingRotation, fullCourtAssessPurchase } from '@hoop-rush/engine';
+  import {
+    defaultFullCourtCoachingRotation,
+    fullCourtAssessPurchase,
+    fullCourtStandings,
+    fullCourtWarChestDollars,
+  } from '@hoop-rush/engine';
+  import { formatWarChestCr } from '#lib/features/full-court/full-court-draft-presentation.js';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Button from '#lib/components/ui/Button.svelte';
@@ -34,10 +40,10 @@
   let startupError = $state<string | null>(null);
   const seasonSections = [
     { value: 'home', label: 'Overview' },
-    { value: 'team', label: 'Team' },
+    { value: 'team', label: 'Team & Tactics' },
     { value: 'war-room', label: 'War Room' },
     { value: 'league', label: 'League' },
-    { value: 'stats', label: 'Stats' },
+    { value: 'stats', label: 'Stats & Awards' },
     { value: 'playoffs', label: 'Playoffs' },
   ] as const;
   let section = $state<(typeof seasonSections)[number]['value']>('home');
@@ -104,6 +110,11 @@
   );
   const league = $derived(season?.lock.season);
   const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
+  const userStandingsRow = $derived.by(() => {
+    if (!season || !userTeam) return null;
+    const table = fullCourtStandings(season.lock.season.teams, season.scores);
+    return [...table.west, ...table.east].find((row) => row.teamId === userTeam.teamId) ?? null;
+  });
   const health = $derived(
     userTeam && season
       ? (current?.playoffs?.checkpoint.healthByTeam ?? season.checkpoint.healthByTeam)[
@@ -180,17 +191,68 @@
     {/if}
 
     {#if season}
+      <div
+        class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-strong bg-surface-1/90 px-4 py-3"
+      >
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="font-display truncate text-xl font-extrabold tracking-tight uppercase">
+                {userTeam?.displayName ?? 'Your Franchise'}
+              </p>
+              {#if userStandingsRow !== null}
+                <span
+                  class="rounded-md border border-line-strong bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-foreground"
+                >
+                  {userStandingsRow.wins}–{userStandingsRow.losses} · #{userStandingsRow.seed}
+                  {userStandingsRow.conference.toUpperCase()}
+                </span>
+              {/if}
+            </div>
+            <p
+              class="mt-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase"
+            >
+              {playoff !== null
+                ? 'Postseason Live'
+                : `Regular Season · Game ${String(season.checkpoint.completedThroughSlot)} of 82`}
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          {#if draft}
+            <div
+              class="rounded-lg border border-line-soft bg-surface-2 px-3 py-1.5 font-mono text-[11px] font-bold tabular-nums text-accent"
+            >
+              {formatWarChestCr(fullCourtWarChestDollars(draft))} War Chest
+            </div>
+          {/if}
+        </div>
+      </div>
+
       <nav
         aria-label="Full Court season"
-        class="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-border p-1 sm:grid-cols-6"
+        class="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-line-strong bg-surface-1 p-1 sm:grid-cols-6"
       >
         {#each seasonSections as item (item.value)}
-          <Button
-            class="min-h-11 px-1"
-            tone={section === item.value ? 'primary' : 'secondary'}
+          <button
+            type="button"
             aria-current={section === item.value ? 'page' : undefined}
-            onclick={() => selectSection(item.value)}>{item.label}</Button
+            onclick={() => selectSection(item.value)}
+            class="font-display relative flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-extrabold tracking-wide uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {section ===
+            item.value
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
           >
+            {item.label}
+            {#if item.value === 'playoffs' && playoff !== null && playoff.championTeamId === null}
+              <span
+                class="h-1.5 w-1.5 rounded-full {section === item.value
+                  ? 'bg-primary-foreground'
+                  : 'bg-accent'}"
+                aria-hidden="true"
+              ></span>
+            {/if}
+          </button>
         {/each}
       </nav>
       {#if current.simulating}

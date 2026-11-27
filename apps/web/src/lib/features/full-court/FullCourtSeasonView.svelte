@@ -16,6 +16,8 @@
   } from '@hoop-rush/data-contracts';
   import { FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
   import {
+    buildFullCourtAwards,
+    buildFullCourtPlayerSeasonStats,
     buildFullCourtSeasonStats,
     fullCourtStandings,
     fullCourtUserNextPlayoffMatchup,
@@ -37,6 +39,7 @@
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { ScheduleCell } from '#lib/components/ui/types.js';
   import { getManifest } from '#lib/data.js';
+  import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
   import {
     fullCourtFinalRecap,
@@ -227,6 +230,7 @@
   );
   const controls = $derived(
     fullCourtHomeControls({
+      lock,
       checkpoint,
       playoff,
       pendingForfeit,
@@ -235,6 +239,32 @@
     }),
   );
   const recap = $derived(fullCourtFinalRecap(lock, playoff, teamName));
+  const playoffGamesList = $derived(
+    playoff === null ? [] : playoff.series.flatMap((entry) => entry.games),
+  );
+  const awards = $derived.by(() => {
+    try {
+      return buildFullCourtAwards({
+        teams: lock.season.teams,
+        regularScores: scores,
+        standings,
+        completedSlots: played,
+        playoffGames: playoffGamesList,
+        championTeamId: playoff?.championTeamId ?? null,
+      });
+    } catch {
+      return null;
+    }
+  });
+  const userRosterStats = $derived(
+    userTeam === null
+      ? []
+      : buildFullCourtPlayerSeasonStats({
+          teams: [userTeam],
+          scores,
+        }).filter((row) => row.games > 0),
+  );
+  const latestPlayoffGame = $derived(userSeriesGames.at(-1) ?? null);
 
   function teamName(teamId: string): string {
     return teamsById.get(teamId)?.displayName ?? teamId;
@@ -304,6 +334,82 @@
     return series.highTeamId === userTeamId || series.lowTeamId === userTeamId;
   }
 </script>
+
+{#snippet seriesPips(wins: number)}
+  <div class="mt-1.5 flex items-center gap-1" aria-hidden="true">
+    {#each [0, 1, 2, 3] as pip (pip)}
+      <span
+        class="h-2 w-2 rounded-full transition-colors {pip < wins ? 'bg-accent' : 'bg-surface-3'}"
+      ></span>
+    {/each}
+  </div>
+{/snippet}
+
+{#snippet simControlsBar()}
+  <div
+    class="mt-5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-4"
+    aria-busy={busy}
+  >
+    {#if controls.primary !== null}
+      <Button
+        tone="primary"
+        disabled={busy}
+        onclick={() => {
+          if (controls.primary !== null) runAction(controls.primary);
+        }}
+      >
+        {#if controls.primary.kind === 'start-playoffs'}
+          <Trophy size={15} aria-hidden="true" />
+        {:else}
+          <Play size={15} aria-hidden="true" />
+        {/if}
+        {controls.primary.label}
+      </Button>
+    {/if}
+    {#each controls.secondary as action (action.label)}
+      <Button tone="secondary" disabled={busy} onclick={() => runAction(action)}>
+        {#if action.count >= 5}
+          <FastForward size={15} aria-hidden="true" />
+        {:else}
+          <SkipForward size={15} aria-hidden="true" />
+        {/if}
+        {action.label}
+      </Button>
+    {/each}
+    {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
+      <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
+        Watch next game
+      </Button>
+    {/if}
+    <p class="text-[11px] text-muted-foreground" role="status">
+      {controls.status}
+    </p>
+  </div>
+
+  {#if notice !== null && !busy}
+    <Alert class="mt-3" tone={notice.tone} title={notice.title}>
+      <p>{notice.message}</p>
+      {#snippet actions()}
+        <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
+      {/snippet}
+    </Alert>
+  {/if}
+
+  {#if pendingForfeit}
+    <Alert class="mt-3" tone="warning" title="Confirm the forfeit">
+      <p>
+        The next Full Court game is a forfeit. Confirm it to record the result and continue the
+        season.
+      </p>
+      {#snippet actions()}
+        <Button tone="primary" disabled={busy} onclick={confirmForfeit}>
+          <ShieldAlert size={15} aria-hidden="true" />
+          {busy ? 'Recording…' : 'Confirm forfeit'}
+        </Button>
+      {/snippet}
+    </Alert>
+  {/if}
+{/snippet}
 
 {#snippet latestStatus()}
   <span class="ui-micro font-bold">
@@ -446,6 +552,8 @@
             {/if}
           </div>
         </div>
+      {:else if userSeries === null || !userSeriesActive}
+        {@render simControlsBar()}
       {/if}
     </Panel>
   {/if}
@@ -509,6 +617,7 @@
                   ? 'text-accent'
                   : 'text-foreground'}">{wins}</span
               >
+              {@render seriesPips(wins)}
             </div>
           </div>
           {#if index === 0}
@@ -587,6 +696,9 @@
             </li>
           {/each}
         </ol>
+      {/if}
+      {#if userSeriesActive}
+        {@render simControlsBar()}
       {/if}
     </Panel>
   {/if}
@@ -831,74 +943,46 @@
       />
     </div>
 
-    <div
-      class="mt-5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-4"
-      aria-busy={busy}
-    >
-      {#if controls.primary !== null}
-        <Button
-          tone="primary"
-          disabled={busy}
-          onclick={() => {
-            if (controls.primary !== null) runAction(controls.primary);
-          }}
-        >
-          {#if controls.primary.kind === 'start-playoffs'}
-            <Trophy size={15} aria-hidden="true" />
-          {:else}
-            <Play size={15} aria-hidden="true" />
-          {/if}
-          {controls.primary.label}
-        </Button>
-      {/if}
-      {#each controls.secondary as action (action.label)}
-        <Button tone="secondary" disabled={busy} onclick={() => runAction(action)}>
-          {#if action.count >= 5}
-            <FastForward size={15} aria-hidden="true" />
-          {:else}
-            <SkipForward size={15} aria-hidden="true" />
-          {/if}
-          {action.label}
-        </Button>
-      {/each}
-      {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
-        <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
-          Watch next game
-        </Button>
-      {/if}
-      <p class="text-[11px] text-muted-foreground" role="status">
-        {controls.status}
-      </p>
-    </div>
-
-    {#if notice !== null && !busy}
-      <Alert class="mt-3" tone={notice.tone} title={notice.title}>
-        <p>{notice.message}</p>
-        {#snippet actions()}
-          <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
-        {/snippet}
-      </Alert>
-    {/if}
-
-    {#if pendingForfeit}
-      <Alert class="mt-3" tone="warning" title="Confirm the forfeit">
-        <p>
-          The next Full Court game is a forfeit. Confirm it to record the result and continue the
-          season.
-        </p>
-        {#snippet actions()}
-          <Button tone="primary" disabled={busy} onclick={confirmForfeit}>
-            <ShieldAlert size={15} aria-hidden="true" />
-            {busy ? 'Recording…' : 'Confirm forfeit'}
-          </Button>
-        {/snippet}
-      </Alert>
-    {/if}
+    {@render simControlsBar()}
   </Panel>
 {/snippet}
 
 {#snippet latestResultPanel()}
-  {#if latestCell !== null && latestResult !== null}
+  {#if playoff !== null && latestPlayoffGame !== null && userSeriesOpponentId !== null}
+    <Panel as="section" padding="sm" aria-label="Latest Full Court result">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <p class="ui-label" data-tone="muted">
+          Latest playoff result · Game {latestPlayoffGame.gameOrdinal}
+        </p>
+        <Badge tone={latestPlayoffGame.won ? 'positive' : 'negative'}>
+          {latestPlayoffGame.doubleForfeit
+            ? 'Double forfeit'
+            : latestPlayoffGame.won
+              ? 'Win'
+              : 'Loss'}
+        </Badge>
+      </div>
+      <GameScoreboard
+        teams={[
+          {
+            key: 'you',
+            label: userTeamName,
+            score: latestPlayoffGame.userPoints ?? '—',
+            winner: latestPlayoffGame.doubleForfeit ? false : latestPlayoffGame.won,
+          },
+          {
+            key: 'opponent',
+            label: teamName(userSeriesOpponentId),
+            score: latestPlayoffGame.opponentPoints ?? '—',
+            winner: latestPlayoffGame.doubleForfeit ? false : !latestPlayoffGame.won,
+          },
+        ]}
+        status={latestStatus}
+        label={`Playoff Game ${String(latestPlayoffGame.gameOrdinal)} result`}
+        class="mt-2"
+      />
+    </Panel>
+  {:else if latestCell !== null && latestResult !== null}
     <Panel as="section" padding="sm" aria-label="Latest Full Court result">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <p class="ui-label" data-tone="muted">
@@ -1044,7 +1128,17 @@
                 <td>{lineup.pointsFor}</td>
                 <td>{lineup.pointsAgainst}</td>
                 <td>{possessionLabel(lineup.pacePossessions)}</td>
-                <td>{rateLabel(lineup.netRatingPer100)}{lineup.sampleMet ? '' : ' *'}</td>
+                <td
+                  class="font-bold {lineup.netRatingPer100 === null
+                    ? ''
+                    : lineup.netRatingPer100 > 0
+                      ? 'text-positive'
+                      : lineup.netRatingPer100 < 0
+                        ? 'text-negative'
+                        : ''}"
+                >
+                  {rateLabel(lineup.netRatingPer100)}{lineup.sampleMet ? '' : ' *'}
+                </td>
                 <td title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}
                   >{lineup.rank ?? '—'}</td
                 >
@@ -1073,6 +1167,10 @@
       <p class="mt-2 text-xs text-muted-foreground">Play a game to record the first actual five.</p>
     {/if}
   </Panel>
+
+  {#if awards !== null}
+    <FullCourtAwardsPanel {awards} rosterStats={userRosterStats} {userTeamId} />
+  {/if}
 {/snippet}
 
 {#snippet leaguePanel()}

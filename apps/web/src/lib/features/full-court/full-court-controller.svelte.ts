@@ -1066,6 +1066,7 @@ export class FullCourtController {
       const opponentSide = fixture.userSide === 'home' ? 'away' : 'home';
       const applied = outcome.checkpoint.games.at(-1)?.adaptations?.[opponentSide];
       if (
+        input.options.ignoreOpponentAdjustment !== true &&
         nextPreview?.adaptation !== null &&
         nextPreview?.adaptation !== undefined &&
         fullCourtPlayoffAdjustmentChanged(applied, nextPreview.adaptation)

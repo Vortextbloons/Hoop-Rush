@@ -448,6 +448,16 @@ export {
   type FullCourtLineupFactsOptions,
 } from './modes/full-court/report.ts';
 export {
+  buildFullCourtAwards,
+  buildFullCourtPlayerSeasonStats,
+  type FullCourtAwardCandidate,
+  type FullCourtAwardResult,
+  type FullCourtAwardsBoard,
+  type FullCourtAwardsTeamInput,
+  type FullCourtLeagueLeaders,
+  type FullCourtPlayerSeasonRow,
+} from './modes/full-court/awards.ts';
+export {
   buildFullCourtSeasonStats,
   buildFullCourtSeasonSummary,
   type FullCourtSeasonLineupOmitted,

@@ -516,7 +516,7 @@ export function simulateFullCourtPlayoffGame(
     dayOffset: fixture.dayOffset,
     homeTeamId: fixture.homeTeamId,
     awayTeamId: fixture.awayTeamId,
-    outcome: fullCourtScoreOutcome(game, side !== null, userLineups),
+    outcome: fullCourtScoreOutcome(game, side !== null, userLineups, true),
     ...(game.kind === 'played' && evidence !== undefined ? { evidence } : {}),
     ...(game.kind === 'played' && adaptations !== undefined ? { adaptations } : {}),
   };

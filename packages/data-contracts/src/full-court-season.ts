@@ -137,6 +137,34 @@ const nonnegativeSidePointsSchema = z.object({
   away: z.number().int().nonnegative(),
 });
 
+export const fullCourtPlayerGameStatsSchema = z.object({
+  playerId: z.string().min(1).max(64),
+  started: z.boolean(),
+  seconds: z.number().int().nonnegative(),
+  points: z.number().int(),
+  rebounds: z.number().int().nonnegative(),
+  offRebounds: z.number().int().nonnegative(),
+  defRebounds: z.number().int().nonnegative(),
+  assists: z.number().int().nonnegative(),
+  steals: z.number().int().nonnegative(),
+  blocks: z.number().int().nonnegative(),
+  turnovers: z.number().int().nonnegative(),
+  fouls: z.number().int().nonnegative(),
+  fgm: z.number().int().nonnegative(),
+  fga: z.number().int().nonnegative(),
+  tpm: z.number().int().nonnegative(),
+  tpa: z.number().int().nonnegative(),
+  ftm: z.number().int().nonnegative(),
+  fta: z.number().int().nonnegative(),
+});
+export type FullCourtPlayerGameStats = z.infer<typeof fullCourtPlayerGameStatsSchema>;
+
+export const fullCourtGamePlayerStatsSchema = z.object({
+  home: z.array(fullCourtPlayerGameStatsSchema),
+  away: z.array(fullCourtPlayerGameStatsSchema),
+});
+export type FullCourtGamePlayerStats = z.infer<typeof fullCourtGamePlayerStatsSchema>;
+
 /**
  * Player-attributed Roulette deductions can make a bench or starter subtotal
  * negative. `starterPoints` is the explicit signed component contract for those
@@ -153,6 +181,8 @@ const playedScoreSchema = z
     starterPoints: signedSidePointsSchema.optional(),
     /** Present only on the user's played fixture; legacy scores omit it. */
     lineups: fullCourtGameLineupsSchema.optional(),
+    /** Compact per-player box stats for season leaders, player averages, and awards. */
+    playerStats: fullCourtGamePlayerStatsSchema.optional(),
   })
   .superRefine((score, context) => {
     if (score.starterPoints !== undefined && score.benchPoints === undefined) {

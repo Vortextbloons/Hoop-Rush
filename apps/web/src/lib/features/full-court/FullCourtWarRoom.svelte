@@ -253,17 +253,40 @@
 <div class="flex flex-col gap-3">
   <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} />
 
-  <FullCourtTrainingCampPanel
-    {draft}
-    {index}
-    {busy}
-    campOpen={practiceOpen}
-    {practiceOpen}
-    {practice}
-    {onPurchaseReport}
-    {onRunPractice}
-    {art}
-  />
+  {#if practiceOpen || practice !== null}
+    <FullCourtTrainingCampPanel
+      {draft}
+      {index}
+      {busy}
+      campOpen={practiceOpen}
+      {practiceOpen}
+      {practice}
+      {onPurchaseReport}
+      {onRunPractice}
+      {art}
+    />
+  {:else}
+    <details class="rounded-xl border border-line-soft bg-surface-1/60 px-4 py-2.5">
+      <summary
+        class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+      >
+        Preseason Training Camp · Closed
+      </summary>
+      <div class="mt-2">
+        <FullCourtTrainingCampPanel
+          {draft}
+          {index}
+          {busy}
+          campOpen={false}
+          practiceOpen={false}
+          {practice}
+          {onPurchaseReport}
+          {onRunPractice}
+          {art}
+        />
+      </div>
+    </details>
+  {/if}
 
   <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
     <SectionHeading

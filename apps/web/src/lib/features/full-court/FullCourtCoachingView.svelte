@@ -591,6 +591,17 @@
             >
               {minutesSummary()}
             </p>
+            <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-3">
+              <div
+                class="h-full rounded-full transition-all {validation.totalMinutes ===
+                FULL_COURT_MINUTE_TOTAL
+                  ? 'bg-positive'
+                  : validation.totalMinutes > FULL_COURT_MINUTE_TOTAL
+                    ? 'bg-negative'
+                    : 'bg-primary'}"
+                style={`width: ${String(Math.min(100, Math.round((validation.totalMinutes / FULL_COURT_MINUTE_TOTAL) * 100)))}%`}
+              ></div>
+            </div>
 
             <div class="mt-3 grid gap-1.5 md:grid-cols-2">
               {#each minuteGroups as group (group.label)}
@@ -632,22 +643,49 @@
                             {/if}
                           </span>
                         </span>
-                        <label class="inline-flex shrink-0 items-center gap-1">
-                          <span class="sr-only">Minutes for {row.player.displayName}</span>
-                          <input
-                            type="number"
-                            inputmode="numeric"
-                            min="0"
-                            max={FULL_COURT_MAX_PLAYER_MINUTES}
-                            step="1"
-                            class="min-h-11 w-16 rounded-lg border border-line-soft bg-surface-2 px-2 text-right font-mono text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                            value={row.minutes}
-                            disabled={locked || !editingRotation}
-                            oninput={(event) =>
-                              setMinutes(row.player.playerId, event.currentTarget.value)}
-                          />
-                          <span class="ui-micro" aria-hidden="true">min</span>
-                        </label>
+                        <div class="inline-flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            class="flex h-9 w-8 items-center justify-center rounded-lg border border-line-soft bg-surface-2 font-mono text-sm font-bold text-foreground transition-colors hover:border-line-strong disabled:opacity-40"
+                            aria-label={`Decrease minutes for ${row.player.displayName}`}
+                            disabled={locked || !editingRotation || row.minutes <= 0}
+                            onclick={() =>
+                              setMinutes(row.player.playerId, String(Math.max(0, row.minutes - 1)))}
+                          >
+                            −
+                          </button>
+                          <label class="inline-flex items-center gap-1">
+                            <span class="sr-only">Minutes for {row.player.displayName}</span>
+                            <input
+                              type="number"
+                              inputmode="numeric"
+                              min="0"
+                              max={FULL_COURT_MAX_PLAYER_MINUTES}
+                              step="1"
+                              class="min-h-9 w-14 rounded-lg border border-line-soft bg-surface-2 px-1.5 text-center font-mono text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                              value={row.minutes}
+                              disabled={locked || !editingRotation}
+                              oninput={(event) =>
+                                setMinutes(row.player.playerId, event.currentTarget.value)}
+                            />
+                            <span class="ui-micro" aria-hidden="true">min</span>
+                          </label>
+                          <button
+                            type="button"
+                            class="flex h-9 w-8 items-center justify-center rounded-lg border border-line-soft bg-surface-2 font-mono text-sm font-bold text-foreground transition-colors hover:border-line-strong disabled:opacity-40"
+                            aria-label={`Increase minutes for ${row.player.displayName}`}
+                            disabled={locked ||
+                              !editingRotation ||
+                              row.minutes >= FULL_COURT_MAX_PLAYER_MINUTES}
+                            onclick={() =>
+                              setMinutes(
+                                row.player.playerId,
+                                String(Math.min(FULL_COURT_MAX_PLAYER_MINUTES, row.minutes + 1)),
+                              )}
+                          >
+                            +
+                          </button>
+                        </div>
                       </li>
                     {/each}
                   </ul>
@@ -1001,7 +1039,7 @@
           {#snippet primary()}
             <Button
               type="submit"
-              tone="primary"
+              tone={dirty ? 'primary' : 'secondary'}
               loading={saving}
               disabled={!validation.valid || locked || !dirty}
             >
