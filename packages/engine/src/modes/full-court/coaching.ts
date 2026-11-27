@@ -1,6 +1,7 @@
 import type {
   FullCourtCoachingPlan,
   FullCourtCoachingRule,
+  FullCourtDefensiveMatchups,
   FullCourtOffensiveHierarchy,
   FullCourtTactics,
   SimulationPlayer,
@@ -48,6 +49,11 @@ export function assertFullCourtCoachingRoster(
       if (outside(id)) throw new Error('The saved rotation includes a player outside your roster.');
     }
   }
+  for (const unit of plan.units ?? []) {
+    if (unit.playerIds.some(outside)) {
+      throw new Error('The saved named unit includes a player outside your roster.');
+    }
+  }
   for (const rule of plan.rules ?? []) {
     const ruleIds = rule.kind === 'closing-lineup' ? rule.lineup : [rule.playerId];
     if (rule.kind === 'foul-trouble' && rule.replacementPlayerId !== undefined) {
@@ -85,15 +91,21 @@ export function withFullCourtCoaching(
     readonly tactics?: FullCourtTactics;
     readonly rules?: readonly FullCourtCoachingRule[];
     readonly hierarchy?: FullCourtOffensiveHierarchy;
+    readonly defensiveMatchups?: FullCourtDefensiveMatchups;
   },
 ): FullCourtTeamGameInput {
-  const { rotation, tactics, rules, hierarchy } = options;
+  const { rotation, tactics, rules, hierarchy, defensiveMatchups } = options;
   const activeRules = rules !== undefined && rules.length > 0 ? rules : undefined;
+  const activeMatchups =
+    defensiveMatchups !== undefined && defensiveMatchups.assignments.length > 0
+      ? defensiveMatchups
+      : undefined;
   if (
     rotation === undefined &&
     tactics === undefined &&
     activeRules === undefined &&
-    hierarchy === undefined
+    hierarchy === undefined &&
+    activeMatchups === undefined
   ) {
     return team;
   }
@@ -115,5 +127,6 @@ export function withFullCourtCoaching(
     ...(rotationInput === undefined ? {} : { rotation: rotationInput }),
     ...(tactics === undefined ? {} : { tactics }),
     ...(hierarchy === undefined ? {} : { hierarchy }),
+    ...(activeMatchups === undefined ? {} : { defensiveMatchups: activeMatchups }),
   };
 }

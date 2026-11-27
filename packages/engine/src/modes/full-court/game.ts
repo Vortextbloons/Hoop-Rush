@@ -1,5 +1,6 @@
 import type {
   EraSimulationProfile,
+  FullCourtDefensiveMatchups,
   FullCourtOffensiveHierarchy,
   FullCourtTactics,
   PlayerDiagnostics,
@@ -46,8 +47,14 @@ import {
   type FullCourtRotationSnapshot,
   type FullCourtRotationUnit,
   type FullCourtRuleRuntimeState,
+  type FullCourtStaggeringInput,
   type FullCourtSubstitutionReason,
 } from './rotation.ts';
+import {
+  activeDefensiveMatchupSignature,
+  applyFullCourtDefensiveMatchupsToPrep,
+  resolveFullCourtDefensiveMatchups,
+} from './matchups.ts';
 import { resolveFullCourtRouletteTeam, type FullCourtRouletteTeamInput } from './roulette.ts';
 import { FullCourtRouletteRuntime, type FullCourtMutationRollup } from './roulette-runtime.ts';
 import {
@@ -98,6 +105,7 @@ export {
   type FullCourtSetupErrorCode,
   type FullCourtStaminaProfile,
   type FullCourtStaminaSource,
+  type FullCourtStaggeringInput,
   type FullCourtSubstitutionDecision,
   type FullCourtSubstitutionReason,
 } from './rotation.ts';
@@ -127,6 +135,8 @@ export interface FullCourtTeamGameInput {
   readonly tactics?: FullCourtTactics;
   /** Optional per-player offensive hierarchy; absent leaves opportunity weights untouched. */
   readonly hierarchy?: FullCourtOffensiveHierarchy;
+  /** Optional per-fixture defensive matchup assignments; absent leaves default coverage unchanged. */
+  readonly defensiveMatchups?: FullCourtDefensiveMatchups;
   /** Optional Full Court Roulette mutation attachments for this team. */
   readonly roulette?: FullCourtRouletteTeamInput;
 }
@@ -330,10 +340,13 @@ class RotationRuntime {
   readonly tactics: FullCourtTactics;
   private readonly opponentDefense: FullCourtTactics['defense'];
   private readonly hierarchy: FullCourtOffensiveHierarchy | undefined;
+  private readonly resolvedMatchups: ReadonlyMap<string, string> | null;
   private readonly roulette: FullCourtRouletteRuntime | undefined;
   private mutationEpoch = 0;
+  private currentMatchupKey = '';
   private readonly playerCache: Array<Map<number, SimulationPlayer>>;
   private readonly prepCache = new Map<number | string, LineupState>();
+  private readonly matchupPrepCache = new Map<string, LineupState>();
 
   constructor(
     plan: FullCourtRotationPlan,
@@ -344,6 +357,7 @@ class RotationRuntime {
     tactics: FullCourtTactics,
     opponentDefense: FullCourtTactics['defense'],
     hierarchy: FullCourtOffensiveHierarchy | undefined,
+    resolvedMatchups: ReadonlyMap<string, string> | null,
     roulette?: FullCourtRouletteRuntime,
   ) {
     this.plan = plan;
@@ -354,6 +368,7 @@ class RotationRuntime {
     this.tactics = tactics;
     this.opponentDefense = opponentDefense;
     this.hierarchy = hierarchy;
+    this.resolvedMatchups = resolvedMatchups;
     this.roulette = roulette;
     this.mutationEpoch = roulette?.profileEpoch(side) ?? 0;
     this.slots = [...plan.startingSlots];
@@ -484,15 +499,48 @@ class RotationRuntime {
    * or fatigue level changed, so the kernel reuses one prepared layout across
    * ordinary trips.
    */
-  refreshLineup(): void {
+  refreshLineup(opponentActivePlayerIds?: readonly string[]): void {
     const epoch = this.roulette?.profileEpoch(this.side) ?? 0;
     if (epoch !== this.mutationEpoch) {
       this.mutationEpoch = epoch;
       for (const cache of this.playerCache) cache.clear();
       this.prepCache.clear();
+      this.matchupPrepCache.clear();
+      this.currentMatchupKey = '';
     }
     const key = this.lineupKey();
-    if (key !== this.lineup.key) this.lineup = this.buildLineup(key);
+    if (this.resolvedMatchups === null) {
+      if (key !== this.lineup.key) this.lineup = this.buildLineup(key);
+      return;
+    }
+    const active =
+      opponentActivePlayerIds === undefined
+        ? null
+        : activeDefensiveMatchupSignature(
+            this.slots,
+            this.plan.roster,
+            opponentActivePlayerIds,
+            this.resolvedMatchups,
+          );
+    const nextMatchupKey = active?.key ?? '';
+    if (key === this.lineup.key && nextMatchupKey === this.currentMatchupKey) return;
+    const base = this.buildLineup(key);
+    if (active === null) {
+      this.lineup = base;
+      this.currentMatchupKey = '';
+      return;
+    }
+    const cacheKey = `${String(key)}|${active.key}`;
+    let matched = this.matchupPrepCache.get(cacheKey);
+    if (matched === undefined) {
+      matched = {
+        ...base,
+        prep: applyFullCourtDefensiveMatchupsToPrep(base.prep, active.pairs),
+      };
+      this.matchupPrepCache.set(cacheKey, matched);
+    }
+    this.lineup = matched;
+    this.currentMatchupKey = active.key;
   }
 
   snapshot(): FullCourtRotationSnapshot {
@@ -550,6 +598,19 @@ class RotationRuntime {
   }
 }
 
+/**
+ * The staggering preference reuses the saved offensive hierarchy, so it never
+ * introduces another roster assignment. Only the two scoring roles count.
+ */
+function fullCourtStaggering(team: FullCourtTeamGameInput): FullCourtStaggeringInput | undefined {
+  if (team.rotation?.staggerStars !== true) return undefined;
+  const scorerPlayerIds = [
+    team.hierarchy?.primaryPlayerId,
+    team.hierarchy?.secondaryPlayerId,
+  ].filter((playerId): playerId is string => playerId !== undefined);
+  return scorerPlayerIds.length === 0 ? undefined : { scorerPlayerIds };
+}
+
 export function simulateFullCourtGame(
   input: FullCourtGameInput,
   context: EngineContext,
@@ -605,11 +666,13 @@ export function runFullCourtGame(
     homeRoster,
     input.home.rotation ?? {},
     input.home.availability ?? [],
+    fullCourtStaggering(input.home),
   );
   const awayPlan = resolveRotationPlan(
     awayRoster,
     input.away.rotation ?? {},
     input.away.availability ?? [],
+    fullCourtStaggering(input.away),
   );
   const homeTactics = resolveFullCourtTactics(input.home.tactics);
   const awayTactics = resolveFullCourtTactics(input.away.tactics);
@@ -627,6 +690,18 @@ export function runFullCourtGame(
         awayPlan,
       })
     : undefined;
+  const homeMatchups = resolveFullCourtDefensiveMatchups({
+    ownRoster: homePlan.roster,
+    opponentTeamId: input.away.teamId,
+    opponentRoster: awayPlan.roster,
+    matchups: input.home.defensiveMatchups,
+  });
+  const awayMatchups = resolveFullCourtDefensiveMatchups({
+    ownRoster: awayPlan.roster,
+    opponentTeamId: input.home.teamId,
+    opponentRoster: homePlan.roster,
+    matchups: input.away.defensiveMatchups,
+  });
   const home = new RotationRuntime(
     homePlan,
     0,
@@ -636,6 +711,7 @@ export function runFullCourtGame(
     homeTactics,
     awayTactics.defense,
     input.home.hierarchy,
+    homeMatchups,
     roulette,
   );
   const away = new RotationRuntime(
@@ -647,11 +723,12 @@ export function runFullCourtGame(
     awayTactics,
     homeTactics.defense,
     input.away.hierarchy,
+    awayMatchups,
     roulette,
   );
+  const runtimes: readonly [RotationRuntime, RotationRuntime] = [home, away];
   roulette?.onTipoff([home.slots, away.slots]);
-  home.refreshLineup();
-  away.refreshLineup();
+  refreshLineups(runtimes);
 
   const recorder = new GameRecorder(
     roulette === undefined
@@ -695,7 +772,6 @@ export function runFullCourtGame(
   }
   effects?.setActiveUnits(home.lineup.units, away.lineup.units);
 
-  const runtimes: readonly [RotationRuntime, RotationRuntime] = [home, away];
   const tape: FullCourtTapeEvent[] | null = options.record === true ? [] : null;
   home.beginStint(0, recorder);
   away.beginStint(0, recorder);
@@ -746,7 +822,7 @@ export function runFullCourtGame(
         tape,
         roulette,
       );
-      for (const runtime of runtimes) runtime.refreshLineup();
+      refreshLineups(runtimes);
       syncKernel(ctx, runtimes, recorder, effects);
     } else {
       resolveSubstitutions(
@@ -762,7 +838,7 @@ export function runFullCourtGame(
         tape,
         roulette,
       );
-      for (const runtime of runtimes) runtime.refreshLineup();
+      refreshLineups(runtimes);
       syncKernel(ctx, runtimes, recorder, effects);
     }
 
@@ -799,13 +875,17 @@ export function runFullCourtGame(
         ]) ?? false;
       const foulCharges = refreshFouls(runtimes, ctx, recorder);
       if (roulette !== undefined) {
+        let anyExited = false;
         for (const runtime of runtimes) {
           const exited = roulette.checkCloneFoulOuts(runtime.side, ctx.personalFouls[runtime.side]);
           if (exited.length > 0) {
             runtime.closeStint(globalSeconds, recorder);
-            runtime.refreshLineup();
-            syncKernel(ctx, runtimes, recorder, effects);
+            anyExited = true;
           }
+        }
+        if (anyExited) {
+          refreshLineups(runtimes);
+          syncKernel(ctx, runtimes, recorder, effects);
         }
       }
 
@@ -842,7 +922,7 @@ export function runFullCourtGame(
           tape,
           roulette,
         );
-        for (const runtime of runtimes) runtime.refreshLineup();
+        refreshLineups(runtimes);
         syncKernel(ctx, runtimes, recorder, effects);
         awardEmergencyTechnicals(
           runtimes,
@@ -866,7 +946,7 @@ export function runFullCourtGame(
         tape,
         roulette,
       );
-      for (const runtime of runtimes) runtime.refreshLineup();
+      refreshLineups(runtimes);
       syncKernel(ctx, runtimes, recorder, effects);
     }
     period += 1;
@@ -1120,6 +1200,12 @@ function applySwap(
   runtime.slots[slot] = inIndex;
   roulette?.onPlayerEntered(runtime.side, inIndex);
   runtime.beginStint(globalSeconds, recorder);
+}
+
+function refreshLineups(runtimes: readonly [RotationRuntime, RotationRuntime]): void {
+  const [home, away] = runtimes;
+  home.refreshLineup(away.activePlayerIds());
+  away.refreshLineup(home.activePlayerIds());
 }
 
 function syncKernel(

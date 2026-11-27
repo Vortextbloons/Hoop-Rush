@@ -2,6 +2,8 @@ import {
   FULL_COURT_COACHING_SCHEMA_VERSION,
   FULL_COURT_DEFAULT_TACTICS,
   FULL_COURT_MAX_COACHING_RULES,
+  FULL_COURT_MAX_NAMED_UNITS,
+  FULL_COURT_MAX_UNIT_NAME_LENGTH,
   type FullCourtBlueprint,
   type FullCourtBlueprintHierarchy,
   type FullCourtClosingLineupRule,
@@ -9,6 +11,7 @@ import {
   type FullCourtCoachingRule,
   type FullCourtFoulTroubleRule,
   type FullCourtInterfaceLevel,
+  type FullCourtNamedUnit,
   type FullCourtPlayerHealth,
   type FullCourtTactics,
   type FullCourtTeamHealth,
@@ -25,6 +28,8 @@ export const FULL_COURT_MINUTE_TOTAL = 240;
 export const FULL_COURT_MAX_PLAYER_MINUTES = 48;
 export const FULL_COURT_STARTER_SLOTS = 5;
 export const FULL_COURT_MAX_RULES = FULL_COURT_MAX_COACHING_RULES;
+export const FULL_COURT_MAX_UNITS = FULL_COURT_MAX_NAMED_UNITS;
+export const FULL_COURT_UNIT_NAME_MAX_LENGTH = FULL_COURT_MAX_UNIT_NAME_LENGTH;
 export const FULL_COURT_DEFAULT_RULE_SECONDS_REMAINING = 6 * 60;
 export const FULL_COURT_DEFAULT_RULE_SCORE_MARGIN = 8;
 export const FULL_COURT_DEFAULT_FOUL_LIMIT = 4;
@@ -39,6 +44,11 @@ export interface FullCourtOffensiveHierarchyDraft {
   floorGeneralPlayerId: string | null;
 }
 
+export interface FullCourtNamedUnitDraft {
+  name: string;
+  playerIds: string[];
+}
+
 export interface FullCourtCoachingDraft {
   tactics: FullCourtTactics;
   interfaceLevel: FullCourtInterfaceLevel;
@@ -46,8 +56,11 @@ export interface FullCourtCoachingDraft {
   startingFive: string[];
   minuteTargets: Record<string, number>;
   closingFive: string[] | null;
+  units: FullCourtNamedUnitDraft[];
   rules: FullCourtCoachingRule[];
   hierarchy: FullCourtOffensiveHierarchyDraft;
+  /** Keep one assigned primary or secondary scorer on the floor when viable. */
+  staggerStars: boolean;
 }
 
 export interface FullCourtCoachingValidation {
@@ -84,6 +97,27 @@ function normalizeFive(
 
 function cloneRule(rule: FullCourtCoachingRule): FullCourtCoachingRule {
   return rule.kind === 'closing-lineup' ? { ...rule, lineup: [...rule.lineup] } : { ...rule };
+}
+
+function cloneUnit(unit: FullCourtNamedUnit): FullCourtNamedUnitDraft {
+  return { name: unit.name, playerIds: [...unit.playerIds] };
+}
+
+function namedUnitNameKey(name: string): string {
+  return name.trim().normalize().toLowerCase();
+}
+
+/** Returns the name of the named unit matching this exact five, if any. */
+export function fullCourtUnitNameForLineup(
+  units: readonly FullCourtNamedUnitDraft[],
+  playerIds: readonly string[],
+): string | null {
+  const target = new Set(playerIds);
+  for (const unit of units) {
+    if (unit.playerIds.length !== target.size) continue;
+    if (unit.playerIds.every((playerId) => target.has(playerId))) return unit.name;
+  }
+  return null;
 }
 
 /** A stable, collision-free id for a rule added in the editor. */
@@ -142,12 +176,14 @@ export function fullCourtCoachingDraft(
     startingFive: normalizeFive(rotation.startingFive, defaultRotation.startingFive, rosterIdSet),
     minuteTargets: rosterMinuteTargets(rosterIds, rotation),
     closingFive,
+    units: (plan.units ?? []).map(cloneUnit),
     rules: (plan.rules ?? []).map(cloneRule),
     hierarchy: {
       primaryPlayerId: plan.hierarchy?.primaryPlayerId ?? null,
       secondaryPlayerId: plan.hierarchy?.secondaryPlayerId ?? null,
       floorGeneralPlayerId: plan.hierarchy?.floorGeneralPlayerId ?? null,
     },
+    staggerStars: plan.staggerStars === true,
   };
 }
 
@@ -164,12 +200,14 @@ export function defaultFullCourtCoachingDraft(
     minuteTargets: rosterMinuteTargets(rosterIds, defaultRotation),
     closingFive:
       defaultRotation.closingFive === undefined ? null : [...defaultRotation.closingFive],
+    units: [],
     rules: [],
     hierarchy: {
       primaryPlayerId: null,
       secondaryPlayerId: null,
       floorGeneralPlayerId: null,
     },
+    staggerStars: false,
   };
 }
 
@@ -191,9 +229,15 @@ export function fullCourtCoachingPlan(draft: FullCourtCoachingDraft): FullCourtC
   const tactics: FullCourtTactics = { ...draft.tactics };
   const rules = draft.rules.map(cloneRule);
   const hierarchy = fullCourtOffensiveHierarchy(draft.hierarchy);
+  const units = draft.units.map((unit) => ({
+    name: unit.name.trim().normalize(),
+    playerIds: [...unit.playerIds],
+  }));
   const trailing = {
+    ...(units.length === 0 ? {} : { units }),
     ...(rules.length === 0 ? {} : { rules }),
     ...(hierarchy === undefined ? {} : { hierarchy }),
+    ...(draft.staggerStars ? { staggerStars: true } : {}),
     ...(draft.interfaceLevel === 'remix' ? {} : { interfaceLevel: draft.interfaceLevel }),
   };
   if (draft.rotationMode === 'automatic') {
@@ -239,6 +283,28 @@ export function validateFullCourtCoachingDraft(
   }
   if (new Set(hierarchyIds).size !== hierarchyIds.length) {
     errors.push('Each scoring role needs a different player.');
+  }
+  if (draft.units.length > FULL_COURT_MAX_UNITS) {
+    errors.push(`Use ${String(FULL_COURT_MAX_UNITS)} named units or fewer.`);
+  }
+  const unitNames = new Set<string>();
+  for (const unit of draft.units) {
+    const name = unit.name.trim();
+    if (name.length === 0 || name.length > FULL_COURT_UNIT_NAME_MAX_LENGTH) {
+      errors.push(
+        `Name each named unit in ${String(FULL_COURT_UNIT_NAME_MAX_LENGTH)} characters or fewer.`,
+      );
+    }
+    const key = namedUnitNameKey(name);
+    if (unitNames.has(key)) {
+      errors.push('Named unit names must be unique.');
+    }
+    unitNames.add(key);
+    if (!isRosterFive(unit.playerIds, rosterIdSet)) {
+      errors.push(
+        `Named unit ${name.length === 0 ? '(unnamed)' : name} needs five different players from your roster.`,
+      );
+    }
   }
   for (const rule of draft.rules) {
     if (rule.kind === 'closing-lineup') {
@@ -333,10 +399,12 @@ export function fullCourtCoachingSignature(plan: FullCourtCoachingPlan): string 
   return JSON.stringify({
     interfaceLevel: plan.interfaceLevel ?? 'remix',
     tactics: [plan.tactics.pace, plan.tactics.offense, plan.tactics.defense],
+    staggerStars: plan.staggerStars === true,
     rotation:
       rotation === undefined
         ? null
         : [rotation.startingFive, minutes, rotation.closingFive ?? null],
+    units: (plan.units ?? []).map((unit) => [unit.name, [...unit.playerIds]]),
     rules: (plan.rules ?? []).map((rule) =>
       rule.kind === 'closing-lineup'
         ? [rule.ruleId, rule.kind, rule.secondsRemainingMax, rule.scoreMarginMax, [...rule.lineup]]
@@ -521,6 +589,7 @@ export function applyFullCourtBlueprintToDraft(
       startingFive: [...draft.startingFive],
       minuteTargets: { ...draft.minuteTargets },
       closingFive: draft.closingFive === null ? null : [...draft.closingFive],
+      units: draft.units.map((unit) => ({ name: unit.name, playerIds: [...unit.playerIds] })),
       rules: draft.rules.map(cloneRule),
       hierarchy: nextHierarchy,
     },

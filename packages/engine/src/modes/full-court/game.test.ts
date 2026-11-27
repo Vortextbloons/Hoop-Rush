@@ -20,7 +20,7 @@ import {
   type FullCourtGameResult,
   type FullCourtPlayerLine,
 } from './game.ts';
-import { allocateSeconds, resolveRotationPlan } from './rotation.ts';
+import { allocateSeconds, resolveRotationPlan, unitNameForPlayerIds } from './rotation.ts';
 import {
   availabilityOf,
   fullCourtTestInput,
@@ -199,6 +199,41 @@ describe('full court game accounting', () => {
     const starters = result.home.players.filter((player) => player.startedGame);
     expect(starters).toHaveLength(5);
     expect(firstStint?.playerIds.every((id) => starters.some((s) => s.playerId === id))).toBe(true);
+  });
+
+  it('records configured named units without changing the seeded game result', () => {
+    const roster = fullCourtTestRoster('namedunits', 8, () => ({ rating: 74 }));
+    const startingFive = roster.slice(0, 5).map((player) => player.playerId);
+    const minuteTargets = Object.fromEntries(roster.map((player) => [player.playerId, 30]));
+    const rotation = { startingFive, minuteTargets };
+    const baseline = simulateFullCourtGame(
+      fullCourtTestInput({ seed: 'namedunits', homeRoster: roster, homeRotation: rotation }),
+      ctx,
+    );
+    const withUnits = simulateFullCourtGame(
+      fullCourtTestInput({
+        seed: 'namedunits',
+        homeRoster: roster,
+        homeRotation: {
+          ...rotation,
+          units: [{ name: 'Opening Five', playerIds: startingFive }],
+        },
+      }),
+      ctx,
+    );
+
+    expect(fullCourtGameDigest(withUnits)).toBe(fullCourtGameDigest(baseline));
+    expect(withUnits.home.units.map((unit) => unit.name)).toEqual(['Opening Five']);
+    expect(withUnits.home.units[0]?.rosterIndices).toHaveLength(FULL_COURT_MIN_ROSTER);
+    const openingUnit = withUnits.home.stints[0]?.playerIds ?? [];
+    expect(
+      unitNameForPlayerIds(
+        withUnits.home.units,
+        withUnits.home.players.map((player) => player.playerId),
+        openingUnit,
+      ),
+    ).toBe('Opening Five');
+    expect(checkFullCourtGameResult(withUnits)).toEqual([]);
   });
 
   it('keeps five eligible players on the floor through disqualifications', () => {

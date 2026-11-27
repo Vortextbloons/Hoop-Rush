@@ -108,6 +108,8 @@ export function fullCourtTestInput(input: {
   readonly awayRoster?: readonly SimulationPlayer[];
   readonly homeRotation?: FullCourtRotationPlanInput;
   readonly awayRotation?: FullCourtRotationPlanInput;
+  readonly homeHierarchy?: FullCourtGameInput['home']['hierarchy'];
+  readonly awayHierarchy?: FullCourtGameInput['away']['hierarchy'];
   readonly homeAvailability?: readonly FullCourtAvailabilityEntry[];
   readonly awayAvailability?: readonly FullCourtAvailabilityEntry[];
 }): FullCourtGameInput {
@@ -123,6 +125,7 @@ export function fullCourtTestInput(input: {
       displayName: 'Home',
       roster: input.homeRoster,
       ...(input.homeRotation === undefined ? {} : { rotation: input.homeRotation }),
+      ...(input.homeHierarchy === undefined ? {} : { hierarchy: input.homeHierarchy }),
       ...(input.homeAvailability === undefined ? {} : { availability: input.homeAvailability }),
     },
     away: {
@@ -130,6 +133,7 @@ export function fullCourtTestInput(input: {
       displayName: 'Away',
       roster: away,
       ...(input.awayRotation === undefined ? {} : { rotation: input.awayRotation }),
+      ...(input.awayHierarchy === undefined ? {} : { hierarchy: input.awayHierarchy }),
       ...(input.awayAvailability === undefined ? {} : { availability: input.awayAvailability }),
     },
   };

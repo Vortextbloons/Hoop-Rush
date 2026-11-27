@@ -14,6 +14,7 @@ import {
   resolveFullCourtBlueprintHierarchy,
   type FullCourtBlueprintBindingPreview,
   type FullCourtBlueprintRotationRef,
+  type FullCourtRotationPlanInput,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
 
@@ -43,6 +44,26 @@ export interface ApplyFullCourtBlueprintResult {
 }
 
 /**
+ * Named units are saved beside the optional custom rotation but the engine
+ * consumes them as part of its rotation input.
+ */
+export function fullCourtRotationInputForPlan(
+  plan: FullCourtCoachingPlan,
+): FullCourtRotationPlanInput | undefined {
+  const units = plan.units;
+  const staggerStars = plan.staggerStars === true ? { staggerStars: true } : {};
+  if (units === undefined || units.length === 0) {
+    if (plan.rotation === undefined && plan.staggerStars !== true) return undefined;
+    return { ...(plan.rotation ?? {}), ...staggerStars };
+  }
+  return {
+    ...(plan.rotation ?? {}),
+    ...staggerStars,
+    units: units.map((unit) => ({ name: unit.name, playerIds: [...unit.playerIds] })),
+  };
+}
+
+/**
  * Applies a saved blueprint to a coaching plan, binding any portable scoring
  * roles to the target roster while preserving existing rotations and rules.
  */
@@ -60,10 +81,14 @@ export function applyFullCourtBlueprintToPlan(options: {
     rotation: plan.rotation ?? defaultRotation,
   });
   const nextHierarchy = normalized.hierarchy === undefined ? plan.hierarchy : preview.hierarchy;
-  const { hierarchy: _previousHierarchy, ...planWithoutHierarchy } = plan;
   const nextPlan = fullCourtCoachingPlanSchema.parse({
-    ...planWithoutHierarchy,
+    schemaVersion: plan.schemaVersion,
     tactics: { ...normalized.tactics },
+    ...(plan.rotation === undefined ? {} : { rotation: plan.rotation }),
+    ...(plan.units === undefined ? {} : { units: plan.units }),
+    ...(plan.rules === undefined ? {} : { rules: plan.rules }),
+    ...(plan.staggerStars === undefined ? {} : { staggerStars: plan.staggerStars }),
+    ...(plan.interfaceLevel === undefined ? {} : { interfaceLevel: plan.interfaceLevel }),
     ...(nextHierarchy === undefined ? {} : { hierarchy: nextHierarchy }),
   });
   assertFullCourtCoachingRoster(nextPlan, roster);

@@ -114,26 +114,26 @@ describe('Full Court portable blueprint scoring roles', () => {
       rotation,
     });
 
-    expect(hierarchy).toEqual({
+    expect(hierarchy).toMatchObject({
       primary: {
         kind: 'starter-slot',
         slot: 2,
         preferredPositions: ['SF'],
-        archetype: expect.any(String),
       },
       secondary: {
         kind: 'bench-slot',
         benchIndex: 1,
         preferredPositions: ['PF', 'SF'],
-        archetype: expect.any(String),
       },
       floorGeneral: {
         kind: 'starter-slot',
         slot: 0,
         preferredPositions: ['PG'],
-        archetype: expect.any(String),
       },
     });
+    expect(typeof hierarchy?.primary?.archetype).toBe('string');
+    expect(typeof hierarchy?.secondary?.archetype).toBe('string');
+    expect(typeof hierarchy?.floorGeneral?.archetype).toBe('string');
     expect(JSON.stringify(hierarchy)).not.toContain('p3');
     expect(JSON.stringify(hierarchy)).not.toContain('p7');
     expect(JSON.stringify(hierarchy)).not.toContain('p1');
@@ -141,10 +141,15 @@ describe('Full Court portable blueprint scoring roles', () => {
 
   it('works cleanly when custom minutes are absent (automatic rotation)', () => {
     const roster = rosterOfSize(8);
+    const primaryStarter = roster[2];
+    const floorStarter = roster[0];
+    if (primaryStarter === undefined || floorStarter === undefined) {
+      throw new Error('Expected 8-player test roster');
+    }
     const portable = buildFullCourtBlueprintHierarchy({
       hierarchy: {
-        primaryPlayerId: roster[2]!.playerId,
-        floorGeneralPlayerId: roster[0]!.playerId,
+        primaryPlayerId: primaryStarter.playerId,
+        floorGeneralPlayerId: floorStarter.playerId,
       },
       roster,
     });

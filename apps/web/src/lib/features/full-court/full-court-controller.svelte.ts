@@ -3,6 +3,7 @@ import {
   advanceFullCourtSeasonSlot,
   archiveFullCourtRun,
   buildFullCourtWatchedReplay,
+  fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,
   saveFullCourtCoaching,
   startFullCourtPlayoffs,
@@ -13,12 +14,16 @@ import {
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   FULL_COURT_DEFAULT_COACHING_PLAN,
+  fullCourtDefensiveMatchupsSchema,
   idSchema,
   type FullCourtBlueprint,
   type FullCourtCoachingPlan,
   type FullCourtCommand,
+  type FullCourtDefensiveMatchupAssignment,
+  type FullCourtDefensiveMatchups,
   type FullCourtDraftState,
   type FullCourtPlayoffCheckpoint,
+  type FullCourtPracticeReport,
   type FullCourtReportTarget,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
@@ -30,7 +35,9 @@ import {
   assertFullCourtCoachingRoster,
   fullCourtDraftIndexOf,
   fullCourtPlayoffView,
+  fullCourtTrainingCampSeed,
   fullCourtUserNextPlayoffMatchup,
+  validateFullCourtDefensiveMatchups,
   type FullCourtCatalogIndex,
   type FullCourtGameHealthOutcome,
   type FullCourtPlayoffLock,
@@ -77,6 +84,7 @@ export class FullCourtController {
   season = $state.raw<SeasonState | null>(null);
   playoffs = $state.raw<PlayoffState | null>(null);
   latestGame = $state.raw<PlayedGame | null>(null);
+  practice = $state.raw<FullCourtPracticeReport | null>(null);
   savedReplay = $state.raw<FullCourtWatchedReplay | null>(null);
   error = $state<string | null>(null);
   pendingForfeit = $state(false);
@@ -85,6 +93,9 @@ export class FullCourtController {
   stopRequested = $state(false);
   restingPlayerIds = $state.raw<readonly string[]>([]);
   restingForGameId = $state.raw<string | null>(null);
+  defensiveMatchupAssignments = $state.raw<readonly FullCourtDefensiveMatchupAssignment[]>([]);
+  defensiveMatchupsForGameId = $state.raw<string | null>(null);
+  defensiveMatchupsOpponentId = $state.raw<string | null>(null);
 
   #disposed = false;
   #assets: Awaited<ReturnType<typeof loadFullCourtAssets>> | null = null;
@@ -250,6 +261,93 @@ export class FullCourtController {
     this.restingForGameId = null;
   }
 
+  #clearDefensiveMatchups(): void {
+    this.defensiveMatchupAssignments = [];
+    this.defensiveMatchupsForGameId = null;
+    this.defensiveMatchupsOpponentId = null;
+  }
+
+  /**
+   * Defensive matchup assignments stay pinned to the next user fixture and
+   * opponent, validate against both locked rosters, and clear once played.
+   */
+  setDefensiveMatchups(assignments: readonly FullCourtDefensiveMatchupAssignment[]): boolean {
+    const season = this.season;
+    const fixture = this.#nextUserFixture();
+    const userTeam = this.#userTeam();
+    if (season === null || fixture === null || userTeam === undefined) {
+      if (assignments.length > 0) {
+        this.error = 'No Full Court game is ready for defensive matchup assignments.';
+      }
+      this.#clearDefensiveMatchups();
+      return assignments.length === 0;
+    }
+    const opponentTeamId =
+      fixture.homeTeamId === userTeam.teamId ? fixture.awayTeamId : fixture.homeTeamId;
+    const opponentTeam = season.lock.season.teams.find((team) => team.teamId === opponentTeamId);
+    if (opponentTeam === undefined) {
+      this.#clearDefensiveMatchups();
+      this.error = 'The next opponent roster is unavailable.';
+      return false;
+    }
+    if (assignments.length === 0) {
+      this.#clearDefensiveMatchups();
+      if (season.checkpoint.completedThroughSlot === 0) this.practice = null;
+      this.error = null;
+      return true;
+    }
+    const candidate = fullCourtDefensiveMatchupsSchema.safeParse({
+      gameId: fixture.gameId,
+      opponentTeamId,
+      assignments,
+    });
+    if (!candidate.success) {
+      this.error = candidate.error.issues[0]?.message ?? 'Invalid defensive matchup assignment.';
+      return false;
+    }
+    const errors = validateFullCourtDefensiveMatchups({
+      userRoster: userTeam.roster,
+      opponentTeamId,
+      opponentRoster: opponentTeam.roster,
+      gameId: fixture.gameId,
+      matchups: candidate.data,
+    });
+    if (errors.length > 0) {
+      this.error = errors[0] ?? 'Invalid defensive matchup assignment.';
+      return false;
+    }
+    this.defensiveMatchupsForGameId = fixture.gameId;
+    this.defensiveMatchupsOpponentId = opponentTeamId;
+    this.defensiveMatchupAssignments = candidate.data.assignments.map((entry) => ({ ...entry }));
+    if (season.checkpoint.completedThroughSlot === 0) this.practice = null;
+    this.error = null;
+    return true;
+  }
+
+  clearDefensiveMatchups(): void {
+    this.#clearDefensiveMatchups();
+    if (this.season?.checkpoint.completedThroughSlot === 0) this.practice = null;
+    this.error = null;
+  }
+
+  #activeDefensiveMatchupsFor(
+    gameId: string,
+    opponentTeamId: string,
+  ): FullCourtDefensiveMatchups | undefined {
+    if (
+      this.defensiveMatchupsForGameId !== gameId ||
+      this.defensiveMatchupsOpponentId !== opponentTeamId ||
+      this.defensiveMatchupAssignments.length === 0
+    ) {
+      return undefined;
+    }
+    return {
+      gameId,
+      opponentTeamId,
+      assignments: [...this.defensiveMatchupAssignments],
+    };
+  }
+
   nextPlayoffPreview(): FullCourtPlayoffOpponentPreview | null {
     const season = this.season;
     const playoffs = this.playoffs;
@@ -296,6 +394,19 @@ export class FullCourtController {
     return this.#act(async () => {
       const draft = this.draft;
       if (draft === null) return;
+      if (target.kind === 'training-camp') {
+        if (draft.stage !== 'complete') {
+          throw new Error('Confirm the roster before booking training camp.');
+        }
+        const season = this.season;
+        if (
+          season !== null
+            ? season.checkpoint.completedThroughSlot !== 0
+            : !(draft.variant === 'roulette' && draft.roulette?.status !== 'finalized')
+        ) {
+          throw new Error('Training camp closes before the first regular-season game.');
+        }
+      }
       if (target.kind === 'opponent-film') {
         const next = this.nextFilmTarget();
         if (next?.gameId !== target.gameId || next.opponentTeamId !== target.opponentTeamId) {
@@ -309,6 +420,57 @@ export class FullCourtController {
         expectedRevision: draft.revision,
         target,
       });
+    });
+  }
+
+  runPractice(): Promise<void> {
+    return this.#act(async () => {
+      const season = this.season;
+      const draft = this.draft;
+      if (season === null || draft === null) return;
+      const runId = season.lock.season.runId;
+      const [savedDraft, checkpoint] = await Promise.all([
+        this.#repositories.fullCourtDraftRepository.load(runId),
+        this.#repositories.fullCourtSeasonRepository.load(runId),
+      ]);
+      if (this.#isDisposed()) return;
+      if (savedDraft !== null) this.draft = savedDraft;
+      const currentDraft = savedDraft ?? draft;
+      if (checkpoint === null || checkpoint.lockDigest !== season.lock.digest) {
+        throw new Error('Training camp practice needs the saved season. Reload the run.');
+      }
+      if (checkpoint.completedThroughSlot !== 0 || this.playoffs !== null) {
+        throw new Error('Training camp practice closes before the first regular-season game.');
+      }
+      const camp = (currentDraft.reports ?? []).find((report) => report.kind === 'training-camp');
+      if (camp === undefined) {
+        throw new Error('Book training camp before opening the practice report.');
+      }
+      const fixture = fullCourtNextUserFixture(season.lock, checkpoint, null);
+      if (fixture === null) throw new Error('No practice opponent is available.');
+      const opponentTeamId =
+        fixture.homeTeamId === season.lock.season.userTeamId
+          ? fixture.awayTeamId
+          : fixture.homeTeamId;
+      const worker = (this.#worker ??= this.#createWorker());
+      const simulatePractice = worker.simulatePractice?.bind(worker);
+      if (simulatePractice === undefined) {
+        throw new Error('Training camp practice is unavailable in this worker.');
+      }
+      const defensiveMatchups = this.#activeDefensiveMatchupsFor(fixture.gameId, opponentTeamId);
+      const report = await simulatePractice(season.lock, {
+        seed: fullCourtTrainingCampSeed(season.lock.season.runSeed, camp.reportId),
+        opponentTeamId,
+        options: {
+          rotation: fullCourtRotationInputForPlan(season.coaching),
+          tactics: season.coaching.tactics,
+          rules: season.coaching.rules,
+          hierarchy: season.coaching.hierarchy,
+          ...(defensiveMatchups === undefined ? {} : { defensiveMatchups }),
+        },
+      });
+      if (this.#isDisposed()) return;
+      this.practice = report;
     });
   }
 
@@ -387,6 +549,7 @@ export class FullCourtController {
       );
       if (this.#isDisposed()) return;
       this.season = { ...season, coaching };
+      this.practice = null;
       this.pendingForfeit = false;
       saved = true;
     });
@@ -401,6 +564,19 @@ export class FullCourtController {
       if (this.restingForGameId !== null && this.restingForGameId !== nextFixture?.gameId) {
         this.#clearRest();
       }
+      const nextOpponentId =
+        nextFixture === null
+          ? null
+          : nextFixture.homeTeamId === this.season.lock.season.userTeamId
+            ? nextFixture.awayTeamId
+            : nextFixture.homeTeamId;
+      if (
+        this.defensiveMatchupsForGameId !== null &&
+        (this.defensiveMatchupsForGameId !== nextFixture?.gameId ||
+          this.defensiveMatchupsOpponentId !== nextOpponentId)
+      ) {
+        this.#clearDefensiveMatchups();
+      }
       if (nextFixture !== null && this.restingPlayerIds.length > 0) {
         const readiness = this.#gameDayReadiness(nextFixture, this.restingPlayerIds);
         if (readiness?.restConflict === true) {
@@ -410,6 +586,9 @@ export class FullCourtController {
       }
       const restGameId = this.restingForGameId;
       const restingPlayerIds = this.restingPlayerIds;
+      const matchupGameId = this.defensiveMatchupsForGameId;
+      const matchupOpponentId = this.defensiveMatchupsOpponentId;
+      const matchupAssignments = this.defensiveMatchupAssignments;
       const worker = (this.#worker ??= this.#createWorker());
       const regular = this.#repositories.fullCourtSeasonRepository;
       const playoffsRepo = this.#repositories.fullCourtPlayoffRepository;
@@ -418,14 +597,28 @@ export class FullCourtController {
         const userGameId = this.#nextOverallUserGameId();
         const restThisGame =
           restGameId !== null && userGameId === restGameId && restingPlayerIds.length > 0;
+        const matchupsThisGame =
+          matchupGameId !== null &&
+          matchupOpponentId !== null &&
+          userGameId === matchupGameId &&
+          matchupAssignments.length > 0;
         const options = {
           acceptForfeit: step === 0 && acceptForfeit,
-          rotation: coaching.rotation,
+          rotation: fullCourtRotationInputForPlan(coaching),
           tactics: coaching.tactics,
           rules: coaching.rules,
           hierarchy: coaching.hierarchy,
           record: record && count === 1,
           ...(restThisGame ? { restingPlayerIds } : {}),
+          ...(matchupsThisGame
+            ? {
+                defensiveMatchups: {
+                  gameId: matchupGameId,
+                  opponentTeamId: matchupOpponentId,
+                  assignments: [...matchupAssignments],
+                },
+              }
+            : {}),
         };
         const playoffs: PlayoffState | null = this.playoffs;
         const current: SeasonState = this.season;
@@ -443,6 +636,10 @@ export class FullCourtController {
         switch (outcome.kind) {
           case 'simulated':
             if (restGameId !== null && userGameId === restGameId) this.#clearRest();
+            if (matchupGameId !== null && userGameId === matchupGameId) {
+              this.#clearDefensiveMatchups();
+            }
+            this.practice = null;
             if ('scores' in outcome) {
               this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
               if (
@@ -544,8 +741,10 @@ export class FullCourtController {
     this.draft = draft;
     this.pendingForfeit = false;
     this.latestGame = null;
+    this.practice = null;
     this.savedReplay = null;
     this.#clearRest();
+    this.#clearDefensiveMatchups();
     if (draft?.stage !== 'complete') {
       this.season = null;
       this.playoffs = null;

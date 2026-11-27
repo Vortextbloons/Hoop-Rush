@@ -12,6 +12,7 @@ import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { FULL_COURT_HISTORICAL_PRESETS } from './coaching-presets.ts';
 import {
   applyFullCourtBlueprintToPlan,
+  fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,
   saveFullCourtCoaching,
 } from './coaching.ts';
@@ -157,6 +158,8 @@ test('saves and reapplies a blueprint with portable scoring roles across runs wi
       },
       closingFive: ['dst-1', 'dst-2', 'dst-3', 'dst-4', 'dst-6'],
     },
+    units: [{ name: 'Bench Mob', playerIds: ['dst-1', 'dst-2', 'dst-3', 'dst-4', 'dst-6'] }],
+    staggerStars: true,
     rules: [
       {
         ruleId: 'rule-1',
@@ -174,7 +177,9 @@ test('saves and reapplies a blueprint with portable scoring roles across runs wi
   });
   expect(applied.plan.tactics).toEqual(blueprint.tactics);
   expect(applied.plan.rotation).toEqual(existingPlan.rotation);
+  expect(applied.plan.units).toEqual(existingPlan.units);
   expect(applied.plan.rules).toEqual(existingPlan.rules);
+  expect(applied.plan.staggerStars).toBe(true);
   expect(applied.plan.interfaceLevel).toBe('mastermind');
   expect(applied.plan.hierarchy).toEqual({
     primaryPlayerId: 'dst-3',
@@ -199,4 +204,75 @@ test('saves and reapplies a blueprint with portable scoring roles across runs wi
   });
   expect(tacticsOnly.plan.hierarchy).toEqual(applied.plan.hierarchy);
   expect(tacticsOnly.plan.rotation).toEqual(existingPlan.rotation);
+  expect(tacticsOnly.plan.units).toEqual(existingPlan.units);
+  expect(tacticsOnly.plan.staggerStars).toBe(true);
+});
+
+test('merges saved named units into the engine rotation input', () => {
+  const rotation = {
+    startingFive: ['p1', 'p2', 'p3', 'p4', 'p5'],
+    minuteTargets: { p1: 48, p2: 48, p3: 48, p4: 48, p5: 48 },
+  };
+  const units = [{ name: 'Small Ball', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }];
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      rotation,
+      units,
+    }),
+  ).toEqual({ ...rotation, units });
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      units,
+    }),
+  ).toEqual({ units });
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      rotation,
+    }),
+  ).toEqual(rotation);
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      rotation,
+      staggerStars: true,
+    }),
+  ).toEqual({ ...rotation, staggerStars: true });
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      staggerStars: true,
+    }),
+  ).toEqual({ staggerStars: true });
+  expect(
+    fullCourtRotationInputForPlan({
+      schemaVersion: 1,
+      tactics: { ...FULL_COURT_DEFAULT_TACTICS },
+      staggerStars: false,
+    }),
+  ).toBeUndefined();
+});
+
+test('rejects a named unit naming a player outside the roster', async () => {
+  await expect(
+    saveFullCourtCoaching(
+      {
+        command: 'set-full-court-coaching',
+        runId: RUN_ID,
+        plan: {
+          ...hierarchyPlan(undefined),
+          units: [{ name: 'Outside', playerIds: ['p1', 'p2', 'p3', 'p4', 'outside-player'] }],
+        },
+      },
+      LOCK,
+      { save: () => Promise.reject(new Error('Invalid input reached storage')) },
+    ),
+  ).rejects.toThrow('The saved named unit includes a player outside your roster.');
 });

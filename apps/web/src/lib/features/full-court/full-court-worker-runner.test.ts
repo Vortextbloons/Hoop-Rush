@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
 import { describe, expect, it } from 'bun:test';
 import { idSchema, seedSchema, type FullCourtCoachingRule } from '@hoop-rush/data-contracts';
-import { createFullCourtSeasonCheckpoint } from '@hoop-rush/engine';
+import {
+  createEngineContext,
+  createFullCourtSeasonCheckpoint,
+  fullCourtTrainingCampSeed,
+  simulateFullCourtTrainingCamp,
+} from '@hoop-rush/engine';
 import type { FullCourtWorkerMessage } from './full-court-worker-protocol';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner';
 import { fullCourtTestPlayoffLock, fullCourtTestSeasonLock } from './full-court-test-support';
@@ -188,6 +193,64 @@ describe('FullCourtWorkerRunner', () => {
     await expect(empty).rejects.toThrow('invalid full court worker request');
   });
 
+  it('validates and forwards a star-staggering rotation through slot, playoff, and practice jobs', async () => {
+    const fake = new FakeWorker();
+    const runner = createFullCourtWorkerRunner({
+      createWorker: () => fake.asWorker(),
+      newRequestId: requestIds(),
+    });
+    const rotation = { staggerStars: true };
+
+    const slot = runner.simulateSlot(LOCK, CHECKPOINT, { rotation });
+    expect(postedRequest(fake, 0)).toMatchObject({ options: { rotation } });
+    fake.emit(slotResult('full-court-test-1'));
+    await slot;
+
+    const game = runner.simulateGame(PLAYOFFS.lock, PLAYOFFS.checkpoint, { rotation });
+    expect(postedRequest(fake, 1)).toMatchObject({ options: { rotation } });
+    fake.emit(gameResult('full-court-test-2'));
+    await game;
+
+    const fixture = LOCK.season.games.find(
+      (entry) =>
+        entry.slot === 1 &&
+        (entry.homeTeamId === LOCK.season.userTeamId ||
+          entry.awayTeamId === LOCK.season.userTeamId),
+    );
+    if (fixture === undefined) throw new Error('missing opening fixture');
+    const opponentTeamId =
+      fixture.homeTeamId === LOCK.season.userTeamId ? fixture.awayTeamId : fixture.homeTeamId;
+    const seed = fullCourtTrainingCampSeed(LOCK.season.runSeed, 'fcs-stagger-test');
+    const report = simulateFullCourtTrainingCamp(
+      LOCK.season,
+      { seed, opponentTeamId, rotation },
+      createEngineContext(),
+    );
+    const simulatePractice = runner.simulatePractice?.bind(runner);
+    if (simulatePractice === undefined) throw new Error('practice runner is unavailable');
+    const practice = simulatePractice(LOCK, {
+      seed,
+      opponentTeamId,
+      options: { rotation },
+    });
+    expect(postedRequest(fake, 2)).toMatchObject({
+      type: 'full-court-simulate-practice',
+      options: { rotation },
+    });
+    fake.emit({
+      schemaVersion: 1,
+      type: 'full-court-practice-result',
+      requestId: 'full-court-test-3',
+      report,
+    });
+    await practice;
+
+    const invalid = runner.simulateSlot(LOCK, CHECKPOINT, {
+      rotation: { staggerStars: 'yes' } as unknown as { staggerStars: boolean },
+    });
+    await expect(invalid).rejects.toThrow('invalid full court worker request');
+  });
+
   it('bootstraps playoff inputs with the season lock, then only references the cache', async () => {
     const fake = new FakeWorker();
     const runner = createFullCourtWorkerRunner({
@@ -263,6 +326,56 @@ describe('FullCourtWorkerRunner', () => {
     expect(postedRequest(replacement, 0)).toHaveProperty('lock', LOCK);
     replacement.emit(slotResult('full-court-test-3'));
     await next;
+  });
+
+  it('sends the locked season with a practice request and returns the compact report', async () => {
+    const fake = new FakeWorker();
+    const runner = createFullCourtWorkerRunner({
+      createWorker: () => fake.asWorker(),
+      newRequestId: requestIds(),
+    });
+    const fixture = LOCK.season.games.find(
+      (game) =>
+        game.slot === 1 &&
+        (game.homeTeamId === LOCK.season.userTeamId || game.awayTeamId === LOCK.season.userTeamId),
+    );
+    if (fixture === undefined) throw new Error('missing opening fixture');
+    const opponentTeamId =
+      fixture.homeTeamId === LOCK.season.userTeamId ? fixture.awayTeamId : fixture.homeTeamId;
+    const seed = fullCourtTrainingCampSeed(LOCK.season.runSeed, 'fcs-practice-test');
+    const report = simulateFullCourtTrainingCamp(
+      LOCK.season,
+      { seed, opponentTeamId },
+      createEngineContext(),
+    );
+    const simulatePractice = runner.simulatePractice?.bind(runner);
+    if (simulatePractice === undefined) throw new Error('practice runner is unavailable');
+    const pending = simulatePractice(LOCK, { seed, opponentTeamId });
+    expect(postedRequest(fake, 0)).toMatchObject({
+      type: 'full-court-simulate-practice',
+      runId: LOCK.season.runId,
+      lockDigest: LOCK.digest,
+      lock: LOCK,
+      seed,
+      opponentTeamId,
+    });
+    fake.emit({
+      schemaVersion: 1,
+      type: 'full-court-practice-result',
+      requestId: 'full-court-test-1',
+      report,
+    });
+    await expect(pending).resolves.toEqual(report);
+
+    const second = simulatePractice(LOCK, { seed, opponentTeamId });
+    expect(postedRequest(fake, 1)).not.toHaveProperty('lock');
+    fake.emit({
+      schemaVersion: 1,
+      type: 'full-court-practice-result',
+      requestId: 'full-court-test-2',
+      report,
+    });
+    await second;
   });
 
   it('disposes the worker and rejects an in-flight job', async () => {

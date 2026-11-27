@@ -101,6 +101,14 @@ export interface FullCourtRotationPlanInput {
   readonly closingFive?: readonly string[];
   readonly units?: readonly FullCourtRotationUnitInput[];
   readonly rules?: readonly FullCourtCoachingRule[];
+  /** Keep one assigned primary or secondary scorer on the floor when viable. */
+  readonly staggerStars?: boolean;
+}
+
+/** Optional scorer coverage derived from the user's saved offensive hierarchy. */
+export interface FullCourtStaggeringInput {
+  /** Primary and secondary option player ids, in that order. */
+  readonly scorerPlayerIds: readonly string[];
 }
 
 export type FullCourtRulePlan =
@@ -187,6 +195,10 @@ export interface FullCourtRotationPlan {
   readonly closingSlots: readonly number[];
   readonly units: readonly FullCourtRotationUnit[];
   readonly rules: readonly FullCourtRulePlan[];
+  /** Whether automatic decisions must preserve one assigned scorer on the floor. */
+  readonly staggerStars: boolean;
+  /** Roster indices for the primary and secondary hierarchy scorers. */
+  readonly scorerIndices: readonly number[];
   readonly notes: readonly FullCourtPlanNote[];
 }
 
@@ -481,6 +493,7 @@ export function resolveRotationPlan(
   roster: readonly SimulationPlayer[],
   input: FullCourtRotationPlanInput = {},
   availability: readonly FullCourtAvailabilityEntry[] = [],
+  staggering?: FullCourtStaggeringInput,
 ): FullCourtRotationPlan {
   const indexById = requireRoster(roster);
   const availabilityById = new Map<string, FullCourtAvailabilityEntry>();
@@ -503,6 +516,16 @@ export function resolveRotationPlan(
       `full court needs ${String(FULL_COURT_MIN_ROSTER)} available players, got ${String(availableCount)}`,
     );
   }
+
+  const scorerIndices: number[] = [];
+  const seenScorers = new Set<number>();
+  for (const playerId of staggering?.scorerPlayerIds ?? []) {
+    const index = indexById.get(playerId);
+    if (index === undefined || seenScorers.has(index)) continue;
+    seenScorers.add(index);
+    scorerIndices.push(index);
+  }
+  const staggerStars = input.staggerStars === true;
 
   const notes: FullCourtPlanNote[] = [];
   const startingEnergy = roster.map((player) =>
@@ -677,6 +700,7 @@ export function resolveRotationPlan(
   }
 
   const units: FullCourtRotationUnit[] = [];
+  const unitNames = new Set<string>();
   for (const unit of input.units ?? []) {
     if (unit.playerIds.length !== FULL_COURT_MIN_ROSTER) {
       throw new FullCourtSetupError(
@@ -684,6 +708,15 @@ export function resolveRotationPlan(
         `unit ${unit.name} must name ${String(FULL_COURT_MIN_ROSTER)} players`,
       );
     }
+    const unitName = unit.name.trim().normalize();
+    const unitNameKey = unitName.toLowerCase();
+    if (unitName.length === 0) {
+      throw new FullCourtSetupError('invalid-lineup', 'named unit needs a name');
+    }
+    if (unitNames.has(unitNameKey)) {
+      throw new FullCourtSetupError('invalid-lineup', `named unit ${unitName} is repeated`);
+    }
+    unitNames.add(unitNameKey);
     const rosterIndices = unit.playerIds.map((id) => {
       const index = indexById.get(id);
       if (index === undefined) {
@@ -697,7 +730,7 @@ export function resolveRotationPlan(
     if (new Set(rosterIndices).size !== rosterIndices.length) {
       throw new FullCourtSetupError('invalid-lineup', `unit ${unit.name} repeats a player`);
     }
-    units.push({ name: unit.name, rosterIndices });
+    units.push({ name: unitName, rosterIndices });
   }
 
   const rules: FullCourtRulePlan[] = [];
@@ -756,6 +789,8 @@ export function resolveRotationPlan(
     closingSlots,
     units,
     rules,
+    staggerStars,
+    scorerIndices,
     notes,
   };
 }
@@ -775,13 +810,41 @@ function requireRulePlayer(
   return index;
 }
 
-export function unitNameFor(plan: FullCourtRotationPlan, slots: readonly number[]): string | null {
-  for (const unit of plan.units) {
+function unitNameForSlots(
+  units: readonly FullCourtRotationUnit[],
+  slots: readonly number[],
+): string | null {
+  for (const unit of units) {
     const unitSet = new Set(unit.rosterIndices);
     if (slots.length !== unitSet.size) continue;
     if (slots.every((index) => unitSet.has(index))) return unit.name;
   }
   return null;
+}
+
+export function unitNameFor(plan: FullCourtRotationPlan, slots: readonly number[]): string | null {
+  return unitNameForSlots(plan.units, slots);
+}
+
+/**
+ * Presentation helper for recorded fives: maps player ids back to roster order
+ * and reuses the same membership rule as the resolved plan.
+ */
+export function unitNameForPlayerIds(
+  units: readonly FullCourtRotationUnit[],
+  rosterPlayerIds: readonly string[],
+  playerIds: readonly string[],
+): string | null {
+  const indexById = new Map(rosterPlayerIds.map((playerId, index) => [playerId, index]));
+  const slots: number[] = [];
+  const seen = new Set<number>();
+  for (const playerId of playerIds) {
+    const index = indexById.get(playerId);
+    if (index === undefined || seen.has(index)) return null;
+    seen.add(index);
+    slots.push(index);
+  }
+  return unitNameForSlots(units, slots);
 }
 
 export type FullCourtSubstitutionReason =
@@ -919,6 +982,47 @@ function pickFreshest(
     }
   }
   return best;
+}
+
+/**
+ * True when this swap would bench the last assigned scorer while bringing back
+ * a non-scorer. A healthy scorer whose replacement is not a scorer is worse for
+ * the user's staggering preference than leaving the rotation alone.
+ */
+function benchesLastScorer(
+  snapshot: FullCourtRotationSnapshot,
+  outIndex: number,
+  inIndex: number,
+): boolean {
+  const { staggerStars, scorerIndices } = snapshot.plan;
+  if (!staggerStars || scorerIndices.length === 0) return false;
+  if (!scorerIndices.includes(outIndex) || scorerIndices.includes(inIndex)) return false;
+  return !scorerIndices.some((index) => index !== outIndex && snapshot.slots.includes(index));
+}
+
+/**
+ * Applies the star-staggering preference to an automatic swap. The outgoing
+ * scorer is replaced by another available assigned scorer when one is viable;
+ * otherwise a healthy last scorer stays on the floor. Exhausted scorers are
+ * allowed to leave because fatigue already outranks the preference.
+ */
+function withScorerCoverage(
+  snapshot: FullCourtRotationSnapshot,
+  decision: Extract<FullCourtSubstitutionDecision, { kind: 'swap' }>,
+  allowedIncoming?: ReadonlySet<number>,
+): FullCourtSubstitutionDecision | null {
+  if (!benchesLastScorer(snapshot, decision.outIndex, decision.inIndex)) return decision;
+  const candidates = benchCandidates(snapshot).filter(
+    (index) =>
+      snapshot.plan.scorerIndices.includes(index) &&
+      (allowedIncoming === undefined || allowedIncoming.has(index)),
+  );
+  const replacement = pickFreshest(snapshot, candidates, FULL_COURT_SEVERE_FATIGUE_ENERGY);
+  if (replacement !== null) return { ...decision, inIndex: replacement };
+  if ((snapshot.energies[decision.outIndex] ?? 0) <= FULL_COURT_SEVERE_FATIGUE_ENERGY) {
+    return decision;
+  }
+  return null;
 }
 
 function closingRuleSwap(
@@ -1083,6 +1187,12 @@ function evaluateCoachingRules(
  * then severe fatigue, then ordered coaching rules, then the closing five or
  * minute-target pace, then ordinary fatigue. Equal candidates resolve by
  * priority and then roster order.
+ *
+ * When the plan staggers stars, an automatic swap may not bench the last
+ * primary/secondary scorer for a non-scorer. Forced exits, explicit coaching
+ * rules, exhausted or unavailable scorers, and emergency continuations all
+ * outrank that guard, and the saved starting five is never rewritten. The guard
+ * never adds a substitution on its own, so a healthy dead ball is left alone.
  */
 export function planSubstitution(
   snapshot: FullCourtRotationSnapshot,
@@ -1145,7 +1255,13 @@ export function planSubstitution(
         }
       }
       if (outIndex === -1 || outSlot === -1) break;
-      return { kind: 'swap', slot: outSlot, outIndex, inIndex: incoming, reason: 'closing-five' };
+      const covered = withScorerCoverage(
+        snapshot,
+        { kind: 'swap', slot: outSlot, outIndex, inIndex: incoming, reason: 'closing-five' },
+        new Set(closing),
+      );
+      if (covered === null) break;
+      return covered;
     }
   } else {
     const progress = clamp(context.globalSeconds / FULL_COURT_REGULATION_SECONDS, 0, 1);
@@ -1180,13 +1296,14 @@ export function planSubstitution(
         incomingDeviation = deviation;
       }
       if (incoming !== null) {
-        return {
+        const covered = withScorerCoverage(snapshot, {
           kind: 'swap',
           slot: outSlot,
           outIndex,
           inIndex: incoming,
           reason: 'minute-target',
-        };
+        });
+        if (covered !== null) return covered;
       }
     }
   }
@@ -1209,5 +1326,12 @@ export function planSubstitution(
     (snapshot.energies[tiredIndex] ?? 0) + FULL_COURT_FATIGUE_SWAP_GAIN,
   );
   if (fresh === null) return { kind: 'none' };
-  return { kind: 'swap', slot: tiredSlot, outIndex: tiredIndex, inIndex: fresh, reason: 'fatigue' };
+  const covered = withScorerCoverage(snapshot, {
+    kind: 'swap',
+    slot: tiredSlot,
+    outIndex: tiredIndex,
+    inIndex: fresh,
+    reason: 'fatigue',
+  });
+  return covered ?? { kind: 'none' };
 }

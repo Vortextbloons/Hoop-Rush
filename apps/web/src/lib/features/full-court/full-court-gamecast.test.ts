@@ -6,6 +6,7 @@ import {
   createEngineContext,
   fullCourtRegularSeasonGameInput,
   simulateRecordedFullCourtGame,
+  unitNameForPlayerIds,
   type FullCourtTapeEvent,
 } from '@hoop-rush/engine';
 import { simulateFullCourtBuzzerBanditTestGame } from '../../../../../../packages/engine/src/modes/full-court/game-test-support.ts';
@@ -41,6 +42,56 @@ test('projects a recorded game to the final score and recorded active fives', ()
     expect(event.awayUnit.every((id) => awayIds.has(id))).toBe(true);
   }
   expect(frames.some((frame) => frame.caption?.includes(' replaces '))).toBe(true);
+});
+
+test('shows a named unit only when the recorded five matches', () => {
+  const { season } = fullCourtTestSeasonLock();
+  const fixture = season.games[0];
+  if (fixture === undefined) throw new Error('Expected an opening fixture');
+  const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
+  const openingFive = input.home.roster.slice(0, 5).map((player) => player.playerId);
+  const unit = { name: 'Opening Five', playerIds: openingFive };
+  const { result, tape } = simulateRecordedFullCourtGame(
+    {
+      ...input,
+      home: {
+        ...input.home,
+        rotation: { ...input.home.rotation, units: [unit] },
+      },
+    },
+    createEngineContext(),
+  );
+  const homeRosterIds = result.home.players.map((player) => player.playerId);
+  expect(unitNameForPlayerIds(result.home.units, homeRosterIds, openingFive)).toBe('Opening Five');
+  expect(
+    unitNameForPlayerIds(result.home.units, homeRosterIds, [
+      ...openingFive.slice(0, 4),
+      result.home.players[5]?.playerId ?? '',
+    ]),
+  ).toBeNull();
+
+  const health = {
+    home: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.homeTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+    away: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.awayTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+  };
+  const body = render(FullCourtGamecast, {
+    props: {
+      game: { kind: 'played', result, tape, health, injuries: [] },
+      userTeamId: season.userTeamId,
+      onClose: () => {},
+    },
+  }).body;
+  expect(body).toContain('Opening Five');
 });
 
 test('records coaching-rule substitutions in the same order as the summary', () => {

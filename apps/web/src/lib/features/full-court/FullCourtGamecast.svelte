@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     buildFullCourtGameReport,
+    unitNameForPlayerIds,
     type FullCourtGameHealthOutcome,
     type FullCourtGameResult,
   } from '@hoop-rush/engine';
@@ -76,6 +77,17 @@
   function clockLabel(secondsRemaining: number): string {
     const seconds = Math.ceil(secondsRemaining);
     return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+
+  function unitNameFor(
+    team: FullCourtGameResult['home'],
+    playerIds: readonly string[],
+  ): string | null {
+    return unitNameForPlayerIds(
+      team.units,
+      team.players.map((player) => player.playerId),
+      playerIds,
+    );
   }
 </script>
 
@@ -155,8 +167,13 @@
     <div class="mt-4 grid gap-3 sm:grid-cols-2">
       {#each teams as team, index (team.teamId)}
         {@const active = index === 0 ? frame.homeUnit : frame.awayUnit}
+        {@const unitName = unitNameFor(team, active)}
         <div>
-          <h4 class="text-sm font-semibold">{team.displayName} on court</h4>
+          <h4 class="text-sm font-semibold">
+            {team.displayName} on court{#if unitName !== null}<span class="text-accent">
+                · {unitName}</span
+              >{/if}
+          </h4>
           <ul class="mt-1 space-y-1 text-xs text-muted-foreground">
             {#each active as id (id)}
               <li>
@@ -193,9 +210,17 @@
           >
           <tbody>
             {#each lineupReport.lineupRows as lineup (lineup.key)}
+              {@const unitName = unitNameFor(
+                lineupReport.userSide === 'home' ? game.result.home : game.result.away,
+                lineup.playerIds,
+              )}
               <tr>
                 <th scope="row" data-align="start"
-                  >{lineup.players.map((player) => player.displayName).join(' · ')}</th
+                  >{lineup.players
+                    .map((player) => player.displayName)
+                    .join(' · ')}{#if unitName !== null}<span class="text-accent">
+                      · {unitName}</span
+                    >{/if}</th
                 >
                 <td>{lineup.minutes.toFixed(1)}</td>
                 <td>{lineup.pacePossessions}</td>

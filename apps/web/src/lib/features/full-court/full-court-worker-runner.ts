@@ -1,5 +1,6 @@
 import type {
   FullCourtPlayoffCheckpoint,
+  FullCourtPracticeReport,
   FullCourtSeasonCheckpoint,
   Seed,
 } from '@hoop-rush/data-contracts';
@@ -9,6 +10,7 @@ import type {
   FullCourtSeasonLock,
   FullCourtSeasonSlotOptions,
   FullCourtSeasonSlotOutcome,
+  FullCourtTrainingCampOptions,
 } from '@hoop-rush/engine';
 import { newRequestId } from '#lib/ids.js';
 import { StreamingWorkerRunner } from '#lib/workers/streaming-worker.js';
@@ -19,6 +21,7 @@ import {
   type FullCourtWorkerGameRequestInput,
   type FullCourtWorkerMessage,
   type FullCourtWorkerPlayoffPayloadInput,
+  type FullCourtWorkerPracticeRequestInput,
   type FullCourtWorkerRequestInput,
   type FullCourtWorkerSlotRequestInput,
 } from './full-court-worker-protocol';
@@ -39,6 +42,14 @@ export interface FullCourtWorkerRunner {
     checkpoint: FullCourtPlayoffCheckpoint,
     options?: FullCourtSeasonSlotOptions,
   ): Promise<FullCourtPlayoffGameOutcome>;
+  simulatePractice?(
+    lock: FullCourtSeasonLock,
+    input: {
+      readonly seed: Seed;
+      readonly opponentTeamId: string;
+      readonly options?: FullCourtTrainingCampOptions;
+    },
+  ): Promise<FullCourtPracticeReport>;
   dispose(): void;
 }
 
@@ -101,6 +112,45 @@ class BrowserFullCourtWorkerRunner implements FullCourtWorkerRunner {
           if (this.hydratedPlayoffs?.runId !== runId) this.hydratedPlayoffs = null;
         }
         return outcome;
+      },
+      (error: unknown) => {
+        if (this.generation === generation) this.clearHydration();
+        throw error;
+      },
+    );
+  }
+
+  simulatePractice(
+    lock: FullCourtSeasonLock,
+    input: {
+      readonly seed: Seed;
+      readonly opponentTeamId: string;
+      readonly options?: FullCourtTrainingCampOptions;
+    },
+  ): Promise<FullCourtPracticeReport> {
+    const runId = lock.season.runId;
+    const includeLock = !this.seasonIsHydrated(runId, lock.digest);
+    const request: FullCourtWorkerPracticeRequestInput = {
+      schemaVersion: FULL_COURT_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'full-court-simulate-practice',
+      requestId: this.nextRequestId(),
+      runId,
+      lockDigest: lock.digest,
+      ...(includeLock ? { lock } : {}),
+      seed: input.seed,
+      opponentTeamId: input.opponentTeamId,
+      ...(input.options === undefined ? {} : { options: input.options }),
+    };
+    const generation = this.generation;
+    return this.runJob<FullCourtPracticeReport>(request, (message) =>
+      message.type === 'full-court-practice-result' ? message.report : null,
+    ).then(
+      (report) => {
+        if (this.generation === generation) {
+          this.hydratedSeason = { runId, digest: lock.digest };
+          if (this.hydratedPlayoffs?.runId !== runId) this.hydratedPlayoffs = null;
+        }
+        return report;
       },
       (error: unknown) => {
         if (this.generation === generation) this.clearHydration();

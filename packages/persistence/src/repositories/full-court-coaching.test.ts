@@ -27,6 +27,7 @@ const CUSTOM_PLAN: FullCourtCoachingPlan = fullCourtCoachingPlanSchema.parse({
     minuteTargets: { p1: 40, p2: 40, p3: 40, p4: 40, p5: 40, p6: 40 },
     closingFive: ['p1', 'p2', 'p3', 'p4', 'p5'],
   },
+  units: [{ name: 'Bench Mob', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }],
 });
 
 test('saves, overwrites, and isolates per-run coaching plans', async () => {
@@ -71,6 +72,28 @@ test('rejects an invalid plan without changing the stored plan', async () => {
       },
     } as unknown as FullCourtCoachingPlan;
     await expect(repository.save(RUN_ID, invalid)).rejects.toThrow('minute targets must total 240');
+    expect(await repository.load(RUN_ID)).toEqual(CUSTOM_PLAN);
+  } finally {
+    first.close();
+  }
+});
+
+test('rejects duplicate named units without changing the stored plan', async () => {
+  resetIndexedDb();
+  const { first } = openTestDatabasePair('full-court-coaching-unit-invalid');
+  try {
+    const repository = createFullCourtCoachingRepository(first);
+    await repository.save(RUN_ID, CUSTOM_PLAN);
+    const invalid = {
+      ...CUSTOM_PLAN,
+      units: [
+        { name: 'Bench Mob', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] },
+        { name: ' bench mob ', playerIds: ['p1', 'p2', 'p3', 'p4', 'p5'] },
+      ],
+    } as unknown as FullCourtCoachingPlan;
+    await expect(repository.save(RUN_ID, invalid)).rejects.toThrow(
+      'named unit names must be unique',
+    );
     expect(await repository.load(RUN_ID)).toEqual(CUSTOM_PLAN);
   } finally {
     first.close();

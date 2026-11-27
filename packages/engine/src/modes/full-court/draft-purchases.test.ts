@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { FullCourtDraftState, FullCourtReportTarget } from '@hoop-rush/data-contracts';
+import type {
+  FullCourtDraftState,
+  FullCourtPurchaseReportCommand,
+  FullCourtReportTarget,
+} from '@hoop-rush/data-contracts';
 import {
   FULL_COURT_DEFAULT_MONEY,
   FULL_COURT_MAX_REPORTS,
@@ -9,7 +13,11 @@ import {
   fullCourtReportPriceDollars,
   fullCourtReportScope,
 } from '@hoop-rush/data-contracts';
-import { applyFullCourtCommand, createFullCourtDraftState } from './draft-commands.ts';
+import {
+  applyFullCourtCommand,
+  createFullCourtDraftState,
+  fullCourtPurchasePhaseRejection,
+} from './draft-commands.ts';
 import {
   fullCourtPayrollDollars,
   fullCourtPayrollStatus,
@@ -123,9 +131,11 @@ describe('full court report purchases', () => {
     expect(fullCourtReportPriceDollars('player-scouting')).toBe(2_000_000);
     expect(fullCourtReportPriceDollars('lineup-fit')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('opponent-film')).toBe(3_000_000);
+    expect(fullCourtReportPriceDollars('training-camp')).toBe(10_000_000);
     expect(fullCourtReportScope('player-scouting')).toBe('run');
     expect(fullCourtReportScope('lineup-fit')).toBe('run');
     expect(fullCourtReportScope('opponent-film')).toBe('game');
+    expect(fullCourtReportScope('training-camp')).toBe('run');
   });
 
   it('charges one scouting receipt without touching payroll', () => {
@@ -252,6 +262,7 @@ describe('full court report purchases', () => {
     for (const target of [
       { kind: 'lineup-fit' },
       { kind: 'opponent-film', gameId: 'game-1', opponentTeamId: 'celtics' },
+      { kind: 'training-camp' },
     ] as const) {
       const outcome = buy(setup, setup.state, target);
       expect(outcome.result.rejection?.code).toBe('report-unavailable');
@@ -278,6 +289,40 @@ describe('full court report purchases', () => {
     expect(film.state.reports?.[1]?.target).toEqual(filmTarget);
     const repeat = buy(setup, film.state, filmTarget);
     expect(repeat.result.rejection?.code).toBe('report-owned');
+  });
+
+  it('sells training camp once after confirmation without touching payroll', () => {
+    const setup = fullCourtTestSetup();
+    const confirmed = finish(setup, sixPickState(setup));
+    const payrollBefore = fullCourtPayrollDollars(confirmed.picks);
+    const warChestBefore = fullCourtWarChestDollars(confirmed);
+    const camp = buy(setup, confirmed, { kind: 'training-camp' });
+    expect(camp.result.status).toBe('accepted');
+    expect(camp.state.reports?.[0]?.kind).toBe('training-camp');
+    expect(camp.state.spending.at(-1)).toMatchObject({
+      kind: 'scouting',
+      dollars: fullCourtReportPriceDollars('training-camp'),
+    });
+    expect(fullCourtPayrollDollars(camp.state.picks)).toBe(payrollBefore);
+    expect(fullCourtWarChestDollars(camp.state)).toBe(
+      warChestBefore - fullCourtReportPriceDollars('training-camp'),
+    );
+    const repeat = buy(setup, camp.state, { kind: 'training-camp' });
+    expect(repeat.result.rejection?.code).toBe('report-owned');
+    expect(repeat.state).toEqual(camp.state);
+  });
+
+  it('rejects training camp when the War Chest cannot cover the price', () => {
+    const setup = fullCourtTestSetup();
+    const confirmed = finish(setup, sixPickState(setup));
+    const payroll = fullCourtPayrollDollars(confirmed.picks);
+    const broke = fullCourtDraftStateSchema.parse({
+      ...confirmed,
+      money: { ...confirmed.money, startingWarChestDollars: payroll + 1 },
+    });
+    const camp = buy(setup, broke, { kind: 'training-camp' });
+    expect(camp.result.rejection?.code).toBe('budget-rejected');
+    expect(camp.state).toEqual(broke);
   });
 
   it('never moves the apron status', () => {
@@ -360,5 +405,62 @@ describe('full court report purchases', () => {
     }).state;
     expect(fullCourtSalaryDollarsOf(player)).toBeGreaterThan(0);
     expect(bought.spending.some((entry) => entry.kind === 'salary')).toBe(false);
+  });
+
+  it('closes training camp once the regular season has started', () => {
+    const setup = fullCourtTestSetup();
+    const confirmed = finish(setup, sixPickState(setup));
+    const command: FullCourtPurchaseReportCommand = {
+      command: 'purchase-full-court-report',
+      commandId: commandId('cmd-camp-phase', confirmed.revision),
+      runId: confirmed.runId,
+      expectedRevision: confirmed.revision,
+      target: { kind: 'training-camp' },
+    };
+    const open = {
+      completedThroughSlot: 0,
+      postseasonStarted: false,
+      playedGameIds: new Set<string>(),
+    };
+    expect(
+      fullCourtPurchasePhaseRejection(confirmed, command, { ...open, completedThroughSlot: null }),
+    ).toBeNull();
+    expect(fullCourtPurchasePhaseRejection(confirmed, command, open)).toBeNull();
+    for (const phase of [
+      { ...open, completedThroughSlot: 1 },
+      { ...open, postseasonStarted: true },
+    ]) {
+      const closed = fullCourtPurchasePhaseRejection(confirmed, command, phase);
+      expect(closed?.status).toBe('rejected');
+      expect(closed?.rejection?.code).toBe('report-unavailable');
+      expect(closed?.revisionBefore).toBe(confirmed.revision);
+      expect(closed?.revisionAfter).toBe(confirmed.revision);
+      expect(closed?.stateDigest).toBe(fullCourtStateDigest(confirmed));
+    }
+  });
+
+  it('closes opponent film once its fixture is committed', () => {
+    const setup = fullCourtTestSetup();
+    const confirmed = finish(setup, sixPickState(setup));
+    const command: FullCourtPurchaseReportCommand = {
+      command: 'purchase-full-court-report',
+      commandId: commandId('cmd-film-phase', confirmed.revision),
+      runId: confirmed.runId,
+      expectedRevision: confirmed.revision,
+      target: { kind: 'opponent-film', gameId: 'game-1', opponentTeamId: 'celtics' },
+    };
+    const open = {
+      completedThroughSlot: 1,
+      postseasonStarted: false,
+      playedGameIds: new Set<string>(['game-0']),
+    };
+    expect(fullCourtPurchasePhaseRejection(confirmed, command, open)).toBeNull();
+    const stale = fullCourtPurchasePhaseRejection(confirmed, command, {
+      ...open,
+      playedGameIds: new Set(['game-1']),
+    });
+    expect(stale?.status).toBe('rejected');
+    expect(stale?.rejection?.code).toBe('report-unavailable');
+    expect(stale?.stateDigest).toBe(fullCourtStateDigest(confirmed));
   });
 });

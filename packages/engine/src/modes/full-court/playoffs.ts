@@ -29,6 +29,7 @@ import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
 import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, type FullCourtTeamGameInput } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
+import { fixtureFullCourtDefensiveMatchups } from './matchups.ts';
 import {
   fullCourtPlayoffAdaptationForTeam,
   fullCourtPlayoffAdaptationsEqual,
@@ -444,6 +445,14 @@ export function simulateFullCourtPlayoffGame(
     (_, index) => fixture.dayOffset + (index + 1) * SERIES_GAME_GAP_DAYS,
   );
   const side = fixture.userSide;
+  const userDefensiveMatchups =
+    side === null
+      ? undefined
+      : fixtureFullCourtDefensiveMatchups(
+          options.defensiveMatchups,
+          fixture.gameId,
+          side === 'home' ? away.teamId : home.teamId,
+        );
   const game = runFullCourtGameWithHealth(
     {
       schemaVersion: 1,
@@ -453,11 +462,11 @@ export function simulateFullCourtPlayoffGame(
       profile: season.profile,
       home:
         side === 'home'
-          ? withFullCourtCoaching(home, options)
+          ? withFullCourtCoaching(home, { ...options, defensiveMatchups: userDefensiveMatchups })
           : applyAiAdaptation(home, adaptations?.home),
       away:
         side === 'away'
-          ? withFullCourtCoaching(away, options)
+          ? withFullCourtCoaching(away, { ...options, defensiveMatchups: userDefensiveMatchups })
           : applyAiAdaptation(away, adaptations?.away),
     },
     fixture.dayOffset,

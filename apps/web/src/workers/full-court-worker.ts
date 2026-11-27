@@ -2,6 +2,7 @@ import {
   createEngineContext,
   simulateFullCourtPlayoffGame,
   simulateFullCourtSeasonSlot,
+  simulateFullCourtTrainingCamp,
   type FullCourtPlayoffLock,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
@@ -124,6 +125,25 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         type: 'full-court-slot-result',
         requestId: request.requestId,
         outcome,
+      });
+      return;
+    }
+    if (request.type === 'full-court-simulate-practice') {
+      const lock = seasonLockFor(request);
+      const report = simulateFullCourtTrainingCamp(
+        lock.season,
+        {
+          seed: request.seed,
+          opponentTeamId: request.opponentTeamId,
+          ...(request.options ?? {}),
+        },
+        engineContext,
+      );
+      post({
+        schemaVersion: FULL_COURT_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'full-court-practice-result',
+        requestId: request.requestId,
+        report,
       });
       return;
     }

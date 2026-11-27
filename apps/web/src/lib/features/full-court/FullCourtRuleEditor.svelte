@@ -10,11 +10,14 @@
   import {
     FULL_COURT_MAX_RULES,
     FULL_COURT_STARTER_SLOTS,
+    fullCourtUnitNameForLineup,
+    type FullCourtNamedUnitDraft,
   } from './full-court-coaching-presenter.ts';
 
   let {
     rules,
     roster,
+    units = [],
     locked = false,
     onAdd,
     onUpdate,
@@ -23,6 +26,7 @@
   }: {
     rules: readonly FullCourtCoachingRule[];
     roster: readonly SimulationPlayer[];
+    units?: readonly FullCourtNamedUnitDraft[];
     locked?: boolean;
     onAdd: (kind: FullCourtCoachingRule['kind']) => void;
     onUpdate: (index: number, rule: FullCourtCoachingRule) => void;
@@ -69,6 +73,12 @@
     if (existing >= 0 && existing !== slot) lineup[existing] = lineup[slot] ?? playerId;
     lineup[slot] = playerId;
     update({ ...rule, lineup });
+  }
+
+  function setNamedUnit(rule: FullCourtClosingLineupRule, name: string): void {
+    const unit = units.find((candidate) => candidate.name === name);
+    if (unit === undefined) return;
+    update({ ...rule, lineup: [...unit.playerIds] });
   }
 
   function setFoulPlayer(rule: FullCourtFoulTroubleRule, playerId: string): void {
@@ -198,6 +208,22 @@
                 />
               </label>
             </div>
+            {#if units.length > 0}
+              <label class="mt-2 block min-w-0">
+                <span class="ui-micro">Start from named unit</span>
+                <select
+                  class={SELECT_CLASS}
+                  value={fullCourtUnitNameForLineup(units, rule.lineup) ?? ''}
+                  disabled={locked}
+                  onchange={(event) => setNamedUnit(rule, event.currentTarget.value)}
+                >
+                  <option value="">Custom lineup</option>
+                  {#each units as unit (unit.name)}
+                    <option value={unit.name}>{unit.name}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
             <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               {#each SLOTS as slot (slot)}
                 <label class="min-w-0">

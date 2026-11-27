@@ -4,11 +4,14 @@ import Dexie from 'dexie';
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   CAP_RUSH_FRANCHISE_ALIGNMENT,
+  FULL_COURT_DEFAULT_COACHING_PLAN,
   FULL_COURT_DEFAULT_MONEY,
   FULL_COURT_HEALTH_VERSION,
   commandIdSchema,
   franchiseIdSchema,
   fullCourtCreateDraftCommandSchema,
+  fullCourtReportPriceDollars,
+  havocInstanceSeed,
   idSchema,
   playerVersionId,
   seedSchema,
@@ -21,9 +24,11 @@ import {
   createEngineContext,
   createFullCourtSeasonCheckpoint,
   fullCourtDraftIndexOf,
+  fullCourtTrainingCampSeed,
   lockFullCourtRegularSeason,
   simulateFullCourtPlayoffGame,
   simulateFullCourtSeasonSlot,
+  simulateFullCourtTrainingCamp,
   type CapRushLeagueField,
 } from '@hoop-rush/engine';
 import {
@@ -58,6 +63,7 @@ import {
 } from './full-court-gamecast.ts';
 import { fullCourtNextUserFixture } from './full-court-season-presenter.ts';
 import type { FullCourtWorkerRunner } from './full-court-worker-runner.ts';
+import { fullCourtWorkerRequestSchema } from './full-court-worker-protocol.ts';
 import {
   openTestDatabasePair,
   resetIndexedDb,
@@ -214,6 +220,8 @@ describe('FullCourtController durable watched replay', () => {
     const createWorker = (): FullCourtWorkerRunner => ({
       simulateSlot: (lock, checkpoint, options) => simulateSlotMock(lock, checkpoint, options),
       simulateGame: (lock, checkpoint, options) => simulateGameMock(lock, checkpoint, options),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
       dispose: () => {},
     });
 
@@ -328,6 +336,8 @@ describe('FullCourtController durable watched replay', () => {
     const createWorker = (): FullCourtWorkerRunner => ({
       simulateSlot: (lock, checkpoint, options) => simulateSlotMock(lock, checkpoint, options),
       simulateGame: (lock, checkpoint, options) => simulateGameMock(lock, checkpoint, options),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
       dispose: () => {},
     });
 
@@ -439,6 +449,8 @@ describe('FullCourtController durable watched replay', () => {
         Promise.resolve(
           simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
         ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
       dispose: () => {},
     });
 
@@ -568,6 +580,8 @@ describe('FullCourtController durable watched replay', () => {
         Promise.resolve(
           simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
         ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
       dispose: () => {},
     });
 
@@ -622,6 +636,8 @@ describe('FullCourtController durable watched replay', () => {
           simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
         );
       },
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
       dispose: () => {},
     });
 
@@ -763,4 +779,516 @@ describe('FullCourtController durable watched replay', () => {
       second.close();
     }
   });
+
+  test('passes saved named units through simulation and reloads them', async () => {
+    installTestEnvironment();
+    const { first, second } = openTestDatabasePair('fc-controller-units');
+    const captured: Array<Parameters<FullCourtWorkerRunner['simulateSlot']>[2]> = [];
+    const simulateSlotMock = mock<FullCourtWorkerRunner['simulateSlot']>(
+      (lock, checkpoint, options) => {
+        captured.push(options);
+        return Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        );
+      },
+    );
+    const simulateGameMock = mock<FullCourtWorkerRunner['simulateGame']>(
+      (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+    );
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) => simulateSlotMock(lock, checkpoint, options),
+      simulateGame: (lock, checkpoint, options) => simulateGameMock(lock, checkpoint, options),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+
+    try {
+      const { assets } = await seedCompletedDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      const team = controller.season?.lock.season.teams.find(
+        (entry) => entry.teamId === controller.season?.lock.season.userTeamId,
+      );
+      if (team === undefined) throw new Error('Expected user team');
+      const unit = {
+        name: 'Opening Five',
+        playerIds: team.roster.slice(0, 5).map((player) => player.playerId),
+      };
+      expect(
+        await controller.saveCoaching({
+          ...FULL_COURT_DEFAULT_COACHING_PLAN,
+          interfaceLevel: 'mastermind',
+          units: [unit],
+        }),
+      ).toBe(true);
+
+      await controller.advance(1);
+      expect(captured[0]?.rotation?.units).toEqual([unit]);
+
+      controller.dispose();
+      first.close();
+
+      const reloaded = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(second),
+        createWorker,
+      });
+      await reloaded.load();
+      expect(reloaded.season?.coaching.units).toEqual([unit]);
+      reloaded.dispose();
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+
+  test('persists the training camp purchase and reproduces the same practice report', async () => {
+    installTestEnvironment();
+    const { first, second } = openTestDatabasePair('fc-controller-training-camp');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+
+    try {
+      const { assets, lock } = await seedCompletedDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      const checkpointBefore = JSON.stringify(controller.season?.checkpoint ?? null);
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(0);
+
+      await controller.purchaseReport({ kind: 'training-camp' });
+      const camp = controller.draft?.reports?.find((report) => report.kind === 'training-camp');
+      if (camp === undefined) throw new Error('Expected a persisted training camp purchase');
+      expect(camp.priceDollars).toBe(10_000_000);
+      expect(controller.draft?.spending.filter((entry) => entry.kind === 'scouting')).toHaveLength(
+        1,
+      );
+
+      await controller.runPractice();
+      const report = controller.practice;
+      if (report === null) throw new Error('Expected a practice report');
+      expect(report.seed).toBe(fullCourtTrainingCampSeed(lock.season.runSeed, camp.reportId));
+      const fixture = lock.season.games.find(
+        (game) =>
+          game.slot === 1 &&
+          (game.homeTeamId === lock.season.userTeamId ||
+            game.awayTeamId === lock.season.userTeamId),
+      );
+      if (fixture === undefined) throw new Error('Missing the opening fixture');
+      expect(report.seed).not.toBe(
+        havocInstanceSeed(lock.season.runSeed, 'full-court-regular-game-v1', fixture.gameId),
+      );
+      expect(JSON.stringify(controller.season?.checkpoint ?? null)).toBe(checkpointBefore);
+      expect(controller.season?.scores).toHaveLength(0);
+      expect(controller.latestGame).toBeNull();
+      expect(controller.savedReplay).toBeNull();
+
+      await controller.runPractice();
+      expect(controller.practice).toEqual(report);
+
+      controller.dispose();
+      first.close();
+
+      const reloaded = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(second),
+        createWorker,
+      });
+      await reloaded.load();
+      expect(
+        reloaded.draft?.reports?.some(
+          (entry) => entry.kind === 'training-camp' && entry.reportId === camp.reportId,
+        ),
+      ).toBe(true);
+      expect(reloaded.draft?.spending.filter((entry) => entry.kind === 'scouting')).toHaveLength(1);
+      expect(reloaded.practice).toBeNull();
+      await reloaded.runPractice();
+      expect(reloaded.practice).toEqual(report);
+      reloaded.dispose();
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+
+  test('validates per-fixture defensive matchups, clears after user game, and skips AI-only playoff games ahead', async () => {
+    installTestEnvironment();
+    const { first } = openTestDatabasePair('fc-controller-matchups');
+    const slotCalls: Array<Parameters<FullCourtWorkerRunner['simulateSlot']>[2]> = [];
+    const playoffCalls: Array<Parameters<FullCourtWorkerRunner['simulateGame']>[2]> = [];
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) => {
+        slotCalls.push(options);
+        return Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        );
+      },
+      simulateGame: (lock, checkpoint, options) => {
+        playoffCalls.push(options);
+        return Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        );
+      },
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+
+    try {
+      const { assets, lock } = await seedCompletedDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+
+      const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
+      const slot1Fixture = lock.season.games.find(
+        (game) =>
+          game.slot === 1 &&
+          (game.homeTeamId === lock.season.userTeamId ||
+            game.awayTeamId === lock.season.userTeamId),
+      );
+      if (userTeam === undefined || slot1Fixture === undefined) {
+        throw new Error('Missing opening fixture');
+      }
+      const slot1OpponentId =
+        slot1Fixture.homeTeamId === userTeam.teamId
+          ? slot1Fixture.awayTeamId
+          : slot1Fixture.homeTeamId;
+      const slot1Opponent = lock.season.teams.find((team) => team.teamId === slot1OpponentId);
+      if (slot1Opponent === undefined) throw new Error('Missing opening opponent');
+      const opp0 = slot1Opponent.roster[0];
+      const opp1 = slot1Opponent.roster[1];
+      const usr0 = userTeam.roster[0];
+      const usr1 = userTeam.roster[1];
+      const usr2 = userTeam.roster[2];
+      if (!opp0 || !opp1 || !usr0 || !usr1 || !usr2) {
+        throw new Error('Missing test roster players');
+      }
+
+      expect(
+        controller.setDefensiveMatchups([
+          { opponentPlayerId: 'not-on-opponent', defenderPlayerId: usr0.playerId },
+        ]),
+      ).toBe(false);
+      expect(controller.error).toContain('opponent roster');
+
+      expect(
+        controller.setDefensiveMatchups([
+          {
+            opponentPlayerId: opp0.playerId,
+            defenderPlayerId: usr2.playerId,
+          },
+          {
+            opponentPlayerId: opp1.playerId,
+            defenderPlayerId: usr2.playerId,
+          },
+        ]),
+      ).toBe(false);
+      expect(controller.error).toContain('at most one assigned opponent');
+
+      const assignment = {
+        opponentPlayerId: opp0.playerId,
+        defenderPlayerId: usr2.playerId,
+      };
+      expect(controller.setDefensiveMatchups([assignment])).toBe(true);
+      expect(controller.defensiveMatchupsForGameId).toBe(slot1Fixture.gameId);
+      expect(controller.defensiveMatchupsOpponentId).toBe(slot1OpponentId);
+
+      const checkpoint = controller.season?.checkpoint;
+      if (checkpoint === undefined) throw new Error('Missing season checkpoint');
+      const protocolCheck = fullCourtWorkerRequestSchema.safeParse({
+        schemaVersion: 1,
+        type: 'full-court-simulate-slot',
+        requestId: 'req-matchup-1',
+        runId: lock.season.runId,
+        lockDigest: lock.digest,
+        checkpoint,
+        options: {
+          defensiveMatchups: {
+            gameId: slot1Fixture.gameId,
+            opponentTeamId: slot1OpponentId,
+            assignments: [assignment],
+          },
+        },
+      });
+      expect(protocolCheck.success).toBe(true);
+
+      await controller.advance(2);
+      expect(slotCalls[0]?.defensiveMatchups).toEqual({
+        gameId: slot1Fixture.gameId,
+        opponentTeamId: slot1OpponentId,
+        assignments: [assignment],
+      });
+      expect(slotCalls[1]?.defensiveMatchups).toBeUndefined();
+      expect(controller.defensiveMatchupAssignments).toEqual([]);
+      expect(controller.defensiveMatchupsForGameId).toBeNull();
+
+      // Jump to completed regular season and start playoffs to test AI-only games ahead.
+      const seasonRepo = createFullCourtSeasonRepository(first);
+      const initial = createFullCourtSeasonCheckpoint(lock);
+      const slot82Health = { ...initial.healthByTeam };
+      const allScores: FullCourtSeasonScore[] = [];
+      for (const fixture of lock.season.games) {
+        if (fixture.slot === CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
+          for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
+            slot82Health[teamId] = {
+              teamId,
+              version: FULL_COURT_HEALTH_VERSION,
+              throughDay: fixture.dayOffset,
+              players: {},
+            };
+          }
+        }
+        const userInGame =
+          fixture.homeTeamId === lock.season.userTeamId ||
+          fixture.awayTeamId === lock.season.userTeamId;
+        const homeWins = userInGame
+          ? fixture.slot % 4 !== 0
+            ? fixture.homeTeamId === lock.season.userTeamId
+            : fixture.awayTeamId === lock.season.userTeamId
+          : fixture.homeTeamId < fixture.awayTeamId;
+        allScores.push({
+          ...fixture,
+          outcome: {
+            kind: 'played',
+            homePoints: homeWins ? 100 : 90,
+            awayPoints: homeWins ? 90 : 100,
+          },
+        });
+      }
+      await first.fullCourtSeasonCheckpoints.put({
+        saveSchemaVersion: 1,
+        runId: lock.season.runId,
+        checkpoint: {
+          schemaVersion: 1,
+          runId: lock.season.runId,
+          lockDigest: lock.digest,
+          completedThroughSlot: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
+          healthByTeam: slot82Health,
+        },
+      });
+      await first.fullCourtSeasonScores.bulkPut(
+        allScores.map((score) => ({
+          saveSchemaVersion: 1,
+          runId: lock.season.runId,
+          gameId: score.gameId,
+          score,
+        })),
+      );
+      await seasonRepo.load(lock.season.runId);
+      await controller.load();
+      await controller.startPlayoffs();
+
+      const preview = controller.nextPlayoffPreview();
+      if (preview === null) throw new Error('Missing playoff preview');
+      const playoffOpp = lock.season.teams.find((team) => team.teamId === preview.opponentTeamId);
+      const playoffOpp0 = playoffOpp?.roster[0];
+      if (playoffOpp0 === undefined) throw new Error('Missing playoff opponent starter');
+      const playoffAssignment = {
+        opponentPlayerId: playoffOpp0.playerId,
+        defenderPlayerId: usr1.playerId,
+      };
+      expect(controller.setDefensiveMatchups([playoffAssignment])).toBe(true);
+      expect(controller.defensiveMatchupsForGameId).toBe(preview.gameId);
+
+      while (controller.playoffs?.view.nextGame?.userSide === null) {
+        await controller.advance(1);
+      }
+      expect(playoffCalls.every((options) => options?.defensiveMatchups === undefined)).toBe(true);
+      expect(controller.defensiveMatchupsForGameId).toBe(preview.gameId);
+
+      await controller.advance(1);
+      expect(playoffCalls.at(-1)?.defensiveMatchups).toEqual({
+        gameId: preview.gameId,
+        opponentTeamId: preview.opponentTeamId,
+        assignments: [playoffAssignment],
+      });
+      expect(controller.defensiveMatchupAssignments).toEqual([]);
+      expect(controller.defensiveMatchupsForGameId).toBeNull();
+      controller.dispose();
+    } finally {
+      first.close();
+    }
+  });
+});
+
+test('keeps a stale tab from paying for training camp after another tab commits the opener', async () => {
+  installTestEnvironment();
+  const { first, second } = openTestDatabasePair('fc-purchase-stale-tab');
+  const createWorker = (): FullCourtWorkerRunner => ({
+    simulateSlot: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulateGame: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulatePractice: (lock, input) =>
+      Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+    dispose: () => {},
+  });
+  try {
+    const { assets, lock } = await seedCompletedDraft(first);
+    const stale = new FullCourtController({
+      loadAssets: () => Promise.resolve(assets),
+      loadHealthProfiles: () => Promise.resolve(null),
+      repositories: repositoriesFor(first),
+      createWorker,
+    });
+    const live = new FullCourtController({
+      loadAssets: () => Promise.resolve(assets),
+      loadHealthProfiles: () => Promise.resolve(null),
+      repositories: repositoriesFor(second),
+      createWorker,
+    });
+    await stale.load();
+    await live.load();
+    expect(stale.season?.checkpoint.completedThroughSlot).toBe(0);
+    const staleFilm = stale.nextFilmTarget();
+    if (staleFilm === null) throw new Error('Expected the opening film target');
+
+    const scout = assets.catalog.candidates[0];
+    if (scout === undefined) throw new Error('Missing catalog candidate');
+    await stale.purchaseReport({
+      kind: 'player-scouting',
+      playerVersionId: scout.playerVersionId,
+    });
+    expect(stale.error).toBeNull();
+
+    await live.advance(1);
+    expect(live.season?.checkpoint.completedThroughSlot).toBe(1);
+
+    await stale.purchaseReport({ kind: 'training-camp' });
+    expect(stale.error).toBe('Training camp closes before the first regular-season game.');
+    expect(stale.draft?.reports?.some((report) => report.kind === 'training-camp') ?? false).toBe(
+      false,
+    );
+
+    await stale.purchaseReport(staleFilm);
+    expect(stale.error).toBe('Film study is available for your next game.');
+
+    const durable = await repositoriesFor(second).fullCourtDraftRepository.load(lock.season.runId);
+    if (durable === null) throw new Error('Missing durable draft');
+    expect(
+      durable.spending.filter((entry) => entry.kind === 'scouting').map((entry) => entry.dollars),
+    ).toEqual([fullCourtReportPriceDollars('player-scouting')]);
+    expect(durable.reports?.some((report) => report.kind === 'training-camp') ?? false).toBe(false);
+    expect(
+      (await repositoriesFor(second).fullCourtSeasonRepository.load(lock.season.runId))
+        ?.completedThroughSlot,
+    ).toBe(1);
+
+    await stale.runPractice();
+    expect(stale.error).toBe('Training camp practice closes before the first regular-season game.');
+    expect(stale.practice).toBeNull();
+
+    // Run-scoped information stays purchasable after the opener; only camp and film close.
+    await stale.purchaseReport({ kind: 'lineup-fit' });
+    expect(stale.error).toBeNull();
+    expect(
+      (await repositoriesFor(second).fullCourtDraftRepository.load(lock.season.runId))?.spending
+        .filter((entry) => entry.kind === 'scouting')
+        .map((entry) => entry.dollars),
+    ).toEqual([
+      fullCourtReportPriceDollars('player-scouting'),
+      fullCourtReportPriceDollars('lineup-fit'),
+    ]);
+    stale.dispose();
+    live.dispose();
+  } finally {
+    first.close();
+    second.close();
+  }
+});
+
+test('opens a practice report bought by another tab and refuses a new one after the opener', async () => {
+  installTestEnvironment();
+  const { first, second } = openTestDatabasePair('fc-practice-durable');
+  const createWorker = (): FullCourtWorkerRunner => ({
+    simulateSlot: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulateGame: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulatePractice: (lock, input) =>
+      Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+    dispose: () => {},
+  });
+  try {
+    const { assets, lock } = await seedCompletedDraft(first);
+    const firstTab = new FullCourtController({
+      loadAssets: () => Promise.resolve(assets),
+      loadHealthProfiles: () => Promise.resolve(null),
+      repositories: repositoriesFor(first),
+      createWorker,
+    });
+    const secondTab = new FullCourtController({
+      loadAssets: () => Promise.resolve(assets),
+      loadHealthProfiles: () => Promise.resolve(null),
+      repositories: repositoriesFor(second),
+      createWorker,
+    });
+    await firstTab.load();
+    await secondTab.load();
+    await secondTab.purchaseReport({ kind: 'training-camp' });
+    expect(secondTab.error).toBeNull();
+    expect(
+      firstTab.draft?.reports?.some((report) => report.kind === 'training-camp') ?? false,
+    ).toBe(false);
+
+    await firstTab.runPractice();
+    expect(firstTab.error).toBeNull();
+    const camp = firstTab.draft?.reports?.find((report) => report.kind === 'training-camp');
+    if (camp === undefined) throw new Error('Expected the durable training camp report');
+    expect(firstTab.practice?.seed).toBe(
+      fullCourtTrainingCampSeed(lock.season.runSeed, camp.reportId),
+    );
+
+    await secondTab.advance(1);
+    const opened = firstTab.practice;
+    await firstTab.runPractice();
+    expect(firstTab.error).toBe(
+      'Training camp practice closes before the first regular-season game.',
+    );
+    expect(firstTab.practice).toEqual(opened);
+    firstTab.dispose();
+    secondTab.dispose();
+  } finally {
+    first.close();
+    second.close();
+  }
 });

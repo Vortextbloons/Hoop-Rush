@@ -13,13 +13,21 @@ const STARTERS = ['p1', 'p2', 'p3', 'p4', 'p5'] as const;
 const FULL_MINUTES = Object.fromEntries(STARTERS.map((playerId) => [playerId, 48]));
 
 function plan(
-  overrides: { rotation?: Record<string, unknown>; tactics?: unknown; hierarchy?: unknown } = {},
+  overrides: {
+    rotation?: Record<string, unknown>;
+    tactics?: unknown;
+    hierarchy?: unknown;
+    units?: unknown;
+    staggerStars?: unknown;
+  } = {},
 ) {
   return {
     schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION,
     tactics: overrides.tactics ?? FULL_COURT_DEFAULT_TACTICS,
     ...(overrides.rotation === undefined ? {} : { rotation: overrides.rotation }),
     ...(overrides.hierarchy === undefined ? {} : { hierarchy: overrides.hierarchy }),
+    ...(overrides.units === undefined ? {} : { units: overrides.units }),
+    ...(overrides.staggerStars === undefined ? {} : { staggerStars: overrides.staggerStars }),
   } satisfies Record<string, unknown>;
 }
 
@@ -186,6 +194,31 @@ describe('Full Court coaching plan', () => {
     ).toBe(false);
   });
 
+  it('accepts named five-player units and rejects duplicate names, duplicate players, and excess units', () => {
+    const unit = (name: string, playerIds: readonly string[] = STARTERS) => ({ name, playerIds });
+    expect(accepts(plan({ units: [unit(' Bench ')] }))).toBe(true);
+    const parsed = fullCourtCoachingPlanSchema.safeParse(plan({ units: [unit(' Bench ')] }));
+    if (!parsed.success) throw new Error(parsed.error.message);
+    expect(parsed.data.units?.[0]?.name).toBe('Bench');
+
+    expect(accepts(plan({ units: [unit('Bench'), unit('bench')] }))).toBe(false);
+    expect(accepts(plan({ units: [unit('Bench', ['p1', 'p1', 'p2', 'p3', 'p4'])] }))).toBe(false);
+    expect(accepts(plan({ units: [unit('Bench', ['p1', 'p2', 'p3', 'p4'])] }))).toBe(false);
+    expect(accepts(plan({ units: [unit('')] }))).toBe(false);
+    expect(
+      accepts(
+        plan({
+          units: Array.from({ length: 7 }, (_value, index) => unit(`Unit ${String(index + 1)}`)),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps legacy plans without named units valid', () => {
+    expect(accepts(plan({ rotation: rotation() }))).toBe(true);
+    expect(fullCourtCoachingPlanSchema.parse(plan()).units).toBeUndefined();
+  });
+
   it('accepts an optional distinct scoring hierarchy and rejects empty or repeated roles', () => {
     expect(accepts(plan({ hierarchy: { primaryPlayerId: 'p1' } }))).toBe(true);
     expect(
@@ -211,6 +244,13 @@ describe('Full Court coaching plan', () => {
       ),
     ).toBe(false);
     expect(accepts(plan({ hierarchy: { primaryPlayerId: '' } }))).toBe(false);
+  });
+
+  it('accepts optional star staggering and omits it from legacy plans', () => {
+    expect(accepts(plan({ staggerStars: true }))).toBe(true);
+    expect(accepts(plan({ staggerStars: false }))).toBe(true);
+    expect(accepts(plan({ staggerStars: 'yes' }))).toBe(false);
+    expect(fullCourtCoachingPlanSchema.parse(plan()).staggerStars).toBeUndefined();
   });
 
   it('rejects unknown tactics and schema versions', () => {

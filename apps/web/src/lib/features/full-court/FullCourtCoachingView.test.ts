@@ -6,6 +6,7 @@ import {
 import {
   FULL_COURT_DEFAULT_COACHING_PLAN,
   playerIdSchema,
+  seasonKeySchema,
   type FullCourtBlueprint,
   type FullCourtCoachingPlan,
   type FullCourtTactics,
@@ -14,6 +15,7 @@ import {
 import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { render } from 'svelte/server';
 import FullCourtCoachingView from './FullCourtCoachingView.svelte';
+import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
 
 const ROSTER: readonly SimulationPlayer[] = Array.from({ length: 8 }, (_, index) =>
   buildSimulationPlayer({
@@ -40,6 +42,7 @@ function renderView(props: {
   plan: FullCourtCoachingPlan;
   readOnly?: boolean;
   busy?: boolean;
+  matchupContext?: FullCourtMatchupEditorContext | null;
   onListBlueprints?: () => Promise<FullCourtBlueprint[]>;
   onSaveBlueprint?: (
     name: string,
@@ -56,6 +59,7 @@ function renderView(props: {
       busy: props.busy ?? false,
       onSave: () => Promise.resolve(true),
       ...(props.readOnly === undefined ? {} : { readOnly: props.readOnly }),
+      ...(props.matchupContext === undefined ? {} : { matchupContext: props.matchupContext }),
       ...(props.onListBlueprints === undefined ? {} : { onListBlueprints: props.onListBlueprints }),
       ...(props.onSaveBlueprint === undefined ? {} : { onSaveBlueprint: props.onSaveBlueprint }),
       ...(props.onRemoveBlueprint === undefined
@@ -155,6 +159,7 @@ describe('FullCourtCoachingView', () => {
         ...CUSTOM_PLAN,
         interfaceLevel: 'mastermind',
         hierarchy: { primaryPlayerId: 'p2', floorGeneralPlayerId: 'p1' },
+        staggerStars: true,
       },
     });
     expect(mastermind).toContain('aria-label="Scoring hierarchy"');
@@ -165,6 +170,40 @@ describe('FullCourtCoachingView', () => {
     expect(mastermind).toContain('Runs the most offense');
     expect(mastermind).toContain('value="p2"');
     expect(mastermind).toContain('value="p1"');
+    expect(mastermind).toContain('Stagger stars');
+    expect(mastermind).toContain(
+      'Foul-outs, injuries, exhaustion, and explicit rules still take priority.',
+    );
+  });
+
+  test('shows named units only in Mastermind and offers them to closing rules', () => {
+    const withUnits: FullCourtCoachingPlan = {
+      ...CUSTOM_PLAN,
+      interfaceLevel: 'mastermind',
+      units: [{ name: 'Small Ball', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }],
+      rules: [
+        {
+          ruleId: 'closing-1',
+          kind: 'closing-lineup',
+          secondsRemainingMax: 360,
+          scoreMarginMax: 6,
+          lineup: ['p1', 'p2', 'p3', 'p4', 'p6'],
+        },
+      ],
+    };
+    expect(renderView({ plan: { ...withUnits, interfaceLevel: 'remix' } })).not.toContain(
+      'aria-label="Named units"',
+    );
+
+    const body = renderView({ plan: withUnits });
+    expect(body).toContain('aria-label="Named units"');
+    expect(body).toContain('Small Ball');
+    expect(body).toContain('Add named unit');
+    expect(body).toContain('Use as closing five');
+    expect(body).toContain('Current closing five');
+    expect(body).toContain('Start from named unit');
+    expect(body).toContain('value="Small Ball"');
+    expect(body).toContain('maxlength="32"');
   });
 
   test('renders ordered rules with priority and editable fields in Mastermind', () => {
@@ -272,5 +311,71 @@ describe('FullCourtCoachingView', () => {
     expect(withHierarchyBody).toContain('Include portable scoring roles');
     expect(withHierarchyBody).toContain('Primary option: Starter 1 (PG)');
     expect(withHierarchyBody).toContain('Floor general: Starter 2 (SG)');
+  });
+
+  test('shows per-fixture defensive matchups only in Mastermind for an applicable editable fixture', () => {
+    const oppRoster = Array.from({ length: 6 }, (_, index) =>
+      buildSimulationPlayer({
+        playerId: playerIdSchema.parse(`opp-${String(index + 1)}`),
+        displayName: `Opp ${String(index + 1)}`,
+        positions: ['PG'],
+      }),
+    );
+    const matchupContext: FullCourtMatchupEditorContext = {
+      fixture: {
+        gameId: 'fc-reg-1-0',
+        phase: 'regular',
+        label: 'Game 1 of 82',
+        dayOffset: 1,
+        homeTeamId: 'user',
+        awayTeamId: 'opp',
+        userSide: 'home',
+      },
+      userTeam: { teamId: 'user', displayName: 'User', anchorSeason: null, roster: [...ROSTER] },
+      opponentTeam: {
+        teamId: 'opp',
+        displayName: 'Boston',
+        anchorSeason: seasonKeySchema.parse('1985-86'),
+        roster: oppRoster,
+      },
+      userHealth: null,
+      opponentHealth: null,
+      restingPlayerIds: [],
+      coachingPlan: CUSTOM_PLAN,
+      assignments: [],
+      forGameId: null,
+      forOpponentId: null,
+    };
+
+    expect(renderView({ plan: CUSTOM_PLAN, matchupContext })).not.toContain(
+      'aria-label="Full Court defensive matchups"',
+    );
+    expect(
+      renderView({
+        plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' },
+        matchupContext,
+      }),
+    ).not.toContain('aria-label="Full Court defensive matchups"');
+    expect(
+      renderView({
+        plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
+        matchupContext,
+        readOnly: true,
+      }),
+    ).not.toContain('aria-label="Full Court defensive matchups"');
+    expect(
+      renderView({
+        plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
+        matchupContext: null,
+      }),
+    ).not.toContain('aria-label="Full Court defensive matchups"');
+
+    const visible = renderView({
+      plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
+      matchupContext,
+    });
+    expect(visible).toContain('aria-label="Full Court defensive matchups"');
+    expect(visible).toContain('Defensive matchups');
+    expect(visible).toContain('Boston');
   });
 });

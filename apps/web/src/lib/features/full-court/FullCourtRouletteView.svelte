@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FullCourtDraftState } from '@hoop-rush/data-contracts';
+  import type { FullCourtDraftState, FullCourtReportTarget } from '@hoop-rush/data-contracts';
   import { CAP_RUSH_SPIN_PURCHASES } from '@hoop-rush/data-contracts';
   import {
     fullCourtPayrollDollars,
@@ -7,6 +7,7 @@
     fullCourtRouletteReceipts,
     fullCourtSpinEligibility,
     fullCourtWarChestDollars,
+    type FullCourtCatalogIndex,
   } from '@hoop-rush/engine';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
@@ -18,19 +19,25 @@
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import { formatWarChestCr } from './full-court-draft-presentation.js';
+  import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
+  import FullCourtTrainingCampPanel from './FullCourtTrainingCampPanel.svelte';
 
   let {
     draft,
+    index,
     busy,
     onPurchaseSpin,
     onSkipSpin,
     onFinalize,
+    onPurchaseReport,
   }: {
     draft: FullCourtDraftState;
+    index: FullCourtCatalogIndex | null;
     busy: boolean;
     onPurchaseSpin: (purchase: 'standard' | 'surge', playerVersionId: string) => void;
     onSkipSpin: () => void;
     onFinalize: () => void;
+    onPurchaseReport: (target: FullCourtReportTarget) => void;
   } = $props();
 
   const purchases = [
@@ -158,3 +165,27 @@
     <Button tone="primary" disabled={busy} onclick={onFinalize}>Finalize and start season</Button>
   </div>
 </Panel>
+
+{#if index !== null}
+  <div class="mt-3 flex flex-col gap-3">
+    <FullCourtRosterFitPanel
+      {draft}
+      {index}
+      {busy}
+      {onPurchaseReport}
+      ariaLabel="Full Court Roulette roster fit"
+      eyebrow="Preparation"
+    />
+    <FullCourtTrainingCampPanel
+      {draft}
+      {index}
+      {busy}
+      campOpen
+      practiceOpen={false}
+      practice={null}
+      {onPurchaseReport}
+      onRunPractice={() => undefined}
+      ariaLabel="Full Court Roulette training camp"
+    />
+  </div>
+{/if}

@@ -9,6 +9,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import {
+  FULL_COURT_MAX_UNITS,
   applyFullCourtBlueprintToDraft,
   blueprintHierarchyFromDraft,
   defaultFullCourtCoachingDraft,
@@ -17,6 +18,7 @@ import {
   fullCourtCoachingSignature,
   fullCourtPlayerHealthView,
   fullCourtTeamMinutes,
+  fullCourtUnitNameForLineup,
   validateFullCourtCoachingDraft,
   type FullCourtCoachingDraft,
 } from './full-court-coaching-presenter.ts';
@@ -119,6 +121,7 @@ describe('Full Court coaching draft', () => {
     expect(draft.minuteTargets).toEqual(DEFAULT_ROTATION.minuteTargets);
     expect(draft.interfaceLevel).toBe('remix');
     expect(draft.rules).toEqual([]);
+    expect(draft.staggerStars).toBe(false);
   });
 
   test('keeps a legacy plan clean and marks no false unsaved change', () => {
@@ -183,6 +186,89 @@ describe('Full Court coaching draft', () => {
     const quick = fullCourtCoachingPlan(draft);
     expect(quick.hierarchy).toEqual({ primaryPlayerId: 'p4' });
     expect(quick.interfaceLevel).toBe('quick');
+  });
+
+  test('defaults star staggering off and preserves it while the control is hidden', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+    expect(draft.staggerStars).toBe(false);
+    expect(fullCourtCoachingPlan(draft)).not.toHaveProperty('staggerStars');
+
+    const saved: FullCourtCoachingPlan = {
+      ...CUSTOM_PLAN,
+      interfaceLevel: 'mastermind',
+      hierarchy: { primaryPlayerId: 'p2', secondaryPlayerId: 'p3' },
+      staggerStars: true,
+    };
+    const seeded = fullCourtCoachingDraft(saved, DEFAULT_ROTATION, ROSTER_IDS);
+    expect(seeded.staggerStars).toBe(true);
+    expect(fullCourtCoachingSignature(fullCourtCoachingPlan(seeded))).toBe(
+      fullCourtCoachingSignature(saved),
+    );
+
+    seeded.interfaceLevel = 'quick';
+    const quick = fullCourtCoachingPlan(seeded);
+    expect(quick.staggerStars).toBe(true);
+    expect(quick.hierarchy).toEqual(saved.hierarchy);
+    expect(quick.interfaceLevel).toBe('quick');
+    expect(fullCourtCoachingPlanSchema.parse(quick)).toEqual(quick);
+  });
+
+  test('seeds, emits, and preserves named units across interface levels', () => {
+    const saved: FullCourtCoachingPlan = {
+      ...CUSTOM_PLAN,
+      interfaceLevel: 'mastermind',
+      units: [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p7'] }],
+    };
+    const draft = fullCourtCoachingDraft(saved, DEFAULT_ROTATION, ROSTER_IDS);
+    expect(draft.units).toEqual([{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p7'] }]);
+    expect(fullCourtUnitNameForLineup(draft.units, ['p7', 'p4', 'p3', 'p2', 'p1'])).toBe('Bench');
+
+    const mastermind = fullCourtCoachingPlan(draft);
+    expect(fullCourtCoachingSignature(mastermind)).toBe(fullCourtCoachingSignature(saved));
+
+    draft.interfaceLevel = 'quick';
+    const quick = fullCourtCoachingPlan(draft);
+    expect(quick.units).toEqual([{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p7'] }]);
+    expect(fullCourtCoachingPlanSchema.parse(quick)).toEqual(quick);
+    expect(quick.interfaceLevel).toBe('quick');
+  });
+
+  test('keeps named units editable without a custom rotation', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+    draft.rotationMode = 'automatic';
+    draft.units = [{ name: 'Small Ball', playerIds: ['p1', 'p2', 'p3', 'p6', 'p7'] }];
+    const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted.rotation).toBeUndefined();
+    expect(emitted.units).toEqual([
+      { name: 'Small Ball', playerIds: ['p1', 'p2', 'p3', 'p6', 'p7'] },
+    ]);
+    expect(fullCourtCoachingPlanSchema.parse(emitted)).toEqual(emitted);
+  });
+
+  test('does not leave a dangling reference when a unit is removed', () => {
+    const draft = fullCourtCoachingDraft(CUSTOM_PLAN, DEFAULT_ROTATION, ROSTER_IDS);
+    const unit = { name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] };
+    draft.units = [unit];
+    draft.rules = [
+      {
+        ruleId: 'rule-1',
+        kind: 'closing-lineup',
+        secondsRemainingMax: 360,
+        scoreMarginMax: 6,
+        lineup: [...unit.playerIds],
+      },
+    ];
+    draft.units = [];
+    const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted.units).toBeUndefined();
+    expect(emitted.rules?.[0]).toEqual({
+      ruleId: 'rule-1',
+      kind: 'closing-lineup',
+      secondsRemainingMax: 360,
+      scoreMarginMax: 6,
+      lineup: ['p1', 'p2', 'p3', 'p4', 'p6'],
+    });
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
   });
 
   test('preserves rotation, tactics, and rules when switching interface level', () => {
@@ -322,6 +408,68 @@ describe('Full Court coaching validation', () => {
     expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
   });
 
+  test('validates named unit names and roster membership', () => {
+    const draft = customDraft();
+    draft.units = [
+      { name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] },
+      { name: ' bench ', playerIds: ['p1', 'p2', 'p3', 'p4', 'p7'] },
+    ];
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Named unit names must be unique.',
+    );
+
+    draft.units = [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p1'] }];
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Named unit Bench needs five different players from your roster.',
+    );
+
+    draft.units = [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'outside'] }];
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Named unit Bench needs five different players from your roster.',
+    );
+
+    draft.units = [{ name: ' ', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }];
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      'Name each named unit in 32 characters or fewer.',
+    );
+
+    draft.units = Array.from({ length: FULL_COURT_MAX_UNITS + 1 }, (_value, index) => ({
+      name: `Unit ${String(index + 1)}`,
+      playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'],
+    }));
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
+      `Use ${String(FULL_COURT_MAX_UNITS)} named units or fewer.`,
+    );
+
+    draft.units = [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }];
+    expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
+  });
+
+  test('validates a named unit plan with a six-player roster', () => {
+    const rosterIds = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    const rotation = {
+      startingFive: rosterIds.slice(0, 5),
+      minuteTargets: Object.fromEntries(rosterIds.map((playerId) => [playerId, 40])),
+    };
+    const draft = fullCourtCoachingDraft(
+      {
+        schemaVersion: 1,
+        tactics: { pace: 'balanced', offense: 'balanced', defense: 'balanced' },
+        rotation,
+      },
+      rotation,
+      rosterIds,
+    );
+    draft.units = [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p5', 'p6'] }];
+
+    const validation = validateFullCourtCoachingDraft(draft, rosterIds);
+    expect(validation.valid).toBe(true);
+    expect(validation.totalMinutes).toBe(240);
+    expect(fullCourtCoachingPlanSchema.parse(fullCourtCoachingPlan(draft)).units).toEqual(
+      draft.units,
+    );
+  });
+
   test('flags a selected starter or closer with a zero-minute target', () => {
     const draft = customDraft();
     draft.minuteTargets.p7 = (draft.minuteTargets.p7 ?? 0) + (draft.minuteTargets.p8 ?? 0);
@@ -430,6 +578,12 @@ describe('Full Court coaching signature', () => {
 
     const automatic = { ...base, rotation: undefined };
     expect(fullCourtCoachingSignature(automatic)).not.toBe(fullCourtCoachingSignature(base));
+
+    const withUnit = {
+      ...base,
+      units: [{ name: 'Bench', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }],
+    };
+    expect(fullCourtCoachingSignature(withUnit)).not.toBe(fullCourtCoachingSignature(base));
   });
 });
 

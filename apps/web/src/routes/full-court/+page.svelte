@@ -19,6 +19,7 @@
     fullCourtWatchedReplaySummary,
   } from '#lib/features/full-court/full-court-gamecast.js';
   import { FullCourtController } from '#lib/features/full-court/full-court-controller.svelte.js';
+  import type { FullCourtMatchupEditorContext } from '#lib/features/full-court/full-court-matchup-presenter.js';
   import { fullCourtNextUserFixture } from '#lib/features/full-court/full-court-season-presenter.js';
   import { openService } from '#lib/service-state.js';
 
@@ -84,6 +85,30 @@
   const nextUserFixture = $derived(
     season ? fullCourtNextUserFixture(season.lock, season.checkpoint, playoff) : null,
   );
+  const allHealth = $derived(
+    current?.playoffs?.checkpoint.healthByTeam ?? season?.checkpoint.healthByTeam ?? null,
+  );
+  const matchupContext = $derived.by((): FullCourtMatchupEditorContext | null => {
+    if (!current || !season || !userTeam || !nextUserFixture) return null;
+    const opponentId =
+      nextUserFixture.homeTeamId === userTeam.teamId
+        ? nextUserFixture.awayTeamId
+        : nextUserFixture.homeTeamId;
+    const opponentTeam = season.lock.season.teams.find((team) => team.teamId === opponentId);
+    if (!opponentTeam) return null;
+    return {
+      fixture: nextUserFixture,
+      userTeam,
+      opponentTeam,
+      userHealth: allHealth?.[userTeam.teamId] ?? null,
+      opponentHealth: allHealth?.[opponentTeam.teamId] ?? null,
+      restingPlayerIds: current.restingPlayerIds,
+      coachingPlan: season.coaching,
+      assignments: current.defensiveMatchupAssignments,
+      forGameId: current.defensiveMatchupsForGameId,
+      forOpponentId: current.defensiveMatchupsOpponentId,
+    };
+  });
   const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
   const savedReplay = $derived(current?.savedReplay ?? null);
   const savedReplaySummary = $derived(
@@ -155,6 +180,9 @@
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
             health={health ?? null}
             dayOffset={nextUserFixture?.dayOffset ?? null}
+            {matchupContext}
+            onMatchupsChange={(assignments) => current.setDefensiveMatchups(assignments)}
+            onResetMatchups={() => current.clearDefensiveMatchups()}
             busy={current.busy}
             onSave={(plan) => current.saveCoaching(plan)}
             onListBlueprints={() => current.listBlueprints()}
@@ -173,7 +201,13 @@
             nextFilmTarget={current.nextFilmTarget()}
             playoffPreview={current.nextPlayoffPreview()}
             busy={current.busy}
+            practiceOpen={playoff === null && season.checkpoint.completedThroughSlot === 0}
+            practice={current.practice}
+            {matchupContext}
+            onMatchupsChange={(assignments) => current.setDefensiveMatchups(assignments)}
+            onResetMatchups={() => current.clearDefensiveMatchups()}
             onPurchaseReport={(target) => void current.purchaseReport(target)}
+            onRunPractice={() => void current.runPractice()}
           />
         {/if}
       {:else if section !== 'team'}
@@ -264,10 +298,12 @@
     {:else if roulettePreparing && draft}
       <FullCourtRouletteView
         {draft}
+        index={current.index}
         busy={current.busy}
         onPurchaseSpin={(purchase, versionId) => void current.purchaseSpin(purchase, versionId)}
         onSkipSpin={() => void current.skipSpin()}
         onFinalize={() => void current.finalizeRoulette()}
+        onPurchaseReport={(target) => void current.purchaseReport(target)}
       />
     {:else if draft?.stage === 'drafting' && current.index !== null}
       <FullCourtDraftView

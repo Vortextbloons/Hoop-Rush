@@ -8,8 +8,10 @@ import {
 import {
   applyFullCourtCommand,
   createFullCourtDraftState,
+  fullCourtPurchasePhaseRejection,
   fullCourtStateDigest,
   type FullCourtCatalogIndex,
+  type FullCourtPurchasePhase,
 } from '@hoop-rush/engine';
 
 export {
@@ -24,6 +26,7 @@ export {
 } from './playoffs.ts';
 export {
   applyFullCourtBlueprintToPlan,
+  fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,
   saveFullCourtCoaching,
   type ApplyFullCourtBlueprintResult,
@@ -42,6 +45,14 @@ export {
   type FullCourtWatchedReplayRepository,
 } from './replay.ts';
 
+export interface FullCourtDraftCommitOptions {
+  /**
+   * The repository runs this inside its write transaction with the durable
+   * season phase, so a purchase cannot slip past a phase change in another tab.
+   */
+  readonly guard?: (phase: FullCourtPurchasePhase) => FullCourtCommandResult | null;
+}
+
 export interface FullCourtDraftRepository {
   load(runId: string): Promise<FullCourtDraftState | null>;
   getReceipt(command: FullCourtCommand): Promise<FullCourtCommandResult | null>;
@@ -49,6 +60,7 @@ export interface FullCourtDraftRepository {
     command: FullCourtCommand,
     state: FullCourtDraftState,
     result: FullCourtCommandResult,
+    options?: FullCourtDraftCommitOptions,
   ): Promise<FullCourtCommandResult>;
 }
 
@@ -63,6 +75,11 @@ export async function submitFullCourtDraftCommand(
   const existing = await repository.load(command.runId);
   if (existing !== null) {
     const { state, result } = applyFullCourtCommand(existing, command, { index });
+    if (command.command === 'purchase-full-court-report' && result.status === 'accepted') {
+      return repository.commit(command, state, result, {
+        guard: (phase) => fullCourtPurchasePhaseRejection(existing, command, phase),
+      });
+    }
     return repository.commit(command, state, result);
   }
   if (command.command !== 'create-full-court-draft') {

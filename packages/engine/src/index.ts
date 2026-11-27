@@ -348,6 +348,8 @@ export {
 export {
   applyFullCourtCommand,
   createFullCourtDraftState,
+  fullCourtPurchasePhaseRejection,
+  type FullCourtPurchasePhase,
 } from './modes/full-court/draft-commands.ts';
 export {
   fullCourtAbsenceTolerance,
@@ -373,6 +375,24 @@ export {
   defaultFullCourtCoachingRotation,
 } from './modes/full-court/coaching.ts';
 export {
+  FULL_COURT_MANUAL_MATCHUP_INTERIOR_WEIGHT,
+  FULL_COURT_MANUAL_MATCHUP_PERIMETER_WEIGHT,
+  applyFullCourtDefensiveMatchupsToPrep,
+  assertFullCourtDefensiveMatchups,
+  fixtureFullCourtDefensiveMatchups,
+  resolveFullCourtDefensiveMatchups,
+  validateFullCourtDefensiveMatchups,
+  type FullCourtMatchupValidationInput,
+} from './modes/full-court/matchups.ts';
+export {
+  unitNameFor,
+  unitNameForPlayerIds,
+  type FullCourtRotationPlanInput,
+  type FullCourtRotationUnit,
+  type FullCourtRotationUnitInput,
+  type FullCourtStaggeringInput,
+} from './modes/full-court/rotation.ts';
+export {
   buildFullCourtBlueprintHierarchy,
   resolveFullCourtBlueprintHierarchy,
   type FullCourtBlueprintBindingPreview,
@@ -394,6 +414,13 @@ export {
   simulateFullCourtRegularSeasonGame,
   type FullCourtRegularSeason,
 } from './modes/full-court/regular-season.ts';
+export {
+  FULL_COURT_TRAINING_CAMP_SEED_PURPOSE,
+  fullCourtTrainingCampSeed,
+  simulateFullCourtTrainingCamp,
+  type FullCourtTrainingCampInput,
+  type FullCourtTrainingCampOptions,
+} from './modes/full-court/preparation.ts';
 export {
   type FullCourtGameHealthOptions,
   type FullCourtGameHealthOutcome,

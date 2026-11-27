@@ -1,6 +1,7 @@
 import type {
   CommandId,
   FullCourtCommand,
+  FullCourtCommandResult,
   FullCourtCreateDraftCommand,
   FullCourtDraftPick,
   FullCourtDraftState,
@@ -378,6 +379,42 @@ function applyPurchaseReport(
     ],
   });
   return acceptFullCourtCommand(state, command, nextState);
+}
+
+/**
+ * Durable facts the draft itself cannot know. `completedThroughSlot` is null
+ * until the regular-season checkpoint exists, so an old save without one stays
+ * purchasable.
+ */
+export interface FullCourtPurchasePhase {
+  readonly completedThroughSlot: number | null;
+  readonly postseasonStarted: boolean;
+  readonly playedGameIds: ReadonlySet<string>;
+}
+
+/**
+ * War Room reads are bought for the phase they cover. Training camp closes once
+ * any regular-season game is committed and film closes once its fixture is
+ * committed (playoff games included). A stale tab re-checks these durable facts
+ * at the purchase write boundary so it cannot charge for a closed phase.
+ */
+export function fullCourtPurchasePhaseRejection(
+  state: FullCourtDraftState,
+  command: FullCourtPurchaseReportCommand,
+  phase: FullCourtPurchasePhase,
+): FullCourtCommandResult | null {
+  const reject = (message: string): FullCourtCommandResult =>
+    rejectFullCourtCommand(state, command, 'report-unavailable', message).result;
+  if (command.target.kind === 'training-camp') {
+    if (phase.postseasonStarted || (phase.completedThroughSlot ?? 0) > 0) {
+      return reject('Training camp closes before the first regular-season game.');
+    }
+    return null;
+  }
+  if (command.target.kind === 'opponent-film' && phase.playedGameIds.has(command.target.gameId)) {
+    return reject('Film study is available for your next game.');
+  }
+  return null;
 }
 
 export function applyFullCourtCommand(

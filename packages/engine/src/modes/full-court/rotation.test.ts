@@ -23,6 +23,7 @@ import {
   resolveRotationPlan,
   staminaProfileOf,
   unitNameFor,
+  unitNameForPlayerIds,
   type FullCourtRotationContext,
   type FullCourtRotationPlan,
   type FullCourtRotationSnapshot,
@@ -232,6 +233,39 @@ describe('rotation plan construction', () => {
     expect(plan.units).toEqual([
       { name: 'Closing Five', rosterIndices: plan.closingSlots.slice(0, 5) },
     ]);
+    expect(
+      unitNameForPlayerIds(
+        plan.units,
+        roster.map((player) => player.playerId),
+        closing,
+      ),
+    ).toBe('Closing Five');
+    expect(
+      unitNameForPlayerIds(
+        plan.units,
+        roster.map((player) => player.playerId),
+        starters,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects repeated or unnamed named units', () => {
+    const roster = fullCourtTestRoster('units-invalid', 8);
+    const five = roster.slice(0, 5).map((player) => player.playerId);
+    expectSetupError(
+      () =>
+        resolveRotationPlan(roster, {
+          units: [
+            { name: 'Bench', playerIds: five },
+            { name: ' bench ', playerIds: five },
+          ],
+        }),
+      'invalid-lineup',
+    );
+    expectSetupError(
+      () => resolveRotationPlan(roster, { units: [{ name: '  ', playerIds: five }] }),
+      'invalid-lineup',
+    );
   });
 
   it('derives stamina from workload and honors catalog ratings', () => {
@@ -483,6 +517,206 @@ describe('substitution decisions', () => {
         stintSeconds: plan.startingSlots.map(() => 200),
       }),
       { ...EARLY, globalSeconds: FULL_COURT_REGULATION_SECONDS * 0.25 },
+    );
+    expect(decision.kind).toBe('none');
+  });
+});
+
+describe('star staggering', () => {
+  function staggerFixture(prefix: string, size = 8) {
+    const roster = fullCourtTestRoster(prefix, size);
+    const ids = roster.map((player) => player.playerId);
+    const first = ids[0];
+    const second = ids[1];
+    if (first === undefined || second === undefined) throw new Error('fixture missing');
+    const plan = resolveRotationPlan(
+      roster,
+      { startingFive: ids.slice(0, 5), staggerStars: true },
+      [],
+      { scorerPlayerIds: [first, second] },
+    );
+    return { roster, ids, plan };
+  }
+
+  function paceSnapshot(
+    plan: FullCourtRotationPlan,
+    leadSeconds: number,
+  ): FullCourtRotationSnapshot {
+    const playedSeconds = plan.roster.map(() => 0);
+    // Both assigned scorers have already played their fill, so the ordinary
+    // pace choice would bring back a non-scorer reserve.
+    playedSeconds[0] = (plan.targetSeconds[0] ?? 0) + leadSeconds;
+    playedSeconds[1] = (plan.targetSeconds[1] ?? 0) + leadSeconds;
+    return snapshotOfPlan(plan, {
+      slots: [0, 2, 3, 4, 5],
+      playedSeconds,
+      stintSeconds: plan.startingSlots.map(() => 600),
+    });
+  }
+
+  it('redirects a pace swap to the other assigned scorer', () => {
+    const { ids, plan } = staggerFixture('stagger-redirect');
+    const decision = planSubstitution(
+      paceSnapshot(plan, FULL_COURT_PACE_DEVIATION_SECONDS + 60),
+      EARLY,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('minute-target');
+    expect(decision.outIndex).toBe(0);
+    expect(decision.inIndex).toBe(1);
+    expect(plan.staggerStars).toBe(true);
+    expect(plan.scorerIndices).toEqual([0, 1]);
+    expect(plan.roster[decision.inIndex]?.playerId).toBe(ids[1]);
+  });
+
+  it('leaves ordinary rotation choices alone when disabled or unassigned', () => {
+    const { roster, ids, plan } = staggerFixture('stagger-disabled');
+    const disabled = resolveRotationPlan(roster, { startingFive: ids.slice(0, 5) });
+    const unassigned = resolveRotationPlan(roster, {
+      startingFive: ids.slice(0, 5),
+      staggerStars: true,
+    });
+    expect(disabled.staggerStars).toBe(false);
+    expect(unassigned.staggerStars).toBe(true);
+    expect(unassigned.scorerIndices).toEqual([]);
+
+    for (const candidate of [disabled, unassigned]) {
+      const decision = planSubstitution(
+        paceSnapshot(candidate, FULL_COURT_PACE_DEVIATION_SECONDS + 60),
+        EARLY,
+      );
+      expect(decision.kind).toBe('swap');
+      if (decision.kind !== 'swap') continue;
+      expect(decision.reason).toBe('minute-target');
+      expect(decision.inIndex).not.toBe(1);
+    }
+    expect(plan.scorerIndices).toEqual([0, 1]);
+  });
+
+  it('does not rewrite an explicit starting five that omits both scorers', () => {
+    const roster = fullCourtTestRoster('stagger-start', 8);
+    const ids = roster.map((player) => player.playerId);
+    const requested = ids.slice(2, 7);
+    const plan = resolveRotationPlan(roster, { startingFive: requested, staggerStars: true }, [], {
+      scorerPlayerIds: [ids[0] ?? '', ids[1] ?? ''],
+    });
+    expect(startingIds(plan)).toEqual(requested);
+    expect(plan.scorerIndices).toEqual([0, 1]);
+  });
+
+  it('lets explicit coaching rules use a five without an assigned scorer', () => {
+    const { roster, ids, plan: base } = staggerFixture('stagger-rule');
+    const lineup = [2, 3, 4, 5, 6].map((index) => ids[index] ?? '');
+    const plan = resolveRotationPlan(
+      roster,
+      {
+        startingFive: ids.slice(0, 5),
+        staggerStars: true,
+        rules: [
+          {
+            ruleId: 'closing',
+            kind: 'closing-lineup',
+            secondsRemainingMax: 360,
+            scoreMarginMax: 8,
+            lineup,
+          },
+        ],
+      },
+      [],
+      { scorerPlayerIds: [ids[0] ?? '', ids[1] ?? ''] },
+    );
+    const state = ruleStateOf(plan);
+    const slots = [...plan.startingSlots];
+    const context: FullCourtRotationContext = {
+      globalSeconds: FULL_COURT_REGULATION_SECONDS - 300,
+      period: 3,
+      periodSecondsRemaining: 300,
+      scoreMargin: 5,
+      legalWindow: true,
+    };
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const decision = planSubstitution(snapshotOfPlan(plan, { slots }), context, state);
+      if (decision.kind !== 'swap') break;
+      expect(decision.reason).toBe('coach-rule');
+      slots[decision.slot] = decision.inIndex;
+    }
+    expect(new Set(slots)).toEqual(new Set([2, 3, 4, 5, 6]));
+    expect(slots.some((index) => plan.scorerIndices.includes(index))).toBe(false);
+    expect(base.scorerIndices).toEqual([0, 1]);
+  });
+
+  it('lets a disqualification remove the last assigned scorer', () => {
+    const { plan } = staggerFixture('stagger-foul');
+    const fouls = plan.roster.map((_player, index) => (index === 0 ? FULL_COURT_FOUL_LIMIT : 0));
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { slots: [0, 2, 3, 4, 5], fouls }),
+      EARLY,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('foul-out');
+    expect(decision.outIndex).toBe(0);
+  });
+
+  it('keeps a tired last scorer when no fresher assigned scorer exists', () => {
+    const { roster, ids } = staggerFixture('stagger-hold');
+    const availability = roster.map((player, index) => ({
+      playerId: player.playerId,
+      available: index !== 1,
+    }));
+    const plan = resolveRotationPlan(
+      roster,
+      { startingFive: ids.slice(0, 5), staggerStars: true },
+      availability,
+      { scorerPlayerIds: [ids[0] ?? '', ids[1] ?? ''] },
+    );
+    const energies = plan.roster.map((_player, index) =>
+      index === 0 ? FULL_COURT_TIRED_ENERGY - 0.05 : 1,
+    );
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, {
+        slots: [0, 2, 3, 4, 5],
+        energies,
+        stintSeconds: plan.startingSlots.map(() => 600),
+      }),
+      EARLY,
+    );
+    expect(decision.kind).toBe('none');
+  });
+
+  it('lets an exhausted scorer leave when no assigned scorer is available', () => {
+    const { roster, ids } = staggerFixture('stagger-tired');
+    const availability = roster.map((player, index) => ({
+      playerId: player.playerId,
+      available: index !== 1,
+    }));
+    const plan = resolveRotationPlan(
+      roster,
+      { startingFive: ids.slice(0, 5), staggerStars: true },
+      availability,
+      { scorerPlayerIds: [ids[0] ?? '', ids[1] ?? ''] },
+    );
+    const energies = plan.roster.map((_player, index) =>
+      index === 0 ? FULL_COURT_SEVERE_FATIGUE_ENERGY - 0.05 : 1,
+    );
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { energies, stintSeconds: plan.startingSlots.map(() => 600) }),
+      EARLY,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('fatigue');
+    expect(decision.outIndex).toBe(0);
+    expect(decision.inIndex).not.toBe(1);
+    expect(plan.available[1]).toBe(false);
+  });
+
+  it('adds no substitution on a healthy dead ball', () => {
+    const { plan } = staggerFixture('stagger-healthy');
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, { stintSeconds: plan.startingSlots.map(() => 120) }),
+      EARLY,
     );
     expect(decision.kind).toBe('none');
   });

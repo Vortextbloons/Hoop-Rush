@@ -10,6 +10,7 @@ import {
   seasonDigestHex,
   seedSchema,
   type FullCourtCoachingRule,
+  type FullCourtDefensiveMatchups,
   type FullCourtOffensiveHierarchy,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
@@ -25,6 +26,7 @@ import { checkFullCourtGameResult, FULL_COURT_SEED_VERSION } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
 import { FULL_COURT_INJURY_VERSION } from './injuries.ts';
 import type { FullCourtLeagueGame } from './league.ts';
+import { fixtureFullCourtDefensiveMatchups } from './matchups.ts';
 import { buildFullCourtGameLineups } from './report.ts';
 import {
   fullCourtFutureDaysOf,
@@ -48,6 +50,8 @@ export interface FullCourtSeasonSlotOptions {
   readonly rules?: readonly FullCourtCoachingRule[];
   /** Per-player offensive hierarchy applied to the user team's game only. */
   readonly hierarchy?: FullCourtOffensiveHierarchy;
+  /** Per-fixture defensive matchup assignments applied only when opponent and game match. */
+  readonly defensiveMatchups?: FullCourtDefensiveMatchups;
   readonly restingPlayerIds?: readonly string[];
   readonly acceptForfeit?: boolean;
   readonly record?: boolean;
@@ -203,8 +207,18 @@ export function simulateFullCourtSeasonSlot(
   }
   function play(fixture: FullCourtLeagueGame, isUserGame: boolean) {
     const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
+    const opponentTeamId = userSide === 'home' ? fixture.awayTeamId : fixture.homeTeamId;
+    const defensiveMatchups = isUserGame
+      ? fixtureFullCourtDefensiveMatchups(options.defensiveMatchups, fixture.gameId, opponentTeamId)
+      : undefined;
     const game = isUserGame
-      ? { ...input, [userSide]: withFullCourtCoaching(input[userSide], options) }
+      ? {
+          ...input,
+          [userSide]: withFullCourtCoaching(input[userSide], {
+            ...options,
+            defensiveMatchups,
+          }),
+        }
       : input;
     return runFullCourtGameWithHealth(game, fixture.dayOffset, context, {
       health: {

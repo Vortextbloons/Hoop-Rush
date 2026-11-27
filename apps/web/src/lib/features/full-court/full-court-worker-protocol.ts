@@ -10,9 +10,11 @@ import {
   capRushPlayoffGamePlanSchema,
   eraSimulationProfileSchema,
   fullCourtCoachingRulesSchema,
+  fullCourtDefensiveMatchupsSchema,
   fullCourtHealthProfileSetSchema,
   fullCourtOffensiveHierarchySchema,
   fullCourtPlayoffCheckpointSchema,
+  fullCourtPracticeReportSchema,
   fullCourtRouletteTeamSchema,
   fullCourtSeasonCheckpointSchema,
   fullCourtSeasonScoreSchema,
@@ -32,6 +34,7 @@ import type {
   FullCourtSeasonLock,
   FullCourtSeasonSlotOptions,
   FullCourtSeasonSlotOutcome,
+  FullCourtTrainingCampOptions,
 } from '@hoop-rush/engine';
 import { z } from 'zod';
 
@@ -70,6 +73,7 @@ const fullCourtRotationPlanInputSchema = z.object({
     .max(20)
     .optional(),
   rules: fullCourtCoachingRulesSchema.optional(),
+  staggerStars: z.boolean().optional(),
 });
 
 const fullCourtSeasonTeamSchema = z.object({
@@ -154,9 +158,18 @@ const fullCourtSeasonSlotOptionsSchema = z.object({
   tactics: fullCourtTacticsSchema.optional(),
   rules: fullCourtCoachingRulesSchema.optional(),
   hierarchy: fullCourtOffensiveHierarchySchema.optional(),
+  defensiveMatchups: fullCourtDefensiveMatchupsSchema.optional(),
   restingPlayerIds: z.array(z.string().min(1).max(64)).max(12).optional(),
   acceptForfeit: z.boolean().optional(),
   record: z.boolean().optional(),
+});
+
+const fullCourtTrainingCampOptionsSchema = z.object({
+  rotation: fullCourtRotationPlanInputSchema.optional(),
+  tactics: fullCourtTacticsSchema.optional(),
+  rules: fullCourtCoachingRulesSchema.optional(),
+  hierarchy: fullCourtOffensiveHierarchySchema.optional(),
+  defensiveMatchups: fullCourtDefensiveMatchupsSchema.optional(),
 });
 
 const fullCourtPlayoffFixtureSchema = capRushPlayoffGamePlanSchema.extend({
@@ -281,6 +294,33 @@ export const fullCourtWorkerSlotRequestSchema = fullCourtWorkerBase
     }
   });
 
+export const fullCourtWorkerPracticeRequestSchema = fullCourtWorkerBase
+  .extend({
+    type: z.literal('full-court-simulate-practice'),
+    runId: idSchema,
+    lockDigest: seedSchema,
+    lock: fullCourtSeasonLockSchema.optional(),
+    seed: seedSchema,
+    opponentTeamId: z.string().min(1).max(64),
+    options: fullCourtTrainingCampOptionsSchema.optional(),
+  })
+  .superRefine((request, context) => {
+    if (request.lock !== undefined) {
+      if (request.lock.season.runId !== request.runId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season run does not match the practice request',
+        });
+      }
+      if (request.lock.digest !== request.lockDigest) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season digest does not match the practice request',
+        });
+      }
+    }
+  });
+
 export const fullCourtWorkerGameRequestSchema = fullCourtWorkerBase
   .extend({
     type: z.literal('full-court-simulate-game'),
@@ -321,6 +361,7 @@ export const fullCourtWorkerGameRequestSchema = fullCourtWorkerBase
 export const fullCourtWorkerRequestSchema = z.discriminatedUnion('type', [
   fullCourtWorkerSlotRequestSchema,
   fullCourtWorkerGameRequestSchema,
+  fullCourtWorkerPracticeRequestSchema,
 ]);
 export type FullCourtWorkerRequest = z.infer<typeof fullCourtWorkerRequestSchema>;
 
@@ -336,6 +377,14 @@ export const fullCourtWorkerGameResultSchema = fullCourtWorkerBase.extend({
 });
 export type FullCourtWorkerGameResultMessage = z.infer<typeof fullCourtWorkerGameResultSchema>;
 
+export const fullCourtWorkerPracticeResultSchema = fullCourtWorkerBase.extend({
+  type: z.literal('full-court-practice-result'),
+  report: fullCourtPracticeReportSchema,
+});
+export type FullCourtWorkerPracticeResultMessage = z.infer<
+  typeof fullCourtWorkerPracticeResultSchema
+>;
+
 export const fullCourtWorkerErrorSchema = fullCourtWorkerBase.extend({
   type: z.literal('full-court-error'),
   code: z.enum(['lock-missing', 'internal']),
@@ -346,6 +395,7 @@ export type FullCourtWorkerErrorMessage = z.infer<typeof fullCourtWorkerErrorSch
 export const fullCourtWorkerMessageSchema = z.discriminatedUnion('type', [
   fullCourtWorkerSlotResultSchema,
   fullCourtWorkerGameResultSchema,
+  fullCourtWorkerPracticeResultSchema,
   fullCourtWorkerErrorSchema,
 ]);
 export type FullCourtWorkerMessage = z.infer<typeof fullCourtWorkerMessageSchema>;
@@ -377,5 +427,19 @@ export interface FullCourtWorkerGameRequestInput {
   readonly options?: FullCourtSeasonSlotOptions;
 }
 
+export interface FullCourtWorkerPracticeRequestInput {
+  readonly schemaVersion: typeof FULL_COURT_WORKER_WIRE_SCHEMA_VERSION;
+  readonly type: 'full-court-simulate-practice';
+  readonly requestId: string;
+  readonly runId: string;
+  readonly lockDigest: Seed;
+  readonly lock?: FullCourtSeasonLock;
+  readonly seed: Seed;
+  readonly opponentTeamId: string;
+  readonly options?: FullCourtTrainingCampOptions;
+}
+
 export type FullCourtWorkerRequestInput =
-  FullCourtWorkerSlotRequestInput | FullCourtWorkerGameRequestInput;
+  | FullCourtWorkerSlotRequestInput
+  | FullCourtWorkerGameRequestInput
+  | FullCourtWorkerPracticeRequestInput;

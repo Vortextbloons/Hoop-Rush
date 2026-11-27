@@ -207,7 +207,6 @@ function scorePlayerForRole(
   player: SimulationPlayer,
   role: FullCourtBlueprintRoleKey,
   ref: FullCourtBlueprintRoleRef,
-  slots: ResolvedSlots,
 ): number {
   const r = player.ratings;
   const overall = effectiveOverallOf(player);
@@ -263,7 +262,7 @@ function rankCandidates(
   return pool
     .map((player) => ({
       player,
-      score: scorePlayerForRole(player, role, ref, slots),
+      score: scorePlayerForRole(player, role, ref),
     }))
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
@@ -499,7 +498,10 @@ export function resolveFullCourtBlueprintHierarchy(options: {
     }
   }
 
-  const bindings = assignedRefs.map(({ role }) => resolvedByRole.get(role)!);
+  const bindings = assignedRefs.flatMap(({ role }) => {
+    const binding = resolvedByRole.get(role);
+    return binding === undefined ? [] : [binding];
+  });
   const primaryPlayerId = resolvedByRole.get('primary')?.playerId ?? null;
   const secondaryPlayerId = resolvedByRole.get('secondary')?.playerId ?? null;
   const floorGeneralPlayerId = resolvedByRole.get('floorGeneral')?.playerId ?? null;

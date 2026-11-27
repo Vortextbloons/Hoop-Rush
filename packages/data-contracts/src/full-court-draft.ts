@@ -100,25 +100,32 @@ export const fullCourtSpendingEntrySchema = z
   });
 export type FullCourtSpendingEntry = z.infer<typeof fullCourtSpendingEntrySchema>;
 
-export const fullCourtReportKindSchema = z.enum(['player-scouting', 'lineup-fit', 'opponent-film']);
+export const fullCourtReportKindSchema = z.enum([
+  'player-scouting',
+  'lineup-fit',
+  'opponent-film',
+  'training-camp',
+]);
 export type FullCourtReportKind = z.infer<typeof fullCourtReportKindSchema>;
 
 /**
- * War Room prices in integer dollars. Scouting buys information only: it never enters
- * payroll, so it cannot move the apron. Tuning stays here so previews and command
- * validation quote the same number.
+ * War Room prices in integer dollars. Scouting and preseason preparation buy
+ * information only: they never enter payroll, so they cannot move the apron.
+ * Tuning stays here so previews and command validation quote the same number.
  */
 export const FULL_COURT_REPORT_PRICES_DOLLARS = {
   'player-scouting': 2_000_000,
   'lineup-fit': 5_000_000,
   'opponent-film': 3_000_000,
+  // Provisional: the original Full Court phase 4 spec priced preseason training at 10 CR.
+  'training-camp': 10_000_000,
 } as const satisfies Record<FullCourtReportKind, number>;
 
 export function fullCourtReportPriceDollars(kind: FullCourtReportKind): number {
   return FULL_COURT_REPORT_PRICES_DOLLARS[kind];
 }
 
-/** Player scouting and lineup fit last for the run; film lasts through its fixture. */
+/** Player scouting, lineup fit, and training camp last for the run; film lasts through its fixture. */
 export function fullCourtReportScope(kind: FullCourtReportKind): 'run' | 'game' {
   return kind === 'opponent-film' ? 'game' : 'run';
 }
@@ -138,6 +145,7 @@ export const fullCourtReportTargetSchema = z.discriminatedUnion('kind', [
     gameId: fullCourtGameReferenceSchema,
     opponentTeamId: fullCourtGameReferenceSchema,
   }),
+  z.object({ kind: z.literal('training-camp') }),
 ]);
 export type FullCourtReportTarget = z.infer<typeof fullCourtReportTargetSchema>;
 
@@ -150,6 +158,8 @@ export function fullCourtReportTargetKey(target: FullCourtReportTarget): string 
       return 'lineup-fit';
     case 'opponent-film':
       return `opponent-film:${target.opponentTeamId}:${target.gameId}`;
+    case 'training-camp':
+      return 'training-camp';
   }
 }
 

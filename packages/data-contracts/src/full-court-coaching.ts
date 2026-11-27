@@ -5,6 +5,8 @@ export const FULL_COURT_COACHING_SCHEMA_VERSION = 1;
 export const FULL_COURT_BLUEPRINT_SCHEMA_VERSION = 1;
 export const FULL_COURT_BLUEPRINT_MAX_NAME_LENGTH = 48;
 export const FULL_COURT_MAX_COACHING_RULES = 8;
+export const FULL_COURT_MAX_NAMED_UNITS = 6;
+export const FULL_COURT_MAX_UNIT_NAME_LENGTH = 32;
 
 const FULL_COURT_MINUTE_TOTAL = 240;
 const FULL_COURT_MIN_ROTATION_PLAYERS = 5;
@@ -195,6 +197,49 @@ function hasDuplicates(ids: readonly string[]): boolean {
   return new Set(ids).size !== ids.length;
 }
 
+/** A reusable, roster-bound five used by closing rules or the closing five. */
+export const fullCourtNamedUnitSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .normalize()
+    .min(1, 'Enter a unit name.')
+    .max(
+      FULL_COURT_MAX_UNIT_NAME_LENGTH,
+      `Use ${String(FULL_COURT_MAX_UNIT_NAME_LENGTH)} characters or fewer for the unit name.`,
+    ),
+  playerIds: z.array(playerRefSchema).length(FULL_COURT_MIN_ROTATION_PLAYERS),
+});
+export type FullCourtNamedUnit = z.infer<typeof fullCourtNamedUnitSchema>;
+
+export const fullCourtNamedUnitsSchema = z
+  .array(fullCourtNamedUnitSchema)
+  .max(
+    FULL_COURT_MAX_NAMED_UNITS,
+    `Use ${String(FULL_COURT_MAX_NAMED_UNITS)} named units or fewer.`,
+  )
+  .superRefine((units, context) => {
+    const names = new Set<string>();
+    units.forEach((unit, index) => {
+      const key = unit.name.toLowerCase();
+      if (names.has(key)) {
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'name'],
+          message: 'named unit names must be unique',
+        });
+      }
+      names.add(key);
+      if (hasDuplicates(unit.playerIds)) {
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'playerIds'],
+          message: 'named unit players must be unique',
+        });
+      }
+    });
+  });
+
 const fullCourtRotationSchema = z
   .object({
     startingFive: z.array(playerRefSchema).length(FULL_COURT_MIN_ROTATION_PLAYERS),
@@ -382,10 +427,18 @@ export const fullCourtCoachingPlanSchema = z.object({
   schemaVersion: z.literal(FULL_COURT_COACHING_SCHEMA_VERSION),
   tactics: fullCourtTacticsSchema,
   rotation: fullCourtRotationSchema.optional(),
+  /** Reusable roster-bound fives. Absent preserves legacy plans. */
+  units: fullCourtNamedUnitsSchema.optional(),
   /** Ordered conditional rules. Absent means no rules and legacy behavior. */
   rules: fullCourtCoachingRulesSchema.optional(),
   /** Optional per-player offensive hierarchy. Absent leaves opportunities untouched. */
   hierarchy: fullCourtOffensiveHierarchySchema.optional(),
+  /**
+   * Keep at least one assigned primary or secondary scorer on the floor when an
+   * automatic rotation choice would otherwise leave neither available scorer out
+   * there. Absent preserves legacy rotations.
+   */
+  staggerStars: z.boolean().optional(),
   /** Optional editor depth; absent behaves like `remix`. */
   interfaceLevel: fullCourtInterfaceLevelSchema.optional(),
 });
