@@ -36,7 +36,6 @@
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
-  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
@@ -370,25 +369,18 @@
         </div>
 
         {#if controls.secondary.length > 0}
-          <Disclosure summary="Sim ahead" class="min-w-0 flex-1">
-            <div class="flex flex-wrap gap-1.5">
-              {#each controls.secondary as action (action.label)}
-                <Button
-                  size="sm"
-                  tone="secondary"
-                  disabled={busy}
-                  onclick={() => runAction(action)}
-                >
-                  {#if action.count >= 5}
-                    <FastForward size={13} aria-hidden="true" />
-                  {:else}
-                    <SkipForward size={13} aria-hidden="true" />
-                  {/if}
-                  {action.label}
-                </Button>
-              {/each}
-            </div>
-          </Disclosure>
+          <div class="flex flex-wrap items-center gap-1.5">
+            {#each controls.secondary as action (action.label)}
+              <Button size="sm" tone="secondary" disabled={busy} onclick={() => runAction(action)}>
+                {#if action.count >= 5}
+                  <FastForward size={13} aria-hidden="true" />
+                {:else}
+                  <SkipForward size={13} aria-hidden="true" />
+                {/if}
+                {action.label}
+              </Button>
+            {/each}
+          </div>
         {/if}
       </div>
     {/if}

@@ -8,6 +8,7 @@
     GamecastRecordedGame,
   } from './gamecast-types';
   import GamecastLiveLayout from './GamecastLiveLayout.svelte';
+  import type { BroadcastFeedRow } from './GamecastFeed.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -131,7 +132,7 @@
   );
   const complete = $derived(progress >= 1);
   const recentFeed = $derived([...feed].slice(-10).reverse());
-  const feedRows = $derived(
+  const feedRows = $derived.by((): BroadcastFeedRow[] =>
     recentFeed.map((line) => ({
       ...line,
       side: line.offense === localParticipantId ? 'local' : 'opponent',

@@ -11,6 +11,7 @@ import { createEngineContext } from '../../sim/kernel.ts';
 import { checkFullCourtGameResult } from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
 import { runFullCourtGameWithHealth } from './health.ts';
+import { buildFullCourtGameLineups, buildFullCourtGameLineupsFromFacts } from './report.ts';
 
 const context = createEngineContext();
 
@@ -168,6 +169,43 @@ test('voluntary rest blocks an illegal rotation and valid rest has replay parity
   expect(recorded.tape?.length).toBeGreaterThan(0);
   expect(summary.result.home.players[0]).toMatchObject({ available: false, seconds: 0 });
   expect(Object.keys(summary.health.home.players)).not.toContain(playerIds[0]);
+});
+
+test('accumulates compact lineup facts through health without a playback tape', () => {
+  const game = fullCourtTestInput({
+    seed: 'health-lineups',
+    homeRoster: fullCourtTestRoster('health-lineups', 9),
+  });
+  const factsOnly = runFullCourtGameWithHealth(game, 0, context, { lineupFacts: true });
+  const recorded = runFullCourtGameWithHealth(game, 0, context, { record: true });
+  if (factsOnly.kind !== 'played' || recorded.kind !== 'played') {
+    throw new Error('Expected a playable game');
+  }
+  expect(factsOnly.result).toEqual(recorded.result);
+  expect(factsOnly.health).toEqual(recorded.health);
+  expect(factsOnly.tape).toBeNull();
+  if (factsOnly.lineupFacts === null || factsOnly.lineupFacts === undefined) {
+    throw new Error('Expected compact lineup facts');
+  }
+  for (const side of ['home', 'away'] as const) {
+    expect(
+      buildFullCourtGameLineupsFromFacts({
+        kind: 'played',
+        gameId: 'fc-health-lineups',
+        userSide: side,
+        result: factsOnly.result,
+        facts: factsOnly.lineupFacts,
+      }),
+    ).toEqual(
+      buildFullCourtGameLineups({
+        kind: 'played',
+        gameId: 'fc-health-lineups',
+        userSide: side,
+        result: recorded.result,
+        tape: recorded.tape,
+      }),
+    );
+  }
 });
 
 test('experimental injuries are opt-in and leave the completed game unchanged', () => {

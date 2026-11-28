@@ -112,8 +112,6 @@ export function capRushFinalsMvpOf(input: {
   };
 }
 
-export type { PlayoffSeriesLike };
-
 export function capRushNextPlayoffGamePlan(input: {
   readonly series: PlayoffSeriesLike;
   readonly runSeed: Seed;

@@ -571,6 +571,7 @@
   function cancel(): void {
     draft = fullCourtCoachingDraft(plan, defaultRotation, rosterIds);
     savedSignature = fullCourtCoachingSignature(plan);
+    lockedMinutes = [];
     saveError = null;
     savedMessage = null;
     announcement = 'Changes discarded.';
@@ -581,6 +582,7 @@
     draft = defaultFullCourtCoachingDraft(defaultRotation, rosterIds);
     draft.interfaceLevel = level;
     savedSignature = fullCourtCoachingSignature(plan);
+    lockedMinutes = [];
     saveError = null;
     savedMessage = null;
     announcement =

@@ -157,6 +157,10 @@ function playoffSeries(input: {
       winnerTeamId,
       homePoints: winnerTeamId === input.highTeamId ? 100 : 90,
       awayPoints: winnerTeamId === input.highTeamId ? 90 : 100,
+      outcome:
+        winnerTeamId === input.highTeamId
+          ? { kind: 'played', homePoints: 100, awayPoints: 90 }
+          : { kind: 'played', homePoints: 90, awayPoints: 100 },
     })),
   } as unknown as FullCourtPlayoffSeries;
 }
@@ -441,7 +445,7 @@ describe('FullCourtAdvanceSession playoffs', () => {
         ],
       }),
       playoffView({
-        nextGame: null,
+        nextGame: fixture,
         series: [
           playoffSeries({
             seriesId: 's1',
@@ -455,13 +459,15 @@ describe('FullCourtAdvanceSession playoffs', () => {
       }),
     ];
     let index = 0;
+    const initialView = steps[0];
+    if (initialView === undefined) throw new Error('Missing opening playoff view');
     const calls: FullCourtAdvancePlayoffCommandInput[] = [];
     const seen = observer();
     const session = new FullCourtAdvanceSession({
       advanceSeasonSlot: () => Promise.reject(new Error('unexpected season advance')),
       advancePlayoffGame: (input) => {
         calls.push(input);
-        const view = steps[Math.min(index + 1, steps.length - 1)] ?? steps.at(-1)!;
+        const view = steps[Math.min(index + 1, steps.length - 1)] ?? initialView;
         index += 1;
         return Promise.resolve<FullCourtPlayoffProgressionResult>({
           kind: 'simulated',
@@ -474,12 +480,12 @@ describe('FullCourtAdvanceSession playoffs', () => {
       observer: seen.value,
     });
 
-    const outcome = await session.advance(playoffRequest({ view: steps[0]!, count: 2 }));
+    const outcome = await session.advance(playoffRequest({ view: initialView, count: 2 }));
 
     expect(calls).toHaveLength(3);
     expect(outcome).toEqual({
       kind: 'finished',
-      stop: { kind: 'game-limit', userGames: 2, bracketGames: 1 },
+      stop: { kind: 'game-limit', userGames: 2, bracketGames: 3 },
     });
   });
 

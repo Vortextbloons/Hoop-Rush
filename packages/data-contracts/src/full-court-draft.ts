@@ -53,7 +53,7 @@ export type FullCourtMoneyConfig = z.infer<typeof fullCourtMoneyConfigSchema>;
 // each real player: a twelve-player budget build (~$65M) and twelve-player depth build
 // (~$172M) stay under the cap line, while deeper competitive builds can cross apron tiers up
 // to the hard limit when cash allows.
-export const FULL_COURT_CAP_LINE_DOLLARS = 180_000_000;
+export const FULL_COURT_CAP_LINE_DOLLARS = 150_000_000;
 export const FULL_COURT_FIRST_APRON_DOLLARS = Math.round(FULL_COURT_CAP_LINE_DOLLARS * 1.2);
 export const FULL_COURT_HARD_LIMIT_DOLLARS = Math.round(FULL_COURT_CAP_LINE_DOLLARS * 1.4);
 

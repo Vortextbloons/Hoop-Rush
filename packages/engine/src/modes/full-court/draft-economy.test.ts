@@ -156,9 +156,9 @@ describe('full court money', () => {
     const sixStarHeavy = 428_490_000;
     const config = FULL_COURT_DEFAULT_MONEY;
     expect(twelveBudget).toBeLessThan(config.capLineDollars);
-    expect(twelveDepth).toBeLessThan(config.capLineDollars);
-    expect(eightCompetitive).toBeGreaterThan(config.capLineDollars);
-    expect(eightCompetitive).toBeLessThan(config.hardLimitDollars);
+    expect(twelveDepth).toBeGreaterThan(config.capLineDollars);
+    expect(twelveDepth).toBeLessThan(config.firstApronDollars);
+    expect(eightCompetitive).toBeGreaterThan(config.hardLimitDollars);
     expect(sixStarHeavy).toBeGreaterThan(config.hardLimitDollars);
   });
 });

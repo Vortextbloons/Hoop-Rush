@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 import { fullCourtGameLineupsSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { runFullCourtGame, simulateRecordedFullCourtGame } from './game.ts';
+import {
+  checkFullCourtGameResult,
+  fullCourtGameDigest,
+  runFullCourtGame,
+  simulateRecordedFullCourtGame,
+  type FullCourtTapeEvent,
+} from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
 import {
   buildFullCourtGameLineups,
+  buildFullCourtGameLineupsFromFacts,
   fullCourtLineupKey,
   type FullCourtLineupFactsOptions,
 } from './report.ts';
@@ -100,22 +107,130 @@ describe('Full Court compact lineups', () => {
     const first = simulateRecordedFullCourtGame(input, ctx);
     const second = simulateRecordedFullCourtGame(input, ctx);
     const unrecorded = runFullCourtGame(input, ctx);
+    const factsOnly = runFullCourtGame(input, ctx, { lineupFacts: true });
 
     expect(second.result).toEqual(first.result);
     expect(second.tape).toEqual(first.tape);
     expect(unrecorded.result).toEqual(first.result);
     expect(unrecorded.tape).toBeNull();
+    expect(unrecorded.lineupFacts).toBeNull();
+    expect(factsOnly.result).toEqual(first.result);
+    expect(fullCourtGameDigest(factsOnly.result)).toBe(fullCourtGameDigest(first.result));
+    expect(factsOnly.tape).toBeNull();
+    if (factsOnly.lineupFacts === null) throw new Error('expected compact lineup facts');
 
-    const inputFor = (tape: typeof first.tape) => ({
+    const inputFor = (tape: readonly FullCourtTapeEvent[], userSide: 'home' | 'away') => ({
       kind: 'played' as const,
       gameId: 'fc-lineup-determinism',
-      userSide: 'home' as const,
+      userSide,
       result: first.result,
       tape,
     });
-    expect(buildFullCourtGameLineups(inputFor(second.tape), { sampleThreshold: 20 })).toEqual(
-      buildFullCourtGameLineups(inputFor(first.tape), { sampleThreshold: 20 }),
-    );
+    for (const side of ['home', 'away'] as const) {
+      expect(
+        buildFullCourtGameLineupsFromFacts(
+          {
+            kind: 'played',
+            gameId: 'fc-lineup-determinism',
+            userSide: side,
+            result: first.result,
+            facts: factsOnly.lineupFacts,
+          },
+          { sampleThreshold: 20 },
+        ),
+      ).toEqual(buildFullCourtGameLineups(inputFor(first.tape, side), { sampleThreshold: 20 }));
+    }
+    expect(
+      buildFullCourtGameLineups(inputFor(second.tape, 'home'), { sampleThreshold: 20 }),
+    ).toEqual(buildFullCourtGameLineups(inputFor(first.tape, 'home'), { sampleThreshold: 20 }));
+  });
+
+  it('matches tape-derived facts across substitutions, technicals, and overtime', () => {
+    const cases: Array<{
+      readonly name: string;
+      readonly seed: string;
+      readonly input: ReturnType<typeof fullCourtTestInput>;
+    }> = [
+      {
+        name: 'substitutions',
+        seed: 'lineup-parity-subs',
+        input: fullCourtTestInput({
+          seed: 'lineup-parity-subs',
+          homeRoster: fullCourtTestRoster('parity-subs-home', 10),
+          awayRoster: fullCourtTestRoster('parity-subs-away', 9),
+        }),
+      },
+      {
+        name: 'technical fouls',
+        seed: 'lineup-stuck',
+        input: fullCourtTestInput({
+          seed: 'lineup-stuck',
+          homeRoster: fullCourtTestRoster('parity-stuck', 5, () => ({
+            rating: 74,
+            foulRate: 100,
+          })),
+        }),
+      },
+      {
+        name: 'overtime',
+        seed: 'ot-1',
+        input: fullCourtTestInput({
+          seed: 'ot-1',
+          homeRoster: fullCourtTestRoster('parity-ot-home', 10),
+          awayRoster: fullCourtTestRoster('parity-ot-away', 10, () => ({ rating: 71 })),
+        }),
+      },
+    ];
+
+    for (const testCase of cases) {
+      const recorded = simulateRecordedFullCourtGame(testCase.input, ctx);
+      const factsOnly = runFullCourtGame(testCase.input, ctx, { lineupFacts: true });
+      const { result } = recorded;
+      expect(checkFullCourtGameResult(result)).toEqual([]);
+      expect(factsOnly.result).toEqual(result);
+      expect(fullCourtGameDigest(factsOnly.result)).toBe(fullCourtGameDigest(result));
+      expect(factsOnly.tape).toBeNull();
+      if (factsOnly.lineupFacts === null) throw new Error(`missing facts for ${testCase.name}`);
+      expect(
+        fullCourtGameLineupsSchema.parse(
+          buildFullCourtGameLineupsFromFacts({
+            kind: 'played',
+            gameId: `fc-${testCase.seed}`,
+            userSide: 'home',
+            result,
+            facts: factsOnly.lineupFacts,
+          }),
+        ).side,
+      ).toBe('home');
+
+      for (const side of ['home', 'away'] as const) {
+        const fromTape = buildFullCourtGameLineups({
+          kind: 'played',
+          gameId: `fc-${testCase.seed}`,
+          userSide: side,
+          result,
+          tape: recorded.tape,
+        });
+        const fromFacts = buildFullCourtGameLineupsFromFacts({
+          kind: 'played',
+          gameId: `fc-${testCase.seed}`,
+          userSide: side,
+          result,
+          facts: factsOnly.lineupFacts,
+        });
+        expect(fromFacts).toEqual(fromTape);
+      }
+
+      if (testCase.name === 'substitutions') {
+        expect(recorded.tape.some((event) => event.kind === 'substitution')).toBe(true);
+      }
+      if (testCase.name === 'technical fouls') {
+        expect(recorded.tape.some((event) => event.kind === 'technical')).toBe(true);
+      }
+      if (testCase.name === 'overtime') {
+        expect(result.overtimePeriods).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('attributes emergency technical points to the actual five', () => {

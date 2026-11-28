@@ -83,7 +83,7 @@
       class="unit-strip"
       data-over={overBudget}
       role="img"
-      aria-label={`Second-quarter unit plan: ${String(planned)} of ${String(FULL_COURT_UNIT_MINUTE_BUDGET)} minutes across ${String(segments.length)} named units`}
+      aria-label={`Second-quarter unit plan: ${String(planned)} of ${String(FULL_COURT_UNIT_MINUTE_BUDGET)} minutes across ${String(segments.length)} ${segments.length === 1 ? 'named unit' : 'named units'}`}
     >
       {#each segments as segment, index (segment.unit.name + String(segment.index))}
         <span

@@ -275,6 +275,46 @@ test('rehydrates a saved watched replay into Gamecast from tipoff without rollin
   expect(body).toContain('Pause');
 });
 
+test('highlights actual rotation and substitution evidence in the finished recap', () => {
+  const { season } = fullCourtTestSeasonLock();
+  const fixture = season.games[0];
+  if (fixture === undefined) throw new Error('Expected an opening fixture');
+  const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
+  const { result, tape } = simulateRecordedFullCourtGame(input, createEngineContext());
+  const health = {
+    home: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.homeTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+    away: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.awayTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+  };
+  const userSide = result.home.teamId === season.userTeamId ? 0 : 1;
+  const substitutions = tape.filter(
+    (event) => event.kind === 'substitution' && event.side === userSide,
+  );
+  expect(substitutions.length).toBeGreaterThan(0);
+
+  const body = render(FullCourtGamecast, {
+    props: {
+      game: { kind: 'played', result, tape, health, injuries: [] },
+      userTeamId: season.userTeamId,
+      onClose: () => {},
+    },
+  }).body;
+
+  expect(body).toContain('starter minutes');
+  expect(body).toContain('bench minutes');
+  expect(body).toContain(`${substitutions.length} substitution`);
+  expect(body).toContain('First change:');
+});
+
 test('renders full Cap Rush style box scores and team totals when finished', () => {
   const { season } = fullCourtTestSeasonLock();
   const fixture = season.games[0];

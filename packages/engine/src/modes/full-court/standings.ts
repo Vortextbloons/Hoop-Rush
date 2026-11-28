@@ -1,19 +1,13 @@
 import {
   CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
   CAP_RUSH_CONFERENCE_SIZE,
-  CAP_RUSH_FRANCHISE_ALIGNMENT,
-  CAP_RUSH_TAKEOVER_TEAMS,
-  capRushAlignmentOf,
   fullCourtSeasonScoreSchema,
   type CapRushConference,
   type CapRushDivision,
   type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
-import {
-  validateLeagueField,
-  type LeagueFieldRules,
-  type LeagueFieldTeam,
-} from '../../league/schedule.ts';
+import { NBA_LEAGUE_RULES } from '../../league/nba.ts';
+import { validateLeagueField, type LeagueFieldTeam } from '../../league/schedule.ts';
 import {
   conferenceStandingOf,
   createTeamTotals,
@@ -26,13 +20,6 @@ import {
 
 type FullCourtLeagueField = LeagueFieldTeam;
 type FullCourtTeamTotals = TeamTotals<CapRushConference, CapRushDivision>;
-
-const FULL_COURT_FIELD_RULES: LeagueFieldRules<CapRushConference, CapRushDivision> = {
-  label: 'Full Court',
-  teamCount: CAP_RUSH_TAKEOVER_TEAMS,
-  teamIds: CAP_RUSH_FRANCHISE_ALIGNMENT.map((entry) => entry.franchiseId),
-  alignmentOf: capRushAlignmentOf,
-};
 
 export type FullCourtStandingsRow = LeagueStanding<CapRushConference, CapRushDivision>;
 
@@ -74,9 +61,12 @@ export function fullCourtStandings(
   field: readonly FullCourtLeagueField[],
   scores: readonly FullCourtSeasonScore[],
 ): FullCourtStandings {
-  validateLeagueField(field, FULL_COURT_FIELD_RULES);
+  validateLeagueField(field, NBA_LEAGUE_RULES);
   const totals = new Map<string, FullCourtTeamTotals>(
-    field.map((team) => [team.teamId, createTeamTotals(team, capRushAlignmentOf(team.teamId))]),
+    field.map((team) => [
+      team.teamId,
+      createTeamTotals(team, NBA_LEAGUE_RULES.alignmentOf(team.teamId)),
+    ]),
   );
   const seen = new Set<string>();
   for (const raw of scores) {

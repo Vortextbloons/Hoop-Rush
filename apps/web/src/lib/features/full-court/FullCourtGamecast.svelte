@@ -256,194 +256,215 @@
     </div>
     <Button tone="secondary" size="sm" onclick={onClose}>Close</Button>
   </div>
-  <GameScoreboard
-    class="mt-3"
-    teams={[
-      {
-        key: 'away',
-        label: game.result.away.displayName,
-        score: finished ? game.result.away.box.points : (frame?.awayScore ?? 0),
-        winner: finished && game.result.winner === 'away',
-      },
-      {
-        key: 'home',
-        label: game.result.home.displayName,
-        score: finished ? game.result.home.box.points : (frame?.homeScore ?? 0),
-        winner: finished && game.result.winner === 'home',
-      },
-    ]}
+  <GamecastLiveLayout
+    class="broadcast mt-3"
+    label="Full Court Gamecast"
+    feed={frames.length > 0 ? visibleFeed : null}
+    feedCountLabel={`${frame?.possession ?? 0} ${frame?.possession === 1 ? 'possession' : 'possessions'}`}
   >
-    {#snippet status()}
-      <span class="ui-micro">
-        {#if finished}
-          Final
-        {:else if frame !== undefined}
-          {gamecastPeriodLabel(frame.period + 1)}
-          · {clockLabel(frame.clockSeconds)}
-        {/if}
-      </span>
+    {#snippet scoreboard()}
+      <GameScoreboard
+        teams={[
+          {
+            key: 'away',
+            label: game.result.away.displayName,
+            score: finished ? game.result.away.box.points : (frame?.awayScore ?? 0),
+            winner: finished && game.result.winner === 'away',
+          },
+          {
+            key: 'home',
+            label: game.result.home.displayName,
+            score: finished ? game.result.home.box.points : (frame?.homeScore ?? 0),
+            winner: finished && game.result.winner === 'home',
+          },
+        ]}
+      >
+        {#snippet status()}
+          <span class="ui-micro">
+            {#if finished}
+              Final
+            {:else if frame !== undefined}
+              {gamecastPeriodLabel(frame.period + 1)}
+              · {clockLabel(frame.clockSeconds)}
+            {/if}
+          </span>
+        {/snippet}
+      </GameScoreboard>
     {/snippet}
-  </GameScoreboard>
 
-  {#if frames.length > 0}
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      <Button size="sm" tone="secondary" disabled={cursor === 0} onclick={() => step(-1)}>
-        Previous possession
-      </Button>
-      <Button size="sm" tone="secondary" disabled={finished} onclick={() => step(1)}>
-        Next possession
-      </Button>
-      {#if finished}
-        <Button
-          size="sm"
-          tone="secondary"
-          onclick={() => {
+    {#snippet content()}
+      {#if frames.length > 0}
+        <GamecastPlaybackControls
+          {paused}
+          complete={finished}
+          ontoggle={() => (paused = !paused)}
+          onskip={() => (cursor = frames.length - 1)}
+          onreplay={() => {
             cursor = 0;
             paused = false;
-          }}>Replay</Button
+          }}
         >
-      {:else}
-        <Button size="sm" tone="secondary" onclick={() => (paused = !paused)}
-          >{paused ? 'Resume' : 'Pause'}</Button
-        >
-        <label class="flex items-center gap-2 text-xs text-muted-foreground">
-          Speed
-          <select
-            class="min-h-9 rounded-md border border-line-soft bg-surface-2 px-2"
-            bind:value={speed}
-          >
-            <option value={1}>1×</option>
-            <option value={4}>4×</option>
-            <option value={12}>12×</option>
-          </select>
+          {#snippet leading()}
+            <Button size="sm" tone="secondary" disabled={cursor === 0} onclick={() => step(-1)}>
+              Previous possession
+            </Button>
+            <Button size="sm" tone="secondary" disabled={finished} onclick={() => step(1)}>
+              Next possession
+            </Button>
+          {/snippet}
+          {#snippet trailing()}
+            <label class="flex items-center gap-2 text-xs text-muted-foreground">
+              Speed
+              <select
+                class="min-h-9 rounded-md border border-line-soft bg-surface-2 px-2"
+                bind:value={speed}
+              >
+                <option value={1}>1×</option>
+                <option value={4}>4×</option>
+                <option value={12}>12×</option>
+              </select>
+            </label>
+          {/snippet}
+        </GamecastPlaybackControls>
+        <label class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+          <span class="shrink-0">Game timeline</span>
+          <input
+            class="w-full accent-primary"
+            type="range"
+            min="0"
+            max={frames.length - 1}
+            value={cursor}
+            oninput={(event) => {
+              paused = true;
+              cursor = event.currentTarget.valueAsNumber;
+            }}
+          />
         </label>
-        <Button size="sm" tone="secondary" onclick={() => (cursor = frames.length - 1)}
-          >Skip to final</Button
-        >
       {/if}
-    </div>
-    <label class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-      <span class="shrink-0">Game timeline</span>
-      <input
-        class="w-full accent-primary"
-        type="range"
-        min="0"
-        max={frames.length - 1}
-        value={cursor}
-        oninput={(event) => {
-          paused = true;
-          cursor = event.currentTarget.valueAsNumber;
-        }}
-      />
-    </label>
-  {/if}
 
-  {#if frame !== undefined}
-    <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
-      {#each teams as team, index (team.teamId)}
-        {@const active = index === 0 ? frame.homeUnit : frame.awayUnit}
-        {@const unitName = unitNameFor(team, active)}
-        <section
-          class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2 sm:p-3"
-          aria-label={`${team.displayName} active five`}
-        >
-          <h4 class="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
-            <span>{team.displayName}</span>
-            <span class="text-xs font-normal text-muted-foreground"
-              >{finished ? 'final five' : 'on court'}</span
+      {#if frame !== undefined}
+        <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
+          {#each teams as team, index (team.teamId)}
+            {@const active = index === 0 ? frame.homeUnit : frame.awayUnit}
+            {@const unitName = unitNameFor(team, active)}
+            <section
+              class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2 sm:p-3"
+              aria-label={`${team.displayName} active five`}
             >
-            {#if !finished && frame.kind === 'trip' && frame.side === index}
-              <span class="ui-micro text-primary">On offense</span>
-            {/if}
-            {#if unitName !== null}
-              <span class="text-xs font-normal text-accent">· {unitName}</span>
-            {/if}
-          </h4>
-          <ul class="mt-2 divide-y divide-line-soft">
-            {#each active as id (id)}
-              {@const player = team.players.find((entry) => entry.playerId === id)}
-              <li class="flex min-w-0 items-center gap-2 py-1.5">
-                <div class="flex justify-center">
-                  <FullCourtPortrait
-                    player={{ playerId: id, displayName: player?.displayName ?? 'Player' }}
-                    {art}
-                    size="sm"
-                    eager
-                  />
-                </div>
-                <span
-                  class="min-w-0 text-xs font-semibold leading-tight sm:text-sm"
-                  title={player?.displayName ?? id}
+              <h4 class="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
+                <span>{team.displayName}</span>
+                <span class="text-xs font-normal text-muted-foreground"
+                  >{finished ? 'final five' : 'on court'}</span
                 >
-                  {player?.displayName ?? 'Player'}
-                </span>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/each}
-    </div>
-    <div class="mt-3">
-      <GamecastFeed
-        rows={visibleFeed}
-        countLabel={`${frame.possession} ${frame.possession === 1 ? 'possession' : 'possessions'}`}
-      />
-    </div>
-  {/if}
+                {#if !finished && frame.kind === 'trip' && frame.side === index}
+                  <span class="ui-micro text-primary">On offense</span>
+                {/if}
+                {#if unitName !== null}
+                  <span class="text-xs font-normal text-accent">· {unitName}</span>
+                {/if}
+              </h4>
+              <ul class="mt-2 divide-y divide-line-soft">
+                {#each active as id (id)}
+                  {@const player = team.players.find((entry) => entry.playerId === id)}
+                  <li class="flex min-w-0 items-center gap-2 py-1.5">
+                    <div class="flex justify-center">
+                      <FullCourtPortrait
+                        player={{ playerId: id, displayName: player?.displayName ?? 'Player' }}
+                        {art}
+                        size="sm"
+                        eager
+                      />
+                    </div>
+                    <span
+                      class="min-w-0 text-xs font-semibold leading-tight sm:text-sm"
+                      title={player?.displayName ?? id}
+                    >
+                      {player?.displayName ?? 'Player'}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+          {/each}
+        </div>
+      {/if}
+    {/snippet}
+  </GamecastLiveLayout>
   {#if finished}
-    {@const team = [game.result.home, game.result.away].find(
-      (entry) => entry.teamId === userTeamId,
+    {@const topShooter = userTeam.players.reduce<(typeof userTeam.players)[number] | undefined>(
+      (leader, player) =>
+        player.fieldGoals.attempted > (leader?.fieldGoals.attempted ?? 0) ? player : leader,
+      undefined,
     )}
-    {#if team !== undefined}
-      {@const topShooter = team.players.reduce<(typeof team.players)[number] | undefined>(
-        (leader, player) =>
-          player.fieldGoals.attempted > (leader?.fieldGoals.attempted ?? 0) ? player : leader,
-        undefined,
-      )}
-      {@const unitSeconds = namedUnitSeconds(team)}
-      {@const ruleSubstitutions =
-        game.tape?.filter(
-          (event) =>
-            event.kind === 'substitution' &&
-            event.reason === 'coach-rule' &&
-            event.side === (team === game.result.home ? 0 : 1),
-        ) ?? []}
-      {@const firstRuleSubstitution = ruleSubstitutions[0]}
-      <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
-        <h3 class="font-semibold">How your team played</h3>
+    {@const unitSeconds = namedUnitSeconds(userTeam)}
+    {@const firstSubstitution = userSubstitutions[0]}
+    {@const playersUsed = userTeam.players.filter((player) => player.minutes > 0)}
+    <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
+      <h3 class="font-semibold">How your team played</h3>
+      <p class="text-muted-foreground">
+        {userTeam.box.possessions} possessions · {userTeam.box.threes.attempted} of
+        {userTeam.box.fieldGoals.attempted} shots from three · {userTeam.box.assists} assists ·
+        {userTeam.box.turnovers} turnovers
+      </p>
+      <p class="text-muted-foreground">
+        {playersUsed.length} players used · {starterMinutes.toFixed(1)} starter minutes ·
+        {benchMinutes.toFixed(1)} bench minutes{#if userTeam.disqualifications > 0}
+          · {userTeam.disqualifications} foul out{userTeam.disqualifications === 1 ? '' : 's'}{/if}
+      </p>
+      {#if foulTrouble.length > 0}
         <p class="text-muted-foreground">
-          {team.box.possessions} possessions · {team.box.threes.attempted} of
-          {team.box.fieldGoals.attempted} shots from three · {team.box.assists} assists ·
-          {team.box.turnovers} turnovers
+          Foul trouble: {foulTrouble
+            .map(
+              (player) =>
+                `${player.displayName} (${String(player.fouls)} PF${player.foulsOut ? ', fouled out' : ''})`,
+            )
+            .join(' · ')}
         </p>
-        {#if topShooter !== undefined}
+      {/if}
+      {#if topShooter !== undefined}
+        <p class="text-muted-foreground">
+          {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
+        </p>
+      {/if}
+      {#if unitSeconds.size > 0}
+        <ul class="mt-1 flex flex-wrap gap-2" aria-label="Lineup group minutes">
+          {#each unitSeconds as [name, seconds] (name)}
+            {@const planned = userTeam.units.find((unit) => unit.name === name)?.plannedMinutes}
+            <li class="rounded-md border border-line-soft px-2 py-1 text-xs">
+              {name} &middot; {(seconds / 60).toFixed(1)} min played
+              {#if planned !== undefined}
+                / {planned} planned{/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if userSubstitutions.length > 0}
+        <p class="text-muted-foreground">
+          {userSubstitutions.length} substitution{userSubstitutions.length === 1 ? '' : 's'} ·
+          {substitutionSummary(userSubstitutions)}
+        </p>
+        {#if firstSubstitution !== undefined}
           <p class="text-muted-foreground">
-            {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
+            First change: {playerNameOf(userTeam, firstSubstitution.inPlayerId)} in for
+            {playerNameOf(userTeam, firstSubstitution.outPlayerId)} ·
+            {gamecastPeriodLabel(firstSubstitution.period + 1)}
+            {clockLabel(firstSubstitution.clockSeconds)}
           </p>
         {/if}
-        {#if unitSeconds.size > 0}
-          <ul class="mt-1 flex flex-wrap gap-2" aria-label="Lineup group minutes">
-            {#each unitSeconds as [name, seconds] (name)}
-              {@const planned = team.units.find((unit) => unit.name === name)?.plannedMinutes}
-              <li class="rounded-md border border-line-soft px-2 py-1 text-xs">
-                {name} &middot; {(seconds / 60).toFixed(1)} min played
-                {#if planned !== undefined}
-                  / {planned} planned{/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-        {#if firstRuleSubstitution?.kind === 'substitution'}
-          <p class="text-muted-foreground">
-            First situational substitution at {Math.floor(
-              firstRuleSubstitution.clockSeconds / 60,
-            )}:{String(Math.floor(firstRuleSubstitution.clockSeconds % 60)).padStart(2, '0')} in period
-            {firstRuleSubstitution.period}.
-            {ruleSubstitutions.length} total.
-          </p>
-        {/if}
-      </section>
-    {/if}
+      {:else}
+        <p class="text-muted-foreground">No substitutions recorded.</p>
+      {/if}
+      {#if bestLineup !== null}
+        <p class="text-muted-foreground">
+          Best qualifying lineup: {bestLineup.players
+            .map((player) => player.displayName)
+            .join(' · ')} · {bestLineup.netRatingPer100 !== null && bestLineup.netRatingPer100 > 0
+            ? '+'
+            : ''}{bestLineup.netRatingPer100?.toFixed(1) ?? '—'} NET RTG over
+          {Math.round(bestLineup.pacePossessions)} possessions.
+        </p>
+      {/if}
+    </section>
     {#if lineupReport !== null}
       <PlayerStatsSection
         surface="none"

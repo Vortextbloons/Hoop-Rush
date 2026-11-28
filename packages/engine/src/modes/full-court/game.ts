@@ -327,6 +327,13 @@ interface MutableLineupFactRow {
   pointsAgainst: number;
 }
 
+interface OpponentLineupFactRow {
+  readonly key: string;
+  readonly playerIds: readonly string[];
+  pointsAgainst: number;
+  defensivePossessions: number;
+}
+
 function lineupFactKey(playerIds: readonly string[]): string {
   return [...playerIds].sort().join('|');
 }
@@ -336,10 +343,8 @@ function lineupFactKey(playerIds: readonly string[]): string {
  * for the user game and without materializing one event object per trip.
  */
 class LineupFactTracker {
-  private readonly rows: [Map<string, MutableLineupFactRow>, Map<string, MutableLineupFactRow>] = [
-    new Map(),
-    new Map(),
-  ];
+  private readonly rows: [Map<string, OpponentLineupFactRow>, Map<string, OpponentLineupFactRow>] =
+    [new Map<string, OpponentLineupFactRow>(), new Map<string, OpponentLineupFactRow>()];
   private readonly scores: [number, number] = [0, 0];
 
   recordTrip(
@@ -354,14 +359,12 @@ class LineupFactTracker {
     const awayDelta = awayScore - this.scores[1];
     this.scores[0] = homeScore;
     this.scores[1] = awayScore;
-    if (homeDelta !== 0) this.credit(0, homeUnit, awayUnit, homeDelta);
-    if (awayDelta !== 0) this.credit(1, awayUnit, homeUnit, awayDelta);
+    if (homeDelta !== 0) this.row(1, awayUnit).pointsAgainst += homeDelta;
+    if (awayDelta !== 0) this.row(0, homeUnit).pointsAgainst += awayDelta;
     if (!ended) return;
     if (offense === 0) {
-      this.row(0, homeUnit).offensivePossessions += 1;
       this.row(1, awayUnit).defensivePossessions += 1;
     } else {
-      this.row(1, awayUnit).offensivePossessions += 1;
       this.row(0, homeUnit).defensivePossessions += 1;
     }
   }
@@ -373,7 +376,11 @@ class LineupFactTracker {
     made: boolean,
   ): void {
     if (!made) return;
-    this.credit(side, side === 0 ? homeUnit : awayUnit, side === 0 ? awayUnit : homeUnit, 1);
+    if (side === 0) {
+      this.row(1, awayUnit).pointsAgainst += 1;
+    } else {
+      this.row(0, homeUnit).pointsAgainst += 1;
+    }
     this.scores[side] += 1;
   }
 
@@ -384,29 +391,16 @@ class LineupFactTracker {
     };
   }
 
-  private credit(
-    side: SideIndex,
-    ownUnit: readonly string[],
-    opponentUnit: readonly string[],
-    points: number,
-  ): void {
-    this.row(side, ownUnit).pointsFor += points;
-    this.row((1 - side) as SideIndex, opponentUnit).pointsAgainst += points;
-  }
-
-  private row(side: SideIndex, playerIds: readonly string[]): MutableLineupFactRow {
+  private row(side: SideIndex, playerIds: readonly string[]): OpponentLineupFactRow {
     const key = lineupFactKey(playerIds);
     const rows = this.rows[side];
     const existing = rows.get(key);
     if (existing !== undefined) return existing;
-    const created: MutableLineupFactRow = {
+    const created: OpponentLineupFactRow = {
       key,
       playerIds: [...playerIds].sort(),
-      seconds: 0,
-      offensivePossessions: 0,
-      defensivePossessions: 0,
-      pointsFor: 0,
       pointsAgainst: 0,
+      defensivePossessions: 0,
     };
     rows.set(key, created);
     return created;

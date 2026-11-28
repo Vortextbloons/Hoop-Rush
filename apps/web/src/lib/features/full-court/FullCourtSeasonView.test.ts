@@ -168,7 +168,6 @@ describe('FullCourtSeasonView sections', () => {
     const body = renderView({ section: 'home' });
     expect(body).toContain('aria-label="Full Court game-day readiness"');
     expect(body).toContain('Game 1 of 82');
-    expect(body).toContain('Sim ahead');
     expect(body).toContain('Sim to next review');
   });
 

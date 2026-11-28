@@ -3,7 +3,6 @@ import {
   CAP_RUSH_PLAYOFF_TEAMS,
   CAP_RUSH_SERIES_GAMES,
   capRushConferenceRoundName,
-  capRushPlayoffSeriesId,
   franchiseAbbreviation,
   type FullCourtPlayoffAdaptation,
   type FullCourtSeasonCheckpoint,
@@ -11,14 +10,27 @@ import {
   type FullCourtTeamHealth,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import {
-  fullCourtPlayoffView,
-  fullCourtUserNextPlayoffMatchup,
-  type FullCourtPlayoffSeries,
-  type FullCourtSeasonLock,
-} from '@hoop-rush/engine';
+import { type FullCourtPlayoffSeries, type FullCourtSeasonLock } from '@hoop-rush/engine';
 
-export type FullCourtPlayoffView = ReturnType<typeof fullCourtPlayoffView>;
+import {
+  fullCourtNextReviewSlot,
+  type FullCourtAdvanceOptions,
+  type FullCourtPlayoffView,
+  type FullCourtSimulationStop,
+  type FullCourtUserFixture,
+} from '@hoop-rush/application/full-court';
+
+export {
+  FULL_COURT_REVIEW_SLOTS,
+  fullCourtNextReviewSlot,
+  fullCourtNextUserFixture,
+  fullCourtPlayoffAdjustmentChanged,
+  fullCourtUserSeries,
+  type FullCourtAdvanceOptions,
+  type FullCourtPlayoffView,
+  type FullCourtSimulationStop,
+  type FullCourtUserFixture,
+} from '@hoop-rush/application/full-court';
 
 /**
  * Parent-owned tab selection. `home` is the matchup-led overview, `league` holds
@@ -59,15 +71,6 @@ export interface FullCourtSeriesGameView extends FullCourtResultView {
 export type FullCourtHomeActionKind = 'sim' | 'start-playoffs';
 
 /** Optional interruptions for a regular-season or playoff batch. */
-export interface FullCourtAdvanceOptions {
-  /** Stop after the first user injury that would affect the next fixture. */
-  readonly stopAtInjury?: boolean;
-  /** Stop after a scheduled quarterly review slot. */
-  readonly stopAtReview?: boolean;
-  /** In playoffs, sim through opponent adjustments until the series finishes. */
-  readonly ignoreOpponentAdjustment?: boolean;
-}
-
 export interface FullCourtHomeAction extends FullCourtAdvanceOptions {
   readonly kind: FullCourtHomeActionKind;
   readonly label: string;
@@ -157,17 +160,6 @@ export function fullCourtUserSchedule(
   });
 }
 
-export function fullCourtUserSeries(
-  series: readonly FullCourtPlayoffSeries[],
-  userTeamId: string,
-): FullCourtPlayoffSeries | null {
-  return (
-    series
-      .filter((entry) => entry.highTeamId === userTeamId || entry.lowTeamId === userTeamId)
-      .at(-1) ?? null
-  );
-}
-
 export function fullCourtSeriesGames(
   series: FullCourtPlayoffSeries,
   userTeamId: string,
@@ -200,104 +192,6 @@ export function fullCourtSeriesGames(
       adjustmentResponse,
     };
   });
-}
-
-export interface FullCourtUserFixture {
-  readonly gameId: string;
-  readonly phase: 'regular' | 'playoff';
-  readonly label: string;
-  readonly dayOffset: number;
-  readonly homeTeamId: string;
-  readonly awayTeamId: string;
-  readonly userSide: 'home' | 'away';
-}
-
-/** Engine bracket spacing, mirrored here only to label the next user fixture day. */
-const FULL_COURT_PLAYOFF_ROUND_GAP_DAYS = 3;
-const FULL_COURT_PLAYOFF_GAME_GAP_DAYS = 2;
-
-function fullCourtPlayoffSeriesStartDay(
-  lock: FullCourtSeasonLock,
-  playoff: FullCourtPlayoffView,
-  round: number,
-): number | null {
-  if (round <= 1) {
-    return (
-      Math.max(...lock.season.games.map((game) => game.dayOffset)) +
-      FULL_COURT_PLAYOFF_ROUND_GAP_DAYS
-    );
-  }
-  const priorGames = playoff.series
-    .filter((series) => series.round === round - 1)
-    .flatMap((series) => series.games);
-  if (priorGames.length === 0) return null;
-  return Math.max(...priorGames.map((game) => game.dayOffset)) + FULL_COURT_PLAYOFF_ROUND_GAP_DAYS;
-}
-
-function fullCourtPlayoffUserGameDay(
-  lock: FullCourtSeasonLock,
-  playoff: FullCourtPlayoffView,
-  series: FullCourtPlayoffSeries,
-  gameOrdinal: number,
-): number | null {
-  const lastGame = series.games.at(-1);
-  if (lastGame !== undefined) {
-    return lastGame.dayOffset + FULL_COURT_PLAYOFF_GAME_GAP_DAYS;
-  }
-  const startDay = fullCourtPlayoffSeriesStartDay(lock, playoff, series.round);
-  return startDay === null ? null : startDay + (gameOrdinal - 1) * FULL_COURT_PLAYOFF_GAME_GAP_DAYS;
-}
-
-/**
- * The next fixture the user actually plays. Playoff brackets can schedule
- * AI-only games first, so this reads the next user series game rather than the
- * next bracket game.
- */
-export function fullCourtNextUserFixture(
-  lock: FullCourtSeasonLock,
-  checkpoint: FullCourtSeasonCheckpoint,
-  playoff: FullCourtPlayoffView | null,
-): FullCourtUserFixture | null {
-  const { userTeamId } = lock.season;
-  if (playoff !== null) {
-    const preview = fullCourtUserNextPlayoffMatchup({
-      userTeamId,
-      runSeed: lock.season.runSeed,
-      series: playoff.series,
-    });
-    if (preview === null) return null;
-    const series = playoff.series.find(
-      (entry) => entry.seriesId === capRushPlayoffSeriesId(preview.round, preview.seriesSlot),
-    );
-    if (series === undefined) return null;
-    const dayOffset = fullCourtPlayoffUserGameDay(lock, playoff, series, preview.gameOrdinal);
-    if (dayOffset === null) return null;
-    return {
-      gameId: preview.gameId,
-      phase: 'playoff',
-      label: `Game ${String(preview.gameOrdinal)} · ${capRushConferenceRoundName(preview.round)}`,
-      dayOffset,
-      homeTeamId: preview.homeTeamId,
-      awayTeamId: preview.awayTeamId,
-      userSide: preview.userSide,
-    };
-  }
-  if (checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) return null;
-  const slot = checkpoint.completedThroughSlot + 1;
-  const fixture = lock.season.games.find(
-    (game) =>
-      game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
-  );
-  if (fixture === undefined) return null;
-  return {
-    gameId: fixture.gameId,
-    phase: 'regular',
-    label: `Game ${String(slot)} of ${String(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM)}`,
-    dayOffset: fixture.dayOffset,
-    homeTeamId: fixture.homeTeamId,
-    awayTeamId: fixture.awayTeamId,
-    userSide: fixture.homeTeamId === userTeamId ? 'home' : 'away',
-  };
 }
 
 export type FullCourtGameDayPlayerStatus =
@@ -482,13 +376,6 @@ export function fullCourtGameDayReadiness(input: {
 }
 
 /** Roughly quarterly season reviews use the same committed-game stop path. */
-export const FULL_COURT_REVIEW_SLOTS = [20, 41, 61, 82] as const;
-
-export function fullCourtNextReviewSlot(completedThroughSlot: number): number | null {
-  return FULL_COURT_REVIEW_SLOTS.find((slot) => slot > completedThroughSlot) ?? null;
-}
-
-/** Returns the number of games until the user's next back-to-back game, or null if none remain. */
 export function fullCourtGamesToNextBackToBack(
   lock: FullCourtSeasonLock,
   completedThroughSlot: number,
@@ -645,55 +532,6 @@ export function fullCourtPlayoffAdaptationRead(
 }
 
 /** True when the opponent's next-game adjustment is new or has changed setting. */
-export function fullCourtPlayoffAdjustmentChanged(
-  applied: FullCourtPlayoffAdaptation | null | undefined,
-  next: FullCourtPlayoffAdaptation | null | undefined,
-): boolean {
-  return next !== null && next !== undefined && (applied?.defense ?? null) !== next.defense;
-}
-
-export type FullCourtSimulationStop =
-  | { readonly kind: 'review'; readonly slot: number }
-  | {
-      readonly kind: 'injury';
-      readonly slot: number;
-      readonly playerIds: readonly string[];
-      readonly availableFromDay: number;
-    }
-  | {
-      readonly kind: 'series-complete';
-      readonly round: number;
-      readonly opponentTeamId: string;
-      readonly won: boolean;
-      readonly userWins: number;
-      readonly opponentWins: number;
-    }
-  | {
-      readonly kind: 'opponent-change';
-      readonly round: number;
-      readonly opponentTeamId: string;
-      readonly gameOrdinal: number;
-    }
-  | {
-      readonly kind: 'opponent-adjustment';
-      readonly round: number;
-      readonly opponentTeamId: string;
-      readonly gameOrdinal: number;
-      readonly adaptation: FullCourtPlayoffAdaptation;
-    }
-  | {
-      readonly kind: 'game-limit';
-      readonly userGames: number;
-      readonly bracketGames: number;
-    }
-  | {
-      readonly kind: 'playoffs-complete';
-      readonly championTeamId: string;
-      readonly userTeamId: string;
-    }
-  | { readonly kind: 'stopped'; readonly userGames: number; readonly bracketGames: number };
-
-/** Typed, display-ready feedback for why a simulation batch returned control. */
 export interface FullCourtSimulationNotice {
   readonly stop: FullCourtSimulationStop;
   readonly tone: 'info' | 'success' | 'warning';

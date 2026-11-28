@@ -2,7 +2,6 @@ import { capRushPlayoffSeriesId } from '@hoop-rush/data-contracts';
 import {
   PLAYOFF_OPENING_PAIRS,
   playoffSeriesFields as playoffSeriesFieldsLeague,
-  type PlayoffSeriesLike,
 } from '../league/playoffs.ts';
 
 export const CONFERENCE_OPENING_PAIRS = PLAYOFF_OPENING_PAIRS;
@@ -25,5 +24,3 @@ export function playoffSeriesFields(
     ...playoffSeriesFieldsLeague(round, seriesSlot, high, low),
   };
 }
-
-export type { PlayoffSeriesLike };

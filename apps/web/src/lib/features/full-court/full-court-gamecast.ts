@@ -56,6 +56,87 @@ export function fullCourtWatchedReplaySummary(
   };
 }
 
+export type FullCourtGamecastSubstitution = Extract<FullCourtTapeEvent, { kind: 'substitution' }>;
+
+export interface FullCourtRotationSummary {
+  readonly substitutions: readonly FullCourtGamecastSubstitution[];
+  readonly reasonSummary: string;
+  readonly firstSubstitution: FullCourtGamecastSubstitution | null;
+  readonly foulTrouble: readonly FullCourtGameResult['home']['players'][number][];
+  readonly playersUsed: number;
+  readonly starterMinutes: number;
+  readonly benchMinutes: number;
+  readonly disqualifications: number;
+}
+
+export function fullCourtSubstitutionReasonLabel(
+  reason: FullCourtGamecastSubstitution['reason'],
+): string {
+  switch (reason) {
+    case 'foul-out':
+      return 'foul out';
+    case 'fatigue':
+      return 'fatigue';
+    case 'minute-target':
+      return 'minute target';
+    case 'closing-five':
+      return 'closing five';
+    case 'coach-rule':
+      return 'coach rule';
+    case 'emergency-continuation':
+      return 'emergency';
+  }
+}
+
+/** Actual rotation facts already recorded in the result and tape. */
+export function fullCourtRotationSummary(
+  team: FullCourtGameResult['home'],
+  side: 0 | 1,
+  tape: readonly FullCourtTapeEvent[] | null,
+): FullCourtRotationSummary {
+  const substitutions = (tape ?? []).filter(
+    (event): event is FullCourtGamecastSubstitution =>
+      event.kind === 'substitution' && event.side === side,
+  );
+  const counts = new Map<string, number>();
+  for (const event of substitutions) {
+    const label = fullCourtSubstitutionReasonLabel(event.reason);
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return {
+    substitutions,
+    reasonSummary: [...counts].map(([label, count]) => `${String(count)} ${label}`).join(' · '),
+    firstSubstitution: substitutions[0] ?? null,
+    foulTrouble: team.players.filter((player) => player.fouls >= 4 || player.foulsOut),
+    playersUsed: team.players.filter((player) => player.minutes > 0).length,
+    starterMinutes: team.players
+      .filter((player) => player.startedGame)
+      .reduce((total, player) => total + player.minutes, 0),
+    benchMinutes: team.players
+      .filter((player) => !player.startedGame)
+      .reduce((total, player) => total + player.minutes, 0),
+    disqualifications: team.disqualifications,
+  };
+}
+
+export interface FullCourtGamecastLineupEvidence {
+  readonly players: readonly { readonly displayName: string }[];
+  readonly sampleMet: boolean;
+  readonly netRatingPer100: number | null;
+  readonly pacePossessions: number;
+}
+
+/** Highest net rating among lineups that cleared the recorded sample floor. */
+export function fullCourtBestLineup<Row extends FullCourtGamecastLineupEvidence>(
+  rows: readonly Row[],
+): Row | null {
+  return (
+    [...rows]
+      .filter((row) => row.sampleMet && row.netRatingPer100 !== null)
+      .sort((left, right) => (right.netRatingPer100 ?? 0) - (left.netRatingPer100 ?? 0))[0] ?? null
+  );
+}
+
 export interface FullCourtGamecastFrame {
   readonly period: number;
   readonly clockSeconds: number;
