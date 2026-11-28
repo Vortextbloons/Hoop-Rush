@@ -74,15 +74,9 @@ export interface IndividualSeasonFacts {
 /**
  * Modes where individual stat-line records are trusted. Cap Rush and Havoc are
  * intentionally absent: both can apply mutations that inflate counting stats.
- * Full Court is listed for its standard-sim record once profile awards are
- * wired there.
+ * Full Court is standard-sim but does not yet award profile achievements.
  */
-const CORE_MODES: readonly IndividualAchievementMode[] = [
-  'classic',
-  'sandbox',
-  'full-court',
-  'multiplayer',
-];
+const CORE_MODES: readonly IndividualAchievementMode[] = ['classic', 'sandbox', 'multiplayer'];
 
 const MODE_ELIGIBILITY: Record<IndividualAchievementId, readonly IndividualAchievementMode[]> = {
   'the-hakeem-special': CORE_MODES,

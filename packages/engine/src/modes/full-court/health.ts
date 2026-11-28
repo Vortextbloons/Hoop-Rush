@@ -69,6 +69,8 @@ export type FullCourtGameHealthOutcome =
       readonly health: Readonly<Record<Side, FullCourtTeamHealth>>;
       /** Postgame time-loss events; empty when the injury slice is disabled. */
       readonly injuries: readonly FullCourtInjuryEvent[];
+      /** Pregame availability actually used, including injury and rest reasons. */
+      readonly availability?: Readonly<Record<Side, readonly FullCourtAvailabilityEntry[]>>;
     } & FullCourtGameRun);
 
 function prepareTeamHealth(
@@ -287,5 +289,14 @@ export function runFullCourtGameWithHealth(
   }
   for (const side of sides)
     addWorkload(health[side], run.result[side], prepared[side].team, profiles);
-  return { kind: 'played', ...run, health, injuries };
+  return {
+    kind: 'played',
+    ...run,
+    health,
+    injuries,
+    availability: {
+      home: prepared.home.team.availability,
+      away: prepared.away.team.availability,
+    },
+  };
 }

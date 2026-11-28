@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   FULL_COURT_HEALTH_VERSION,
-  FULL_COURT_WATCHED_REPLAY_SCHEMA_VERSION,
   fullCourtSeasonScoreSchema,
-  fullCourtWatchedReplaySchema,
-  idSchema,
-  seedSchema,
   capRushLeagueGameId,
   type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
@@ -91,7 +87,7 @@ describe('signed Full Court scoring', () => {
     expect(score.outcome.lineups.side).toBe('home');
   });
 
-  it('keeps a watched replay valid with signed bench facts', () => {
+  it('keeps the recorded tape valid with signed bench facts', () => {
     const { result, tape } = playedSimulation();
     const gameId = capRushLeagueGameId(1, 'home', 'away');
     const report = buildFullCourtGameReport({
@@ -104,43 +100,23 @@ describe('signed Full Court scoring', () => {
     if (report.status !== 'played') throw new Error('expected a played report');
     const facts = fullCourtCompletedGameFacts(report);
     if (facts === null) throw new Error('expected completed-game facts');
-    const digest = seedSchema.parse('a'.repeat(32));
-    const replay = fullCourtWatchedReplaySchema.parse({
-      schemaVersion: FULL_COURT_WATCHED_REPLAY_SCHEMA_VERSION,
-      identity: {
-        runId: idSchema.parse('replay-run'),
-        phase: 'regular',
-        seasonLockDigest: digest,
-        lockDigest: digest,
-        gameId,
-        slot: 1,
-        dayOffset: 0,
-        homeTeamId: 'home',
-        awayTeamId: 'away',
-        userTeamId: 'home',
-        userSide: 'home',
-        gameNumber: result.gameNumber,
-        gameSeed: result.seed,
-      },
-      facts: {
-        teamPoints: facts.teamPoints,
-        opponentPoints: report.opponentPoints,
-        userWon: report.userWon,
-        starterPoints: facts.starterPoints,
-        benchPoints: facts.benchPoints,
-        teamBonusPoints: facts.teamBonusPoints,
-        benchPlayerCount: facts.benchPlayerCount,
-        lineupCount: report.lineupRows.length,
-      },
-      health: { home: health('home'), away: health('away') },
-      injuries: [],
-      result,
-      tape,
-    });
-    expect(replay.facts.benchPoints).toBe(facts.benchPoints);
-    expect(
-      replay.facts.starterPoints + replay.facts.benchPoints + replay.facts.teamBonusPoints,
-    ).toBe(replay.facts.teamPoints);
+    // Signed bench facts reach the tape through the per-player deltas the
+    // broadcast folds into a live box.
+    const deltas = tape.flatMap((event) => (event.kind === 'trip' ? (event.deltas ?? []) : []));
+    expect(deltas.length).toBeGreaterThan(0);
+    const deltaPoints = new Map<string, number>();
+    for (const delta of deltas) {
+      deltaPoints.set(
+        delta.playerId,
+        (deltaPoints.get(delta.playerId) ?? 0) + (delta.line[0] ?? 0),
+      );
+    }
+    const homePoints = result.home.players.reduce(
+      (total, player) => total + (deltaPoints.get(player.playerId) ?? 0),
+      0,
+    );
+    expect(homePoints).toBe(result.home.box.points);
+    expect(facts.starterPoints + facts.benchPoints + facts.teamBonusPoints).toBe(facts.teamPoints);
   });
 
   it('keeps signed bench and starter facts valid in the season summary', () => {

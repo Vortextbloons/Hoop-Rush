@@ -1,5 +1,9 @@
-import { FULL_COURT_TAPE_STAT_FIELDS, type FullCourtTapeEvent } from '@hoop-rush/data-contracts';
-import type { FullCourtGameHealthOutcome, FullCourtGameResult } from '@hoop-rush/engine';
+import { FULL_COURT_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
+import type {
+  FullCourtGameHealthOutcome,
+  FullCourtGameResult,
+  FullCourtTapeEvent,
+} from '@hoop-rush/engine';
 
 export type FullCourtPlayedGameOutcome = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
 

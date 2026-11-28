@@ -100,6 +100,43 @@ describe('fixed five career facts', () => {
     expect(fixedFiveAchievementCandidates('p2', oneLoss, entries, null)).toEqual([]);
   });
 
+  test('awards individual stat-line achievements from verified boxes', () => {
+    const game = simulateGame(buildGameSimulationInput(), createEngineContext());
+    const reboundLine = game.away.players[0];
+    if (reboundLine === undefined) throw new Error('Missing test player');
+    const h2h = {
+      ...game,
+      home: { ...game.home, teamId: 'p1' },
+      away: {
+        ...game.away,
+        teamId: 'p2',
+        players: [
+          { ...reboundLine, rebounds: { ...reboundLine.rebounds, total: 30 } },
+          ...game.away.players.slice(1),
+        ],
+      },
+      winner: 'away' as const,
+    };
+    const result: FixedFiveCompetitionResult = {
+      competition: 'duel',
+      games: Array.from({ length: 4 }, (_, index) => ({
+        gameNumber: index + 1,
+        seed: seedSchema.parse(game.seed),
+        winner: 'p2' as const,
+      })),
+      p1Wins: 0,
+      p2Wins: 4,
+      winner: 'p2',
+      stoppedAtGame: 4,
+    };
+    const entries: FixedFiveWorkerResultEntry[] = Array.from({ length: 4 }, (_, index) => ({
+      tag: 'duel',
+      game: { ...h2h, gameNumber: index + 1 },
+    }));
+    const candidates = fixedFiveAchievementCandidates('p2', result, entries, null);
+    expect(candidates.map((candidate) => candidate.id)).toContain('board-man-gets-paid');
+  });
+
   test('awards Dame Time from a verified one-point Game 7', () => {
     const game = simulateGame(buildGameSimulationInput(), createEngineContext());
     const winners = ['p1', 'p2', 'p1', 'p2', 'p1', 'p2', 'p1'] as const;

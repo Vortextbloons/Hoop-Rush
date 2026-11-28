@@ -53,7 +53,6 @@ import {
   createFullCourtNextGamePlanRepository,
   createFullCourtPlayoffRepository,
   createFullCourtSeasonRepository,
-  createFullCourtWatchedReplayRepository,
 } from '@hoop-rush/persistence';
 import {
   DEFAULT_ERA_SIM_PROFILE,
@@ -63,10 +62,6 @@ import {
 import type { Persistence } from '#lib/persistence.js';
 import { FULL_COURT_ACTIVE_RUN_KEY } from './full-court-active-run.ts';
 import { FullCourtController } from './full-court-controller.svelte.ts';
-import {
-  fullCourtWatchedReplayOutcome,
-  fullCourtWatchedReplaySummary,
-} from './full-court-gamecast.ts';
 import type { FullCourtWorkerRunner } from './full-court-worker-runner.ts';
 import { fullCourtWorkerRequestSchema } from './full-court-worker-protocol.ts';
 import {
@@ -129,7 +124,6 @@ function repositoriesFor(db: HoopRushDatabase): Persistence {
     fullCourtBlueprintRepository: createFullCourtBlueprintRepository(db),
     fullCourtCoachingRepository: createFullCourtCoachingRepository(db),
     fullCourtHistoryRepository: createFullCourtHistoryRepository(db),
-    fullCourtWatchedReplayRepository: createFullCourtWatchedReplayRepository(db),
     fullCourtNextGamePlanRepository: createFullCourtNextGamePlanRepository(db),
     profileRepository: new DexieProfileRepository(db),
   };
@@ -278,8 +272,8 @@ async function seedPlayoffReadyDraft(
   return seeded;
 }
 
-describe('FullCourtController durable watched replay', () => {
-  test('persists watched regular-season replay across refresh and quick sims without replacing latest live report', async () => {
+describe('FullCourtController single-game broadcast', () => {
+  test('opens playback for a watched regular-season game and reopens the hub after closing it', async () => {
     installTestEnvironment();
     const { first, second } = openTestDatabasePair('fc-controller-reload');
     const simulateSlotMock = mock<FullCourtWorkerRunner['simulateSlot']>(
@@ -312,27 +306,46 @@ describe('FullCourtController durable watched replay', () => {
       });
       await controller.load();
       expect(controller.error).toBeNull();
-      expect(controller.savedReplay).toBeNull();
+      expect(controller.playback).toBeNull();
       expect(controller.latestGame).toBeNull();
 
-      // Watch game 1 (record: true).
+      // A watched single-game sim opens the broadcast instead of the hub.
       await controller.advance(1, false, true);
       expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
       expect(controller.latestGame?.tape?.length).toBeGreaterThan(0);
-      expect(controller.savedReplay?.identity.slot).toBe(1);
-      expect(controller.savedReplay?.identity.gameSeed).toBe(controller.latestGame?.result.seed);
-      const watchedGameOne = controller.savedReplay;
-      if (watchedGameOne === null) throw new Error('Expected savedReplay after watching game 1');
+      const broadcast = controller.playback;
+      if (broadcast === null) throw new Error('Expected playback after watching game 1');
+      const latest = controller.latestGame;
+      if (latest === null) throw new Error('Expected a published game after watching game 1');
+      expect(broadcast.cursor).toBe(0);
+      expect(broadcast.game.result.seed).toBe(latest.result.seed);
+      expect(broadcast.label).toContain('Game 1');
       expect(simulateSlotMock).toHaveBeenCalledTimes(1);
 
-      // Quick-sim game 2 (record: false): latestGame updates to game 2 summary, savedReplay stays game 1.
+      // Playback owns the screen: a new sim is refused until it is closed.
+      await controller.advance(1, false, false);
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
+      expect(controller.playback).toBe(broadcast);
+      expect(simulateSlotMock).toHaveBeenCalledTimes(1);
+
+      controller.seekPlayback(5);
+      expect(controller.playback?.cursor).toBe(5);
+      // The cursor never jumps backwards from a stale frame.
+      controller.seekPlayback(3);
+      expect(controller.playback?.cursor).toBe(5);
+
+      controller.closePlayback();
+      expect(controller.playback).toBeNull();
+      const watchedGameOne = broadcast.game;
+
+      // Quick-sim game 2 (record: false): no broadcast, latest game has no tape.
       await controller.advance(1, false, false);
       expect(controller.season?.checkpoint.completedThroughSlot).toBe(2);
+      expect(controller.playback).toBeNull();
       expect(controller.latestGame?.tape).toBeNull();
-      expect(controller.latestGame?.result.seed).not.toBe(watchedGameOne.identity.gameSeed);
-      expect(controller.savedReplay).toEqual(watchedGameOne);
+      expect(controller.latestGame?.result.seed).not.toBe(watchedGameOne.result.seed);
 
-      // Forfeit slot 3 (simulated as user forfeit): no replay write, savedReplay remains game 1.
+      // Forfeit slot 3 (simulated as user forfeit): no broadcast either.
       const prevCalls = simulateSlotMock.mock.calls.length;
       simulateSlotMock.mockImplementationOnce((lock, checkpoint) => {
         const normal = simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), {
@@ -358,7 +371,7 @@ describe('FullCourtController durable watched replay', () => {
       await controller.advance(1, true, true);
       expect(controller.season?.checkpoint.completedThroughSlot).toBe(3);
       expect(controller.latestGame).toBeNull();
-      expect(controller.savedReplay).toEqual(watchedGameOne);
+      expect(controller.playback).toBeNull();
       expect(simulateSlotMock).toHaveBeenCalledTimes(prevCalls + 1);
 
       // Simulate browser refresh: close DB, open second connection, fresh controller.
@@ -375,14 +388,8 @@ describe('FullCourtController durable watched replay', () => {
       await reloaded.load();
       expect(reloaded.season?.checkpoint.completedThroughSlot).toBe(3);
       expect(reloaded.latestGame).toBeNull();
-      expect(reloaded.savedReplay).toEqual(watchedGameOne);
-      // Opening saved replay uses stored evidence only and rolls zero possessions.
-      if (reloaded.savedReplay === null) throw new Error('Expected reloaded savedReplay');
-      const rehydrated = fullCourtWatchedReplayOutcome(reloaded.savedReplay);
-      const summary = fullCourtWatchedReplaySummary(reloaded.savedReplay);
-      expect(summary.gameLabel).toBe('Game 1');
-      expect(rehydrated.result).toEqual(watchedGameOne.result);
-      expect(rehydrated.tape).toEqual(watchedGameOne.tape);
+      // Playback is per-game screen state, never a saved second copy of the game.
+      expect(reloaded.playback).toBeNull();
       expect(simulateSlotMock).toHaveBeenCalledTimes(callsBeforeRefresh);
       expect(simulateGameMock).toHaveBeenCalledTimes(0);
 
@@ -395,7 +402,7 @@ describe('FullCourtController durable watched replay', () => {
     }
   });
 
-  test('persists watched playoff replay across refresh', async () => {
+  test('opens the broadcast for a watched playoff game and does not re-simulate on refresh', async () => {
     installTestEnvironment();
     const { first, second } = openTestDatabasePair('fc-controller-playoffs-reload');
     const simulateSlotMock = mock<FullCourtWorkerRunner['simulateSlot']>(
@@ -481,13 +488,17 @@ describe('FullCourtController durable watched replay', () => {
       const gamesBeforeWatch = controller.playoffs?.checkpoint.games.length ?? 0;
       await controller.advance(1, false, true);
       expect(controller.playoffs?.checkpoint.games.length).toBeGreaterThan(gamesBeforeWatch);
-      expect(controller.savedReplay?.identity.phase).toBe('playoff');
-      expect(controller.savedReplay?.identity.runId).toBe(runId);
-      const watchedPlayoff = controller.savedReplay;
-      if (watchedPlayoff === null) throw new Error('Expected playoff savedReplay');
+      const broadcast = controller.playback;
+      if (broadcast === null) throw new Error('Expected playback after watching a playoff game');
+      expect(broadcast.game.tape?.length).toBeGreaterThan(0);
+      expect(broadcast.label).toContain('First round');
+      expect(broadcast.note).toContain('Playoffs');
       const gameCalls = simulateGameMock.mock.calls.length;
 
-      // Refresh and verify playoff savedReplay survives without re-simulating.
+      controller.closePlayback();
+      expect(controller.playback).toBeNull();
+
+      // Refresh: the committed bracket reloads and nothing is re-simulated.
       controller.dispose();
       first.close();
 
@@ -501,7 +512,7 @@ describe('FullCourtController durable watched replay', () => {
       expect(reloaded.playoffs?.checkpoint.games.length).toBe(
         controller.playoffs?.checkpoint.games.length,
       );
-      expect(reloaded.savedReplay).toEqual(watchedPlayoff);
+      expect(reloaded.playback).toBeNull();
       expect(simulateGameMock).toHaveBeenCalledTimes(gameCalls);
       reloaded.dispose();
     } finally {
@@ -983,7 +994,7 @@ describe('FullCourtController durable watched replay', () => {
       expect(JSON.stringify(controller.season?.checkpoint ?? null)).toBe(checkpointBefore);
       expect(controller.season?.scores).toHaveLength(0);
       expect(controller.latestGame).toBeNull();
-      expect(controller.savedReplay).toBeNull();
+      expect(controller.playback).toBeNull();
 
       await controller.runPractice(opponentId);
       expect(controller.practice?.seed).toBe(practiceSeed(2));
@@ -1284,11 +1295,12 @@ test('publishes the committed slot when clearing the pinned game plan fails', as
     expect(controller.error).toBe(clearFailure.message);
     expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
     expect(controller.latestGame).not.toBeNull();
-    expect(controller.savedReplay?.identity.slot).toBe(1);
+    expect(controller.playback?.game.result.seed).toBe(controller.latestGame?.result.seed);
     const durable = await base.fullCourtSeasonRepository.load(lock.season.runId);
     expect(durable?.completedThroughSlot).toBe(1);
 
     // A stale durable plan does not block the next committed slot.
+    controller.closePlayback();
     await controller.advance(1, false, false);
     expect(controller.error).toBeNull();
     expect(controller.season?.checkpoint.completedThroughSlot).toBe(2);

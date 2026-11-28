@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { CAP_RUSH_CONFERENCE_GAMES_PER_TEAM } from './cap-rush-league.ts';
 import { CAP_RUSH_PLAYOFF_ROUNDS, CAP_RUSH_SERIES_WINS } from './cap-rush-postseason.ts';
+import {
+  FULL_COURT_ACHIEVEMENT_IDS,
+  fullCourtAchievementIdSchema,
+} from './full-court-achievements.ts';
 import { fullCourtCoachingPlanSchema } from './full-court-coaching.ts';
 import { fullCourtDraftStateSchema } from './full-court-draft.ts';
 import { idSchema } from './ids.ts';
@@ -83,7 +87,14 @@ export const fullCourtHistoryRecordSchema = z
       seriesWon: z.number().int().min(0).max(CAP_RUSH_PLAYOFF_ROUNDS),
       eliminatedRound: z.number().int().min(1).max(CAP_RUSH_PLAYOFF_ROUNDS).nullable(),
     }),
-    achievements: z.array(z.enum(['bench-mob', 'the-chess-match'])).max(2),
+    achievements: z.array(fullCourtAchievementIdSchema).max(FULL_COURT_ACHIEVEMENT_IDS.length),
+    /**
+     * Evidence is optional so legacy archives remain readable. When present it
+     * must describe a recorded achievement, and profile reveals can reuse it.
+     */
+    achievementEvidence: z
+      .record(fullCourtAchievementIdSchema, z.string().min(1).max(250))
+      .optional(),
   })
   .superRefine((record, context) => {
     if (record.draft.runId !== record.runId || record.draft.stage !== 'complete') {
@@ -125,6 +136,15 @@ export const fullCourtHistoryRecordSchema = z
         path: ['achievements'],
         message: 'History achievements must be unique',
       });
+    }
+    for (const id of Object.keys(record.achievementEvidence ?? {})) {
+      if (!record.achievements.includes(id as (typeof record.achievements)[number])) {
+        context.addIssue({
+          code: 'custom',
+          path: ['achievementEvidence', id],
+          message: 'Achievement evidence requires the matching achievement',
+        });
+      }
     }
   });
 export type FullCourtHistoryRecord = z.infer<typeof fullCourtHistoryRecordSchema>;

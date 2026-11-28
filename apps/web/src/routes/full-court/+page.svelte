@@ -103,15 +103,6 @@
     confirmNewDraft = false;
   }
 
-  /**
-   * Playback owns the screen. The hub stays mounted so the sim that just
-   * finished keeps its own state, but only the broadcast and its Continue show.
-   */
-  function closePlayback(instance: FullCourtController, report: boolean): void {
-    if (report) instance.reportPlayback();
-    else instance.closePlayback();
-  }
-
   async function abandonRun(instance: FullCourtController): Promise<void> {
     await instance.abandonRun();
     if (instance.draft === null) {
@@ -285,7 +276,7 @@
           {art}
           draft={draft ?? null}
           index={current.index ?? null}
-          onclose={() => closePlayback(current, true)}
+          onclose={() => current.closePlayback()}
         />
       {/key}
     {:else if season}

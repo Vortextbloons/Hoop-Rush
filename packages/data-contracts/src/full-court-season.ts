@@ -127,6 +127,37 @@ export const fullCourtGameLineupsSchema = z
   });
 export type FullCourtGameLineups = z.infer<typeof fullCourtGameLineupsSchema>;
 
+export const FULL_COURT_ACHIEVEMENT_FACTS_VERSION = 1;
+
+const injuredPlayerIdsSchema = z
+  .array(z.string().min(1).max(64))
+  .max(12)
+  .refine((ids) => new Set(ids).size === ids.length, 'injured players must be unique');
+
+/**
+ * Compact per-game facts that cannot be reconstructed from the persisted box
+ * score. Kept beside the score so a season can evaluate its achievements
+ * without re-simulating games or retaining a playback tape.
+ */
+export const fullCourtAchievementFactsSchema = z.object({
+  version: z.literal(FULL_COURT_ACHIEVEMENT_FACTS_VERSION),
+  possessions: z.object({
+    home: z.number().int().nonnegative(),
+    away: z.number().int().nonnegative(),
+  }),
+  overtimePeriods: z.number().int().min(0).max(8),
+  largestDeficit: z.object({
+    home: z.number().int().nonnegative(),
+    away: z.number().int().nonnegative(),
+  }),
+  injuredPlayerIds: z.object({
+    home: injuredPlayerIdsSchema,
+    away: injuredPlayerIdsSchema,
+  }),
+  usedDefensiveMatchups: z.boolean().optional(),
+});
+export type FullCourtAchievementFacts = z.infer<typeof fullCourtAchievementFactsSchema>;
+
 const signedSidePointsSchema = z.object({
   home: z.number().int(),
   away: z.number().int(),
@@ -183,6 +214,8 @@ const playedScoreSchema = z
     lineups: fullCourtGameLineupsSchema.optional(),
     /** Compact per-player box stats for season leaders, player averages, and awards. */
     playerStats: fullCourtGamePlayerStatsSchema.optional(),
+    /** Additive facts for season achievements; legacy scores omit them. */
+    achievementFacts: fullCourtAchievementFactsSchema.optional(),
   })
   .superRefine((score, context) => {
     if (score.starterPoints !== undefined && score.benchPoints === undefined) {
@@ -246,6 +279,22 @@ const playedScoreSchema = z
           path: ['benchPoints', side],
           message:
             'Bench scoring and team bonus cannot exceed team scoring without signed starter points',
+        });
+      }
+    }
+    if (score.achievementFacts !== undefined) {
+      if (score.achievementFacts.largestDeficit.home > score.awayPoints) {
+        context.addIssue({
+          code: 'custom',
+          path: ['achievementFacts', 'largestDeficit', 'home'],
+          message: 'The home deficit cannot exceed the away score',
+        });
+      }
+      if (score.achievementFacts.largestDeficit.away > score.homePoints) {
+        context.addIssue({
+          code: 'custom',
+          path: ['achievementFacts', 'largestDeficit', 'away'],
+          message: 'The away deficit cannot exceed the home score',
         });
       }
     }

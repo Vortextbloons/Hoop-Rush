@@ -213,6 +213,16 @@ export const fullCourtGameResultSchema = z
     winner: sideSchema,
     overtimePeriods: z.number().int().min(0).max(8),
     totalSeconds: z.number().positive(),
+    /**
+     * The largest lead each side held at any point. Optional because older
+     * recorded games predate the field; new games always set it.
+     */
+    largestDeficit: z
+      .object({
+        home: z.number().int().nonnegative(),
+        away: z.number().int().nonnegative(),
+      })
+      .optional(),
   })
   .superRefine((result, context) => {
     if (result.home.teamId === result.away.teamId) {

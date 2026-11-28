@@ -28,7 +28,10 @@ function ids(unlocks: readonly { id: string }[]): string[] {
   return unlocks.map((unlock) => unlock.id);
 }
 
-function game(unlockLine: IndividualGamePlayerLine, mode: 'classic' | 'havoc' = 'classic') {
+function game(
+  unlockLine: IndividualGamePlayerLine,
+  mode: 'classic' | 'sandbox' | 'multiplayer' | 'cap-rush' | 'full-court' | 'havoc' = 'classic',
+) {
   return evaluateIndividualGameAchievements({ mode, players: [unlockLine] });
 }
 
@@ -156,28 +159,26 @@ describe('individual game achievements', () => {
   it('awards the 81 and 100 point games', () => {
     expect(ids(game(line({ points: 81 })))).toContain('kobes-revenge');
     expect(ids(game(line({ points: 81 })))).not.toContain('wilt-was-here');
-    expect(ids(game(line({ points: 100 })))).toEqual(
-      expect.arrayContaining(['kobes-revenge', 'wilt-was-here']),
-    );
+    const wilt = ids(game(line({ points: 100 })));
+    expect(wilt).toContain('kobes-revenge');
+    expect(wilt).toContain('wilt-was-here');
   });
 
-  it('does not award individual lines in Havoc', () => {
-    expect(
-      ids(
-        game(
-          line({
-            points: 100,
-            rebounds: { total: 30, offensive: 15 },
-            assists: 20,
-            steals: 10,
-            blocks: 10,
-            threes: { made: 12, attempted: 20 },
-            rim: { made: 10, attempted: 12 },
-          }),
-          'havoc',
-        ),
-      ),
-    ).toEqual([]);
+  it('does not award individual lines outside standard-sim modes', () => {
+    const prolific = line({
+      points: 100,
+      rebounds: { total: 30, offensive: 15 },
+      assists: 20,
+      steals: 10,
+      blocks: 10,
+      threes: { made: 12, attempted: 20 },
+      rim: { made: 10, attempted: 12 },
+    });
+    for (const mode of ['havoc', 'cap-rush', 'full-court'] as const) {
+      expect(ids(game(prolific, mode))).toEqual([]);
+    }
+    expect(ids(game(prolific, 'sandbox'))).toContain('wilt-was-here');
+    expect(ids(game(prolific, 'multiplayer'))).toContain('wilt-was-here');
   });
 });
 

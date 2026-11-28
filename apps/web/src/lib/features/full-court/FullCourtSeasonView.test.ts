@@ -575,9 +575,10 @@ test('renders notable moments on latest result and stats tab when player stats t
     checkpoint: { ...opened, completedThroughSlot: 1 },
     scores: [score],
   });
-  expect(homeBody).toContain('aria-label="Latest game notable moments"');
-  expect(homeBody).toContain('40-Point Triple-Double');
-  expect(homeBody).toContain(star.displayName);
+  // The latest-result panel is the compact scoreline; the gamecast owns the
+  // per-game moments so the hub never repeats the game that just played.
+  expect(homeBody).toContain('Latest Full Court result');
+  expect(homeBody).not.toContain('aria-label="Latest game notable moments"');
 
   const statsBody = renderView({
     section: 'stats',

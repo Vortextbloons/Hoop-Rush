@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
 import type { FullCourtCoachingRule } from '@hoop-rush/data-contracts';
-import { buildFullCourtWatchedReplay } from '@hoop-rush/application/full-court';
 import {
   buildFullCourtGameReport,
   createEngineContext,
@@ -18,11 +17,10 @@ import FullCourtGamecast from './FullCourtGamecast.svelte';
 import {
   fullCourtBestLineup,
   fullCourtGamecastFrames,
+  fullCourtLiveBoxFold,
   fullCourtPossessionCursor,
   fullCourtRotationSummary,
   fullCourtSubstitutionReasonLabel,
-  fullCourtWatchedReplayOutcome,
-  fullCourtWatchedReplaySummary,
 } from './full-court-gamecast.ts';
 import { fullCourtTestSeasonLock } from './full-court-test-support.ts';
 
@@ -110,13 +108,14 @@ test('shows a named unit only when the recorded five matches', () => {
     props: {
       game: { kind: 'played', result, tape, health, injuries: [] },
       userTeamId: season.userTeamId,
-      onClose: () => {},
+      label: 'Game 1 of 82',
+      onclose: () => {},
     },
   }).body;
   expect(body).toContain('Opening Five');
-  expect(body.match(/active five"/g)).toHaveLength(2);
   expect(body).toContain('Next possession');
   expect(body).toContain('Play-by-play feed');
+  expect(body).toContain('Game 1 of 82');
 });
 
 test('records coaching-rule substitutions in the same order as the summary', () => {
@@ -206,7 +205,7 @@ test('captions simultaneous split scoring from signed tape events', () => {
   expect(frames[2]?.caption).toBe(`${result.home.displayName} loses 1 point`);
 });
 
-test('rehydrates a saved watched replay into Gamecast from tipoff without rolling possessions', () => {
+test('opens the broadcast at tipoff and folds per-player lines as the cursor advances', () => {
   const { season } = fullCourtTestSeasonLock();
   const fixture = season.games.find(
     (game) => game.homeTeamId === season.userTeamId || game.awayTeamId === season.userTeamId,
@@ -215,67 +214,77 @@ test('rehydrates a saved watched replay into Gamecast from tipoff without rollin
   const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
   const { result, tape } = simulateRecordedFullCourtGame(input, createEngineContext());
   const userSide = fixture.homeTeamId === season.userTeamId ? 'home' : 'away';
-  const replay = buildFullCourtWatchedReplay({
-    phase: 'regular',
-    runId: season.runId,
-    seasonLockDigest: season.runSeed,
-    lockDigest: season.runSeed,
-    gameId: fixture.gameId,
-    slot: fixture.slot,
-    dayOffset: fixture.dayOffset,
-    userTeamId: season.userTeamId,
-    game: {
-      kind: 'played',
-      result,
-      tape,
-      health: {
-        home: {
-          version: 'full-court-health-v1',
-          teamId: fixture.homeTeamId,
-          throughDay: fixture.dayOffset,
-          players: {},
-        },
-        away: {
-          version: 'full-court-health-v1',
-          teamId: fixture.awayTeamId,
-          throughDay: fixture.dayOffset,
-          players: {},
-        },
+  const game = {
+    kind: 'played' as const,
+    result,
+    tape,
+    health: {
+      home: {
+        version: 'full-court-health-v1' as const,
+        teamId: fixture.homeTeamId,
+        throughDay: fixture.dayOffset,
+        players: {},
       },
-      injuries: [],
+      away: {
+        version: 'full-court-health-v1' as const,
+        teamId: fixture.awayTeamId,
+        throughDay: fixture.dayOffset,
+        players: {},
+      },
     },
-  });
+    injuries: [],
+  };
 
-  const summary = fullCourtWatchedReplaySummary(replay);
-  expect(summary.gameId).toBe(fixture.gameId);
-  expect(summary.gameLabel).toBe('Game 1');
-  expect(summary.replayNote).toContain('Starts from tipoff');
+  // The tape carries per-player deltas so a broadcast can show a live box.
+  const tripDeltas = tape.flatMap((event) => (event.kind === 'trip' ? [event.deltas] : []));
+  expect(tripDeltas.some((deltas) => deltas !== undefined)).toBe(true);
 
-  const outcome = fullCourtWatchedReplayOutcome(replay);
-  expect(outcome.result).toEqual(result);
-  expect(outcome.tape).toEqual(tape);
+  const fold = fullCourtLiveBoxFold(game);
+  expect(fold.linesAt(0).home.every((line) => line.points === 0)).toBe(true);
+
+  // Halfway through, the live lines are a strict prefix of the final box.
+  const halfway = fold.linesAt(Math.floor(tape.length / 2));
+  const finalLines = fold.linesAt(tape.length);
+  for (const [index, line] of finalLines.home.entries()) {
+    expect(halfway.home[index]?.points ?? 0).toBeLessThanOrEqual(line.points);
+  }
+  expect(finalLines.home.reduce((total, line) => total + line.points, 0)).toBe(
+    result.home.box.points,
+  );
+  expect(finalLines.away.reduce((total, line) => total + line.points, 0)).toBe(
+    result.away.box.points,
+  );
+  // A backward seek rebuilds identically instead of drifting.
+  expect(fold.linesAt(1).home.map((line) => line.points)).toEqual(
+    fullCourtLiveBoxFold(game)
+      .linesAt(1)
+      .home.map((line) => line.points),
+  );
 
   const report = buildFullCourtGameReport({
     kind: 'played',
     gameId: fixture.gameId,
     userSide,
-    result: outcome.result,
-    tape: outcome.tape ?? [],
+    result,
+    tape,
   });
   expect(report.status).toBe('played');
 
   const body = render(FullCourtGamecast, {
     props: {
-      game: outcome,
+      game,
       userTeamId: season.userTeamId,
-      replayNote: summary.replayNote,
-      onClose: () => {},
+      label: 'Game 1 of 82',
+      note: 'vs Opponent',
+      onclose: () => {},
     },
   }).body;
-  expect(body).toContain('Gamecast');
-  expect(body).toContain('Starts from tipoff');
+  expect(body).toContain('Full Court gamecast');
+  expect(body).toContain('Game 1 of 82');
+  expect(body).toContain('vs Opponent');
   expect(body).toContain('Skip to final');
   expect(body).toContain('Pause');
+  expect(body).toContain('Skip and continue');
 });
 
 test('summarizes the recorded rotation and qualifies its lineups for the recap', () => {
@@ -342,7 +351,8 @@ test('renders full Cap Rush style box scores and team totals when finished', () 
     props: {
       game: { kind: 'played', result, tape: null, health, injuries: [] },
       userTeamId: season.userTeamId,
-      onClose: () => {},
+      label: 'Game 1 of 82',
+      onclose: () => {},
     },
   }).body;
 

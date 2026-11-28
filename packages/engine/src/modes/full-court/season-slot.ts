@@ -303,6 +303,7 @@ function checkedScoreFor(
   game: FullCourtGameHealthOutcome,
   isUserGame: boolean,
   userLineups: ReturnType<typeof buildFullCourtGameLineupsFromFacts> | undefined,
+  usedDefensiveMatchups = false,
 ): FullCourtSeasonScore {
   if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
   if (game.kind === 'played') {
@@ -315,7 +316,9 @@ function checkedScoreFor(
   }
   return fullCourtSeasonScoreSchema.parse({
     ...fixture,
-    outcome: fullCourtScoreOutcome(game, isUserGame, userLineups, true),
+    outcome: fullCourtScoreOutcome(game, isUserGame, userLineups, true, {
+      usedDefensiveMatchups,
+    }),
   });
 }
 
@@ -340,7 +343,20 @@ export function simulateFullCourtUserSlot(
     return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
   }
   const userLineups = userLineupsOf(userGame, userFixture.gameId, userSide);
-  const userScore = checkedScoreFor(userFixture, userGame, true, userLineups);
+  const opponentTeamId = userSide === 'home' ? userFixture.awayTeamId : userFixture.homeTeamId;
+  const usedDefensiveMatchups =
+    fixtureFullCourtDefensiveMatchups(
+      options.defensiveMatchups,
+      userFixture.gameId,
+      opponentTeamId,
+    ) !== undefined;
+  const userScore = checkedScoreFor(
+    userFixture,
+    userGame,
+    true,
+    userLineups,
+    usedDefensiveMatchups,
+  );
   return {
     kind: 'user-ready',
     slot,
@@ -407,6 +423,13 @@ export function simulateFullCourtSeasonSlot(
     return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
   }
   const userLineups = userLineupsOf(userGame, userFixture.gameId, userSide);
+  const opponentTeamId = userSide === 'home' ? userFixture.awayTeamId : userFixture.homeTeamId;
+  const usedDefensiveMatchups =
+    fixtureFullCourtDefensiveMatchups(
+      options.defensiveMatchups,
+      userFixture.gameId,
+      opponentTeamId,
+    ) !== undefined;
 
   const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
   const scores = entries.map((fixture) => {
@@ -417,7 +440,13 @@ export function simulateFullCourtSeasonSlot(
     if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
     healthByTeam[fixture.homeTeamId] = game.health.home;
     healthByTeam[fixture.awayTeamId] = game.health.away;
-    return checkedScoreFor(fixture, game, isUser, isUser ? userLineups : undefined);
+    return checkedScoreFor(
+      fixture,
+      game,
+      isUser,
+      isUser ? userLineups : undefined,
+      isUser && usedDefensiveMatchups,
+    );
   });
   return {
     kind: 'simulated',

@@ -346,6 +346,37 @@ describe('full court determinism and recording', () => {
     expect(substitutions.length).toBeGreaterThan(0);
   });
 
+  it('records per-player deltas that reconcile with the final box', () => {
+    const input = fullCourtTestInput({
+      seed: 'tape-deltas',
+      homeRoster: fullCourtTestRoster('delta', 10),
+      awayRoster: fullCourtTestRoster('delta-away', 10),
+    });
+    const { result, tape } = simulateRecordedFullCourtGame(input, ctx);
+    const trips = tape.filter((event) => event.kind === 'trip');
+    expect(trips.every((event) => event.deltas !== undefined)).toBe(true);
+    const totals = new Map<string, number[]>();
+    for (const trip of trips) {
+      for (const delta of trip.deltas ?? []) {
+        const line = totals.get(delta.playerId) ?? [];
+        for (const [index, value] of delta.line.entries()) {
+          line[index] = (line[index] ?? 0) + value;
+        }
+        totals.set(delta.playerId, line);
+      }
+    }
+    for (const team of [result.home, result.away]) {
+      for (const player of team.players) {
+        const line = totals.get(player.playerId) ?? [];
+        expect(line[0] ?? 0).toBe(player.points);
+        expect(line[1] ?? 0).toBe(player.fieldGoals.made);
+        expect(line[2] ?? 0).toBe(player.fieldGoals.attempted);
+        expect(line[9] ?? 0).toBe(player.assists);
+        expect(line[13] ?? 0).toBe(player.fouls);
+      }
+    }
+  });
+
   it('keeps legacy results when a plan carries no rules', () => {
     const roster = fullCourtTestRoster('no-rules', 9);
     const baseline = simulateFullCourtGame(

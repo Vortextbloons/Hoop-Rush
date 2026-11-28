@@ -231,6 +231,11 @@ export interface FullCourtGameResult {
   readonly overtimePeriods: number;
   /** Live seconds elapsed in the game. */
   readonly totalSeconds: number;
+  /**
+   * Largest lead each side held at any point. Optional on legacy recorded
+   * results that predate the field.
+   */
+  readonly largestDeficit?: { readonly home: number; readonly away: number };
 }
 
 export type FullCourtTapeEvent =
@@ -859,6 +864,8 @@ export function runFullCourtGame(
   let offense = openingTipWinner;
   let globalSeconds = 0;
   let period = 0;
+  /** Largest lead each side held at any point, tracked from live scoring. */
+  const largestDeficit = { home: 0, away: 0 };
 
   for (;;) {
     if (period > 0) {
@@ -940,6 +947,9 @@ export function runFullCourtGame(
       globalSeconds += secondsElapsed;
       chargeTime(runtimes, secondsElapsed, effects);
       const foulCharges = refreshFouls(runtimes, ctx);
+      const margin = recorder.sides[0].points - recorder.sides[1].points;
+      if (margin > largestDeficit.home) largestDeficit.home = margin;
+      else if (-margin > largestDeficit.away) largestDeficit.away = -margin;
 
       if (tape !== null && homeUnit !== null && awayUnit !== null) {
         const deltas = tripDeltas?.capture(recorder);
@@ -1044,6 +1054,7 @@ export function runFullCourtGame(
     winner: homeScore > awayScore ? 'home' : 'away',
     overtimePeriods,
     totalSeconds: globalSeconds,
+    largestDeficit,
   };
   return { result, tape, lineupFacts: lineupFacts?.finish(result) ?? null };
 }
@@ -1626,6 +1637,17 @@ export function checkFullCourtGameResult(result: FullCourtGameResult): string[] 
       failures.push(
         `${side} period scores (${String(total)}) != ${side} points (${String(result[side].box.points)})`,
       );
+    }
+  }
+  if (result.largestDeficit !== undefined) {
+    if (result.largestDeficit.home < 0 || result.largestDeficit.away < 0) {
+      failures.push('largest deficit cannot be negative');
+    }
+    if (result.largestDeficit.home > result.away.box.points) {
+      failures.push('home largest deficit exceeds the away score');
+    }
+    if (result.largestDeficit.away > result.home.box.points) {
+      failures.push('away largest deficit exceeds the home score');
     }
   }
   if (result.home.box.points === result.away.box.points) {

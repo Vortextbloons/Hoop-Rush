@@ -159,6 +159,16 @@
         : 'Opponent ball',
   );
 
+  /** The recorded five on the floor right now, in home/away terms. */
+  const onCourt = $derived({
+    local: homeIsUser ? (frame?.homeUnit ?? []) : (frame?.awayUnit ?? []),
+    opponent: homeIsUser ? (frame?.awayUnit ?? []) : (frame?.homeUnit ?? []),
+  });
+  const userUnitName = $derived(unitNameFor(game.result[userSide], onCourt.local));
+  const opponentUnitName = $derived(
+    unitNameFor(game.result[homeIsUser ? 'away' : 'home'], onCourt.opponent),
+  );
+
   const FEED_TAIL = 16;
   const feed = $derived.by((): BroadcastFeedRow[] => {
     const rows: BroadcastFeedRow[] = [];
@@ -383,7 +393,7 @@
       {/if}
 
       <div class="bc-panels mt-3">
-        {#each [{ box: userBox, side: 'local' as const, top: topUserPoints }, { box: opponentBox, side: 'opponent' as const, top: topOpponentPoints }] as side (side.side)}
+        {#each [{ box: userBox, side: 'local' as const, top: topUserPoints, unit: userUnitName }, { box: opponentBox, side: 'opponent' as const, top: topOpponentPoints, unit: opponentUnitName }] as side (side.side)}
           <section
             class="bc-panel"
             aria-label={`${side.side === 'local' ? 'You' : 'Opponent'} player stats`}
@@ -392,6 +402,9 @@
               <span class="bc-panel-team" data-side={side.side}>
                 {side.side === 'local' ? 'You' : 'Opponent'}
               </span>
+              {#if side.unit !== null}
+                <span class="bc-unit">{side.unit}</span>
+              {/if}
               <strong class="bc-panel-score"
                 >{side.side === 'local' ? userScore : opponentScore}</strong
               >
@@ -654,8 +667,12 @@
     font-weight: 600;
     color: var(--color-muted-foreground);
   }
-  .bc-feed-list,
-  .bc-feed-empty {
-    height: 236px;
+  .bc-unit {
+    margin-left: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    text-transform: uppercase;
   }
 </style>

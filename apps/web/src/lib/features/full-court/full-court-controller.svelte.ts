@@ -51,7 +51,6 @@ import {
   type FullCourtPlayoffLock,
   type FullCourtPlayoffOpponentPreview,
   type FullCourtSeasonLock,
-  type FullCourtUserFixture,
 } from '@hoop-rush/engine';
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
@@ -800,15 +799,8 @@ export class FullCourtController {
     this.playback = { ...playback, cursor };
   }
 
-  /** Ends the broadcast and returns to the hub, or keeps it open as a report. */
+  /** Ends the broadcast and returns to the hub; the game stays in `latestGame`. */
   closePlayback(): void {
-    this.playback = null;
-  }
-
-  reportPlayback(): void {
-    const playback = this.playback;
-    if (playback === null) return;
-    this.latestGame = playback.game;
     this.playback = null;
   }
 

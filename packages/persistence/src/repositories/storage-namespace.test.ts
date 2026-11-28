@@ -249,23 +249,25 @@ describe('storage namespace', () => {
     current.close();
   });
 
-  it('upgrades version 23 and keeps the watched replay while adding next-game plans', async () => {
+  it('upgrades version 23 without dropping its leftover rows while adding next-game plans', async () => {
     resetIndexedDb();
     const name = testDatabaseName('v23-upgrade');
     const old = new Dexie(name);
     old.version(23).stores(HOOP_RUSH_DATABASE_STORES_V23);
-    const replayRow = {
+    // The v23 watched-replay table is no longer read or written; the upgrade
+    // must still leave any existing row in place rather than wiping it.
+    const legacyRow = {
       saveSchemaVersion: 1,
       runId: 'saved-replay',
       replay: { identity: { runId: 'saved-replay', gameId: 'crl-01-bos-nyk' } },
     };
-    await old.table('fullCourtWatchedReplays').put(replayRow);
+    await old.table('fullCourtWatchedReplays').put(legacyRow);
     old.close();
 
     const current = new HoopRushDatabase(name);
     await current.open();
     expect(current.verno).toBe(24);
-    expect(await current.table('fullCourtWatchedReplays').get('saved-replay')).toEqual(replayRow);
+    expect(await current.table('fullCourtWatchedReplays').get('saved-replay')).toEqual(legacyRow);
     expect(await current.fullCourtNextGamePlans.count()).toBe(0);
     current.close();
   });

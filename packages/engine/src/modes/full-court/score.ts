@@ -1,4 +1,5 @@
 import type {
+  FullCourtAchievementFacts,
   FullCourtGameLineups,
   FullCourtGamePlayerStats,
   FullCourtPlayerGameStats,
@@ -56,11 +57,37 @@ function benchPlayers(team: FullCourtTeamResult): number {
   ).length;
 }
 
+export interface FullCourtScoreOptions {
+  /** True only for a user game where defensive matchups were actually assigned. */
+  readonly usedDefensiveMatchups?: boolean;
+}
+
+function achievementFactsOf(
+  game: Extract<FullCourtGameHealthOutcome, { kind: 'played' }>,
+  options: FullCourtScoreOptions,
+): FullCourtAchievementFacts | undefined {
+  if (game.availability === undefined) return undefined;
+  const { home, away } = game.result;
+  const injured = (side: 'home' | 'away'): string[] =>
+    game.availability?.[side]
+      .filter((entry) => !entry.available && entry.reason === 'injury')
+      .map((entry) => entry.playerId) ?? [];
+  return {
+    version: 1,
+    possessions: { home: home.box.possessions, away: away.box.possessions },
+    overtimePeriods: game.result.overtimePeriods,
+    largestDeficit: game.result.largestDeficit ?? { home: 0, away: 0 },
+    injuredPlayerIds: { home: injured('home'), away: injured('away') },
+    ...(options.usedDefensiveMatchups === true && { usedDefensiveMatchups: true }),
+  };
+}
+
 export function fullCourtScoreOutcome(
   game: Exclude<FullCourtGameHealthOutcome, { kind: 'rest-conflict' }>,
   retainBenchPoints: boolean,
   lineups?: FullCourtGameLineups,
   retainPlayerStats = false,
+  options: FullCourtScoreOptions = {},
 ): FullCourtSeasonScore['outcome'] {
   if (game.kind === 'forfeit') return { kind: 'forfeit', losingSides: [...game.sides] };
   const { home, away } = game.result;
@@ -74,6 +101,7 @@ export function fullCourtScoreOutcome(
         away: teamPlayerStats(away),
       }
     : undefined;
+  const achievementFacts = achievementFactsOf(game, options);
   return {
     kind: 'played',
     homePoints: home.box.points,
@@ -87,5 +115,6 @@ export function fullCourtScoreOutcome(
     }),
     ...(lineups !== undefined && { lineups }),
     ...(playerStats !== undefined && { playerStats }),
+    ...(achievementFacts !== undefined && { achievementFacts }),
   };
 }

@@ -92,6 +92,7 @@ export * from './full-court-matchups.ts';
 export * from './full-court-next-game-plan.ts';
 export * from './full-court-draft.ts';
 export * from './full-court-health.ts';
+export * from './full-court-achievements.ts';
 export * from './full-court-history.ts';
 export * from './full-court-preparation.ts';
 export * from './full-court-tape.ts';

@@ -8,9 +8,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   evaluateIndividualGameAchievements,
+  evaluateIndividualSeasonAchievements,
   evaluateSeriesAchievements,
   evaluateSharedSeasonAchievements,
   individualGameLineFromBoxScore,
+  type IndividualGamePlayerLine,
   type SeriesAchievementFacts,
 } from '@hoop-rush/engine';
 import { fixedFiveRepository } from './fixed-five-repo.js';
@@ -95,6 +97,49 @@ function fixedFiveSeriesFacts(
   };
 }
 
+function fixedFiveSeasonPlayerFacts(
+  games: readonly { players: readonly IndividualGamePlayerLine[] }[],
+) {
+  const totals = new Map<
+    string,
+    {
+      displayName: string | null;
+      gamesPlayed: number;
+      points: number;
+      rebounds: number;
+      assists: number;
+      fieldGoalsAttempted: number;
+    }
+  >();
+  for (const game of games) {
+    for (const line of game.players) {
+      const current = totals.get(line.playerId) ?? {
+        displayName: line.displayName,
+        gamesPlayed: 0,
+        points: 0,
+        rebounds: 0,
+        assists: 0,
+        fieldGoalsAttempted: 0,
+      };
+      current.gamesPlayed += 1;
+      current.points += line.points;
+      current.rebounds += line.rebounds.total;
+      current.assists += line.assists;
+      current.fieldGoalsAttempted += line.fieldGoals.attempted;
+      totals.set(line.playerId, current);
+    }
+  }
+  return [...totals.entries()].map(([playerId, total]) => ({
+    playerId,
+    displayName: total.displayName ?? playerId,
+    gamesPlayed: total.gamesPlayed,
+    points: total.points,
+    rebounds: total.rebounds,
+    assists: total.assists,
+    fieldGoals: { made: 0, attempted: total.fieldGoalsAttempted },
+  }));
+}
+
 export function fixedFiveAchievementCandidates(
   participant: 'p1' | 'p2',
   result: FixedFiveCompetitionResult,
@@ -126,6 +171,16 @@ export function fixedFiveAchievementCandidates(
       new Set(result.participants.map((entry) => entry.participantId)).size === 2;
     return [
       ...individual,
+      ...evaluateIndividualSeasonAchievements({
+        mode: 'multiplayer',
+        players: fixedFiveSeasonPlayerFacts(
+          careerFacts.map((game) => ({
+            players: game.players.map((line) =>
+              individualGameLineFromBoxScore(line, displayNames.get(line.playerId) ?? null),
+            ),
+          })),
+        ),
+      }),
       ...evaluateSharedSeasonAchievements({
         wins: summary.wins,
         losses: summary.losses,

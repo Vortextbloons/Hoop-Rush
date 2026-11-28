@@ -35,7 +35,10 @@ Record-level schemas live here; domain schemas live in
   blueprints live in `fullCourtBlueprints` (keyed by trimmed/NFC
   case-insensitive name `key`), and the pinned next-game rest and defensive
   matchup plan lives in `fullCourtNextGamePlans` (key `runId`). A guarded clear
-  compares the stored plan's fixture id before deleting.
+  compares the stored plan's fixture id before deleting. The version-23
+  `fullCourtWatchedReplays` table is retired: a watched single game is replayed
+  from the tape returned by the simulation worker, and the recorder keeps no
+  second stored copy of a game.
 - **Record envelopes**: every stored record carries its domain
   `saveSchemaVersion`. Readers raise unsupported-version errors through the
   mode's load error; never silently delete or rewrite a record on read.

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FULL_COURT_ACHIEVEMENT_IDS } from './full-court-achievements.ts';
 
 export const PROFILE_SAVE_SCHEMA_VERSION = 1;
 export const legacyAchievementIdSchema = z.enum([
@@ -70,6 +71,7 @@ export const collectionAchievementIdSchema = z.enum([
   'moneyball-champions',
   'season-sweep',
   'the-finals-rematch',
+  ...FULL_COURT_ACHIEVEMENT_IDS,
 ]);
 export const achievementIdSchema = z.enum([
   ...legacyAchievementIdSchema.options,

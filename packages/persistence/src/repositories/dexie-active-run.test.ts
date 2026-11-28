@@ -167,6 +167,58 @@ describe('dexie active run save/load round-trip', () => {
     expect((await repo.loadActiveRun())?.run.games).toHaveLength(0);
   });
 
+  it('awards individual stat-line achievements from an appended game', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('dexie-individual-achievement'));
+    try {
+      const repo = new DexieChallengeRepository(db);
+      const profiles = new DexieProfileRepository(db);
+      const context = createEngineContext();
+      const playerProfile = buildGameSimulationInput().profile;
+      const fixture = buildChallengeRun({ runId: 'individual-run' });
+      const base = {
+        ...fixture,
+        versions: { ...fixture.versions, engineVersion: context.engineVersion },
+      };
+      const bindingId = `challenge:${base.runId}`;
+      await profiles.initialize(crypto.randomUUID());
+      await profiles.bind(bindingId);
+      await repo.saveActiveRun({
+        recordId: 'active',
+        saveSchemaVersion: 2,
+        run: base,
+        updatedAtIso: '2026-01-01T00:00:00.000Z',
+      });
+      const result = simulateGame(createGameInput(base, playerProfile, 1), context);
+      const reboundLine = result.home.players[0];
+      if (reboundLine === undefined) throw new Error('Missing test player');
+      const individualResult = {
+        ...result,
+        home: {
+          ...result.home,
+          players: [
+            { ...reboundLine, rebounds: { ...reboundLine.rebounds, total: 30 } },
+            ...result.home.players.slice(1),
+          ],
+        },
+      };
+      const current = acceptGameResult(base, individualResult);
+      await repo.appendActiveGames([
+        {
+          runId: base.runId,
+          gameNumber: 1,
+          result: individualResult,
+          aggregates: current.aggregates,
+          status: 'active',
+          firstLossGameNumber: current.firstLossGameNumber,
+        },
+      ]);
+      expect(await profiles.listUnlocks(bindingId)).toContain('board-man-gets-paid');
+    } finally {
+      db.close();
+    }
+  });
+
   it('records a season achievement when promoting the accepted result', async () => {
     resetIndexedDb();
     const db = new TestDatabase(testDatabaseName('dexie-season-achievement'));

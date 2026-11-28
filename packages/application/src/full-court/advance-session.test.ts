@@ -201,7 +201,7 @@ function observer(overrides: Partial<FullCourtAdvanceObserver> = {}) {
     progress: (completed, total) => progress.push({ completed, total }),
     seasonCommitted: () => {},
     playoffsCommitted: () => {},
-    publishedGame: (game) => published.push(game?.result.seed ?? null),
+    publishedGame: (game) => published.push(game === null ? null : 'played'),
     clearGamePlan: (input) => {
       cleared.push({ gameId: input.gameId });
       return Promise.resolve();

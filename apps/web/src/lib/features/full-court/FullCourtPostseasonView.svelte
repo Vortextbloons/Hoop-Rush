@@ -35,7 +35,6 @@
     type FullCourtSimulationNotice,
   } from './full-court-season-presenter.js';
   import {
-    buildFullCourtNotableMoments,
     fullCourtUserNextPlayoffMatchup,
     type FullCourtSeasonLock,
     type FullCourtStandings,
@@ -176,16 +175,6 @@
     userPlayoffPreview?.adaptation == null
       ? null
       : fullCourtPlayoffAdaptationRead(userPlayoffPreview.adaptation),
-  );
-  const playoffMoments = $derived(
-    playoff === null
-      ? null
-      : buildFullCourtNotableMoments({
-          teams: lock.season.teams,
-          userTeamId,
-          regularScores: [],
-          series: playoff.series,
-        }),
   );
 
   function teamName(teamId: string): string {
@@ -449,7 +438,6 @@
       {#if userSeriesGames.length > 0}
         <ol class="mt-4 flex flex-col gap-1.5" aria-label="Games in your playoff series">
           {#each [...userSeriesGames].reverse() as game, index (game.gameId)}
-            {@const topMoment = playoffMoments?.byGameId.get(game.gameId)?.[0] ?? null}
             <PlayoffGameRow
               ordinal={game.gameOrdinal}
               home={game.userHome}
@@ -463,20 +451,6 @@
               {/snippet}
               {#if game.forfeit}
                 <span class="font-mono text-[8px] text-muted-foreground uppercase">Forfeit</span>
-              {/if}
-              {#if topMoment !== null}
-                <span class="w-full text-[11px] text-muted-foreground">
-                  <strong
-                    class={topMoment.tier === 'historic'
-                      ? 'text-accent'
-                      : topMoment.isUserPlayerOrTeam
-                        ? 'text-primary'
-                        : 'text-foreground'}
-                  >
-                    {topMoment.headline}
-                  </strong>
-                  · {topMoment.playerName ?? topMoment.teamName} ({topMoment.statLine})
-                </span>
               {/if}
             </PlayoffGameRow>
           {/each}
