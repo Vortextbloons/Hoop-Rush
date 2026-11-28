@@ -19,10 +19,11 @@
   import {
     fullCourtAssessPurchase,
     fullCourtSalaryDollarsOf,
+    fullCourtScoutPlayer,
     type FullCourtCatalogIndex,
   } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, ChevronDown, Eye, FileSearch, Lock, Users, X } from '@lucide/svelte';
+  import { Check, ChevronDown, FileSearch, Lock, Users, X } from '@lucide/svelte';
   import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
   import type { ProfileTab } from '#lib/components/PlayerProfileSheet.svelte';
@@ -46,7 +47,6 @@
     bucketLabel,
     capStatusClass,
     capStatusLabel,
-    capStatusShortLabel,
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import { loadFullCourtArt, type FullCourtArt } from './full-court-art.js';
@@ -65,8 +65,9 @@
   } from './full-court-draft-presentation.js';
   import FullCourtDraftCard from './FullCourtDraftCard.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtRating from './FullCourtRating.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
-  import FullCourtScoutDialog from './FullCourtScoutDialog.svelte';
+  import FullCourtScoutReport from './FullCourtScoutReport.svelte';
 
   let {
     draft,
@@ -104,7 +105,6 @@
   let expandedCardIds = $state<Record<string, boolean>>({});
   let profileVersionId = $state<string | null>(null);
   let profileTab = $state<ProfileTab>('details');
-  let scoutVersionId = $state<string | null>(null);
 
   onMount(() => {
     let mounted = true;
@@ -199,13 +199,6 @@
         .map((report) => [fullCourtReportTargetKey(report.target), report]),
     ),
   );
-  const selectedScout = $derived.by(() => {
-    if (scoutVersionId === null) return null;
-    const player = index.byVersionId.get(scoutVersionId);
-    if (player === undefined) return null;
-    const record = scoutRecordFor(player.playerVersionId) ?? null;
-    return record === null ? null : { player, record };
-  });
   const selectedProfile = $derived.by(() => {
     if (profileVersionId === null) return null;
     const player = index.byVersionId.get(profileVersionId);
@@ -249,6 +242,8 @@
   }
 
   function toggleCardExpanded(versionId: string): void {
+    // Playstyle is paid information: the reveal stays shut until this player is scouted.
+    if (scoutRecordFor(versionId) === null) return;
     expandedCardIds = {
       ...expandedCardIds,
       [versionId]: !expandedCardIds[versionId],
@@ -330,11 +325,6 @@
     onPurchaseReport({ kind: 'player-scouting', playerVersionId: player.playerVersionId });
   }
 
-  function openScoutReport(player: CapRushSourcePlayer): void {
-    if (scoutRecordFor(player.playerVersionId) === null) return;
-    scoutVersionId = player.playerVersionId;
-  }
-
   function rowActionLabel(row: FullCourtCatalogRow): string {
     if (row.onRoster) return 'Signed';
     if (row.playerRostered) return 'Rostered';
@@ -408,11 +398,7 @@
   </header>
 
   <div class="mt-4 space-y-3">
-    <Panel
-      as="section"
-      class="px-4 py-2.5 sm:px-5 sm:py-3"
-      aria-label="Draft payroll and War Chest"
-    >
+    <Panel as="section" class="px-4 py-2.5 sm:px-5 sm:py-3" aria-label="Draft payroll and budget">
       <div
         class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
       >
@@ -541,11 +527,13 @@
                       >
                         {player.displayName}
                       </button>
-                      <span
-                        class="shrink-0 font-mono text-[10px] font-bold text-muted-foreground tabular-nums"
-                        aria-label={`Overall ${String(player.originalOverall)}`}
-                        >{player.originalOverall}</span
-                      >
+                      <span class="shrink-0">
+                        <FullCourtRating
+                          value={player.originalOverall}
+                          size="sm"
+                          layout="stacked"
+                        />
+                      </span>
                     </div>
                     <p
                       class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[8px] text-muted-foreground"
@@ -580,19 +568,36 @@
 
               <button
                 type="button"
-                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5"
-                aria-expanded={expanded}
+                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] uppercase outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5 {scoutRecord ===
+                null
+                  ? 'cursor-not-allowed border-line-soft/70 bg-surface-1/60 text-muted-foreground'
+                  : 'border-line-soft bg-surface-1 text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                aria-expanded={scoutRecord === null ? false : expanded}
+                aria-label={scoutRecord === null
+                  ? `Scout ${player.displayName} to unlock playstyle`
+                  : `${expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
+                disabled={scoutRecord === null || busy}
                 onclick={() => toggleCardExpanded(player.playerVersionId)}
               >
-                <span>{expanded ? 'Playstyle' : 'Show playstyle'}</span>
-                <ChevronDown
-                  size={11}
-                  class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
-                  aria-hidden="true"
-                />
+                <span
+                  >{scoutRecord === null
+                    ? 'Scout to unlock playstyle'
+                    : expanded
+                      ? 'Hide playstyle'
+                      : 'Show playstyle'}</span
+                >
+                {#if scoutRecord === null}
+                  <Lock size={11} class="shrink-0" aria-hidden="true" />
+                {:else}
+                  <ChevronDown
+                    size={11}
+                    class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                    aria-hidden="true"
+                  />
+                {/if}
               </button>
 
-              {#if expanded && profile !== null}
+              {#if expanded && profile !== null && scoutRecord !== null}
                 <div class="mx-2 mt-1.5 grid shrink-0 gap-2 sm:mx-2.5">
                   <p
                     class="w-full truncate font-mono text-[8px] font-bold tracking-[0.08em] text-accent uppercase"
@@ -611,6 +616,9 @@
                       {/each}
                     </div>
                   {/if}
+                  <div class="rounded-lg border border-line-soft bg-surface-1/70 p-2">
+                    <FullCourtScoutReport report={fullCourtScoutPlayer(player)} compact />
+                  </div>
                   <button
                     type="button"
                     class="min-h-0 justify-self-center rounded border border-accent/40 bg-accent/10 px-2.5 py-1 font-mono text-[7.5px] leading-tight font-bold tracking-[0.07em] text-accent uppercase outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring"
@@ -622,7 +630,7 @@
               {/if}
 
               <div class="mx-2 mt-auto border-t border-line-soft py-1.5 sm:mx-2.5">
-                <div class="flex items-baseline justify-between gap-1.5">
+                <div class="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
                   <p
                     class="font-display text-base leading-[1.2] font-extrabold tracking-tight tabular-nums sm:text-xl"
                   >
@@ -633,8 +641,7 @@
                       row.statusAfterPick,
                     )}"
                   >
-                    <span class="sm:hidden">{capStatusShortLabel(row.statusAfterPick)}</span>
-                    <span class="hidden sm:inline">{capStatusLabel(row.statusAfterPick)}</span>
+                    {capStatusLabel(row.statusAfterPick)}
                   </span>
                 </div>
                 {#if row.assessment.legal && row.assessment.projectedPayroll !== null}
@@ -666,19 +673,14 @@
               {#if onPurchaseReport !== undefined}
                 <div class="mx-2 mb-1.5 flex items-center justify-between gap-1.5 sm:mx-2.5">
                   {#if scoutRecord !== null}
-                    <span class="font-mono text-[8px] font-bold text-positive uppercase"
-                      >Scouted</span
+                    <span
+                      class="inline-flex items-center gap-1 font-mono text-[8px] font-bold text-positive uppercase"
                     >
-                    <Button
-                      size="sm"
-                      tone="secondary"
-                      disabled={busy}
-                      aria-label={`Open scouting report for ${player.displayName}`}
-                      onclick={() => openScoutReport(player)}
+                      <Check size={10} aria-hidden="true" /> Scouted
+                    </span>
+                    <span class="font-mono text-[8px] text-muted-foreground"
+                      >Playstyle unlocked</span
                     >
-                      <Eye size={12} aria-hidden="true" />
-                      Report
-                    </Button>
                   {:else}
                     <span class="font-mono text-[8px] text-muted-foreground">
                       Scout {formatMillions(scoutPrice)}
@@ -726,7 +728,7 @@
                 {/snippet}
               </SectionHeading>
               <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-                Six to twelve players. Lock at any point once you reach six.
+                Six to twelve players. Lock the roster once you have six.
               </p>
             </div>
 
@@ -734,7 +736,7 @@
               <EmptyState
                 surface="none"
                 title="No players signed yet"
-                message="Pick a player from Round 1 above to start your roster."
+                message="Sign 6 to 12 players to start your rotation."
               />
             {:else}
               <ul class="divide-y divide-line-soft">
@@ -760,15 +762,23 @@
                           />
                         {/if}
                         <span class="truncate"
-                          >{pick.player.seasonKey} · {formatPositions(pick.player.positions)}</span
+                          >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
+                          {formatPositions(pick.player.positions)}</span
                         >
                       </p>
                     </div>
                     <div class="shrink-0 text-right">
-                      <p class="font-mono text-xs font-bold tabular-nums">
+                      <FullCourtRating
+                        value={pick.player.originalOverall}
+                        size="sm"
+                        layout="inline"
+                        align="right"
+                      />
+                      <p
+                        class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
+                      >
                         {formatMillions(pick.salaryDollars)}
                       </p>
-                      <p class="ui-micro">Round {pick.pickOrdinal + 1}</p>
                     </div>
                     <IconButton
                       label={`Remove ${pick.player.displayName} from the roster`}
@@ -870,7 +880,7 @@
               />
             {:else}
               <ul
-                class="grid grid-cols-2 gap-2 p-2.5 sm:gap-2.5 sm:p-3 md:grid-cols-3 xl:grid-cols-4"
+                class="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-2 p-2.5 sm:gap-2.5 sm:p-3"
               >
                 {#each catalogPage.rows as row (row.player.playerVersionId)}
                   {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
@@ -942,6 +952,7 @@
               {@const signable = row.assessment.legal && !row.onRoster && !complete}
               {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
               {@const scoutBlocked = scoutBlocker(scoutAssessment)}
+              {@const expanded = Boolean(expandedCardIds[row.player.playerVersionId])}
 
               <div class="flex items-start gap-2.5">
                 <FullCourtPortrait player={row.player} {art} size="md" />
@@ -950,11 +961,11 @@
                     <h3 class="font-display min-w-0 truncate text-lg font-extrabold tracking-tight">
                       {row.player.displayName}
                     </h3>
-                    <span
-                      class="shrink-0 font-mono text-xs font-bold text-muted-foreground tabular-nums"
-                      aria-label={`Overall ${String(row.player.originalOverall)}`}
-                      >{row.player.originalOverall}</span
-                    >
+                    <FullCourtRating
+                      value={row.player.originalOverall}
+                      size="sm"
+                      layout="stacked"
+                    />
                   </div>
                   <p
                     class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted-foreground uppercase"
@@ -977,37 +988,72 @@
                     >
                       {row.player.positions.join('/')}
                     </span>
-                    {#if inspectedProfile !== null}
-                      <span
-                        class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
-                      >
-                        {inspectedProfile.archetype}
-                      </span>
-                    {/if}
                   </div>
                 </div>
               </div>
 
-              {#if inspectedChips.length > 0}
-                <div class="mt-2.5 flex flex-wrap items-start gap-1">
-                  {#each inspectedChips as chip (chip.label)}
-                    <span
-                      class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
-                      'good'
-                        ? 'border-positive/40 bg-positive/10 text-positive'
-                        : 'border-negative/45 bg-negative/10 text-negative'}">{chip.label}</span
-                    >
-                  {/each}
-                </div>
-              {/if}
+              <div class="mt-2.5">
+                {#if scoutRecord === null}
+                  <p
+                    class="flex items-center gap-1.5 rounded-lg border border-line-soft bg-surface-1/70 px-2.5 py-2 text-[11px] text-muted-foreground"
+                  >
+                    <Lock size={12} class="shrink-0" aria-hidden="true" />
+                    Scout this player to reveal playstyle and usage.
+                  </p>
+                {:else}
+                  <button
+                    type="button"
+                    class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-expanded={expanded}
+                    aria-label={`${expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
+                    onclick={() => toggleCardExpanded(row.player.playerVersionId)}
+                  >
+                    <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+                    <ChevronDown
+                      size={12}
+                      class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  {#if expanded && inspectedProfile !== null}
+                    <div class="mt-2 grid gap-2">
+                      <p
+                        class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
+                      >
+                        {inspectedProfile.archetype}
+                      </p>
+                      {#if inspectedChips.length > 0}
+                        <div class="flex flex-wrap items-start gap-1">
+                          {#each inspectedChips as chip (chip.label)}
+                            <span
+                              class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
+                              'good'
+                                ? 'border-positive/40 bg-positive/10 text-positive'
+                                : 'border-negative/45 bg-negative/10 text-negative'}"
+                              >{chip.label}</span
+                            >
+                          {/each}
+                        </div>
+                      {/if}
+                      <div class="rounded-xl border border-line-soft bg-surface-1/70 p-3">
+                        <FullCourtScoutReport report={fullCourtScoutPlayer(row.player)} />
+                      </div>
+                    </div>
+                  {/if}
+                {/if}
+              </div>
 
               <div class="mt-3 border-t border-line-soft pt-2.5">
                 <div class="flex items-baseline justify-between gap-2">
-                  <p
-                    class="font-display text-2xl leading-none font-extrabold tracking-tight tabular-nums"
-                  >
-                    {formatMillions(row.salaryDollars)}
-                  </p>
+                  <div class="min-w-0">
+                    <span class="ui-micro">Salary</span>
+                    <p
+                      class="font-display text-2xl leading-none font-extrabold tracking-tight tabular-nums"
+                    >
+                      {formatMillions(row.salaryDollars)}
+                    </p>
+                  </div>
                   <span
                     class="inline-flex shrink-0 rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {capStatusClass(
                       row.statusAfterPick,
@@ -1063,18 +1109,8 @@
                   {#if scoutRecord !== null}
                     <div class="min-w-0">
                       <Badge tone="positive">Scouted</Badge>
-                      <p class="ui-micro mt-0.5">Scouting report · {scoutScopeLabel}</p>
+                      <p class="ui-micro mt-0.5">Playstyle unlocked · {scoutScopeLabel}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      tone="secondary"
-                      disabled={busy}
-                      aria-label={`Open scouting report for ${row.player.displayName}`}
-                      onclick={() => openScoutReport(row.player)}
-                    >
-                      <Eye size={13} aria-hidden="true" />
-                      Report
-                    </Button>
                   {:else}
                     <div class="min-w-0">
                       <p class="ui-micro">
@@ -1148,7 +1184,7 @@
                   {/snippet}
                 </SectionHeading>
                 <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  Six to twelve players. Locking freezes every salary for the run.
+                  Six to twelve players. Lock the roster once you have six.
                 </p>
               </div>
 
@@ -1156,7 +1192,7 @@
                 <EmptyState
                   surface="none"
                   title="No players signed yet"
-                  message="Sign 6 to 12 players from the pool to start your rotation."
+                  message="Sign 6 to 12 players to start your rotation."
                 />
               {:else}
                 <ul
@@ -1184,17 +1220,23 @@
                             />
                           {/if}
                           <span class="truncate"
-                            >{pick.player.seasonKey} · {formatPositions(
-                              pick.player.positions,
-                            )}</span
+                            >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
+                            {formatPositions(pick.player.positions)}</span
                           >
                         </p>
                       </div>
                       <div class="shrink-0 text-right">
-                        <p class="font-mono text-xs font-bold tabular-nums">
+                        <FullCourtRating
+                          value={pick.player.originalOverall}
+                          size="sm"
+                          layout="inline"
+                          align="right"
+                        />
+                        <p
+                          class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
+                        >
                           {formatMillions(pick.salaryDollars)}
                         </p>
-                        <p class="ui-micro">Pick {pick.pickOrdinal + 1}</p>
                       </div>
                       {#if !complete}
                         <IconButton
@@ -1289,17 +1331,6 @@
     open
     onOpenChange={(open) => {
       if (!open) profileVersionId = null;
-    }}
-  />
-{/if}
-
-{#if selectedScout !== null}
-  <FullCourtScoutDialog
-    player={selectedScout.player}
-    priceDollars={selectedScout.record.priceDollars}
-    purchasedRevision={selectedScout.record.purchasedRevision}
-    onclose={() => {
-      scoutVersionId = null;
     }}
   />
 {/if}

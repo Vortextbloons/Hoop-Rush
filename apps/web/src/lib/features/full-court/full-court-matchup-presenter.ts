@@ -5,7 +5,7 @@ import {
   type FullCourtTeamHealth,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import type { FullCourtRegularSeason } from '@hoop-rush/engine';
+import { defaultFullCourtCoachingRotation, type FullCourtRegularSeason } from '@hoop-rush/engine';
 import type { FullCourtUserFixture } from './full-court-season-presenter.ts';
 
 type SeasonTeam = FullCourtRegularSeason['teams'][number];
@@ -16,6 +16,7 @@ export interface FullCourtMatchupOpponentOption {
   readonly positions: readonly SimulationPlayer['positions'][number][];
   readonly starter: boolean;
   readonly available: boolean;
+  readonly plannedMinutes: number | null;
   readonly statusLabel: string;
 }
 
@@ -102,22 +103,37 @@ export function buildFullCourtMatchupEditorView(
     ? `Saved matchups belonged to a previous fixture and no longer apply to ${fixture.label} vs ${opponentTeam.displayName}.`
     : null;
 
-  const opponentStarterSet = new Set(opponentTeam.rotation?.startingFive ?? []);
   const opponentAvailability = new Map(
-    (opponentTeam.availability ?? []).map((entry) => [entry.playerId, entry.available]),
+    (opponentTeam.availability ?? []).map((entry) => [entry.playerId, entry]),
   );
-  const opponents: FullCourtMatchupOpponentOption[] = [...opponentTeam.roster]
-    .map((player) => {
+  const availability = opponentTeam.roster.map((player) => {
+    const entry = opponentAvailability.get(player.playerId);
+    return {
+      ...entry,
+      playerId: player.playerId,
+      available:
+        entry?.available !== false &&
+        !isPlayerInjured(opponentHealth, player.playerId, fixture.dayOffset),
+    };
+  });
+  const rotation =
+    availability.filter((entry) => entry.available).length >= 5
+      ? defaultFullCourtCoachingRotation({ ...opponentTeam, availability }, opponentTeam.rotation)
+      : null;
+  const opponentStarterSet = new Set(
+    rotation?.startingFive ?? opponentTeam.rotation?.startingFive ?? [],
+  );
+  const opponents: FullCourtMatchupOpponentOption[] = opponentTeam.roster
+    .map((player, index) => {
       const starter = opponentStarterSet.has(player.playerId);
-      const injured =
-        isPlayerInjured(opponentHealth, player.playerId, fixture.dayOffset) ||
-        opponentAvailability.get(player.playerId) === false;
+      const injured = availability[index]?.available === false;
       return {
         playerId: player.playerId,
         displayName: player.displayName,
         positions: player.positions,
         starter,
         available: !injured,
+        plannedMinutes: rotation?.minuteTargets[player.playerId] ?? null,
         statusLabel: injured ? 'Out' : starter ? 'Starter' : 'Bench',
       };
     })

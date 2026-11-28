@@ -1,8 +1,5 @@
 <script lang="ts">
-  import { fullCourtReportScope } from '@hoop-rush/data-contracts';
   import { fullCourtScoutPlayer } from '@hoop-rush/engine';
-  import Badge from '#lib/components/ui/Badge.svelte';
-  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
 
   const ROLE_LABELS = {
@@ -52,28 +49,14 @@
 
   let {
     report,
-    priceDollars = null,
-    purchasedRevision = null,
+    compact = false,
   }: {
     report: ReturnType<typeof fullCourtScoutPlayer>;
-    priceDollars?: number | null;
-    purchasedRevision?: number | null;
+    compact?: boolean;
   } = $props();
 </script>
 
-<div class="mt-3 flex flex-wrap items-center gap-2 border-y border-line-soft py-2.5">
-  <Badge tone="positive">Owned</Badge>
-  <span class="font-mono text-[9px] text-muted-foreground uppercase">
-    {fullCourtReportScope('player-scouting') === 'run' ? 'Lifetime of this run' : 'This game only'}
-  </span>
-  {#if priceDollars !== null}
-    <span class="ml-auto font-mono text-[9px] text-muted-foreground tabular-nums">
-      Paid {formatMillions(priceDollars)}
-    </span>
-  {/if}
-</div>
-
-<div class="mt-3 grid gap-3 sm:grid-cols-2">
+<div class={compact ? 'grid gap-2' : 'grid gap-3 sm:grid-cols-2'}>
   <section aria-label="Usage read">
     <p class="ui-label text-muted-foreground">Usage</p>
     <p class="mt-1 font-display text-2xl font-extrabold tabular-nums">
@@ -175,9 +158,3 @@
     </ul>
   {/if}
 </section>
-
-{#if purchasedRevision !== null}
-  <p class="mt-4 border-t border-line-soft pt-2 font-mono text-[9px] text-muted-foreground">
-    Bought at draft revision {purchasedRevision}.
-  </p>
-{/if}

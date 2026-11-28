@@ -121,6 +121,7 @@ function renderWarRoom(input: {
   season: FullCourtRegularSeason;
   nextFilmTarget: { kind: 'opponent-film'; gameId: string; opponentTeamId: string } | null;
   playoffPreview?: FullCourtPlayoffOpponentPreview | null;
+  preseasonOpen?: boolean;
   practiceOpen?: boolean;
   practice?: ReturnType<typeof simulateFullCourtTrainingCamp> | null;
   matchupContext?: FullCourtMatchupEditorContext | null;
@@ -164,6 +165,22 @@ describe('FullCourtWarRoom', () => {
     expect(body).toContain('Owned');
     expect(body).toContain('aria-label="Roster strengths"');
     expect(body).toContain('OVR');
+    expect(body).not.toContain('Buy opponent film');
+  });
+
+  test('closes preseason purchases once the regular season has started', () => {
+    const { index, draft, season, nextFilmTarget } = setup();
+    const body = renderWarRoom({
+      draft,
+      index,
+      season,
+      nextFilmTarget,
+      preseasonOpen: false,
+    });
+
+    expect(body).toContain('Roster fit closed before game 1.');
+    expect(body).toContain('League opponent film closed before game 1.');
+    expect(body).not.toContain('Buy roster fit');
     expect(body).not.toContain('Buy opponent film');
   });
 

@@ -453,18 +453,26 @@ export function fullCourtPurchasePhaseRejection(
 ): FullCourtCommandResult | null {
   const reject = (message: string): FullCourtCommandResult =>
     rejectFullCourtCommand(state, command, 'report-unavailable', message).result;
-  if (command.target.kind === 'training-camp') {
+  if (command.target.kind === 'training-camp' || command.target.kind === 'lineup-fit') {
     if (phase.postseasonStarted || (phase.completedThroughSlot ?? 0) > 0) {
-      return reject('Training camp closes before the first regular-season game.');
+      return reject(
+        command.target.kind === 'training-camp'
+          ? 'Training camp closes before the first regular-season game.'
+          : 'Roster fit closes before the first regular-season game.',
+      );
     }
     return null;
   }
-  if (
-    command.target.kind === 'opponent-film' &&
-    command.target.gameId !== undefined &&
-    phase.playedGameIds.has(command.target.gameId)
-  ) {
-    return reject('Film study is available for your next game.');
+  if (command.target.kind === 'opponent-film') {
+    if (command.target.gameId === undefined) {
+      if (phase.postseasonStarted || (phase.completedThroughSlot ?? 0) > 0) {
+        return reject('League opponent film closes before the first regular-season game.');
+      }
+      return null;
+    }
+    if (phase.playedGameIds.has(command.target.gameId)) {
+      return reject('Film study is available for your next game.');
+    }
   }
   return null;
 }

@@ -15,8 +15,15 @@ import {
 
 type CoachingRotation = NonNullable<FullCourtCoachingPlan['rotation']>;
 
-export function defaultFullCourtCoachingRotation(team: FullCourtTeamGameInput): CoachingRotation {
-  const { startingSlots, targetSeconds } = resolveRotationPlan(team.roster, {}, team.availability);
+export function defaultFullCourtCoachingRotation(
+  team: FullCourtTeamGameInput,
+  rotation: FullCourtRotationPlanInput = {},
+): CoachingRotation {
+  const { startingSlots, targetSeconds } = resolveRotationPlan(
+    team.roster,
+    rotation,
+    team.availability,
+  );
   const minutes = targetSeconds.map((seconds) => Math.floor(seconds / 60));
   const extraMinutes =
     FULL_COURT_REGULATION_TEAM_SECONDS / 60 - minutes.reduce((total, value) => total + value, 0);

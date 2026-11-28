@@ -223,7 +223,7 @@ export interface FullCourtSigningImpact {
   readonly payrollAfter: string;
   /** Hard-limit payroll room left after this signing. */
   readonly roomAfter: string;
-  /** War Chest left after paying this salary. */
+  /** Budget left after paying this salary. */
   readonly warChestAfter: string;
   /** Apron line this signing crosses, or null when the roster's tier holds. */
   readonly apronShift: string | null;

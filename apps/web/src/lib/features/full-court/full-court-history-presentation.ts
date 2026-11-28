@@ -1,5 +1,6 @@
 import {
   capRushConferenceRoundName,
+  franchiseAbbreviation,
   type CapRushPayrollStatus,
   type FullCourtHistoryRecord,
   type FullCourtTactics,
@@ -11,7 +12,7 @@ import {
 } from '@hoop-rush/engine';
 import {
   capStatusClass,
-  capStatusShortLabel,
+  capStatusLabel,
   formatMillions,
 } from '#lib/features/cap-rush/cap-rush-presentation.js';
 import { fullCourtVariantLabel } from './full-court-draft-presentation.js';
@@ -42,6 +43,7 @@ export interface FullCourtHistoryRosterRow {
   readonly playerVersionId: string;
   readonly displayName: string;
   readonly seasonKey: string;
+  readonly teamAbbreviation: string;
   readonly position: string;
   readonly overall: number;
   readonly salaryLabel: string;
@@ -116,6 +118,7 @@ export function presentFullCourtHistoryEntry(
         playerVersionId: pick.player.playerVersionId,
         displayName: pick.player.displayName,
         seasonKey: pick.player.seasonKey,
+        teamAbbreviation: franchiseAbbreviation(pick.player.franchiseId),
         position: pick.player.positions.join('/'),
         overall: pick.player.originalOverall,
         salaryLabel: formatMillions(pick.salaryDollars),
@@ -176,7 +179,7 @@ export function presentFullCourtHistoryEntry(
     seriesWon: playoffs.seriesWon,
     payrollLabel: formatMillions(payrollDollars),
     capStatus,
-    capStatusLabel: capStatusShortLabel(capStatus),
+    capStatusLabel: capStatusLabel(capStatus),
     capStatusClass: capStatusClass(capStatus),
     warChestSpentLabel: formatMillions(warChestSpent),
     warChestRemainingLabel: formatMillions(warChestRemaining),

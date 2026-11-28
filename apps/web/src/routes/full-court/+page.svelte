@@ -88,7 +88,9 @@
   }
 
   function selectSection(value: typeof section) {
-    section = value;
+    // During the postseason the bracket owns the page, so Overview and Playoffs
+    // both land on the postseason screen instead of a dead overview.
+    section = postseasonMode && value === 'home' ? 'playoffs' : value;
     confirmNewDraft = false;
   }
 
@@ -208,6 +210,25 @@
       savedReplaySummary !== null &&
       current.latestGame.result.seed === savedReplaySummary.gameSeed,
   );
+
+  /**
+   * Once the regular season is over the postseason screen is the only place that
+   * advances the bracket, so the page lands there and stays there until the
+   * champion is crowned. The nav still allows reading other tabs.
+   */
+  const postseasonMode = $derived(
+    playoff !== null || (season?.checkpoint.completedThroughSlot ?? 0) >= 82,
+  );
+  let syncedPostseason = $state(false);
+  $effect(() => {
+    if (!postseasonMode) {
+      syncedPostseason = false;
+      return;
+    }
+    if (syncedPostseason) return;
+    syncedPostseason = true;
+    if (section !== 'playoffs') section = 'playoffs';
+  });
 </script>
 
 <svelte:head>
@@ -316,10 +337,16 @@
           </button>
         {/each}
       </nav>
-      {#if current.simulating}
+      {#if current.simulating && (section === 'team' || section === 'war-room')}
         <div class="mb-4 flex flex-wrap items-center gap-3">
           <p role="status" class="text-sm text-muted-foreground">
-            {current.stopRequested ? 'Saving the current game…' : 'Simulating…'}
+            {#if current.stopRequested}
+              Saving the current game…
+            {:else if current.simProgress !== null && current.simProgress.total > 1}
+              Simulating {current.simProgress.completed} of {current.simProgress.total} games…
+            {:else}
+              Simulating…
+            {/if}
           </p>
           <Button
             size="sm"
@@ -386,6 +413,7 @@
             nextFilmTarget={current.nextFilmTarget()}
             {playoffPreview}
             busy={current.busy}
+            preseasonOpen={season.checkpoint.completedThroughSlot === 0}
             practiceOpen={campBooked ||
               (playoff === null && season.checkpoint.completedThroughSlot === 0)}
             practice={current.practice}
@@ -407,6 +435,10 @@
           health={health ?? null}
           restingPlayerIds={current.restingPlayerIds}
           busy={current.busy}
+          simulating={current.simulating}
+          simProgress={current.simProgress}
+          stopRequested={current.stopRequested}
+          onStopAfterGame={() => current.stopAfterGame()}
           pendingForfeit={current.pendingForfeit}
           notice={current.notice}
           {art}
@@ -427,6 +459,7 @@
               <FullCourtGamecast
                 game={current.latestGame}
                 userTeamId={season.lock.season.userTeamId}
+                {art}
                 onClose={() => (activeGamecast = null)}
               />
             {/key}
@@ -436,6 +469,7 @@
                 game={fullCourtWatchedReplayOutcome(savedReplay)}
                 userTeamId={season.lock.season.userTeamId}
                 replayNote={savedReplaySummary.replayNote}
+                {art}
                 onClose={() => (activeGamecast = null)}
               />
             {/key}

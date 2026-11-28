@@ -17,7 +17,6 @@ import {
 } from '@hoop-rush/engine';
 import { buildCapRushTestCatalog, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
 import { render } from 'svelte/server';
-import { fullCourtCatalogPage } from './full-court-draft-presentation.js';
 import FullCourtDraftView from './FullCourtDraftView.svelte';
 import FullCourtScoutReport from './FullCourtScoutReport.svelte';
 import { FULL_COURT_MIN_ROSTER_SIZE, fullCourtDraftStateSchema } from '@hoop-rush/data-contracts';
@@ -137,7 +136,8 @@ describe('FullCourtDraftView', () => {
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
     expect(body).toContain('Round 1');
-    expect(body).toContain('Show playstyle');
+    expect(body).toContain('Scout to unlock playstyle');
+    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} to unlock playstyle"`);
     expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
     expect(body).toContain('Legal finish');
@@ -164,7 +164,7 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Locked');
   });
 
-  test('prices player scouting per round card without replacing the profile actions', () => {
+  test('keeps playstyle locked behind player scouting', () => {
     const { state, index } = setup();
     const body = renderView(state, index, () => undefined);
     const firstPlayer = state.offer?.cards[0]?.player;
@@ -172,6 +172,9 @@ describe('FullCourtDraftView', () => {
 
     expect(body).toContain('Scout $2M');
     expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} for $2M"`);
+    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} to unlock playstyle"`);
+    expect(body).not.toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
+    expect(body).not.toContain('aria-label="Shot profile"');
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
 
@@ -180,16 +183,32 @@ describe('FullCourtDraftView', () => {
     const body = renderView({ ...state, offer: undefined, pool: undefined }, index);
 
     expect(body).toContain('Open catalog');
+    expect(body).toContain('Salary');
   });
 
-  test('marks a purchased scouting report as owned and opens it from the same card', () => {
+  test('keeps the selected player panel playstyle locked until scouted', () => {
+    const { state, index } = setup();
+    const body = renderView(
+      { ...state, offer: undefined, pool: undefined },
+      index,
+      () => undefined,
+    );
+
+    expect(body).toContain('Scout this player to reveal playstyle and usage.');
+    expect(body).not.toContain('aria-label="Shot profile"');
+  });
+
+  test('unlocks playstyle on the same card after a scouting report is purchased', () => {
     const { state, index } = setup();
     const targetName = state.offer?.cards[0]?.player.displayName ?? '';
     const body = renderView(scoutedState(index, state, targetName), index, () => undefined);
 
     expect(body).toContain('Scouted');
-    expect(body).toContain(`aria-label="Open scouting report for ${targetName}"`);
+    expect(body).toContain('Playstyle unlocked');
+    expect(body).toContain(`aria-label="Show ${targetName} playstyle"`);
+    expect(body).not.toContain(`aria-label="Scout ${targetName} to unlock playstyle"`);
     expect(body).not.toContain(`aria-label="Scout ${targetName} for $2M"`);
+    expect(body).not.toContain(`aria-label="Open scouting report for ${targetName}"`);
   });
 
   test('blocks a scouting purchase when the budget cannot cover the cheapest legal finish', () => {
@@ -207,21 +226,16 @@ describe('FullCourtScoutReport', () => {
     const player = index.catalog.candidates.find((candidate) => candidate.displayName === 'PG 97');
     if (player === undefined) throw new Error('missing test player PG 97');
     const body = render(FullCourtScoutReport, {
-      props: {
-        report: fullCourtScoutPlayer(player),
-        priceDollars: 2_000_000,
-        purchasedRevision: 1,
-      },
+      props: { report: fullCourtScoutPlayer(player) },
     }).body;
 
-    expect(body).toContain('Owned');
-    expect(body).toContain('Lifetime of this run');
+    expect(body).toContain('aria-label="Usage read"');
+    expect(body).toContain('aria-label="Role read"');
+    expect(body).toContain('aria-label="Shot profile"');
     expect(body).toContain('Secondary creator');
     expect(body).toContain('Perimeter stopper');
     expect(body).toContain('Perimeter');
     expect(body).toContain('68');
     expect(body).toContain('Poor free throw');
-    expect(body).toContain('Paid $2M');
-    expect(body).toContain('Bought at draft revision 1.');
   });
 });

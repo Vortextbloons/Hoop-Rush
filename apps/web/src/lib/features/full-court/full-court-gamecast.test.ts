@@ -14,6 +14,7 @@ import { render } from 'svelte/server';
 import FullCourtGamecast from './FullCourtGamecast.svelte';
 import {
   fullCourtGamecastFrames,
+  fullCourtPossessionCursor,
   fullCourtWatchedReplayOutcome,
   fullCourtWatchedReplaySummary,
 } from './full-court-gamecast.ts';
@@ -42,6 +43,21 @@ test('projects a recorded game to the final score and recorded active fives', ()
     expect(event.awayUnit.every((id) => awayIds.has(id))).toBe(true);
   }
   expect(frames.some((frame) => frame.caption?.includes(' replaces '))).toBe(true);
+
+  const completed = tape.flatMap((event, index) =>
+    event.kind === 'trip' && event.ended ? [index + 1] : [],
+  );
+  expect(completed.length).toBeGreaterThan(2);
+  let cursor = 0;
+  for (const next of completed) {
+    expect(fullCourtPossessionCursor(frames, cursor, 1)).toBe(next);
+    expect(fullCourtPossessionCursor(frames, next, -1)).toBe(cursor);
+    expect(frames[next]?.homeUnit).toHaveLength(5);
+    expect(frames[next]?.awayUnit).toHaveLength(5);
+    expect(frames[next]?.caption).toBeTruthy();
+    cursor = next;
+  }
+  expect(fullCourtPossessionCursor(frames, cursor, 1)).toBe(frames.length - 1);
 });
 
 test('shows a named unit only when the recorded five matches', () => {
@@ -92,6 +108,9 @@ test('shows a named unit only when the recorded five matches', () => {
     },
   }).body;
   expect(body).toContain('Opening Five');
+  expect(body.match(/active five"/g)).toHaveLength(2);
+  expect(body).toContain('Next possession');
+  expect(body).toContain('Play-by-play feed');
 });
 
 test('records coaching-rule substitutions in the same order as the summary', () => {

@@ -63,6 +63,9 @@ export interface FullCourtGamecastFrame {
   readonly awayScore: number;
   readonly homeUnit: readonly string[];
   readonly awayUnit: readonly string[];
+  readonly side: 0 | 1 | null;
+  readonly kind: FullCourtTapeEvent['kind'] | null;
+  readonly possession: number;
   readonly caption: string | null;
 }
 
@@ -102,6 +105,9 @@ export function fullCourtGamecastFrames(
     awayScore: 0,
     homeUnit: result.home.stints[0]?.playerIds ?? [],
     awayUnit: result.away.stints[0]?.playerIds ?? [],
+    side: null,
+    kind: null,
+    possession: 0,
     caption: null,
   };
   frames.push(frame);
@@ -113,6 +119,8 @@ export function fullCourtGamecastFrames(
         homeScore: event.homeScore,
         awayScore: event.awayScore,
         clockSeconds: (event.period < 4 ? 12 : 5) * 60,
+        side: null,
+        kind: event.kind,
         caption: null,
       };
     } else if (event.kind === 'trip') {
@@ -125,12 +133,24 @@ export function fullCourtGamecastFrames(
         awayScore: event.awayScore,
         homeUnit: event.homeUnit,
         awayUnit: event.awayUnit,
-        caption: scoreEventCaption(
-          result.home.displayName,
-          result.away.displayName,
-          homeDelta,
-          awayDelta,
-        ),
+        side: event.offense,
+        kind: event.kind,
+        possession: frame.possession + Number(event.ended),
+        caption:
+          scoreEventCaption(
+            result.home.displayName,
+            result.away.displayName,
+            homeDelta,
+            awayDelta,
+          ) ??
+          {
+            defensiveRebound: 'Defensive rebound',
+            offensiveRebound: 'Offensive rebound',
+            liveTurnover: 'Live-ball turnover',
+            deadBall: 'Dead ball',
+            madeBasket: 'Made basket',
+            neutral: 'No score',
+          }[event.nextPossessionStart],
       };
     } else if (event.kind === 'substitution') {
       const key = event.side === 0 ? 'homeUnit' : 'awayUnit';
@@ -144,6 +164,8 @@ export function fullCourtGamecastFrames(
         [key]: frame[key].map((player) =>
           player === event.outPlayerId ? event.inPlayerId : player,
         ),
+        side: event.side,
+        kind: event.kind,
         caption: `${incoming} replaces ${outgoing} · ${event.reason.replaceAll('-', ' ')}`,
       };
     } else {
@@ -155,10 +177,31 @@ export function fullCourtGamecastFrames(
         [key]: frame[key] + Number(event.made),
         homeUnit: event.homeUnit ?? frame.homeUnit,
         awayUnit: event.awayUnit ?? frame.awayUnit,
+        side: event.side,
+        kind: event.kind,
         caption: event.made ? 'Technical free throw made' : 'Technical free throw missed',
       };
     }
     frames.push(frame);
   }
   return frames;
+}
+
+export function fullCourtPossessionCursor(
+  frames: readonly FullCourtGamecastFrame[],
+  cursor: number,
+  direction: -1 | 1,
+): number {
+  const possession = frames[cursor]?.possession ?? 0;
+  for (let index = cursor + direction; index > 0 && index < frames.length; index += direction) {
+    const frame = frames[index];
+    if (
+      frame?.kind === 'trip' &&
+      frame.possession !== frames[index - 1]?.possession &&
+      (direction === 1 ? frame.possession > possession : frame.possession < possession)
+    ) {
+      return index;
+    }
+  }
+  return direction === 1 ? Math.max(0, frames.length - 1) : 0;
 }

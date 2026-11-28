@@ -49,6 +49,7 @@
     index,
     busy,
     onPurchaseReport,
+    purchasable = true,
     ariaLabel = 'Full Court War Room roster fit',
     eyebrow = 'War Room',
     art = null,
@@ -57,6 +58,7 @@
     index: FullCourtCatalogIndex;
     busy: boolean;
     onPurchaseReport: (target: FullCourtReportTarget) => void;
+    purchasable?: boolean;
     ariaLabel?: string;
     eyebrow?: string;
     art?: FullCourtArt | null;
@@ -115,7 +117,7 @@
   }
 
   function buyFit(): void {
-    if (busy || !locked || fitRecord !== null || !fitAssessment.legal) return;
+    if (busy || !locked || !purchasable || fitRecord !== null || !fitAssessment.legal) return;
     onPurchaseReport(FIT_TARGET);
   }
 </script>
@@ -143,14 +145,14 @@
     <p class="font-mono text-[10px] text-muted-foreground uppercase">
       {roster.length} players · {formatMillions(payrollDollars)} payroll
     </p>
-    <p class="font-mono text-[10px] text-muted-foreground uppercase">{warChestCr} War Chest</p>
+    <p class="font-mono text-[10px] text-muted-foreground uppercase">{warChestCr} budget</p>
     <p class="font-mono text-[9px] text-muted-foreground uppercase">{scopeLabel}</p>
   </div>
 
   {#if fitReport !== null}
-    <div class="mt-4 grid items-start gap-3 sm:grid-cols-2">
+    <div class="mt-3 grid items-start gap-2.5 sm:grid-cols-2">
       <section
-        class="rounded-xl border border-positive/30 bg-positive/5 p-3.5"
+        class="rounded-xl border border-positive/30 bg-positive/5 p-3"
         aria-label="Roster strengths"
       >
         <div class="flex items-center justify-between gap-2">
@@ -165,21 +167,19 @@
             No strength cleared the evidence thresholds.
           </p>
         {:else}
-          <ul class="mt-2.5 flex flex-col gap-2.5">
+          <ul class="mt-2 flex flex-col gap-1.5">
             {#each fitReport.strengths as finding (finding.code)}
-              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2.5">
+              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2">
                 <p class="text-xs font-bold text-foreground">
                   {LINEUP_FINDING_LABELS[finding.code]}
                 </p>
                 {#if finding.evidence.length > 0}
-                  <div class="mt-1.5">
+                  <div class="mt-1">
                     <FullCourtScoutEvidence
-                      {art}
                       items={finding.evidence.map((entry) => ({
                         name: entry.displayName,
                         field: entry.field,
                         value: entry.value,
-                        player: playerForEvidence(entry),
                       }))}
                     />
                   </div>
@@ -191,7 +191,7 @@
       </section>
 
       <section
-        class="rounded-xl border border-negative/30 bg-negative/5 p-3.5"
+        class="rounded-xl border border-negative/30 bg-negative/5 p-3"
         aria-label="Roster gaps"
       >
         <div class="flex items-center justify-between gap-2">
@@ -204,21 +204,19 @@
         {#if fitReport.gaps.length === 0}
           <p class="mt-2 text-xs text-muted-foreground">No gap cleared the evidence thresholds.</p>
         {:else}
-          <ul class="mt-2.5 flex flex-col gap-2.5">
+          <ul class="mt-2 flex flex-col gap-1.5">
             {#each fitReport.gaps as finding (finding.code)}
-              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2.5">
+              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2">
                 <p class="text-xs font-bold text-foreground">
                   {LINEUP_FINDING_LABELS[finding.code]}
                 </p>
                 {#if finding.evidence.length > 0}
-                  <div class="mt-1.5">
+                  <div class="mt-1">
                     <FullCourtScoutEvidence
-                      {art}
                       items={finding.evidence.map((entry) => ({
                         name: entry.displayName,
                         field: entry.field,
                         value: entry.value,
-                        player: playerForEvidence(entry),
                       }))}
                     />
                   </div>
@@ -232,6 +230,10 @@
   {:else if fitRecord !== null}
     <p class="mt-3 text-xs text-muted-foreground">
       The roster fit report is unavailable for this roster.
+    </p>
+  {:else if !purchasable}
+    <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+      Roster fit closed before game 1. Preseason purchases are no longer available.
     </p>
   {:else}
     <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">

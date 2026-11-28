@@ -169,7 +169,16 @@
   const validation = $derived(validateFullCourtCoachingDraft(draft, rosterIds));
   const locked = $derived(readOnly || busy || saving);
   const editingRotation = $derived(draft.rotationMode === 'custom');
-  const minutes = $derived(fullCourtTeamMinutes(draft, roster, plan, health, dayOffset));
+  const minutes = $derived(
+    fullCourtTeamMinutes(
+      editingRotation ? draft : { ...draft, ...defaultRotation, closingFive: null },
+      roster,
+      plan,
+      health,
+      dayOffset,
+    ),
+  );
+  const displayedMinutes = $derived(minutes.starterMinutes + minutes.benchMinutes);
   const dirty = $derived(
     fullCourtCoachingSignature(fullCourtCoachingPlan(draft)) !== savedSignature,
   );
@@ -179,22 +188,21 @@
     { label: 'Bench', rows: minutes.bench, total: minutes.benchMinutes },
   ]);
   const blueprintRotation = $derived(activeRotationForBlueprint(draft, defaultRotation));
-  const showRotation = $derived(draft.interfaceLevel !== 'quick');
-  const showRules = $derived(draft.interfaceLevel === 'mastermind');
-  const showHierarchy = $derived(draft.interfaceLevel === 'mastermind');
-  const showUnits = $derived(draft.interfaceLevel === 'mastermind');
-  const showMatchups = $derived(
-    draft.interfaceLevel === 'mastermind' && !readOnly && matchupContext !== null,
+  const mastermind = $derived(draft.interfaceLevel === 'mastermind' && !readOnly);
+  const playerNames = $derived(
+    new Map(roster.map((player) => [player.playerId, player.displayName])),
   );
+  const lineupNames = (ids: readonly string[]) =>
+    ids.map((id) => playerNames.get(id) ?? 'Unavailable player').join(', ');
   const hasStaggerScorers = $derived(
     draft.hierarchy.primaryPlayerId !== null || draft.hierarchy.secondaryPlayerId !== null,
   );
   const interfaceDescription = $derived(
     draft.interfaceLevel === 'quick'
-      ? 'Pick a strategy and let the staff handle the rotation. Saved rotation, scoring roles, and rules stay in place.'
+      ? 'Set a strategy, choose your starters, and manage bench minutes.'
       : draft.interfaceLevel === 'remix'
         ? 'Set pace, offense, defense, rotation, and the closing five.'
-        : 'Everything in Remix plus scoring roles, named units, and ordered conditional rules.',
+        : 'Fine-tune scoring roles, lineup groups, situational rules, and defensive matchups.',
   );
 
   function setInterfaceLevel(level: FullCourtInterfaceLevel): void {
@@ -407,14 +415,14 @@
   }
 
   function minutesSummary(): string {
-    if (validation.totalMinutes === FULL_COURT_MINUTE_TOTAL) {
+    if (displayedMinutes === FULL_COURT_MINUTE_TOTAL) {
       return `All ${String(FULL_COURT_MINUTE_TOTAL)} minutes assigned.`;
     }
-    if (validation.totalMinutes < FULL_COURT_MINUTE_TOTAL) {
-      const amount = FULL_COURT_MINUTE_TOTAL - validation.totalMinutes;
+    if (displayedMinutes < FULL_COURT_MINUTE_TOTAL) {
+      const amount = FULL_COURT_MINUTE_TOTAL - displayedMinutes;
       return `${String(amount)} ${amount === 1 ? 'minute' : 'minutes'} left to assign.`;
     }
-    const amount = validation.totalMinutes - FULL_COURT_MINUTE_TOTAL;
+    const amount = displayedMinutes - FULL_COURT_MINUTE_TOTAL;
     return `${String(amount)} ${amount === 1 ? 'minute' : 'minutes'} over ${String(FULL_COURT_MINUTE_TOTAL)}.`;
   }
 
@@ -422,7 +430,7 @@
     if (row.starterSlot !== null) {
       return `Starter ${String(row.starterSlot + 1)}`;
     }
-    return 'Bench';
+    return row.minutes === 0 ? 'Out of rotation' : 'Bench';
   }
 
   async function save(): Promise<void> {
@@ -459,6 +467,35 @@
     }}
     novalidate
   >
+    {#if !readOnly}
+      <div class="save-bar mb-3 rounded-lg border border-line-soft px-3 py-2">
+        <p class="save-state" aria-live="polite">
+          {#if dirty}
+            Unsaved changes
+          {:else}
+            Saved plan is in use
+          {/if}
+        </p>
+        <ActionRow>
+          {#snippet primary()}
+            <Button
+              type="submit"
+              tone={dirty ? 'primary' : 'secondary'}
+              loading={saving}
+              disabled={!validation.valid || locked || !dirty}
+            >
+              {saveLabel}
+            </Button>
+          {/snippet}
+          {#snippet secondary()}
+            <Button tone="secondary" disabled={locked || !dirty} onclick={cancel}>Discard</Button>
+          {/snippet}
+          {#snippet tertiary()}
+            <Button tone="ghost" disabled={locked} onclick={reset}>Reset</Button>
+          {/snippet}
+        </ActionRow>
+      </div>
+    {/if}
     <fieldset class="m-0 min-w-0 border-0 p-0" disabled={locked}>
       <legend class="sr-only">Team</legend>
       <SectionHeading
@@ -495,96 +532,64 @@
       </div>
 
       <div class="mt-3 grid gap-3">
-        {#if showRotation}
-          <Panel as="section" padding="sm" aria-label="Rotation">
-            <SectionHeading level={4} size="sm" title="Rotation">
-              {#snippet actions()}
-                {#if readOnly}
-                  <Badge tone={editingRotation ? 'primary' : 'neutral'}>
-                    {editingRotation ? 'Custom' : 'Automatic'}
-                  </Badge>
-                {:else}
-                  <SegmentedControl
-                    label="Rotation source"
-                    value={draft.rotationMode}
-                    options={ROTATION_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                    onchange={setRotationMode}
-                  />
-                {/if}
-              {/snippet}
-            </SectionHeading>
+        <Panel as="section" padding="sm" aria-label="Rotation">
+          <SectionHeading level={4} size="sm" title="Rotation">
+            {#snippet actions()}
+              {#if readOnly}
+                <Badge tone={editingRotation ? 'primary' : 'neutral'}>
+                  {editingRotation ? 'Custom' : 'Automatic'}
+                </Badge>
+              {:else}
+                <SegmentedControl
+                  label="Rotation source"
+                  value={draft.rotationMode}
+                  options={ROTATION_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={setRotationMode}
+                />
+              {/if}
+            {/snippet}
+          </SectionHeading>
 
-            <div class="mt-3">
-              <TeamCourtPreview
-                starters={minutes.starters}
-                bench={minutes.bench}
-                {focusedSlot}
-                readOnly={locked || !editingRotation}
-                onFocusSlot={(slot) => (focusedSlot = slot)}
-                {art}
-              />
-            </div>
+          {#if !editingRotation}
+            <p
+              class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+            >
+              {readOnly
+                ? 'The staff sets the starters and minutes for every game.'
+                : 'The staff sets the starters and minutes for every game. Choose Custom to lock in your own five and minute targets.'}
+            </p>
+          {/if}
 
-            {#if !editingRotation}
-              <p
-                class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
-              >
-                {readOnly
-                  ? 'The staff sets the starters and minutes for every game.'
-                  : 'The staff sets the starters and minutes for every game. Choose Custom to lock in your own five and minute targets.'}
-              </p>
-            {/if}
-
-            <div class="mt-4">
-              <div class="flex flex-wrap items-baseline justify-between gap-1">
-                <p class="ui-label" data-tone="muted">Starting five</p>
-                <p class="ui-micro">
-                  {editingRotation ? 'Positions are advisory' : 'Staff rotation'}
-                </p>
-              </div>
-              <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                {#each SLOTS as slot (slot)}
-                  <label
-                    class="min-w-0 rounded-lg"
-                    data-focused={focusedSlot === slot ? 'true' : undefined}
-                  >
-                    <span class="ui-micro">Starter {slot + 1}</span>
-                    <select
-                      class={SELECT_CLASS}
-                      value={draft.startingFive[slot] ?? ''}
-                      disabled={locked || !editingRotation}
-                      onfocus={() => (focusedSlot = slot)}
-                      onchange={(event) => setStarter(slot, event.currentTarget.value)}
-                    >
-                      {#each roster as player (player.playerId)}
-                        <option value={player.playerId}>
-                          {player.displayName} · {formatPositions(player.positions)}
-                        </option>
-                      {/each}
-                    </select>
-                  </label>
-                {/each}
-              </div>
-            </div>
-          </Panel>
-
-          <Panel as="section" padding="sm" aria-label="Minutes">
+          <div class="mt-4 border-t border-line-soft pt-3" aria-label="Minutes" role="group">
             <SectionHeading level={4} size="sm" title="Minutes">
               {#snippet actions()}
+                {#if !readOnly && editingRotation}
+                  <Button
+                    tone="secondary"
+                    size="sm"
+                    disabled={locked}
+                    onclick={() => {
+                      draft.minuteTargets = { ...defaultRotation.minuteTargets };
+                      markEdited();
+                      announcement = 'Staff minutes copied. Save changes to use them.';
+                    }}
+                  >
+                    Autofill minutes
+                  </Button>
+                {/if}
                 <Badge
-                  tone={validation.totalMinutes === FULL_COURT_MINUTE_TOTAL
+                  tone={displayedMinutes === FULL_COURT_MINUTE_TOTAL
                     ? 'positive'
-                    : validation.totalMinutes > FULL_COURT_MINUTE_TOTAL
+                    : displayedMinutes > FULL_COURT_MINUTE_TOTAL
                       ? 'negative'
                       : 'neutral'}
                 >
-                  {validation.totalMinutes} / {FULL_COURT_MINUTE_TOTAL} min
+                  {displayedMinutes} / {FULL_COURT_MINUTE_TOTAL} min
                 </Badge>
               {/snippet}
             </SectionHeading>
             <p
-              class="mt-1 text-[11px] leading-snug {validation.totalMinutes ===
-              FULL_COURT_MINUTE_TOTAL
+              class="mt-1 text-[11px] leading-snug {displayedMinutes === FULL_COURT_MINUTE_TOTAL
                 ? 'text-positive'
                 : 'text-muted-foreground'}"
               aria-live="polite"
@@ -593,13 +598,13 @@
             </p>
             <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-3">
               <div
-                class="h-full rounded-full transition-all {validation.totalMinutes ===
+                class="h-full rounded-full transition-all {displayedMinutes ===
                 FULL_COURT_MINUTE_TOTAL
                   ? 'bg-positive'
-                  : validation.totalMinutes > FULL_COURT_MINUTE_TOTAL
+                  : displayedMinutes > FULL_COURT_MINUTE_TOTAL
                     ? 'bg-negative'
                     : 'bg-primary'}"
-                style={`width: ${String(Math.min(100, Math.round((validation.totalMinutes / FULL_COURT_MINUTE_TOTAL) * 100)))}%`}
+                style={`width: ${String(Math.min(100, Math.round((displayedMinutes / FULL_COURT_MINUTE_TOTAL) * 100)))}%`}
               ></div>
             </div>
 
@@ -618,11 +623,29 @@
                           ? 'border-primary/50'
                           : 'border-line-soft'}"
                       >
-                        <FullCourtPortrait player={row.player} {art} size="sm" />
-                        <span class="min-w-0 flex-1">
-                          <span class="block truncate text-sm font-semibold">
-                            {row.player.displayName}
-                          </span>
+                        <FullCourtPortrait player={row.player} {art} size="md" />
+                        <div class="min-w-0 flex-1">
+                          {#if editingRotation && !readOnly && row.starterSlot !== null}
+                            {@const slot = row.starterSlot}
+                            <select
+                              class="min-h-8 w-full rounded-md border border-line-soft bg-surface-2 px-1.5 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={`Change Starter ${slot + 1}`}
+                              value={row.player.playerId}
+                              disabled={locked}
+                              onfocus={() => (focusedSlot = slot)}
+                              onchange={(event) => setStarter(slot, event.currentTarget.value)}
+                            >
+                              {#each roster as player (player.playerId)}
+                                <option value={player.playerId}>
+                                  {player.displayName} · {formatPositions(player.positions)}
+                                </option>
+                              {/each}
+                            </select>
+                          {:else}
+                            <span class="block truncate text-sm font-semibold">
+                              {row.player.displayName}
+                            </span>
+                          {/if}
                           <span class="ui-micro flex flex-wrap items-center gap-x-1.5">
                             <span>{roleLabel(row)}</span>
                             <span aria-hidden="true">·</span>
@@ -641,135 +664,107 @@
                                 · {row.health.label}
                               </span>
                             {/if}
+                            {#if row.player.overall != null}
+                              <span>· {row.player.overall} OVR</span>
+                            {/if}
                           </span>
-                        </span>
-                        <div class="inline-flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            class="flex h-9 w-8 items-center justify-center rounded-lg border border-line-soft bg-surface-2 font-mono text-sm font-bold text-foreground transition-colors hover:border-line-strong disabled:opacity-40"
-                            aria-label={`Decrease minutes for ${row.player.displayName}`}
-                            disabled={locked || !editingRotation || row.minutes <= 0}
-                            onclick={() =>
-                              setMinutes(row.player.playerId, String(Math.max(0, row.minutes - 1)))}
-                          >
-                            −
-                          </button>
-                          <label class="inline-flex items-center gap-1">
-                            <span class="sr-only">Minutes for {row.player.displayName}</span>
-                            <input
-                              type="number"
-                              inputmode="numeric"
-                              min="0"
-                              max={FULL_COURT_MAX_PLAYER_MINUTES}
-                              step="1"
-                              class="min-h-9 w-14 rounded-lg border border-line-soft bg-surface-2 px-1.5 text-center font-mono text-sm tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                              value={row.minutes}
-                              disabled={locked || !editingRotation}
-                              oninput={(event) =>
-                                setMinutes(row.player.playerId, event.currentTarget.value)}
-                            />
-                            <span class="ui-micro" aria-hidden="true">min</span>
-                          </label>
-                          <button
-                            type="button"
-                            class="flex h-9 w-8 items-center justify-center rounded-lg border border-line-soft bg-surface-2 font-mono text-sm font-bold text-foreground transition-colors hover:border-line-strong disabled:opacity-40"
-                            aria-label={`Increase minutes for ${row.player.displayName}`}
-                            disabled={locked ||
-                              !editingRotation ||
-                              row.minutes >= FULL_COURT_MAX_PLAYER_MINUTES}
-                            onclick={() =>
-                              setMinutes(
-                                row.player.playerId,
-                                String(Math.min(FULL_COURT_MAX_PLAYER_MINUTES, row.minutes + 1)),
-                              )}
-                          >
-                            +
-                          </button>
                         </div>
+                        {#if editingRotation && !readOnly}
+                          <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                            <label class="grid justify-items-center gap-0.5">
+                              <span class="sr-only">Minutes for {row.player.displayName}</span>
+                              <input
+                                type="number"
+                                inputmode="numeric"
+                                min="0"
+                                max={FULL_COURT_MAX_PLAYER_MINUTES}
+                                step="1"
+                                class="min-h-10 w-16 rounded-lg border border-line-soft bg-surface-2 px-1.5 text-center font-mono text-sm tabular-nums text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                value={row.minutes}
+                                disabled={locked}
+                                oninput={(event) =>
+                                  setMinutes(row.player.playerId, event.currentTarget.value)}
+                              />
+                              <span class="ui-micro" aria-hidden="true">min</span>
+                            </label>
+                            {#if row.starterSlot === null && !row.closer && row.minutes > 0}
+                              <Button
+                                type="button"
+                                tone="ghost"
+                                size="sm"
+                                disabled={locked}
+                                aria-label={`Sit ${row.player.displayName}`}
+                                onclick={() => setMinutes(row.player.playerId, '0')}
+                              >
+                                Sit
+                              </Button>
+                            {/if}
+                          </div>
+                        {:else}
+                          <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
+                            {row.minutes} <span class="ui-micro">min</span>
+                          </p>
+                        {/if}
                       </li>
                     {/each}
                   </ul>
                 </div>
               {/each}
             </div>
-
-            {#if editingRotation}
-              <div class="mt-4 border-t border-line-soft pt-3">
-                <label class="flex items-center gap-2 text-sm font-semibold">
-                  <input
-                    type="checkbox"
-                    class="size-4 accent-primary"
-                    checked={draft.closingFive !== null}
-                    disabled={locked}
-                    onchange={(event) => toggleClosingFive(event.currentTarget.checked)}
-                  />
-                  Set a closing five
-                </label>
-                <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  Optional. Used in late, close games.
-                </p>
-                {#if draft.closingFive !== null}
-                  {@const closers = draft.closingFive}
-                  <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                    {#each SLOTS as slot (slot)}
-                      <label class="min-w-0">
-                        <span class="ui-micro">Closer {slot + 1}</span>
-                        <select
-                          class={SELECT_CLASS}
-                          value={closers[slot] ?? ''}
-                          disabled={locked}
-                          onchange={(event) => setCloser(slot, event.currentTarget.value)}
-                        >
-                          {#each roster as player (player.playerId)}
-                            <option value={player.playerId}>
-                              {player.displayName} · {formatPositions(player.positions)}
-                            </option>
-                          {/each}
-                        </select>
-                      </label>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/if}
-          </Panel>
-        {:else}
-          <Panel as="section" padding="sm" aria-label="Rotation summary">
-            <SectionHeading level={4} size="sm" title="Rotation">
-              {#snippet actions()}
-                <Badge tone={editingRotation ? 'primary' : 'neutral'}>
-                  {editingRotation ? 'Custom' : 'Automatic'}
-                </Badge>
-              {/snippet}
-            </SectionHeading>
+          </div>
+          <details class="mt-4 rounded-lg border border-line-soft bg-surface-1 p-3">
+            <summary class="cursor-pointer text-sm font-semibold">Court preview</summary>
             <div class="mt-3">
               <TeamCourtPreview
                 starters={minutes.starters}
                 bench={minutes.bench}
-                readOnly={true}
+                {focusedSlot}
+                readOnly
                 {art}
               />
             </div>
-            <p class="mt-3 text-[11px] leading-snug text-muted-foreground">
-              {editingRotation && !readOnly
-                ? 'A saved custom rotation is in place. Switch to Remix to edit it, or use the staff rotation for this plan.'
-                : 'The staff sets the starters and minutes for every game.'}
-            </p>
-            {#if editingRotation && !readOnly}
-              <div class="mt-2">
-                <Button
-                  tone="secondary"
-                  type="button"
-                  disabled={locked}
-                  onclick={() => setRotationMode('automatic')}
-                >
-                  Use staff rotation
-                </Button>
-              </div>
-            {/if}
-          </Panel>
-        {/if}
+          </details>
 
+          {#if editingRotation}
+            <div class="mt-4 border-t border-line-soft pt-3">
+              <label class="flex items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  class="size-4 accent-primary"
+                  checked={draft.closingFive !== null}
+                  disabled={locked}
+                  onchange={(event) => toggleClosingFive(event.currentTarget.checked)}
+                />
+                Set a closing five
+              </label>
+              <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
+                Optional. Used in late, close games.
+              </p>
+              {#if draft.closingFive !== null}
+                {@const closers = draft.closingFive}
+                <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {#each SLOTS as slot (slot)}
+                    <label class="min-w-0">
+                      <span class="ui-micro">Closer {slot + 1}</span>
+                      <select
+                        class={SELECT_CLASS}
+                        value={closers[slot] ?? ''}
+                        disabled={locked}
+                        onchange={(event) => setCloser(slot, event.currentTarget.value)}
+                      >
+                        {#each roster as player (player.playerId)}
+                          <option value={player.playerId}>
+                            {player.displayName} · {formatPositions(player.positions)}
+                          </option>
+                        {/each}
+                      </select>
+                    </label>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </Panel>
         <Panel as="section" padding="sm" aria-label="Tactics">
           <SectionHeading level={4} size="sm" title="Tactics" />
           <div class="mt-3 grid gap-2">
@@ -826,15 +821,15 @@
           {/if}
         </Panel>
 
-        {#if showHierarchy}
+        {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Scoring hierarchy">
             <SectionHeading
               level={4}
               size="sm"
               title="Scoring hierarchy"
-              description="Optional roles that shift opportunity weight toward the active player's own tendencies."
+              description="Choose who takes the lead on offense and who sets up teammates."
             />
-            <div class="mt-3 grid gap-2">
+            <div class="mt-3 grid gap-3 md:grid-cols-3">
               {#each HIERARCHY_ROLES as role (role.key)}
                 <label class="grid min-w-0 gap-1">
                   <span class="text-sm font-semibold">{role.label}</span>
@@ -852,7 +847,7 @@
                       </option>
                     {/each}
                   </select>
-                  <span class="ui-micro">{role.hint}</span>
+                  <span class="text-xs text-muted-foreground">{role.hint}</span>
                 </label>
               {/each}
             </div>
@@ -885,7 +880,7 @@
           </Panel>
         {/if}
 
-        {#if showUnits}
+        {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Named units">
             <SectionHeading
               level={4}
@@ -981,7 +976,7 @@
           </Panel>
         {/if}
 
-        {#if showRules}
+        {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Coaching rules">
             <SectionHeading
               level={4}
@@ -1001,6 +996,66 @@
                 onMove={moveRule}
               />
             </div>
+          </Panel>
+        {/if}
+        {#if !mastermind}
+          <Panel as="section" padding="sm" aria-label="Game plan summary">
+            <SectionHeading
+              level={4}
+              size="sm"
+              title="Game plan"
+              description={readOnly
+                ? undefined
+                : 'Edit scoring roles, lineup groups, and game situations in Mastermind.'}
+            />
+            <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              {#each HIERARCHY_ROLES as role (role.key)}
+                {@const id = draft.hierarchy[role.key]}
+                <div>
+                  <dt class="text-muted-foreground">{role.label}</dt>
+                  <dd class="font-semibold">{id === null ? 'Staff choice' : lineupNames([id])}</dd>
+                </div>
+              {/each}
+              <div>
+                <dt class="text-muted-foreground">Star rotation</dt>
+                <dd>
+                  {draft.staggerStars && hasStaggerScorers
+                    ? 'Keep a leading scorer on the floor when possible'
+                    : 'Normal substitutions'}
+                </dd>
+              </div>
+            </dl>
+            <details class="mt-3 rounded-lg border border-line-soft bg-surface-1 p-3">
+              <summary class="cursor-pointer text-sm font-semibold"
+                >Lineup groups and game situations</summary
+              >
+              <ul class="mt-2 grid gap-2 text-sm">
+                {#each draft.units as unit, index (index)}
+                  <li><strong>{unit.name}</strong> ? {lineupNames(unit.playerIds)}</li>
+                {:else}
+                  <li class="text-muted-foreground">No saved lineup groups.</li>
+                {/each}
+                {#each draft.rules as rule (rule.ruleId)}
+                  {#if rule.kind === 'closing-lineup'}
+                    <li>
+                      With {Math.floor(rule.secondsRemainingMax / 60)}:{String(
+                        rule.secondsRemainingMax % 60,
+                      ).padStart(2, '0')} or less left and the score within {rule.scoreMarginMax} points,
+                      use {lineupNames(rule.lineup)}.
+                    </li>
+                  {:else}
+                    <li>
+                      At {rule.foulLimit} fouls, replace {lineupNames([rule.playerId])} with {rule.replacementPlayerId ==
+                      null
+                        ? 'a staff-selected substitute'
+                        : lineupNames([rule.replacementPlayerId])}.
+                    </li>
+                  {/if}
+                {:else}
+                  <li class="text-muted-foreground">The staff handles in-game adjustments.</li>
+                {/each}
+              </ul>
+            </details>
           </Panel>
         {/if}
       </div>
@@ -1025,44 +1080,16 @@
         <p class="mt-3 text-xs font-semibold text-positive" role="status">{savedMessage}</p>
       {/if}
     </fieldset>
-
-    {#if !readOnly}
-      <div class="save-bar mt-4 border-t border-line-soft pt-4">
-        <p class="save-state" aria-live="polite">
-          {#if dirty}
-            Unsaved changes
-          {:else}
-            Saved plan is in use
-          {/if}
-        </p>
-        <ActionRow>
-          {#snippet primary()}
-            <Button
-              type="submit"
-              tone={dirty ? 'primary' : 'secondary'}
-              loading={saving}
-              disabled={!validation.valid || locked || !dirty}
-            >
-              {saveLabel}
-            </Button>
-          {/snippet}
-          {#snippet secondary()}
-            <Button tone="secondary" disabled={locked || !dirty} onclick={cancel}>Discard</Button>
-          {/snippet}
-          {#snippet tertiary()}
-            <Button tone="ghost" disabled={locked} onclick={reset}>Reset</Button>
-          {/snippet}
-        </ActionRow>
-      </div>
-    {/if}
   </form>
 
-  {#if showMatchups}
+  {#if matchupContext !== null}
     <div class="mt-4">
       <FullCourtDefensiveMatchupsPanel
         context={matchupContext}
         busy={busy || saving}
-        {readOnly}
+        readOnly={!mastermind}
+        canCustomize={!readOnly && !mastermind}
+        {art}
         {onMatchupsChange}
         {onResetMatchups}
       />
@@ -1073,14 +1100,13 @@
 <style>
   .save-bar {
     position: sticky;
-    bottom: 0.75rem;
+    top: 0.5rem;
     z-index: 20;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1rem;
-    padding-bottom: 0.5rem;
-    background: var(--color-background);
+    background: var(--color-surface-1);
   }
   .save-state {
     margin: 0 auto 0 0;

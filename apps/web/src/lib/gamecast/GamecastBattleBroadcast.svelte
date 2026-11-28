@@ -6,6 +6,7 @@
     GamecastBattleVisibleState,
   } from '#lib/gamecast/gamecast-battle-playback.js';
   import { gamecastBattleLiveBoxFold } from '#lib/gamecast/gamecast-battle-view.js';
+  import GamecastFeed from './GamecastFeed.svelte';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import { gamecastBattleAbilityLines } from '#lib/gamecast/gamecast-battle-playback.js';
   import type { GamecastBattlePlaybackFrame } from '#lib/gamecast/gamecast-battle-stream.js';
@@ -177,34 +178,20 @@
     {/if}
   </section>
 
-  <section class="hm-feed" aria-label="Scoring feed">
-    <header class="hm-feed-head">
-      <h3>Scoring feed</h3>
-      <span>{feed.length} scoring plays</span>
-    </header>
-    {#if recentFeed.length === 0}
-      <p class="hm-feed-empty">Waiting for the first bucket…</p>
-    {:else}
-      <ol class="hm-feed-list" aria-live="polite">
-        {#each recentFeed as line, index (line.key)}
-          <li
-            class="hm-feed-line"
-            data-latest={index === 0}
-            data-side={line.side === localSide ? 'local' : 'opponent'}
-          >
-            <span class="hm-feed-clock"
-              >{havocPeriodLabel(line.period)} {formatHavocClock(line.clockSeconds)}</span
-            >
-            <span class="hm-feed-team">{line.side === localSide ? 'You' : 'Opp'}</span>
-            <span class="hm-feed-summary">{line.summary}</span>
-            <span class="hm-feed-points" data-negative={line.points < 0}
-              >{feedPoints(line.points)}</span
-            >
-          </li>
-        {/each}
-      </ol>
-    {/if}
-  </section>
+  <GamecastFeed
+    label="Scoring feed"
+    title="Scoring feed"
+    emptyMessage="Waiting for the first bucket."
+    showTags={false}
+    periodLabel={havocPeriodLabel}
+    clockLabel={formatHavocClock}
+    countLabel={`${feed.length} scoring plays`}
+    rows={recentFeed.map((line) => ({
+      ...line,
+      side: line.side === localSide ? 'local' : 'opponent',
+      team: line.side === localSide ? 'You' : 'Opp',
+    }))}
+  />
 </section>
 
 <style>
@@ -423,9 +410,6 @@
   .hm-feed-line[data-side='local'] {
     border-left-color: var(--broadcast-accent, #ffd782);
   }
-  .hm-feed-line[data-latest='true'] {
-    background: color-mix(in srgb, var(--broadcast-surface, #303c63) 82%, white 7%);
-  }
   .hm-feed-clock {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -448,12 +432,6 @@
     background: color-mix(in srgb, var(--broadcast-accent, #ffd782) 16%, transparent);
     color: var(--broadcast-accent, #ffd782);
   }
-  .hm-feed-summary {
-    overflow: hidden;
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .hm-ability-line {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
@@ -468,19 +446,6 @@
   }
   .hm-ability-line[data-side='opponent'] .hm-ability-detail strong {
     color: var(--broadcast-opponent, hsl(212 90% 62%));
-  }
-  .hm-feed-points {
-    font-family: var(--font-display);
-    font-size: 15px;
-    font-weight: 900;
-    color: var(--broadcast-positive, #8bceaf);
-  }
-  .hm-feed-points[data-negative='true'] {
-    color: var(--broadcast-opponent, hsl(212 90% 62%));
-  }
-  .hm-feed-empty {
-    font-size: 12px;
-    color: var(--broadcast-muted, #c1cae4);
   }
   @keyframes hm-score-pop {
     0% {
@@ -523,10 +488,6 @@
     }
     .hm-feed-line {
       grid-template-columns: auto auto minmax(0, 1fr);
-    }
-    .hm-feed-points {
-      grid-column: 3;
-      justify-self: end;
     }
   }
   @media (max-width: 480px) {

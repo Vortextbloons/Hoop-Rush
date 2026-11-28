@@ -98,7 +98,11 @@ test('presents variant, roster, strategy, economy, season finish, and achievemen
   expect(presented.playoffLabel).toBe('Champions');
   expect(presented.strategySummary).toBe('Fast pace · Perimeter offense · Pressure defense');
   expect(presented.customRotation).toBe(true);
+  expect(['Under the cap', 'First apron', 'Second apron', 'Over the hard limit']).toContain(
+    presented.capStatusLabel,
+  );
   expect(presented.roster).toHaveLength(6);
+  expect(presented.roster.every((row) => row.teamAbbreviation.length > 0)).toBe(true);
   const overalls = presented.roster.map((row) => row.overall);
   expect(overalls).toEqual([...overalls].sort((left, right) => right - left));
   expect(new Set(overalls).size).toBeGreaterThan(1);

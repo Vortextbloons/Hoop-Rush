@@ -444,15 +444,48 @@ function autoFive(
   weights: readonly number[],
   available: readonly boolean[],
 ): number[] {
-  const slots: number[] = [];
+  type Assignment = { slots: number[]; fits: number; value: number };
+  const complete = (1 << LINEUP_STRUCTURE.length) - 1;
+  const assignments: (Assignment | undefined)[] = [{ slots: [], fits: 0, value: 0 }];
+  for (const [index, player] of roster.entries()) {
+    if (available[index] !== true) continue;
+    for (let mask = complete - 1; mask >= 0; mask -= 1) {
+      const current = assignments[mask];
+      if (current === undefined) continue;
+      for (const [slot, position] of LINEUP_STRUCTURE.entries()) {
+        const bit = 1 << slot;
+        if ((mask & bit) !== 0) continue;
+        const next = mask | bit;
+        const fits = current.fits + Number(canPlay(player.positions, position));
+        const value = current.value + (weights[index] ?? 0);
+        const previous = assignments[next];
+        if (
+          previous !== undefined &&
+          (previous.fits > fits || (previous.fits === fits && previous.value >= value))
+        )
+          continue;
+        const slots = [...current.slots];
+        slots[slot] = index;
+        assignments[next] = { slots, fits, value };
+      }
+    }
+  }
+  const best = assignments[complete];
+  if (best === undefined) return [];
+  const greedy: number[] = [];
   const used = new Set<number>();
-  for (let slot = 0; slot < LINEUP_STRUCTURE.length; slot += 1) {
+  for (const slot of LINEUP_STRUCTURE.keys()) {
     const index = pickForSlot(roster, weights, available, used, slot);
-    if (index === null) return slots;
-    slots.push(index);
+    if (index === null) return best.slots;
+    greedy.push(index);
     used.add(index);
   }
-  return slots;
+  const greedyFits = greedy.filter((index, slot) => {
+    const player = roster[index];
+    return player !== undefined && canPlay(player.positions, slotRequirement(slot));
+  }).length;
+  const greedyValue = greedy.reduce((sum, index) => sum + (weights[index] ?? 0), 0);
+  return greedyFits === best.fits && greedyValue >= best.value - 1e-10 ? greedy : best.slots;
 }
 
 function topByPriority(available: readonly boolean[], priorities: readonly number[]): number[] {
@@ -557,13 +590,27 @@ export function resolveRotationPlan(
           return value;
         });
 
+  const readyWeights = weights.map((weight, index) => {
+    const profile = stamina[index];
+    if (profile?.source !== 'catalog-rating' && profile?.source !== 'override') return weight;
+    const fatigue = 1 - (startingEnergy[index] ?? 1);
+    return weight * (1 - (0.5 * fatigue) / profile.capacityScale);
+  });
+  const minuteWeights = roster.map((player, index) => {
+    const role = clamp(
+      (workloadOf(player) * WORKLOAD_REFERENCE_MINUTES) / NEUTRAL_MINUTES_PER_GAME,
+      1e-6,
+      1,
+    );
+    return (readyWeights[index] ?? 0) * role;
+  });
   let requestedSeconds: number[];
   let targetSeconds: number[];
   if (input.minuteTargets === undefined) {
     notes.push({ code: 'auto-rotation', playerId: null });
     requestedSeconds = weights.map(() => 0);
     targetSeconds = allocateSeconds(
-      weights,
+      minuteWeights,
       FULL_COURT_REGULATION_TEAM_SECONDS,
       FULL_COURT_MAX_PLAYER_SECONDS,
     );
@@ -588,7 +635,7 @@ export function resolveRotationPlan(
     if (availableRequested <= 0) {
       notes.push({ code: 'auto-rotation', playerId: null });
       targetSeconds = allocateSeconds(
-        weights,
+        minuteWeights,
         FULL_COURT_REGULATION_TEAM_SECONDS,
         FULL_COURT_MAX_PLAYER_SECONDS,
       );
@@ -601,7 +648,7 @@ export function resolveRotationPlan(
       const allocated = Math.min(requestedCapacity, FULL_COURT_REGULATION_TEAM_SECONDS);
       targetSeconds = allocateSeconds(availableTargets, allocated, FULL_COURT_MAX_PLAYER_SECONDS);
       const reserveSeconds = allocateSeconds(
-        weights.map((weight, index) => (availableTargets[index] === 0 ? weight : 0)),
+        minuteWeights.map((weight, index) => (availableTargets[index] === 0 ? weight : 0)),
         FULL_COURT_REGULATION_TEAM_SECONDS - allocated,
         FULL_COURT_MAX_PLAYER_SECONDS,
       );
@@ -615,7 +662,7 @@ export function resolveRotationPlan(
   let startingSlots: number[];
   const requestedFive = input.startingFive;
   if (requestedFive === undefined) {
-    startingSlots = autoFive(roster, weights, available);
+    startingSlots = autoFive(roster, readyWeights, available);
     if (startingSlots.length < FULL_COURT_MIN_ROSTER) {
       throw new FullCourtSetupError(
         'insufficient-available',
@@ -660,7 +707,7 @@ export function resolveRotationPlan(
         continue;
       }
       notes.push({ code: 'starter-unavailable', playerId: id });
-      const filler = pickForSlot(roster, weights, available, used, slot, reserved);
+      const filler = pickForSlot(roster, readyWeights, available, used, slot, reserved);
       if (filler === null) {
         throw new FullCourtSetupError(
           'insufficient-available',

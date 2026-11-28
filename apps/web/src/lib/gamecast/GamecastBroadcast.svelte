@@ -7,6 +7,7 @@
     GamecastPlayer,
     GamecastRecordedGame,
   } from './gamecast-types';
+  import GamecastFeed from './GamecastFeed.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -299,44 +300,14 @@
     {/each}
   </div>
 
-  <section class="bc-feed" aria-label="Play-by-play feed">
-    <header class="bc-feed-head">
-      <h3>Live feed</h3>
-      <span class="bc-feed-count">
-        {feed.length}
-        {feed.length === 1 ? 'possession' : 'possessions'}
-      </span>
-    </header>
-    {#if recentFeed.length > 0}
-      <ul class="bc-feed-list" aria-live="polite">
-        {#each recentFeed as line, index (line.key)}
-          <li
-            class="bc-feed-line"
-            class:latest={index === 0}
-            data-offense={line.offense === localParticipantId ? 'local' : 'opponent'}
-          >
-            <span class="bc-feed-clock">
-              {gamecastPeriodLabel(line.period)}
-              {formatClock(Math.max(0, Math.floor(line.clockSeconds)))}
-            </span>
-            <span
-              class="bc-feed-team"
-              data-side={line.offense === localParticipantId ? 'local' : 'opponent'}
-            >
-              {line.offense === localParticipantId ? 'You' : 'Opp'}
-            </span>
-            <span class="bc-feed-tag" data-points={line.points > 0 ? 'yes' : 'no'}>
-              {feedTag(line)}
-            </span>
-            <span class="bc-feed-summary">{displaySummary(line.summary)}</span>
-            {#if line.points > 0}
-              <span class="bc-feed-pts">+{line.points}</span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="bc-feed-empty">Waiting for the first possession…</p>
-    {/if}
-  </section>
+  <GamecastFeed
+    rows={recentFeed.map((line) => ({
+      ...line,
+      side: line.offense === localParticipantId ? 'local' : 'opponent',
+      team: line.offense === localParticipantId ? 'You' : 'Opp',
+      tag: feedTag(line),
+      summary: displaySummary(line.summary),
+    }))}
+    countLabel={`${feed.length} ${feed.length === 1 ? 'possession' : 'possessions'}`}
+  />
 </section>

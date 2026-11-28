@@ -16,7 +16,7 @@
   }: {
     player: HeadshotPlayer;
     manifest: HoopRushManifest;
-    size?: 'sm' | 'md' | 'court' | 'xl';
+    size?: 'xs' | 'sm' | 'md' | 'court' | 'xl';
     eager?: boolean;
     fallbackInitials: string;
   } = $props();
@@ -52,13 +52,15 @@
     attempt = urls.length;
   }
   const faceClass = $derived(
-    size === 'sm'
-      ? 'h-9 w-9 rounded-md text-xs'
-      : size === 'court'
-        ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
-        : size === 'xl'
-          ? 'h-20 w-20 rounded-2xl text-xl md:h-24 md:w-24'
-          : 'h-12 w-12 rounded-lg text-sm',
+    size === 'xs'
+      ? 'h-6 w-6 rounded-full text-[9px]'
+      : size === 'sm'
+        ? 'h-9 w-9 rounded-md text-xs'
+        : size === 'court'
+          ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
+          : size === 'xl'
+            ? 'h-20 w-20 rounded-2xl text-xl md:h-24 md:w-24'
+            : 'h-12 w-12 rounded-lg text-sm',
   );
 </script>
 
@@ -69,8 +71,8 @@
         {src}
         bind:this={imgEl}
         alt=""
-        width={size === 'sm' ? 36 : size === 'xl' ? 96 : 48}
-        height={size === 'sm' ? 36 : size === 'xl' ? 96 : 48}
+        width={size === 'xs' ? 24 : size === 'sm' ? 36 : size === 'xl' ? 96 : 48}
+        height={size === 'xs' ? 24 : size === 'sm' ? 36 : size === 'xl' ? 96 : 48}
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"

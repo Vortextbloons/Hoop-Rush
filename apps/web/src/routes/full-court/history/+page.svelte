@@ -12,6 +12,7 @@
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import { errorMessageOf } from '#lib/errors.js';
   import FullCourtPortrait from '#lib/features/full-court/FullCourtPortrait.svelte';
+  import FullCourtRating from '#lib/features/full-court/FullCourtRating.svelte';
   import {
     presentFullCourtHistoryEntry,
     type FullCourtHistoryEntryView,
@@ -123,7 +124,7 @@
               />
               <StatTile label="Payroll" size="sm" surface="tile" value={entry.payrollLabel} />
               <StatTile
-                label="War Chest left"
+                label="Budget left"
                 size="sm"
                 surface="tile"
                 value={entry.warChestRemainingLabel}
@@ -141,7 +142,7 @@
               <div class="rounded-xl border border-line-soft bg-surface-1 p-3">
                 <p class="ui-label" data-tone="muted">Economy</p>
                 <p class="mt-1 text-sm font-medium">
-                  War Chest spent: {entry.warChestSpentLabel} · Left: {entry.warChestRemainingLabel}
+                  Budget spent: {entry.warChestSpentLabel} · Left: {entry.warChestRemainingLabel}
                 </p>
                 <p class="mt-1 text-xs text-muted-foreground">
                   Scouting: {entry.scoutingSpentLabel} · Roulette spins: {entry.spinSpentLabel}
@@ -177,17 +178,19 @@
                           {player.displayName}
                         </p>
                         <p class="text-muted-foreground">
-                          {player.position} · {player.seasonKey}{player.starter ? ' · Starter' : ''}
+                          {player.teamAbbreviation} · {player.seasonKey} · {player.position}{player.starter
+                            ? ' · Starter'
+                            : ''}
                         </p>
                       </div>
                     </div>
                     <div class="shrink-0 text-right">
-                      <p
-                        class="font-mono text-[11px] font-bold tabular-nums"
-                        aria-label={`Overall ${String(player.overall)}`}
-                      >
-                        {player.overall} OVR
-                      </p>
+                      <FullCourtRating
+                        value={player.overall}
+                        size="sm"
+                        layout="inline"
+                        align="right"
+                      />
                       <p class="font-mono text-[10px] tabular-nums text-muted-foreground">
                         {player.salaryLabel}
                         {#if player.minutesTarget !== null}

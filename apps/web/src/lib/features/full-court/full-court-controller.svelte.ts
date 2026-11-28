@@ -124,6 +124,7 @@ export class FullCourtController {
   pendingForfeit = $state(false);
   busy = $state(false);
   simulating = $state(false);
+  simProgress = $state.raw<{ completed: number; total: number } | null>(null);
   stopRequested = $state(false);
   restingPlayerIds = $state.raw<readonly string[]>([]);
   restingForGameId = $state.raw<string | null>(null);
@@ -201,6 +202,27 @@ export class FullCourtController {
       }
       localStorage.setItem(FULL_COURT_ACTIVE_RUN_KEY, runId);
       await this.#openRun(runId);
+    });
+  }
+
+  abandonRun(): Promise<void> {
+    return this.#act(async () => {
+      const runId = this.draft?.runId ?? this.season?.lock.season.runId ?? null;
+      if (runId === null) return;
+      await this.#nextGamePlanWrite;
+      await this.#repositories.fullCourtNextGamePlanRepository.clear(runId);
+      localStorage.removeItem(FULL_COURT_ACTIVE_RUN_KEY);
+      this.draft = null;
+      this.season = null;
+      this.playoffs = null;
+      this.latestGame = null;
+      this.practice = null;
+      this.savedReplay = null;
+      this.notice = null;
+      this.pendingForfeit = false;
+      this.#controlReturnedForSeriesId = null;
+      this.#clearRest();
+      this.#clearDefensiveMatchups();
     });
   }
 
@@ -816,6 +838,18 @@ export class FullCourtController {
     const repository = this.#repositories.fullCourtSeasonRepository;
     let acceptNextForfeit = input.acceptForfeit;
     let played = 0;
+    const initialSeason = this.season;
+    const total =
+      initialSeason === null
+        ? 0
+        : Math.min(
+            input.count,
+            Math.max(
+              0,
+              CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - initialSeason.checkpoint.completedThroughSlot,
+            ),
+          );
+    if (total > 0) this.simProgress = { completed: 0, total };
     while (!this.#isDisposed()) {
       if (this.stopRequested) {
         return { kind: 'stopped', userGames: played, bracketGames: 0 };
@@ -864,6 +898,7 @@ export class FullCourtController {
 
       acceptNextForfeit = false;
       played += 1;
+      this.simProgress = { completed: played, total: Math.max(total, played) };
       await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
       this.practice = null;
       this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
@@ -924,6 +959,8 @@ export class FullCourtController {
     let acceptNextForfeit = input.acceptForfeit;
     let userGames = 0;
     let bracketGames = 0;
+    const total = Math.max(1, input.count);
+    this.simProgress = { completed: 0, total };
     while (!this.#isDisposed()) {
       if (this.stopRequested) {
         return { kind: 'stopped', userGames, bracketGames };
@@ -1013,6 +1050,9 @@ export class FullCourtController {
       }
 
       bracketGames += 1;
+      if (!userAlive) {
+        this.simProgress = { completed: bracketGames, total: Math.max(total, bracketGames) };
+      }
       const nextView = fullCourtPlayoffView(playoffs.lock, outcome.checkpoint);
       this.playoffs = { ...playoffs, checkpoint: outcome.checkpoint, view: nextView };
       if (!nextIsUser) {
@@ -1028,6 +1068,7 @@ export class FullCourtController {
       }
 
       userGames += 1;
+      this.simProgress = { completed: userGames, total: Math.max(total, userGames) };
       acceptNextForfeit = false;
       this.#controlReturnedForSeriesId = null;
       await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
@@ -1235,6 +1276,7 @@ export class FullCourtController {
       if (!this.#isDisposed()) {
         this.busy = false;
         this.simulating = false;
+        this.simProgress = null;
         this.stopRequested = false;
       }
     }

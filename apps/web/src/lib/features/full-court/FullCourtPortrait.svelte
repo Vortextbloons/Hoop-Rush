@@ -8,7 +8,7 @@
     type FullCourtArtPlayer,
   } from './full-court-art.ts';
 
-  type PortraitSize = 'sm' | 'md' | 'court' | 'xl';
+  type PortraitSize = 'xs' | 'sm' | 'md' | 'court' | 'xl';
 
   let {
     player,
@@ -27,13 +27,15 @@
   const face = $derived(resolvedArt?.faceFor(player) ?? null);
   const initials = $derived(initialsOf(player.displayName));
   const fallbackClass = $derived(
-    size === 'sm'
-      ? 'h-9 w-9 rounded-md text-xs'
-      : size === 'court'
-        ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
-        : size === 'xl'
-          ? 'h-20 w-20 rounded-2xl text-xl md:h-24 md:w-24'
-          : 'h-12 w-12 rounded-lg text-sm',
+    size === 'xs'
+      ? 'h-6 w-6 rounded-full text-[9px]'
+      : size === 'sm'
+        ? 'h-9 w-9 rounded-md text-xs'
+        : size === 'court'
+          ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
+          : size === 'xl'
+            ? 'h-20 w-20 rounded-2xl text-xl md:h-24 md:w-24'
+            : 'h-12 w-12 rounded-lg text-sm',
   );
 
   onMount(() => {

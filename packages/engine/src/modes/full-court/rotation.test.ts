@@ -133,6 +133,30 @@ describe('rotation plan construction', () => {
     expect(plan.startingSlots).toHaveLength(FULL_COURT_MIN_ROSTER);
   });
 
+  it('moves a versatile guard to shooting guard when a point guard can cover the first slot', () => {
+    const roster = fullCourtTestRoster('fit', 5);
+    const pointGuard = fullCourtTestPlayer({ index: 0, prefix: 'fit', rating: 65 });
+    const versatile = fullCourtTestPlayer({ index: 1, prefix: 'fit', rating: 95 });
+    roster[0] = pointGuard;
+    roster[1] = { ...versatile, positions: ['PG', 'SG'] };
+    expect(resolveRotationPlan(roster).startingSlots).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('gives deep reserves fewer minutes than established rotation players', () => {
+    const roster = Array.from({ length: 12 }, (_, index) =>
+      fullCourtTestPlayer({
+        index,
+        prefix: 'depth',
+        minutesPerGame: index < 5 ? 34 : index < 9 ? 18 : 6,
+      }),
+    );
+    const { targetSeconds } = resolveRotationPlan(roster);
+    expect(targetSeconds[0]).toBeGreaterThan(30 * 60);
+    expect(targetSeconds[5]).toBeGreaterThan(10 * 60);
+    expect(targetSeconds[11]).toBeLessThan(6 * 60);
+    expect(targetSeconds.reduce((sum, seconds) => sum + seconds, 0)).toBe(240 * 60);
+  });
+
   it('allocates exactly 240 regulation minutes across a deep roster', () => {
     const plan = resolveRotationPlan(fullCourtTestRoster('deep', 12));
     const total = plan.targetSeconds.reduce((sum, value) => sum + value, 0);
@@ -142,6 +166,26 @@ describe('rotation plan construction', () => {
       expect(seconds).toBeGreaterThanOrEqual(0);
       expect(seconds).toBeLessThanOrEqual(FULL_COURT_MAX_PLAYER_SECONDS);
     }
+  });
+
+  it('gives rested players more automatic minutes when stamina is known', () => {
+    const roster = fullCourtTestRoster('staff-minutes', 8);
+    const baseline = resolveRotationPlan(roster);
+    const plan = resolveRotationPlan(
+      roster,
+      {},
+      roster.map((player, index) => ({
+        playerId: player.playerId,
+        available: true,
+        staminaRating: index === 0 ? 45 : 95,
+        energy: index === 0 ? 0.5 : 1,
+      })),
+    );
+
+    expect(plan.targetSeconds[0] ?? 0).toBeLessThan(baseline.targetSeconds[0] ?? 0);
+    expect(plan.targetSeconds.reduce((sum, value) => sum + value, 0)).toBe(
+      FULL_COURT_REGULATION_TEAM_SECONDS,
+    );
   });
 
   it('keeps an explicit legal plan unchanged and normalizes an illegal one', () => {

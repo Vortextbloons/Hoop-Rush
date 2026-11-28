@@ -59,7 +59,9 @@ function renderView(props: {
       busy: props.busy ?? false,
       onSave: () => Promise.resolve(true),
       ...(props.readOnly === undefined ? {} : { readOnly: props.readOnly }),
-      ...(props.matchupContext === undefined ? {} : { matchupContext: props.matchupContext }),
+      ...(props.matchupContext === undefined
+        ? {}
+        : { matchupContext: props.matchupContext, onMatchupsChange: () => undefined }),
       ...(props.onListBlueprints === undefined ? {} : { onListBlueprints: props.onListBlueprints }),
       ...(props.onSaveBlueprint === undefined ? {} : { onSaveBlueprint: props.onSaveBlueprint }),
       ...(props.onRemoveBlueprint === undefined
@@ -83,13 +85,15 @@ describe('FullCourtCoachingView', () => {
     expect(body).toContain('Reset');
     expect(body).toContain('type="submit"');
     expect(body).toContain('Starter 1');
-    expect(body).toContain('Minutes for Player 1');
+    expect(body).toContain('240 / 240 min');
+    expect(body).not.toContain('Minutes for Player 1');
   });
 
   test('shows five starters, roster minute targets, and an optional closing five', () => {
     const body = renderView({ plan: CUSTOM_PLAN });
 
-    expect(body).toContain('Positions are advisory');
+    expect(body).toContain('aria-label="Change Starter 1"');
+    expect(body).toContain('Autofill minutes');
     expect(body).toContain('Starter 1');
     expect(body).toContain('Starter 5');
     expect(body.split('Minutes for ').length - 1).toBe(ROSTER.length);
@@ -134,10 +138,12 @@ describe('FullCourtCoachingView', () => {
       plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' },
     });
     expect(quick).toContain('aria-label="Coaching interface"');
-    expect(quick).toContain('Pick a strategy and let the staff handle the rotation.');
-    expect(quick).not.toContain('aria-label="Rotation source"');
-    expect(quick).not.toContain('aria-label="Minutes"');
+    expect(quick).toContain('Set a strategy, choose your starters, and manage bench minutes.');
+    expect(quick).toContain('aria-label="Rotation source"');
+    expect(quick).toContain('aria-label="Minutes"');
     expect(quick).toContain('aria-label="Tactics"');
+    expect(quick).toContain('aria-label="Sit Player 7"');
+    expect(quick).toContain('aria-label="Game plan summary"');
 
     const mastermind = renderView({
       plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
@@ -257,10 +263,11 @@ describe('FullCourtCoachingView', () => {
     const presetsIndex = body.indexOf('data-testid="full-court-strategy-presets"');
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);
-    expect(minutesIndex).toBeGreaterThan(courtIndex);
-    expect(tacticsIndex).toBeGreaterThan(minutesIndex);
+    expect(courtIndex).toBeGreaterThan(minutesIndex);
+    expect(tacticsIndex).toBeGreaterThan(courtIndex);
     expect(presetsIndex).toBeGreaterThan(tacticsIndex);
-    expect(saveBarIndex).toBeGreaterThan(presetsIndex);
+    expect(saveBarIndex).toBeGreaterThan(-1);
+    expect(saveBarIndex).toBeLessThan(courtIndex);
   });
 
   test('renders blueprint save controls when callbacks are provided and respects readOnly and busy', () => {
@@ -313,7 +320,7 @@ describe('FullCourtCoachingView', () => {
     expect(withHierarchyBody).toContain('Floor general: Starter 2 (SG)');
   });
 
-  test('shows per-fixture defensive matchups only in Mastermind for an applicable editable fixture', () => {
+  test('shows opponent scouting in every mode and reserves matchup editing for Mastermind', () => {
     const oppRoster = Array.from({ length: 6 }, (_, index) =>
       buildSimulationPlayer({
         playerId: playerIdSchema.parse(`opp-${String(index + 1)}`),
@@ -347,22 +354,22 @@ describe('FullCourtCoachingView', () => {
       forOpponentId: null,
     };
 
-    expect(renderView({ plan: CUSTOM_PLAN, matchupContext })).not.toContain(
-      'aria-label="Full Court defensive matchups"',
-    );
-    expect(
-      renderView({
-        plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' },
-        matchupContext,
-      }),
-    ).not.toContain('aria-label="Full Court defensive matchups"');
-    expect(
-      renderView({
-        plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
-        matchupContext,
-        readOnly: true,
-      }),
-    ).not.toContain('aria-label="Full Court defensive matchups"');
+    for (const interfaceLevel of ['quick', 'remix', 'mastermind'] as const) {
+      const body = renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel }, matchupContext });
+      expect(body).toContain('aria-label="Opponent roster"');
+      expect(body).toContain('Opp 1');
+      expect(body).toContain('projected min');
+      expect(body).toContain('Three-point shot');
+      expect(body.includes('Add matchup')).toBe(interfaceLevel === 'mastermind');
+    }
+
+    const readOnly = renderView({
+      plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
+      matchupContext,
+      readOnly: true,
+    });
+    expect(readOnly).toContain('aria-label="Opponent roster"');
+    expect(readOnly).not.toContain('Add matchup');
     expect(
       renderView({
         plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },

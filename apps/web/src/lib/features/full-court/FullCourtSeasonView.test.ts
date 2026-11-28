@@ -195,7 +195,7 @@ describe('FullCourtSeasonView sections', () => {
     expect(blocked).not.toContain('Sim next game');
   });
 
-  test('home shows the playoff primary action during the bracket', () => {
+  test('home shows the postseason screen once the bracket exists', () => {
     const body = renderView({
       section: 'home',
       checkpoint: completed,
@@ -203,7 +203,18 @@ describe('FullCourtSeasonView sections', () => {
     });
     expect(body).toContain('Postseason');
     expect(body).toContain('Sim next game');
-    expect(body).toContain('Full Court postseason status');
+    expect(body).toContain('aria-label="Full Court postseason"');
+  });
+
+  test('home hands the bracket to the postseason screen instead of simming it', () => {
+    const body = renderView({
+      section: 'home',
+      checkpoint: completed,
+      playoff: bracketView(),
+    });
+    expect(body).toContain('aria-label="Full Court postseason"');
+    expect(body).toContain('aria-label="Full Court playoff bracket"');
+    expect(body).not.toContain('aria-label="Full Court season progress"');
   });
 
   test('home replaces sim actions with the terminal recap after a champion', () => {
@@ -267,7 +278,7 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('aria-label="Full Court playoff bracket"');
     expect(body).toContain('Four rounds to the title');
     expect(body).toContain('aria-label="Your playoff series"');
-    expect(body).toContain('Up next: Game');
+    expect(body).toContain('Your series is live');
     expect(body).not.toContain('aria-label="Full Court regular season"');
   });
 

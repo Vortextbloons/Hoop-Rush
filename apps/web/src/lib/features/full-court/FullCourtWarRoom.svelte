@@ -12,10 +12,9 @@
   } from '@hoop-rush/data-contracts';
   import {
     fullCourtAssessPurchase,
-    fullCourtFilmReport,
     fullCourtLeagueWeaknesses,
+    fullCourtWarChestDollars,
     type FullCourtCatalogIndex,
-    type FullCourtFilmPlayer,
     type FullCourtOpponentWeaknessCode,
     type FullCourtPlayoffOpponentPreview,
     type FullCourtRegularSeason,
@@ -26,31 +25,22 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
   import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
-  import {
-    fullCourtPlayoffAdaptationRead,
-    fullCourtPlayoffFixtureLabel,
-  } from './full-court-season-presenter.ts';
   import FullCourtDefensiveMatchupsPanel from './FullCourtDefensiveMatchupsPanel.svelte';
-  import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
-  import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
   import FullCourtTrainingCampPanel from './FullCourtTrainingCampPanel.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
   import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
 
-  type SeasonTeam = FullCourtRegularSeason['teams'][number];
   type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
-  type FilmReport = ReturnType<typeof fullCourtFilmReport>;
-
-  interface FilmRotationRead {
-    players: readonly FullCourtFilmPlayer[];
-    missingVersion: readonly string[];
-    missingMinutes: readonly string[];
-    startersKnown: boolean;
-  }
+  type WarRoomTab = 'all' | 'fit' | 'camp' | 'film' | 'matchups';
 
   const FILM_PRICE = fullCourtReportPriceDollars('opponent-film');
+  let activeTab = $state<WarRoomTab>('all');
+  let showAllOpponents = $state(false);
 
   const FILM_FINDING_LABELS = {
     'three-point-volume': 'Three-point volume',
@@ -99,6 +89,7 @@
     playoffPreview = null,
     busy,
     onPurchaseReport,
+    preseasonOpen = true,
     practiceOpen = false,
     practice = null,
     onRunPractice = () => undefined,
@@ -114,6 +105,7 @@
     playoffPreview?: FullCourtPlayoffOpponentPreview | null;
     busy: boolean;
     onPurchaseReport: (target: FullCourtReportTarget) => void;
+    preseasonOpen?: boolean;
     practiceOpen?: boolean;
     practice?: FullCourtPracticeReport | null;
     onRunPractice?: (opponentTeamId?: string) => void;
@@ -123,21 +115,32 @@
     art?: FullCourtArt | null;
   } = $props();
 
-  const reportsByTarget = $derived(
-    new Map(
-      (draft.reports ?? []).map((report) => [fullCourtReportTargetKey(report.target), report]),
-    ),
-  );
   const locked = $derived(draft.stage === 'complete');
+  const fitOwned = $derived((draft.reports ?? []).some((report) => report.kind === 'lineup-fit'));
+  const campOwned = $derived(
+    (draft.reports ?? []).some((report) => report.kind === 'training-camp'),
+  );
   const leagueFilmRecord = $derived(
     (draft.reports ?? []).find((report) => report.kind === 'opponent-film') ?? null,
   );
+  const warRoomTabOptions = $derived.by(() => {
+    const base: { value: WarRoomTab; label: string }[] = [
+      { value: 'all', label: 'All' },
+      { value: 'fit', label: 'Roster Fit' },
+      { value: 'camp', label: 'Training Camp' },
+      { value: 'film', label: 'Opponent Film' },
+    ];
+    if (matchupContext !== null) {
+      base.push({ value: 'matchups', label: 'Matchups' });
+    }
+    return base;
+  });
   const leagueOpponents = $derived(
     season.teams
       .filter((team) => team.teamId !== season.userTeamId)
       .map((team) => ({ teamId: team.teamId, displayName: team.displayName })),
   );
-  const topOpponentWeaknesses = $derived.by(() => {
+  const allOpponentWeaknesses = $derived.by(() => {
     if (leagueFilmRecord === null) return [];
     const opponents = season.teams
       .filter((team) => team.teamId !== season.userTeamId)
@@ -160,117 +163,11 @@
           tendencies: player.tendencies,
         })),
       }));
-    return fullCourtLeagueWeaknesses(opponents).slice(0, 8);
+    return fullCourtLeagueWeaknesses(opponents);
   });
-
-  const filmFixture = $derived(
-    nextFilmTarget === null
-      ? null
-      : (season.games.find((game) => game.gameId === nextFilmTarget.gameId) ?? null),
+  const displayedOpponentWeaknesses = $derived(
+    showAllOpponents ? allOpponentWeaknesses : allOpponentWeaknesses.slice(0, 8),
   );
-  const filmPlayoffLabel = $derived(
-    nextFilmTarget?.gameId === undefined
-      ? null
-      : fullCourtPlayoffFixtureLabel(nextFilmTarget.gameId),
-  );
-  const matchingPlayoffAdjustment = $derived.by(() => {
-    if (
-      nextFilmTarget === null ||
-      playoffPreview === null ||
-      playoffPreview.gameId !== nextFilmTarget.gameId ||
-      playoffPreview.opponentTeamId !== nextFilmTarget.opponentTeamId ||
-      playoffPreview.adaptation === null
-    ) {
-      return null;
-    }
-    return fullCourtPlayoffAdaptationRead(playoffPreview.adaptation);
-  });
-  const opponentTeam = $derived(
-    nextFilmTarget === null
-      ? null
-      : (season.teams.find((team) => team.teamId === nextFilmTarget.opponentTeamId) ?? null),
-  );
-  const filmRecord = $derived(
-    nextFilmTarget === null
-      ? null
-      : (reportsByTarget.get(fullCourtReportTargetKey(nextFilmTarget)) ?? null),
-  );
-  const filmAssessment = $derived(
-    nextFilmTarget === null
-      ? null
-      : fullCourtAssessPurchase({ index, state: draft, priceDollars: FILM_PRICE }),
-  );
-  const filmRead = $derived(opponentTeam === null ? null : filmRotationOf(opponentTeam));
-  const filmReport = $derived.by((): FilmReport | null => {
-    const team = opponentTeam;
-    const read = filmRead;
-    if (filmRecord === null || team === null || read === null) return null;
-    if (read.players.length === 0 || team.anchorSeason === null) return null;
-    try {
-      return fullCourtFilmReport({
-        teamId: team.teamId,
-        seasonKey: team.anchorSeason,
-        rotation: read.players,
-      });
-    } catch {
-      return null;
-    }
-  });
-
-  const freeStarters = $derived.by(() => {
-    const team = opponentTeam;
-    const startingFive = team?.rotation?.startingFive;
-    if (team === null || startingFive === undefined) {
-      return { names: [] as string[], complete: false };
-    }
-    const byId = new Map<string, string>(
-      team.roster.map((player) => [player.playerId, player.displayName]),
-    );
-    const names = startingFive.flatMap((playerId) => {
-      const name = byId.get(playerId);
-      return name === undefined ? [] : [name];
-    });
-    return { names, complete: names.length === startingFive.length };
-  });
-
-  function filmRotationOf(team: SeasonTeam): FilmRotationRead {
-    const starters =
-      team.rotation === undefined ? null : new Set<string>(team.rotation.startingFive ?? []);
-    const players: FullCourtFilmPlayer[] = [];
-    const missingVersion: string[] = [];
-    const missingMinutes: string[] = [];
-    for (const player of team.roster) {
-      if (player.playerVersionId === undefined) {
-        missingVersion.push(player.displayName);
-        continue;
-      }
-      const minutes = player.anchors?.minutesPerGame;
-      if (minutes === undefined || minutes <= 0) {
-        missingMinutes.push(player.displayName);
-        continue;
-      }
-      players.push({
-        playerId: player.playerId,
-        playerVersionId: player.playerVersionId,
-        displayName: player.displayName,
-        positions: player.positions,
-        minutes,
-        starter: starters?.has(player.playerId) ?? false,
-        ratings: player.ratings,
-        tendencies: player.tendencies,
-      });
-    }
-    return {
-      players,
-      missingVersion,
-      missingMinutes,
-      startersKnown: starters !== null,
-    };
-  }
-
-  function scopeLabel(kind: 'opponent-film'): string {
-    return fullCourtReportScope(kind) === 'run' ? 'Lifetime of this run' : 'This game only';
-  }
 
   function purchaseAffordance(assessment: PurchaseAssessment): string {
     if (assessment.legal) {
@@ -294,85 +191,153 @@
   }
 
   function buyFilm(): void {
-    if (busy || !locked || leagueFilmRecord !== null) return;
+    if (busy || !locked || !preseasonOpen || leagueFilmRecord !== null) return;
     const assessment = fullCourtAssessPurchase({ index, state: draft, priceDollars: FILM_PRICE });
     if (!assessment.legal) return;
     onPurchaseReport({ kind: 'opponent-film' });
   }
 </script>
 
-<div class="flex flex-col gap-3">
-  <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
+<div class="space-y-3">
+  <Panel as="section" padding="sm" aria-label="War Room overview">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <SegmentedControl
+        label="War Room sections"
+        value={activeTab}
+        onchange={(next) => (activeTab = next)}
+        options={warRoomTabOptions}
+      />
+      <StatGrid columns={4} mobile={2}>
+        <StatTile
+          label="Budget"
+          size="sm"
+          surface="tile"
+          value={formatMillions(fullCourtWarChestDollars(draft))}
+        />
+        <StatTile
+          label="Roster Fit"
+          size="sm"
+          surface="tile"
+          tone={fitOwned ? 'default' : 'muted'}
+          value={fitOwned ? 'Owned' : formatMillions(fullCourtReportPriceDollars('lineup-fit'))}
+        />
+        <StatTile
+          label="Training Camp"
+          size="sm"
+          surface="tile"
+          tone={campOwned ? 'default' : 'muted'}
+          value={campOwned
+            ? 'Booked'
+            : formatMillions(fullCourtReportPriceDollars('training-camp'))}
+        />
+        <StatTile
+          label="Opponent Film"
+          size="sm"
+          surface="tile"
+          tone={leagueFilmRecord !== null ? 'default' : 'muted'}
+          value={leagueFilmRecord !== null ? 'Owned' : formatMillions(FILM_PRICE)}
+        />
+      </StatGrid>
+    </div>
+  </Panel>
 
-  {#if practiceOpen || practice !== null}
-    <FullCourtTrainingCampPanel
-      {draft}
-      {index}
-      {busy}
-      campOpen={practiceOpen}
-      {practiceOpen}
-      {practice}
-      opponents={leagueOpponents}
-      {onPurchaseReport}
-      {onRunPractice}
-      {art}
-    />
-  {:else}
-    <details class="rounded-xl border border-line-soft bg-surface-1/60 px-4 py-2.5">
-      <summary
-        class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
-      >
-        Training Camp · Closed
-      </summary>
-      <div class="mt-2">
+  <div class="grid gap-3 {activeTab === 'all' ? 'xl:grid-cols-2 xl:items-start' : ''}">
+    <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'fit'}>
+      <FullCourtRosterFitPanel
+        {draft}
+        {index}
+        {busy}
+        {onPurchaseReport}
+        purchasable={preseasonOpen}
+        {art}
+      />
+    </div>
+
+    <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'camp'}>
+      {#if practiceOpen || practice !== null}
         <FullCourtTrainingCampPanel
           {draft}
           {index}
           {busy}
-          campOpen={false}
-          practiceOpen={false}
+          campOpen={practiceOpen}
+          {practiceOpen}
           {practice}
           opponents={leagueOpponents}
           {onPurchaseReport}
           {onRunPractice}
           {art}
         />
-      </div>
-    </details>
-  {/if}
+      {:else}
+        <details class="rounded-xl border border-line-soft bg-surface-1/60 px-4 py-2.5">
+          <summary
+            class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+          >
+            Training Camp · Closed
+          </summary>
+          <div class="mt-2">
+            <FullCourtTrainingCampPanel
+              {draft}
+              {index}
+              {busy}
+              campOpen={false}
+              practiceOpen={false}
+              {practice}
+              opponents={leagueOpponents}
+              {onPurchaseReport}
+              {onRunPractice}
+              {art}
+            />
+          </div>
+        </details>
+      {/if}
+    </div>
+  </div>
 
-  <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
-    <SectionHeading
-      eyebrow="War Room"
-      title="League opponent film"
-      level={2}
-      size="md"
-      description="One-time upgrade scanning all league opponents to surface the biggest contenders and their weaknesses."
-    >
-      {#snippet actions()}
-        {#if leagueFilmRecord !== null}
-          <Badge tone="positive">Owned</Badge>
-        {:else}
-          <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-            {formatMillions(FILM_PRICE)}
-          </span>
-        {/if}
-      {/snippet}
-    </SectionHeading>
+  <div hidden={activeTab !== 'all' && activeTab !== 'film'}>
+    <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
+      <SectionHeading
+        eyebrow="War Room"
+        title="League opponent film"
+        level={2}
+        size="md"
+        description="One-time upgrade scanning all league opponents to surface the biggest contenders and their weaknesses."
+      >
+        {#snippet actions()}
+          {#if leagueFilmRecord !== null}
+            <div class="flex items-center gap-2">
+              <Button
+                size="sm"
+                tone="secondary"
+                onclick={() => (showAllOpponents = !showAllOpponents)}
+              >
+                {showAllOpponents
+                  ? 'Top 8 contenders'
+                  : `All ${String(allOpponentWeaknesses.length)} teams`}
+              </Button>
+              <Badge tone="positive">Owned</Badge>
+            </div>
+          {:else}
+            <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
+              {formatMillions(FILM_PRICE)}
+            </span>
+          {/if}
+        {/snippet}
+      </SectionHeading>
 
-    {#if leagueFilmRecord !== null}
-      <div class="mt-3 grid gap-2 sm:grid-cols-2">
-        {#each topOpponentWeaknesses as opponent, idx (opponent.teamId)}
-          {@const oppIdentity = art === null ? null : art.teamFor(opponent.teamId)}
-          <div class="rounded-lg border border-line-soft bg-surface-1 p-2.5">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex min-w-0 items-center gap-2">
+      {#if leagueFilmRecord !== null}
+        <div
+          class="mt-3 grid max-h-[26rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {#each displayedOpponentWeaknesses as opponent, idx (opponent.teamId)}
+            {@const oppIdentity = art === null ? null : art.teamFor(opponent.teamId)}
+            <div class="rounded-lg border border-line-soft bg-surface-1 p-2.5">
+              <div class="flex items-center gap-2">
                 {#if oppIdentity !== null && art !== null}
                   <TeamLogo
                     manifest={art.manifest}
                     franchiseId={oppIdentity.franchiseId}
                     teamExternalId={oppIdentity.teamExternalId}
-                    className="h-5 w-5"
+                    className="h-5 w-5 shrink-0"
                   />
                 {/if}
                 <div class="min-w-0">
@@ -383,49 +348,56 @@
                   <p class="ui-micro">{opponent.seasonKey} · {opponent.rating} OVR</p>
                 </div>
               </div>
+              <div class="mt-2 flex flex-wrap gap-1">
+                {#if opponent.weaknesses.length === 0}
+                  <Badge tone="neutral">No major gaps</Badge>
+                {:else}
+                  {#each opponent.weaknesses as code (code)}
+                    <Badge tone="negative">{WEAKNESS_LABELS[code]}</Badge>
+                  {/each}
+                {/if}
+              </div>
             </div>
-            <div class="mt-2 flex flex-wrap gap-1">
-              {#if opponent.weaknesses.length === 0}
-                <Badge tone="neutral">No major gaps</Badge>
-              {:else}
-                {#each opponent.weaknesses as code (code)}
-                  <Badge tone="negative">{WEAKNESS_LABELS[code]}</Badge>
-                {/each}
-              {/if}
-            </div>
-          </div>
-        {/each}
-      </div>
-    {:else}
-      {@const filmPurchase = fullCourtAssessPurchase({
-        index,
-        state: draft,
-        priceDollars: FILM_PRICE,
-      })}
-      <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
-        <Button
-          size="sm"
-          tone="primary"
-          disabled={busy || !locked || !filmPurchase.legal}
-          aria-label={`Buy opponent film for ${formatMillions(FILM_PRICE)}`}
-          onclick={buyFilm}
-        >
-          <Film size={14} aria-hidden="true" />
-          Buy opponent film
-        </Button>
-        <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-          {purchaseAffordance(filmPurchase)}
+          {/each}
+        </div>
+      {:else if !preseasonOpen}
+        <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+          League opponent film closed before game 1. Preseason purchases are no longer available.
         </p>
-      </div>
-    {/if}
-  </Panel>
+      {:else}
+        {@const filmPurchase = fullCourtAssessPurchase({
+          index,
+          state: draft,
+          priceDollars: FILM_PRICE,
+        })}
+        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
+          <Button
+            size="sm"
+            tone="primary"
+            disabled={busy || !locked || !filmPurchase.legal}
+            aria-label={`Buy opponent film for ${formatMillions(FILM_PRICE)}`}
+            onclick={buyFilm}
+          >
+            <Film size={14} aria-hidden="true" />
+            Buy opponent film
+          </Button>
+          <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
+            {purchaseAffordance(filmPurchase)}
+          </p>
+        </div>
+      {/if}
+    </Panel>
+  </div>
 
   {#if matchupContext !== null}
-    <FullCourtDefensiveMatchupsPanel
-      context={matchupContext}
-      {busy}
-      {onMatchupsChange}
-      {onResetMatchups}
-    />
+    <div hidden={activeTab !== 'all' && activeTab !== 'matchups'}>
+      <FullCourtDefensiveMatchupsPanel
+        context={matchupContext}
+        {art}
+        {busy}
+        {onMatchupsChange}
+        {onResetMatchups}
+      />
+    </div>
   {/if}
 </div>

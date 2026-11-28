@@ -1292,17 +1292,14 @@ test('keeps a stale tab from paying for training camp after another tab commits 
     expect(stale.error).toBe('Training camp practice closes before the first regular-season game.');
     expect(stale.practice).toBeNull();
 
-    // Run-scoped information stays purchasable after the opener; only camp and film close.
+    // Every run perk is bought before the opener, so lineup fit closes with camp and film.
     await stale.purchaseReport({ kind: 'lineup-fit' });
-    expect(stale.error).toBeNull();
+    expect(stale.error).toBe('Roster fit closes before the first regular-season game.');
     expect(
       (await repositoriesFor(second).fullCourtDraftRepository.load(lock.season.runId))?.spending
         .filter((entry) => entry.kind === 'scouting')
         .map((entry) => entry.dollars),
-    ).toEqual([
-      fullCourtReportPriceDollars('player-scouting'),
-      fullCourtReportPriceDollars('lineup-fit'),
-    ]);
+    ).toEqual([fullCourtReportPriceDollars('player-scouting')]);
     stale.dispose();
     live.dispose();
   } finally {

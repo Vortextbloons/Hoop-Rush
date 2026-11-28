@@ -16,6 +16,7 @@
     type FullCourtCatalogRow,
   } from './full-court-draft-presentation.js';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtRating from './FullCourtRating.svelte';
 
   let {
     row,
@@ -81,15 +82,8 @@
           <span class="truncate">{abbreviation} · {player.seasonKey}</span>
         </p>
       </div>
-      <div class="shrink-0 text-right leading-none">
-        <p class="font-display text-xl font-extrabold tracking-tight tabular-nums">
-          {player.originalOverall}
-        </p>
-        <p
-          class="mt-0.5 font-mono text-[8px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
-        >
-          OVR
-        </p>
+      <div class="shrink-0">
+        <FullCourtRating value={player.originalOverall} size="md" layout="stacked" />
       </div>
     </div>
 
@@ -109,22 +103,24 @@
       {/if}
     </div>
 
-    <div class="mt-auto border-t border-line-soft pt-2">
-      <div class="flex items-baseline justify-between gap-2">
+    <div
+      class="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 border-t border-line-soft pt-2"
+    >
+      <div class="min-w-0">
         <span class="ui-micro">Salary</span>
-        <span
-          class="min-w-0 text-right font-mono text-[8px] font-bold tracking-[0.04em] uppercase {capStatusClass(
-            row.statusAfterPick,
-          )}"
+        <p
+          class="font-display mt-0.5 text-base leading-none font-extrabold tracking-tight tabular-nums"
         >
-          {capStatusLabel(row.statusAfterPick)}
-        </span>
+          {formatMillions(row.salaryDollars)}
+        </p>
       </div>
-      <p
-        class="font-display mt-0.5 text-base leading-none font-extrabold tracking-tight tabular-nums"
+      <span
+        class="inline-flex rounded-full border px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.04em] uppercase {capStatusClass(
+          row.statusAfterPick,
+        )}"
       >
-        {formatMillions(row.salaryDollars)}
-      </p>
+        {capStatusLabel(row.statusAfterPick)}
+      </span>
     </div>
   </button>
 

@@ -3,10 +3,7 @@
     CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
     CAP_RUSH_CONFERENCE_NAMES,
     CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
-    CAP_RUSH_SERIES_GAMES,
     CAP_RUSH_SERIES_WINS,
-    capRushConferenceRoundName,
-    capRushSeriesConferenceOf,
     capRushSeriesWinner,
     capRushSeriesWins,
     type FullCourtSeasonCheckpoint,
@@ -27,6 +24,8 @@
   import { franchiseIdentityOf } from '#lib/branding.js';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import ScheduleGrid from '#lib/components/screens/ScheduleGrid.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
@@ -43,6 +42,7 @@
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtPostseasonView from './FullCourtPostseasonView.svelte';
   import {
     fullCourtFinalRecap,
     fullCourtGameDayReadiness,
@@ -51,12 +51,10 @@
     fullCourtNextUserFixture,
     fullCourtPlayoffAdaptationRead,
     fullCourtPlayoffRounds,
-    fullCourtPlayoffStatus,
     fullCourtSeriesGames,
     fullCourtUserSchedule,
     fullCourtUserSeries,
     type FullCourtAdvanceOptions,
-    type FullCourtBracketRound,
     type FullCourtHomeAction,
     type FullCourtMatchupSide,
     type FullCourtPlayoffView,
@@ -81,6 +79,10 @@
     notice = null,
     onDismissNotice,
     art = null,
+    simulating = false,
+    simProgress = null,
+    stopRequested = false,
+    onStopAfterGame,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -99,6 +101,10 @@
     notice?: FullCourtSimulationNotice | null;
     onDismissNotice?: () => void;
     art?: FullCourtArt | null;
+    simulating?: boolean;
+    simProgress?: { readonly completed: number; readonly total: number } | null;
+    stopRequested?: boolean;
+    onStopAfterGame?: () => void;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -203,14 +209,10 @@
         : userSeries.highTeamId,
   );
   const championId = $derived(playoff?.championTeamId ?? null);
-  const postseasonStatus = $derived(
-    playoff === null ? null : fullCourtPlayoffStatus(playoff, userTeamId, teamName),
-  );
   const latestRound = $derived.by(() => {
     const populated = bracketRounds.filter((round) => round.series.length > 0);
     return populated.length === 0 ? 1 : Math.max(...populated.map((round) => round.round));
   });
-  const activeRound = $derived(selectedRound ?? latestRound);
 
   const matchup = $derived(fullCourtNextMatchup(lock, checkpoint, playoff, teamName));
   const nextBracketGameHasUser = $derived(playoff === null || playoff.nextGame?.userSide !== null);
@@ -233,11 +235,13 @@
       ? null
       : fullCourtPlayoffAdaptationRead(userPlayoffPreview.adaptation),
   );
+  /** The postseason screen owns every bracket action and every postseason view. */
+  const playoffMode = $derived(playoff !== null || regularComplete);
   const controls = $derived(
     fullCourtHomeControls({
       lock,
       checkpoint,
-      playoff,
+      playoff: null,
       pendingForfeit,
       busy,
       restConflict: gameDayReadiness.restConflict,
@@ -330,66 +334,117 @@
     if (busy || pendingForfeit) return;
     onStartPlayoffs();
   }
-
-  function seriesSeed(series: FullCourtBracketRound['series'][number], teamId: string): number {
-    return teamId === series.highTeamId ? series.highSeed : series.lowSeed;
-  }
-
-  function seriesHasUser(series: FullCourtBracketRound['series'][number]): boolean {
-    return series.highTeamId === userTeamId || series.lowTeamId === userTeamId;
-  }
 </script>
 
-{#snippet seriesPips(wins: number)}
-  <div class="mt-1.5 flex items-center gap-1" aria-hidden="true">
-    {#each [0, 1, 2, 3] as pip (pip)}
-      <span
-        class="h-2 w-2 rounded-full transition-colors {pip < wins ? 'bg-accent' : 'bg-surface-3'}"
-      ></span>
-    {/each}
-  </div>
-{/snippet}
-
 {#snippet simControlsBar()}
+  {#if simulating}
+    <div
+      class="mt-4 rounded-xl border border-primary/40 bg-primary/5 p-3"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <span class="relative flex h-2.5 w-2.5" aria-hidden="true">
+            <span
+              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75 motion-reduce:animate-none"
+            ></span>
+            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
+          </span>
+          <p class="font-display text-sm font-extrabold tracking-wide uppercase">
+            {#if stopRequested}
+              Saving current game…
+            {:else if simProgress !== null && simProgress.total > 1}
+              Simulating {simProgress.completed} of {simProgress.total} games…
+            {:else if simProgress !== null && simProgress.total === 1}
+              Simulating game…
+            {:else}
+              Simulating games…
+            {/if}
+          </p>
+        </div>
+        {#if onStopAfterGame !== undefined}
+          <Button size="sm" tone="secondary" disabled={stopRequested} onclick={onStopAfterGame}>
+            Stop after this game
+          </Button>
+        {/if}
+      </div>
+      {#if simProgress !== null && simProgress.total > 0}
+        <div
+          class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-3"
+          role="progressbar"
+          aria-label="Season simulation progress"
+          aria-valuemin={0}
+          aria-valuemax={simProgress.total}
+          aria-valuenow={simProgress.completed}
+        >
+          <span
+            class="block h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
+            style:width={`${Math.min(100, (simProgress.completed / simProgress.total) * 100)}%`}
+          ></span>
+        </div>
+      {:else}
+        <div class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-3">
+          <div
+            class="sim-sweep h-full w-1/3 rounded-full bg-primary motion-reduce:animate-none"
+          ></div>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   <div
-    class="mt-5 flex flex-wrap items-center gap-2 border-t border-line-soft pt-4"
+    class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4"
     aria-busy={busy}
   >
-    {#if controls.primary !== null}
-      <Button
-        tone="primary"
-        disabled={busy}
-        onclick={() => {
-          if (controls.primary !== null) runAction(controls.primary);
-        }}
+    <div class="flex flex-wrap items-center gap-2">
+      {#if controls.primary !== null}
+        <Button
+          tone="primary"
+          disabled={busy}
+          onclick={() => {
+            if (controls.primary !== null) runAction(controls.primary);
+          }}
+        >
+          {#if controls.primary.kind === 'start-playoffs'}
+            <Trophy size={15} aria-hidden="true" />
+          {:else}
+            <Play size={15} aria-hidden="true" />
+          {/if}
+          {controls.primary.label}
+        </Button>
+      {/if}
+      {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
+        <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
+          Watch next game
+        </Button>
+      {/if}
+    </div>
+
+    {#if controls.secondary.length > 0}
+      <div
+        class="flex flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
+        role="group"
+        aria-label="Batch simulation"
       >
-        {#if controls.primary.kind === 'start-playoffs'}
-          <Trophy size={15} aria-hidden="true" />
-        {:else}
-          <Play size={15} aria-hidden="true" />
-        {/if}
-        {controls.primary.label}
-      </Button>
+        <span class="ui-micro px-2 text-muted-foreground">Skip</span>
+        {#each controls.secondary as action (action.label)}
+          <Button size="sm" tone="secondary" disabled={busy} onclick={() => runAction(action)}>
+            {#if action.count >= 5}
+              <FastForward size={13} aria-hidden="true" />
+            {:else}
+              <SkipForward size={13} aria-hidden="true" />
+            {/if}
+            {action.label}
+          </Button>
+        {/each}
+      </div>
     {/if}
-    {#each controls.secondary as action (action.label)}
-      <Button tone="secondary" disabled={busy} onclick={() => runAction(action)}>
-        {#if action.count >= 5}
-          <FastForward size={15} aria-hidden="true" />
-        {:else}
-          <SkipForward size={15} aria-hidden="true" />
-        {/if}
-        {action.label}
-      </Button>
-    {/each}
-    {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
-      <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
-        Watch next game
-      </Button>
-    {/if}
-    <p class="text-[11px] text-muted-foreground" role="status">
-      {controls.status}
-    </p>
   </div>
+
+  <p class="mt-2 text-[11px] text-muted-foreground" role="status">
+    {controls.status}
+  </p>
 
   {#if notice !== null && !busy}
     <Alert class="mt-3" tone={notice.tone} title={notice.title}>
@@ -458,300 +513,6 @@
       {role === null ? '' : `${role} · `}{sideMeta(side)}
     </p>
   </div>
-{/snippet}
-
-{#snippet bracketRoundColumn(round: FullCourtBracketRound)}
-  <div class="min-w-0">
-    <p class="font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-      {round.label}
-    </p>
-    <div class="mt-2 flex flex-col gap-2">
-      {#each round.series as series (series.seriesId)}
-        {@const conference = capRushSeriesConferenceOf(series.round, series.seriesSlot)}
-        {@const winner = capRushSeriesWinner(series)}
-        {@const userMatchup = seriesHasUser(series)}
-        <div
-          class="rounded-xl border p-2.5 {userMatchup
-            ? 'border-primary/50 bg-primary/5'
-            : 'border-line-soft bg-surface-1'}"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span
-              class="font-mono text-[8px] font-bold tracking-[0.1em] text-muted-foreground uppercase"
-            >
-              {conference === null ? 'Finals' : conference === 'west' ? 'West' : 'East'}
-            </span>
-            <span class="font-mono text-[9px] tabular-nums text-muted-foreground">
-              {capRushSeriesWins(series, series.highTeamId)}–{capRushSeriesWins(
-                series,
-                series.lowTeamId,
-              )}
-            </span>
-          </div>
-          {#each [series.highTeamId, series.lowTeamId] as teamId (teamId)}
-            {@const wins = capRushSeriesWins(series, teamId)}
-            {@const teamIdentity = identityOf(teamId)}
-            <div
-              class="mt-1.5 flex items-center gap-1.5 text-[11px] {winner === teamId
-                ? 'font-bold text-foreground'
-                : 'text-muted-foreground'}"
-            >
-              <span class="w-4 shrink-0 text-center font-mono text-[9px] tabular-nums"
-                >{seriesSeed(series, teamId)}</span
-              >
-              {#if teamIdentity !== null && manifest !== null}
-                <TeamLogo
-                  {manifest}
-                  franchiseId={teamIdentity.franchiseId}
-                  teamExternalId={teamIdentity.teamExternalId}
-                  alt=""
-                  className="h-4 w-4 shrink-0"
-                />
-              {/if}
-              <span class="min-w-0 flex-1 truncate" title={teamName(teamId)}
-                >{teamName(teamId)}</span
-              >
-              {#if teamId === userTeamId}
-                <span class="shrink-0 font-mono text-[8px] font-bold text-primary uppercase"
-                  >You</span
-                >
-              {/if}
-              <span class="shrink-0 font-mono text-[10px] tabular-nums">{wins}</span>
-            </div>
-          {/each}
-          {#if winner !== null}
-            <p class="mt-1 font-mono text-[8px] font-bold text-positive uppercase">
-              Series decided
-            </p>
-          {/if}
-        </div>
-      {/each}
-      {#if round.series.length === 0}
-        <div
-          class="rounded-xl border border-dashed border-line-soft p-3 text-[10px] text-muted-foreground"
-        >
-          Awaiting the previous round.
-        </div>
-      {/if}
-    </div>
-  </div>
-{/snippet}
-
-{#snippet postseasonPanel()}
-  {#if postseasonStatus !== null}
-    <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Full Court postseason status">
-      <SectionHeading eyebrow="Postseason" title={postseasonStatus.headline} level={2} size="md">
-        {#snippet actions()}
-          <Badge tone="neutral">
-            {championId === null ? 'Bracket in progress' : 'Final'}
-          </Badge>
-        {/snippet}
-      </SectionHeading>
-      <p class="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-        {postseasonStatus.message}
-      </p>
-
-      {#if championId !== null}
-        <div
-          class="mt-4 flex items-center gap-4 rounded-xl border border-accent/50 bg-accent/10 p-4"
-          role="status"
-        >
-          <Trophy size={32} class="shrink-0 text-accent" aria-hidden="true" />
-          <div class="min-w-0">
-            <p class="ui-label text-accent">Champion</p>
-            <p class="font-display text-2xl font-extrabold tracking-tight uppercase">
-              {teamName(championId)}
-            </p>
-            {#if championId === userTeamId}
-              <p class="mt-1 text-xs text-muted-foreground">Your five took the title.</p>
-            {/if}
-          </div>
-        </div>
-      {:else if userSeries === null || !userSeriesActive}
-        {@render simControlsBar()}
-      {/if}
-    </Panel>
-  {/if}
-{/snippet}
-
-{#snippet userSeriesPanel()}
-  {#if userSeries !== null}
-    <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Your playoff series">
-      <div class="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p class="ui-label text-accent">
-            {capRushConferenceRoundName(userSeries.round)} ·
-            {#if userSeriesActive}
-              Game {Math.min(CAP_RUSH_SERIES_GAMES, userSeries.games.length + 1)}
-            {:else}
-              Series complete
-            {/if}
-          </p>
-          <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-            {userSeriesActive ? 'Your series is live' : 'Your series is decided'}
-          </h3>
-        </div>
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
-          Best of seven · First to {CAP_RUSH_SERIES_WINS}
-        </p>
-      </div>
-
-      <div class="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-        {#each [userSeries.highTeamId, userSeries.lowTeamId] as teamId, index (teamId)}
-          {@const identity = identityOf(teamId)}
-          {@const wins = capRushSeriesWins(userSeries, teamId)}
-          {@const won = userSeriesWinner === teamId}
-          <div
-            class="flex min-w-0 items-center gap-3 rounded-xl border p-3 {teamId === userTeamId
-              ? 'border-primary/50 bg-primary/10'
-              : 'border-line-soft bg-surface-1'} {index === 1 ? 'sm:order-3 sm:text-right' : ''}"
-          >
-            {#if identity !== null && manifest !== null}
-              <TeamLogo
-                {manifest}
-                franchiseId={identity.franchiseId}
-                teamExternalId={identity.teamExternalId}
-                alt=""
-                className="h-8 w-8 {index === 1 ? 'sm:order-2' : ''}"
-              />
-            {/if}
-            <div class="min-w-0 flex-1">
-              <p class="font-mono text-[9px] text-muted-foreground uppercase">
-                Seed {seriesSeed(userSeries, teamId)}
-              </p>
-              <p class="truncate text-sm font-bold" title={teamName(teamId)}>
-                {teamName(teamId)}
-              </p>
-              {#if won}
-                <p class="font-mono text-[9px] font-bold text-positive uppercase">Series won</p>
-              {/if}
-            </div>
-            <div class="shrink-0 text-center">
-              <span
-                class="font-display block text-4xl leading-none font-extrabold tabular-nums {won
-                  ? 'text-accent'
-                  : 'text-foreground'}">{wins}</span
-              >
-              {@render seriesPips(wins)}
-            </div>
-          </div>
-          {#if index === 0}
-            <span
-              class="hidden text-center font-mono text-[10px] text-muted-foreground uppercase sm:order-2 sm:block"
-              >vs</span
-            >
-          {/if}
-        {/each}
-      </div>
-
-      {#if nextUserGame !== null && userSeriesActive}
-        <p class="mt-3 text-xs text-muted-foreground">
-          Up next: Game {nextUserGame.gameOrdinal}
-          {nextUserGame.userSide === 'home' ? 'at home' : 'on the road'} against
-          <strong class="text-foreground"
-            >{userSeriesOpponentId === null
-              ? 'your opponent'
-              : teamName(userSeriesOpponentId)}</strong
-          >.
-        </p>
-      {/if}
-      {#if userSeriesActive && userPlayoffAdjustment !== null}
-        <div
-          class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
-          aria-label="Playoff opponent adjustment"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="ui-label text-muted-foreground">Opponent adjustment</p>
-            <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
-          </div>
-          <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
-          <p class="mt-0.5 text-[11px] text-muted-foreground">
-            {userPlayoffAdjustment.detailLabel}
-          </p>
-        </div>
-      {/if}
-
-      {#if userSeriesGames.length > 0}
-        <ol class="mt-3 flex flex-col gap-1.5" aria-label="Games in your playoff series">
-          {#each userSeriesGames as game (game.gameId)}
-            <li
-              class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line-soft bg-surface-1 px-3 py-2"
-            >
-              <span class="font-mono text-[9px] font-bold text-muted-foreground uppercase"
-                >Game {game.gameOrdinal}</span
-              >
-              <span class="font-mono text-[10px] text-muted-foreground uppercase">
-                {game.userHome ? 'Home' : 'Away'}
-              </span>
-              <span
-                class="font-display ml-auto text-lg font-extrabold tabular-nums"
-                title={game.scoreLabel}>{game.compactLabel}</span
-              >
-              <span
-                class="rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold uppercase {game.won
-                  ? 'border-positive/40 bg-positive/10 text-positive'
-                  : 'border-negative/40 bg-negative/10 text-negative'}"
-                >{game.won ? 'Win' : 'Loss'}</span
-              >
-              {#if game.forfeit && !game.doubleForfeit}
-                <span class="font-mono text-[8px] text-muted-foreground uppercase">Forfeit</span>
-              {/if}
-              {#if game.opponentAdaptation !== null}
-                {@const adjustment = fullCourtPlayoffAdaptationRead(game.opponentAdaptation)}
-                <span
-                  class="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[8px] font-bold text-accent uppercase"
-                  title={`${adjustment.reasonLabel}: ${adjustment.detailLabel}`}
-                  aria-label={`Game ${game.gameOrdinal} opponent adjustment: ${adjustment.settingLabel}`}
-                  >{adjustment.settingLabel}</span
-                >
-              {/if}
-              {#if game.adjustmentResponse !== null}
-                <p class="basis-full text-xs text-muted-foreground">{game.adjustmentResponse}</p>
-              {/if}
-            </li>
-          {/each}
-        </ol>
-      {/if}
-      {#if userSeriesActive}
-        {@render simControlsBar()}
-      {/if}
-    </Panel>
-  {/if}
-{/snippet}
-
-{#snippet bracketPanel()}
-  <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Full Court playoff bracket">
-    <SectionHeading eyebrow="Bracket" title="Four rounds to the title" level={2} size="md">
-      {#snippet actions()}
-        <SegmentedControl
-          class="lg:hidden"
-          label="Choose a playoff round"
-          size="md"
-          value={activeRound}
-          onchange={(round) => (selectedRound = round)}
-          options={bracketRounds.map((round) => ({
-            value: round.round,
-            label: round.label,
-          }))}
-        />
-      {/snippet}
-    </SectionHeading>
-
-    <div class="mt-4 lg:hidden">
-      {#if bracketRounds.length > 0}
-        {@const activeBracket = bracketRounds.find((round) => round.round === activeRound)}
-        {#if activeBracket !== undefined}
-          {@render bracketRoundColumn(activeBracket)}
-        {/if}
-      {/if}
-    </div>
-
-    <div class="mt-4 hidden gap-3 lg:grid lg:grid-cols-4">
-      {#each bracketRounds as round (round.round)}
-        {@render bracketRoundColumn(round)}
-      {/each}
-    </div>
-  </Panel>
 {/snippet}
 
 {#snippet recapPanel()}
@@ -1126,60 +887,70 @@
         5-man unit performance across played games. Units with fewer than
         {seasonStats.lineups.sampleThreshold} possessions are marked with *.
       </p>
-      <div class="overflow-x-auto">
-        <table class="ui-stats-table mt-3" aria-label="Full Court season lineups">
-          <thead>
-            <tr>
-              <th scope="col" data-align="start">Lineup</th>
-              <th scope="col">GP</th>
-              <th scope="col">MIN</th>
-              <th scope="col">PF</th>
-              <th scope="col">PA</th>
-              <th scope="col">POSS</th>
-              <th scope="col">NET RTG</th>
-              <th scope="col">RK</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each visibleLineups as lineup (lineup.key)}
-              <tr>
-                <th scope="row" data-align="start">
-                  <div class="flex items-center gap-2">
-                    <div class="flex shrink-0 -space-x-2">
-                      {#each lineup.players as player (player.playerId)}
-                        <div class="rounded-full ring-2 ring-surface-1">
-                          <FullCourtPortrait {player} {art} size="sm" />
-                        </div>
-                      {/each}
-                    </div>
-                    <span class="min-w-0 text-xs font-semibold">
-                      {lineup.players.map((player) => player.displayName).join(' · ')}
-                    </span>
+      <div class="ui-stats-scroll mt-3">
+        <PlayerStatsTable
+          columns={[
+            { key: 'games', label: 'GP', value: (lineup) => lineup.games },
+            { key: 'minutes', label: 'MIN', value: (lineup) => lineup.minutes.toFixed(1) },
+            { key: 'pointsFor', label: 'PF', value: (lineup) => lineup.pointsFor },
+            { key: 'pointsAgainst', label: 'PA', value: (lineup) => lineup.pointsAgainst },
+            {
+              key: 'poss',
+              label: 'POSS',
+              value: (lineup) => possessionLabel(lineup.pacePossessions),
+            },
+            {
+              key: 'netRating',
+              label: 'NET RTG',
+              value: (lineup) =>
+                `${rateLabel(lineup.netRatingPer100)}${lineup.sampleMet ? '' : ' *'}`,
+            },
+            { key: 'rank', label: 'RK', value: (lineup) => lineup.rank ?? '—' },
+          ] satisfies PlayerStatColumn<(typeof visibleLineups)[number]>[]}
+          rows={visibleLineups}
+          rowKey={(lineup) => lineup.key}
+          caption="Full Court season lineups"
+          playerLabel="Lineup"
+          stickyIdentity
+          playerCellClass="ui-stats-player-cell"
+          playerHeadCellClass="ui-stats-player-cell"
+        >
+          {#snippet identity(lineup)}
+            <div class="flex items-center gap-2">
+              <div class="flex shrink-0 -space-x-2">
+                {#each lineup.players as player (player.playerId)}
+                  <div class="rounded-full ring-2 ring-surface-1">
+                    <FullCourtPortrait {player} {art} size="sm" />
                   </div>
-                </th>
-                <td>{lineup.games}</td>
-                <td>{lineup.minutes.toFixed(1)}</td>
-                <td>{lineup.pointsFor}</td>
-                <td>{lineup.pointsAgainst}</td>
-                <td>{possessionLabel(lineup.pacePossessions)}</td>
-                <td
-                  class="font-bold {lineup.netRatingPer100 === null
-                    ? ''
-                    : lineup.netRatingPer100 > 0
-                      ? 'text-positive'
-                      : lineup.netRatingPer100 < 0
-                        ? 'text-negative'
-                        : ''}"
-                >
-                  {rateLabel(lineup.netRatingPer100)}{lineup.sampleMet ? '' : ' *'}
-                </td>
-                <td title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}
-                  >{lineup.rank ?? '—'}</td
-                >
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+                {/each}
+              </div>
+              <span class="min-w-0 text-xs font-semibold">
+                {lineup.players.map((player) => player.displayName).join(' · ')}
+              </span>
+            </div>
+          {/snippet}
+          {#snippet cell(lineup, column)}
+            {#if column.key === 'netRating'}
+              <span
+                class="font-bold {lineup.netRatingPer100 === null
+                  ? ''
+                  : lineup.netRatingPer100 > 0
+                    ? 'text-positive'
+                    : lineup.netRatingPer100 < 0
+                      ? 'text-negative'
+                      : ''}"
+              >
+                {column.value(lineup)}
+              </span>
+            {:else if column.key === 'rank'}
+              <span title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}>
+                {column.value(lineup)}
+              </span>
+            {:else}
+              {column.value(lineup)}
+            {/if}
+          {/snippet}
+        </PlayerStatsTable>
       </div>
       {#if seasonStats.lineups.rows.length > 8}
         <div class="mt-3">
@@ -1276,53 +1047,61 @@
 {/snippet}
 
 <div class="flex flex-col gap-3">
-  {#if section === 'home'}
-    {@render homePanel()}
-    {#if recap !== null}
-      {@render recapPanel()}
-    {:else if playoff !== null}
-      {@render postseasonPanel()}
-    {/if}
-    {@render latestResultPanel()}
-  {:else if section === 'league'}
+  {#if section === 'league'}
     {@render leaguePanel()}
   {:else if section === 'stats'}
     {@render statsPanel()}
-  {:else if playoff === null}
+  {:else if playoffMode}
+    {#if recap !== null}
+      {@render recapPanel()}
+    {:else}
+      <FullCourtPostseasonView
+        {lock}
+        {checkpoint}
+        {playoff}
+        {standings}
+        {pendingForfeit}
+        {busy}
+        {simulating}
+        {stopRequested}
+        {notice}
+        {onDismissNotice}
+        {onAdvance}
+        {onStartPlayoffs}
+        {onStopAfterGame}
+        {art}
+      />
+    {/if}
+  {:else if section === 'playoffs'}
     <Panel as="section" padding="md" aria-label="Full Court postseason">
       <SectionHeading
         eyebrow="Postseason"
-        title={regularComplete
-          ? 'The bracket is ready to seed'
-          : 'The bracket opens after 82 games'}
+        title="The bracket opens after 82 games"
         level={2}
         size="md"
       />
       <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        {#if regularComplete}
-          The regular season is complete. Seed the top eight in each conference and play the
-          bracket.
-        {:else}
-          {remaining}
-          {remaining === 1 ? 'regular-season game remains' : 'regular-season games remain'} before the
-          top eight in each conference are seeded.
-        {/if}
+        {remaining}
+        {remaining === 1 ? 'regular-season game remains' : 'regular-season games remain'} before the top
+        eight in each conference are seeded.
       </p>
-      {#if regularComplete}
-        <Button
-          class="mt-4"
-          tone="primary"
-          disabled={busy || pendingForfeit}
-          onclick={startPlayoffs}
-        >
-          <Trophy size={15} aria-hidden="true" />
-          Start playoffs
-        </Button>
-      {/if}
     </Panel>
   {:else}
-    {@render postseasonPanel()}
-    {@render userSeriesPanel()}
-    {@render bracketPanel()}
+    {@render homePanel()}
+    {@render latestResultPanel()}
   {/if}
 </div>
+
+<style>
+  @keyframes simSweep {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+  .sim-sweep {
+    animation: simSweep 1.15s ease-in-out infinite;
+  }
+</style>

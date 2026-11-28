@@ -441,6 +441,47 @@ describe('full court report purchases', () => {
     }
   });
 
+  it('closes roster fit and league film once the regular season has started', () => {
+    const setup = fullCourtTestSetup();
+    const confirmed = finish(setup, sixPickState(setup));
+    const open = {
+      completedThroughSlot: 0,
+      postseasonStarted: false,
+      playedGameIds: new Set<string>(),
+    };
+    const cases: readonly {
+      target: FullCourtReportTarget;
+      message: string;
+    }[] = [
+      {
+        target: { kind: 'lineup-fit' },
+        message: 'Roster fit closes before the first regular-season game.',
+      },
+      {
+        target: { kind: 'opponent-film' },
+        message: 'League opponent film closes before the first regular-season game.',
+      },
+    ];
+    for (const { target, message } of cases) {
+      const command: FullCourtPurchaseReportCommand = {
+        command: 'purchase-full-court-report',
+        commandId: commandId(`cmd-${target.kind}-phase`, confirmed.revision),
+        runId: confirmed.runId,
+        expectedRevision: confirmed.revision,
+        target,
+      };
+      expect(fullCourtPurchasePhaseRejection(confirmed, command, open)).toBeNull();
+      for (const phase of [
+        { ...open, completedThroughSlot: 1 },
+        { ...open, postseasonStarted: true },
+      ]) {
+        const closed = fullCourtPurchasePhaseRejection(confirmed, command, phase);
+        expect(closed?.status).toBe('rejected');
+        expect(closed?.rejection?.message).toBe(message);
+      }
+    }
+  });
+
   it('closes opponent film once its fixture is committed', () => {
     const setup = fullCourtTestSetup();
     const confirmed = finish(setup, sixPickState(setup));
