@@ -4,7 +4,7 @@
   import { Crown } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
-  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import { buildPlayerProfile, defaultSlotForPositions } from '#lib/players/player-profile.js';
   import type { PlayerProfileReferences } from '#lib/players/player-profile.js';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, initialsOf } from './cap-rush-presentation.ts';
@@ -82,9 +82,10 @@
   const selectedProfile = $derived.by(() => {
     const player = selectedSlot?.player ?? null;
     if (player === null) return null;
+    const slot = selectedSlot?.slot ?? defaultSlotForPositions(player.positions);
     return buildPlayerProfile(
-      capRushProfileInput(player, selectedTeam?.abbreviation ?? player.franchiseId),
-      references?.forSlot(player.positions[0] ?? '') ?? null,
+      capRushProfileInput(player, selectedTeam?.abbreviation ?? player.franchiseId, slot),
+      references?.forSlot(slot) ?? null,
     );
   });
 

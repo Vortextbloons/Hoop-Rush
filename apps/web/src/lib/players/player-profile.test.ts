@@ -3,6 +3,7 @@ import type { SimulationRatings, SimulationTendencies } from '@hoop-rush/data-co
 import {
   buildPlayerProfile,
   buildPlayerProfileReferences,
+  defaultSlotForPositions,
   PROFILE_RATING_GROUPS,
   type ProfileSample,
 } from './player-profile.ts';
@@ -393,6 +394,45 @@ describe('player profile traits', () => {
     );
     expect(view.strengths.map((trait) => trait.label)).toContain('Pick-and-roll maestro');
     expect(view.archetype).toBe('Pick-and-roll maestro');
+  });
+
+  it('names a wing archetype for a swingman evaluated at SF instead of forcing guard maestro', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ insideScoring: 78, ballHandling: 72, passing: 65, speed: 75 }),
+        tendencies: tendencies({ driveRate: 32, rimFrequency: 36 }),
+      },
+      [...samples, ...cohort(60, 'SF')],
+      { positions: ['PF', 'PG', 'SF', 'SG'], slot: 'SF' },
+    );
+    expect(view.archetype).toBe('Slashing wing');
+  });
+
+  it('names a slashing guard for a downhill guard without elite table-setting passing', () => {
+    const view = profileOf(
+      {
+        ratings: ratings({ passing: 60, speed: 76, insideScoring: 76, offensiveIq: 74 }),
+        tendencies: tendencies({
+          usageRate: 35,
+          driveRate: 32,
+          rimFrequency: 36,
+          pickAndRollBallHandlerRate: 26,
+        }),
+      },
+      samples,
+      { positions: ['PG'], slot: 'PG' },
+    );
+    expect(view.archetype).toBe('Slashing guard');
+    expect(view.archetype).not.toBe('Pick-and-roll maestro');
+  });
+
+  it('determines the default slot for various position combinations', () => {
+    expect(defaultSlotForPositions([])).toBe('PG');
+    expect(defaultSlotForPositions(['SG'])).toBe('SG');
+    expect(defaultSlotForPositions(['PF', 'SF'])).toBe('SF');
+    expect(defaultSlotForPositions(['PF', 'PG', 'SF', 'SG'])).toBe('SF');
+    expect(defaultSlotForPositions(['C', 'PF'])).toBe('C');
+    expect(defaultSlotForPositions(['PG', 'SG'])).toBe('PG');
   });
 
   it('names a 3-and-D big for a center with rim protection and floor spacing', () => {

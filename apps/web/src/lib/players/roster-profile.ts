@@ -1,9 +1,10 @@
 import type { PlayoffPerformance, RosterDetailsEntry } from '@hoop-rush/data-contracts';
-import type {
-  PlayerProfileInput,
-  PlayerProfileStatGroup,
-  PlayerProfileStats,
-  ProfileSample,
+import {
+  defaultSlotForPositions,
+  type PlayerProfileInput,
+  type PlayerProfileStatGroup,
+  type PlayerProfileStats,
+  type ProfileSample,
 } from '#lib/players/player-profile.js';
 
 type RosterStats = RosterDetailsEntry['stats'];
@@ -122,7 +123,7 @@ export function rosterProfileInput(
     postseason:
       postseasonGroupsOf(row.playoffPerformance) ??
       postseasonGroupsOf(detail.playoffPerformance ?? null),
-    slot: row.positionsPlayable[0] ?? null,
+    slot: defaultSlotForPositions(row.positionsPlayable),
   };
 }
 

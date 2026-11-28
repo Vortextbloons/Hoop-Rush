@@ -3,7 +3,7 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { Check, ChevronDown } from '@lucide/svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
-  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import { buildPlayerProfile, defaultSlotForPositions } from '#lib/players/player-profile.js';
   import { capRushProfileInput } from '#lib/features/cap-rush/cap-rush-player-profile.js';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
@@ -55,9 +55,10 @@
   // Playstyle is free information, the way Cap Rush shows it on every card.
   let expanded = $state(false);
   const profile = $derived.by(() => {
-    const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
+    const slot = defaultSlotForPositions(player.positions);
+    const reference = fullCourtProfileReferences(index).forSlot(slot) ?? null;
     return buildPlayerProfile(
-      capRushProfileInput(player, team?.abbreviation ?? abbreviation),
+      capRushProfileInput(player, team?.abbreviation ?? abbreviation, slot),
       reference,
     );
   });

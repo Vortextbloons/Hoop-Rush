@@ -11,7 +11,7 @@ import {
   apronTierLabel,
   apronTierShortLabel,
 } from '#lib/players/player-apron.js';
-import type { PlayerProfileInput } from '#lib/players/player-profile.js';
+import { defaultSlotForPositions, type PlayerProfileInput } from '#lib/players/player-profile.js';
 
 /** First- and second-apron rule text, matching the locked-run behaviour. */
 const APRON_RULES: Readonly<
@@ -128,6 +128,7 @@ export function capRushApronHeadline(view: PlayerApronView): string | null {
 export function capRushProfileInput(
   player: CapRushSourcePlayer,
   franchiseLabel: string,
+  slot?: string | null,
 ): PlayerProfileInput {
   return {
     displayName: player.displayName,
@@ -142,7 +143,7 @@ export function capRushProfileInput(
     ratings: player.profile.ratings,
     tendencies: player.profile.tendencies,
     anchors: player.profile.anchors ?? null,
-    slot: player.positions[0] ?? null,
+    slot: slot ?? defaultSlotForPositions(player.positions),
   };
 }
 

@@ -478,7 +478,7 @@ const STRENGTH_RULES: readonly TraitRule[] = [
   {
     label: 'Pick-and-roll maestro',
     phrase: 'pick-and-roll creation',
-    signal: { tendencies: ['pickAndRollBallHandlerRate'], ratings: ['passing', 'offensiveIq'] },
+    signal: { tendencies: ['pickAndRollBallHandlerRate'] },
     test: (c) =>
       c.tendency('pickAndRollBallHandlerRate') >= 0.85 &&
       (c.rating('passing') >= 0.75 || c.rating('offensiveIq') >= 0.75),
@@ -724,6 +724,47 @@ function joinPhrases(phrases: readonly string[]): string {
   return `${first}, ${second}${rest.length > 1 ? `, ${rest.slice(0, -1).join(', ')}` : ''}, and ${last}`;
 }
 
+export function defaultSlotForPositions(positions: readonly string[]): string {
+  if (positions.length === 0) return 'PG';
+  if (positions.length === 1) return positions[0] ?? 'PG';
+  if (
+    positions.includes('PG') &&
+    !positions.includes('SF') &&
+    !positions.includes('PF') &&
+    !positions.includes('C')
+  ) {
+    return 'PG';
+  }
+  if (
+    positions.includes('SG') &&
+    !positions.includes('SF') &&
+    !positions.includes('PF') &&
+    !positions.includes('C')
+  ) {
+    return 'SG';
+  }
+  if (
+    positions.includes('C') &&
+    !positions.includes('SF') &&
+    !positions.includes('SG') &&
+    !positions.includes('PG')
+  ) {
+    return 'C';
+  }
+  if (
+    positions.includes('PF') &&
+    !positions.includes('SF') &&
+    !positions.includes('SG') &&
+    !positions.includes('PG')
+  ) {
+    return 'PF';
+  }
+  if (positions.includes('SF')) {
+    return 'SF';
+  }
+  return positions[0] ?? 'PG';
+}
+
 /**
  * Picks the archetype backed by the strongest evidence rather than the first
  * fixed rule that matches. A guard with elite steals and passing should not be
@@ -734,6 +775,7 @@ function archetypeOf(
   allWeaknesses: readonly PlayerProfileTrait[],
   positions: readonly string[],
   tendencies: Readonly<SimulationTendencies>,
+  slot?: string | null,
 ): string {
   const labels = new Set([...allStrengths, ...allWeaknesses].map((trait) => trait.label));
   const has = (label: string) => labels.has(label);
@@ -745,10 +787,11 @@ function archetypeOf(
     return required.reduce((sum, label) => sum + strengthOf(label), 0) / required.length;
   };
 
-  const isGuard = positions.some((position) => position === 'PG' || position === 'SG');
-  const isBig = positions.some((position) => position === 'C' || position === 'PF');
-  const hasWing = positions.some((position) => position === 'SF');
-  const isCenter = positions.includes('C');
+  const effectiveSlot = slot && slot.length > 0 ? slot : defaultSlotForPositions(positions);
+  const isGuard = effectiveSlot === 'PG' || effectiveSlot === 'SG';
+  const isBig = effectiveSlot === 'C' || effectiveSlot === 'PF';
+  const isCenter = effectiveSlot === 'C';
+  const hasWing = effectiveSlot === 'SF';
   const shootsIt = has('Unlimited range') || has('High-volume shooter');
 
   const candidates: { label: string; score: number }[] = [];
@@ -781,10 +824,17 @@ function archetypeOf(
     }
     candidates.push({ label: 'Creator', score: evidence('Table-setting passer') });
     if (has('Pick-and-roll maestro')) {
-      candidates.push({
-        label: 'Pick-and-roll maestro',
-        score: evidence('Pick-and-roll maestro'),
-      });
+      if (has('Table-setting passer')) {
+        candidates.push({
+          label: 'Pick-and-roll maestro',
+          score: evidence('Pick-and-roll maestro', 'Table-setting passer'),
+        });
+      } else {
+        candidates.push({
+          label: 'Pick-and-roll maestro',
+          score: strengthOf('Pick-and-roll maestro') * 0.88,
+        });
+      }
     }
     if (has('Midrange maestro') && (has('Isolation scorer') || has('High-usage engine'))) {
       candidates.push({
@@ -801,10 +851,20 @@ function archetypeOf(
         score: evidence('High-usage engine', 'High-volume shooter'),
       });
     }
-    candidates.push({
-      label: 'Scoring guard',
-      score: evidence('High-usage engine', 'Isolation scorer'),
-    });
+    if (has('High-usage engine') && (has('Isolation scorer') || has('Downhill driver'))) {
+      candidates.push({
+        label: 'Scoring guard',
+        score: evidence(
+          'High-usage engine',
+          has('Isolation scorer') ? 'Isolation scorer' : 'Downhill driver',
+        ),
+      });
+    } else {
+      candidates.push({
+        label: 'Scoring guard',
+        score: evidence('High-usage engine', 'Isolation scorer'),
+      });
+    }
     candidates.push({ label: 'Slashing guard', score: evidence('Downhill driver') });
     if (has('Transition weapon') && (has('Downhill driver') || has('Rim finisher'))) {
       candidates.push({
@@ -1097,7 +1157,13 @@ export function buildPlayerProfile(
     overall: input.overall,
     offense: input.offense,
     defense: input.defense,
-    archetype: archetypeOf(allStrengths, allWeaknesses, input.positions, input.tendencies),
+    archetype: archetypeOf(
+      allStrengths,
+      allWeaknesses,
+      input.positions,
+      input.tendencies,
+      input.slot,
+    ),
     summary: summaryOf(strengths, weaknesses),
     strengths,
     weaknesses,

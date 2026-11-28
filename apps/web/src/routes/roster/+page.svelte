@@ -325,7 +325,7 @@
     if (input === null) return null;
     return buildPlayerProfile(
       input,
-      profileReferences.forSlot(row.positionsPlayable[0] ?? '') ?? null,
+      profileReferences.forSlot(input.slot ?? row.positionsPlayable[0] ?? '') ?? null,
     );
   });
 

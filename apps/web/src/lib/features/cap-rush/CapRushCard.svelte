@@ -6,7 +6,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
-  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import { buildPlayerProfile, defaultSlotForPositions } from '#lib/players/player-profile.js';
   import type { PlayerProfileReferences } from '#lib/players/player-profile.js';
   import type { CapRushArt } from './cap-rush-art.ts';
   import {
@@ -58,9 +58,14 @@
   const apronStrip = $derived(capRushApronStrip(apron));
 
   const profile = $derived.by(() => {
-    const reference = references?.forSlot(player.positions[0] ?? '') ?? null;
+    const slot = card.slot ?? defaultSlotForPositions(player.positions);
+    const reference = references?.forSlot(slot) ?? null;
     return buildPlayerProfile(
-      capRushProfileInput(player, team?.abbreviation ?? franchiseAbbreviation(player.franchiseId)),
+      capRushProfileInput(
+        player,
+        team?.abbreviation ?? franchiseAbbreviation(player.franchiseId),
+        slot,
+      ),
       reference,
     );
   });
