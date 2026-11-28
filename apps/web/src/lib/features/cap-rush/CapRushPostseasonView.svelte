@@ -1,4 +1,9 @@
 <script lang="ts">
+  import PlayoffSeriesWins from '#lib/components/screens/PlayoffSeriesWins.svelte';
+  import PlayoffGameRow from '#lib/components/screens/PlayoffGameRow.svelte';
+  import PauseSimulationButton from '#lib/components/screens/PauseSimulationButton.svelte';
+  import SimulationProgress from '#lib/components/screens/SimulationProgress.svelte';
+  import ChampionshipBanner from '#lib/components/screens/ChampionshipBanner.svelte';
   import {
     CAP_RUSH_SERIES_WINS,
     capRushConferenceStandingsEntries,
@@ -8,7 +13,7 @@
     type CapRushPlayoffSeries,
     type CapRushStoredPlayoffGame,
   } from '@hoop-rush/data-contracts';
-  import { Play, SkipForward, Trophy, X } from '@lucide/svelte';
+  import { Play, SkipForward, Trophy } from '@lucide/svelte';
   import type { CapRushDraftView } from '@hoop-rush/application/cap-rush';
   import { capRushBoxOf } from '@hoop-rush/engine';
   import DialogShell from '#lib/components/DialogShell.svelte';
@@ -265,32 +270,11 @@
   </header>
 
   {#if isChampion}
-    <div
-      class="relative overflow-hidden rounded-2xl border border-accent/50 bg-accent/10 p-5 sm:p-7 {liveChampion
-        ? 'trophy-banner'
-        : ''}"
-      role="status"
-    >
-      {#if liveChampion}
-        <div class="confetti" aria-hidden="true">
-          {#each Array.from({ length: 14 }, (_, index) => index) as piece (piece)}
-            <span style="--i:{piece}"></span>
-          {/each}
-        </div>
-      {/if}
-      <div class="relative flex items-center gap-4">
-        <Trophy size={40} class="shrink-0 text-accent" aria-hidden="true" />
-        <div class="min-w-0">
-          <p class="ui-label text-accent">Cap Rush champion</p>
-          <h2 class="font-display text-3xl font-extrabold tracking-tight uppercase">
-            {championEntry?.displayName ?? 'Your five'}
-          </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Four rounds. Four wins each. The championship is yours.
-          </p>
-        </div>
-      </div>
-    </div>
+    <ChampionshipBanner
+      team={championEntry?.displayName ?? 'Your five'}
+      label="Cap Rush champion"
+      celebrate={liveChampion}
+    />
   {:else if championEntry !== null}
     <Panel role="status" padding="md">
       <SectionHeading
@@ -367,15 +351,10 @@
   <Panel padding="none" class="p-4 sm:p-5" aria-label="Postseason action">
     <div class="flex flex-wrap items-center gap-2">
       {#if controller.busy}
-        <button
-          type="button"
-          class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 text-sm font-bold outline-none hover:border-negative hover:text-negative focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          disabled={controller.cancelling}
-          onclick={() => controller.cancel()}
-        >
-          <X size={15} aria-hidden="true" />
-          {controller.cancelling ? 'Pausing…' : 'Pause'}
-        </button>
+        <PauseSimulationButton
+          stopping={controller.cancelling}
+          onStop={() => controller.cancel()}
+        />
       {:else if postseason?.phase === 'complete'}
         <button
           type="button"
@@ -422,19 +401,11 @@
     </div>
 
     {#if controller.progress !== null}
-      <div
-        class="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-3"
-        role="progressbar"
-        aria-label="Postseason simulation progress"
-        aria-valuemin={0}
-        aria-valuemax={controller.progress.total}
-        aria-valuenow={controller.progress.completed}
-      >
-        <span
-          class="block h-full rounded-full bg-primary motion-reduce:transition-none"
-          style:width={`${Math.min(100, (controller.progress.completed / controller.progress.total) * 100)}%`}
-        ></span>
-      </div>
+      <SimulationProgress
+        class="mt-3"
+        label="Postseason simulation progress"
+        progress={controller.progress}
+      />
     {/if}
 
     {#if controller.notice !== null}
@@ -500,13 +471,7 @@
               {/if}
             </div>
             <div class="shrink-0 text-center">
-              {#key seriesWins(userSeries, teamId)}
-                <span
-                  class="series-wins font-display block text-4xl font-extrabold leading-none tabular-nums {won
-                    ? 'text-accent'
-                    : 'text-foreground'}">{seriesWins(userSeries, teamId)}</span
-                >
-              {/key}
+              <PlayoffSeriesWins wins={seriesWins(userSeries, teamId)} {won} />
             </div>
           </div>
           {#if index === 0}
@@ -525,37 +490,27 @@
             {@const userPoints = userHome ? game.homePoints : game.awayPoints}
             {@const otherPoints = userHome ? game.awayPoints : game.homePoints}
             {@const userWon = game.winnerTeamId === userTeamId}
-            <li
-              class="game-row flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 {index ===
-              0
-                ? 'game-row-latest'
-                : ''}"
+            <PlayoffGameRow
+              ordinal={game.gameOrdinal}
+              home={userHome}
+              won={userWon}
+              latest={index === 0}
             >
-              <span class="font-mono text-[9px] font-bold text-muted-foreground uppercase"
-                >Game {game.gameOrdinal}</span
-              >
-              <span class="font-mono text-[10px] text-muted-foreground uppercase">
-                {userHome ? 'Home' : 'Away'}
-              </span>
-              <button
-                type="button"
-                class="font-display ml-auto rounded text-lg font-extrabold tabular-nums outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-                onclick={() => openSeriesBox(game)}
-              >
-                {userPoints}–{otherPoints}
-              </button>
-              <span
-                class="rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold uppercase {userWon
-                  ? 'border-positive/40 bg-positive/10 text-positive'
-                  : 'border-negative/40 bg-negative/10 text-negative'}"
-                >{userWon ? 'Win' : 'Loss'}</span
-              >
+              {#snippet score()}
+                <button
+                  type="button"
+                  class="font-display ml-auto rounded text-lg font-extrabold tabular-nums outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                  onclick={() => openSeriesBox(game)}
+                >
+                  {userPoints}–{otherPoints}
+                </button>
+              {/snippet}
               {#if game.overtimePeriods > 0}
                 <span class="font-mono text-[8px] text-muted-foreground uppercase"
                   >OT{game.overtimePeriods > 1 ? ` ${game.overtimePeriods}` : ''}</span
                 >
               {/if}
-            </li>
+            </PlayoffGameRow>
           {/each}
         </ol>
       {/if}
@@ -667,39 +622,6 @@
   .seed-reveal {
     animation: seed-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
-  .trophy-banner {
-    animation: trophy-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .series-wins {
-    animation: win-bump 280ms ease-out;
-  }
-  .game-row-latest {
-    animation: score-in 320ms ease-out both;
-  }
-  .confetti {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .confetti span {
-    position: absolute;
-    top: -10%;
-    left: calc((var(--i) + 0.5) * 7%);
-    width: 6px;
-    height: 10px;
-    border-radius: 1px;
-    background: var(--cr-gold);
-    opacity: 0.8;
-    animation: confetti-fall 1600ms ease-in both;
-    animation-delay: calc(var(--i) * 35ms);
-  }
-  .confetti span:nth-child(3n) {
-    background: var(--color-primary);
-  }
-  .confetti span:nth-child(4n) {
-    background: var(--cr-ice);
-  }
   @keyframes seed-in {
     from {
       transform: translateY(-4px);
@@ -710,57 +632,9 @@
       opacity: 1;
     }
   }
-  @keyframes trophy-in {
-    from {
-      transform: translateY(10px) scale(0.98);
-      opacity: 0;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-  @keyframes win-bump {
-    0% {
-      transform: scale(1.35);
-      color: var(--cr-gold);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
-  @keyframes score-in {
-    from {
-      transform: translateY(4px);
-      opacity: 0;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-  @keyframes confetti-fall {
-    0% {
-      transform: translateY(-20%) rotate(0deg);
-      opacity: 0;
-    }
-    15% {
-      opacity: 0.9;
-    }
-    100% {
-      transform: translateY(780%) rotate(540deg);
-      opacity: 0;
-    }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .seed-reveal,
-    .trophy-banner,
-    .series-wins,
-    .game-row-latest {
+    .seed-reveal {
       animation: none;
-    }
-    .confetti {
-      display: none;
     }
   }
 </style>

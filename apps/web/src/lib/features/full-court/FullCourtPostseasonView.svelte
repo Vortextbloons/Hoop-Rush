@@ -1,4 +1,8 @@
 <script lang="ts">
+  import PlayoffSeriesWins from '#lib/components/screens/PlayoffSeriesWins.svelte';
+  import PlayoffGameRow from '#lib/components/screens/PlayoffGameRow.svelte';
+  import SimulationStatus from '#lib/components/screens/SimulationStatus.svelte';
+  import ChampionshipBanner from '#lib/components/screens/ChampionshipBanner.svelte';
   import {
     CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
     CAP_RUSH_SERIES_WINS,
@@ -45,6 +49,7 @@
     pendingForfeit,
     busy,
     simulating = false,
+    simProgress = null,
     stopRequested = false,
     notice = null,
     onDismissNotice,
@@ -60,6 +65,7 @@
     pendingForfeit: boolean;
     busy: boolean;
     simulating?: boolean;
+    simProgress?: { readonly completed: number; readonly total: number } | null;
     stopRequested?: boolean;
     notice?: FullCourtSimulationNotice | null;
     onDismissNotice?: () => void;
@@ -272,23 +278,7 @@
   </header>
 
   {#if isChampion}
-    <div class="champion-banner trophy-banner" role="status">
-      <div class="confetti" aria-hidden="true">
-        {#each Array.from({ length: 14 }, (_, index) => index) as piece (piece)}
-          <span style="--i:{piece}"></span>
-        {/each}
-      </div>
-      <div class="relative flex items-center gap-4">
-        <Trophy size={38} class="shrink-0 text-accent" aria-hidden="true" />
-        <div class="min-w-0">
-          <p class="ui-label text-accent">Full Court champions</p>
-          <h2 class="postseason-champion-name">{userTeamName}</h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Four rounds. Four wins each. The championship is yours.
-          </p>
-        </div>
-      </div>
-    </div>
+    <ChampionshipBanner team={userTeamName} label="Full Court champions" />
   {:else if championId !== null}
     <Panel padding="md" class="border-accent/40" role="status">
       <p class="ui-label text-accent">Champion</p>
@@ -331,17 +321,13 @@
   <Panel padding="none" class="p-4" aria-label="Postseason action">
     <div class="flex flex-wrap items-center gap-2">
       {#if simulating}
-        <span
-          class="inline-flex min-h-11 items-center gap-2 font-mono text-[10px] font-bold text-primary uppercase"
-        >
-          <span class="live-dot" aria-hidden="true"></span>
-          {stopRequested ? 'Saving current game…' : 'Simulating…'}
-        </span>
-        {#if onStopAfterGame !== undefined}
-          <Button size="sm" tone="secondary" disabled={stopRequested} onclick={onStopAfterGame}>
-            Stop after this game
-          </Button>
-        {/if}
+        <SimulationStatus
+          class="w-full"
+          label="Postseason simulation progress"
+          progress={simProgress}
+          stopping={stopRequested}
+          onStop={onStopAfterGame}
+        />
       {:else if controls.primary !== null}
         <Button
           tone="primary"
@@ -380,12 +366,6 @@
       {/if}
     </div>
     <p class="mt-2 text-[11px] text-muted-foreground" role="status">{controls.status}</p>
-
-    {#if simulating}
-      <div class="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-        <div class="sim-sweep h-full w-1/3 rounded-full bg-primary"></div>
-      </div>
-    {/if}
 
     {#if pendingForfeit}
       <Alert class="mt-3" tone="warning" title="Confirm the forfeit">
@@ -459,7 +439,7 @@
               {/if}
             </div>
             <div class="shrink-0 text-center">
-              <span class="series-wins" data-won={won}>{wins}</span>
+              <PlayoffSeriesWins {wins} {won} />
               <div class="mt-1 flex justify-center gap-1" aria-hidden="true">
                 {#each [0, 1, 2, 3] as pip (pip)}
                   <span class="pip" data-filled={pip < wins}></span>
@@ -492,17 +472,17 @@
       {#if userSeriesGames.length > 0}
         <ol class="mt-4 flex flex-col gap-1.5" aria-label="Games in your playoff series">
           {#each [...userSeriesGames].reverse() as game, index (game.gameId)}
-            <li class="game-row" data-latest={index === 0}>
-              <span class="font-mono text-[9px] font-bold text-muted-foreground uppercase"
-                >Game {game.gameOrdinal}</span
-              >
-              <span class="font-mono text-[10px] text-muted-foreground uppercase">
-                {game.userHome ? 'Home' : 'Away'}
-              </span>
-              <span class="font-display ml-auto text-lg font-extrabold tabular-nums"
-                >{game.userPoints}–{game.opponentPoints}</span
-              >
-              <span class="result-pill" data-won={game.won}>{game.won ? 'Win' : 'Loss'}</span>
+            <PlayoffGameRow
+              ordinal={game.gameOrdinal}
+              home={game.userHome}
+              won={game.won}
+              latest={index === 0}
+            >
+              {#snippet score()}
+                <span class="font-display ml-auto text-lg font-extrabold tabular-nums"
+                  >{game.userPoints}–{game.opponentPoints}</span
+                >
+              {/snippet}
               {#if game.opponentAdaptation !== null}
                 {@const adjustment = fullCourtPlayoffAdaptationRead(game.opponentAdaptation)}
                 <span
@@ -515,7 +495,7 @@
               {#if game.forfeit}
                 <span class="font-mono text-[8px] text-muted-foreground uppercase">Forfeit</span>
               {/if}
-            </li>
+            </PlayoffGameRow>
           {/each}
         </ol>
       {/if}
@@ -629,21 +609,6 @@
     color: var(--color-muted-foreground);
   }
 
-  .champion-banner {
-    position: relative;
-    overflow: hidden;
-    padding: 1.1rem 1.25rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-    border-radius: 1rem;
-    background:
-      radial-gradient(
-        120% 120% at 0% 0%,
-        color-mix(in srgb, var(--color-accent) 22%, transparent),
-        transparent 66%
-      ),
-      var(--color-surface-1);
-  }
-
   .adjustment {
     margin-top: 0.75rem;
     padding: 0.65rem 0.75rem;
@@ -685,20 +650,6 @@
     background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface-1));
   }
 
-  .series-wins {
-    display: block;
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    animation: win-bump 280ms ease-out;
-  }
-
-  .series-wins[data-won='true'] {
-    color: var(--color-accent);
-  }
-
   .pip {
     width: 0.4rem;
     height: 0.4rem;
@@ -708,161 +659,5 @@
 
   .pip[data-filled='true'] {
     background: var(--color-accent);
-  }
-
-  .game-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.3rem 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.65rem;
-    background: var(--color-surface-1);
-  }
-
-  .game-row[data-latest='true'] {
-    border-color: color-mix(in srgb, var(--color-accent) 38%, var(--color-line-soft));
-    animation: score-in 320ms ease-out both;
-  }
-
-  .result-pill {
-    padding: 0.05rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--color-negative) 40%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-negative) 10%, transparent);
-    color: var(--color-negative);
-    font-family: var(--font-mono);
-    font-size: 0.5rem;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-
-  .result-pill[data-won='true'] {
-    border-color: color-mix(in srgb, var(--color-positive) 40%, transparent);
-    background: color-mix(in srgb, var(--color-positive) 10%, transparent);
-    color: var(--color-positive);
-  }
-
-  .live-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: var(--color-primary);
-    animation: live-pulse 1.4s ease-out infinite;
-  }
-
-  .sim-sweep {
-    animation: sim-sweep 1.15s ease-in-out infinite;
-  }
-
-  .confetti {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .confetti span {
-    position: absolute;
-    top: -10%;
-    left: calc((var(--i) + 0.5) * 7%);
-    width: 6px;
-    height: 10px;
-    border-radius: 1px;
-    background: var(--fs-gold);
-    opacity: 0.8;
-    animation: confetti-fall 1600ms ease-in both;
-    animation-delay: calc(var(--i) * 35ms);
-  }
-
-  .confetti span:nth-child(3n) {
-    background: var(--color-primary);
-  }
-
-  .confetti span:nth-child(4n) {
-    background: var(--color-foreground);
-  }
-
-  .trophy-banner {
-    animation: trophy-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-
-  @keyframes live-pulse {
-    0% {
-      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 55%, transparent);
-    }
-    70%,
-    100% {
-      box-shadow: 0 0 0 0.4rem transparent;
-    }
-  }
-
-  @keyframes sim-sweep {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(300%);
-    }
-  }
-
-  @keyframes win-bump {
-    0% {
-      transform: scale(1.3);
-      color: var(--fs-gold);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
-
-  @keyframes score-in {
-    from {
-      transform: translateY(4px);
-      opacity: 0;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-
-  @keyframes trophy-in {
-    from {
-      transform: translateY(10px) scale(0.98);
-      opacity: 0;
-    }
-    to {
-      transform: none;
-      opacity: 1;
-    }
-  }
-
-  @keyframes confetti-fall {
-    0% {
-      transform: translateY(-20%) rotate(0deg);
-      opacity: 0;
-    }
-    15% {
-      opacity: 0.9;
-    }
-    100% {
-      transform: translateY(780%) rotate(540deg);
-      opacity: 0;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .series-wins,
-    .game-row[data-latest='true'],
-    .trophy-banner,
-    .sim-sweep,
-    .live-dot {
-      animation: none;
-    }
-    .confetti {
-      display: none;
-    }
   }
 </style>

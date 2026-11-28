@@ -499,7 +499,7 @@ class RotationRuntime {
    * or fatigue level changed, so the kernel reuses one prepared layout across
    * ordinary trips.
    */
-  refreshLineup(opponentActivePlayerIds?: readonly string[]): void {
+  refreshLineup(opponentActivePlayerIds?: readonly string[]): boolean {
     const epoch = this.roulette?.profileEpoch(this.side) ?? 0;
     if (epoch !== this.mutationEpoch) {
       this.mutationEpoch = epoch;
@@ -510,8 +510,11 @@ class RotationRuntime {
     }
     const key = this.lineupKey();
     if (this.resolvedMatchups === null) {
-      if (key !== this.lineup.key) this.lineup = this.buildLineup(key);
-      return;
+      if (key !== this.lineup.key) {
+        this.lineup = this.buildLineup(key);
+        return true;
+      }
+      return false;
     }
     const active =
       opponentActivePlayerIds === undefined
@@ -523,12 +526,12 @@ class RotationRuntime {
             this.resolvedMatchups,
           );
     const nextMatchupKey = active?.key ?? '';
-    if (key === this.lineup.key && nextMatchupKey === this.currentMatchupKey) return;
+    if (key === this.lineup.key && nextMatchupKey === this.currentMatchupKey) return false;
     const base = this.buildLineup(key);
     if (active === null) {
       this.lineup = base;
       this.currentMatchupKey = '';
-      return;
+      return true;
     }
     const cacheKey = `${String(key)}|${active.key}`;
     let matched = this.matchupPrepCache.get(cacheKey);
@@ -541,6 +544,7 @@ class RotationRuntime {
     }
     this.lineup = matched;
     this.currentMatchupKey = active.key;
+    return true;
   }
 
   snapshot(): FullCourtRotationSnapshot {
@@ -808,7 +812,7 @@ export function runFullCourtGame(
         homeScore: recorder.sides[0].points,
         awayScore: recorder.sides[1].points,
       });
-      refreshFouls(runtimes, ctx, recorder);
+      refreshFouls(runtimes, ctx);
       resolveSubstitutions(
         runtimes,
         recorder,
@@ -846,12 +850,8 @@ export function runFullCourtGame(
     let periodStart = true;
     while (secondsRemaining > 0) {
       state.secondsRemaining = secondsRemaining;
-      const homeUnit = home.activePlayerIds();
-      const awayUnit = away.activePlayerIds();
-      const foulUnits: readonly [readonly string[], readonly string[]] = [
-        home.lineup.units,
-        away.lineup.units,
-      ];
+      const homeUnit = tape !== null ? home.activePlayerIds() : null;
+      const awayUnit = tape !== null ? away.activePlayerIds() : null;
       roulette?.beginPossession(offense, period, periodStart);
       periodStart = false;
       const trip = resolveTrip(ctx, offense);
@@ -873,7 +873,7 @@ export function runFullCourtGame(
           homePlan.playerKeys,
           awayPlan.playerKeys,
         ]) ?? false;
-      const foulCharges = refreshFouls(runtimes, ctx, recorder);
+      const foulCharges = refreshFouls(runtimes, ctx);
       if (roulette !== undefined) {
         let anyExited = false;
         for (const runtime of runtimes) {
@@ -883,25 +883,26 @@ export function runFullCourtGame(
             anyExited = true;
           }
         }
-        if (anyExited) {
-          refreshLineups(runtimes);
+        if (anyExited && refreshLineups(runtimes)) {
           syncKernel(ctx, runtimes, recorder, effects);
         }
       }
 
-      tape?.push({
-        kind: 'trip',
-        period,
-        clockSeconds: secondsRemaining,
-        secondsElapsed,
-        offense,
-        ended: trip.ended,
-        nextPossessionStart: ctx.possessionStart,
-        homeScore: recorder.sides[0].points,
-        awayScore: recorder.sides[1].points,
-        homeUnit,
-        awayUnit,
-      });
+      if (tape !== null && homeUnit !== null && awayUnit !== null) {
+        tape.push({
+          kind: 'trip',
+          period,
+          clockSeconds: secondsRemaining,
+          secondsElapsed,
+          offense,
+          ended: trip.ended,
+          nextPossessionStart: ctx.possessionStart,
+          homeScore: recorder.sides[0].points,
+          awayScore: recorder.sides[1].points,
+          homeUnit,
+          awayUnit,
+        });
+      }
 
       if (trip.ended && !keepOffense) offense = (1 - offense) as SideIndex;
       // Forced disqualification exits apply at once; tactical changes wait for a
@@ -915,6 +916,10 @@ export function runFullCourtGame(
         legalWindow,
       };
       if (foulCharges.length > 0) {
+        const foulUnits: readonly [readonly string[], readonly string[]] = [
+          home.lineup.units,
+          away.lineup.units,
+        ];
         resolveSubstitutions(
           runtimes,
           recorder,
@@ -922,8 +927,9 @@ export function runFullCourtGame(
           tape,
           roulette,
         );
-        refreshLineups(runtimes);
-        syncKernel(ctx, runtimes, recorder, effects);
+        if (refreshLineups(runtimes)) {
+          syncKernel(ctx, runtimes, recorder, effects);
+        }
         awardEmergencyTechnicals(
           runtimes,
           recorder,
@@ -946,8 +952,9 @@ export function runFullCourtGame(
         tape,
         roulette,
       );
-      refreshLineups(runtimes);
-      syncKernel(ctx, runtimes, recorder, effects);
+      if (refreshLineups(runtimes)) {
+        syncKernel(ctx, runtimes, recorder, effects);
+      }
     }
     period += 1;
     if (period >= MAX_PERIODS_HARD_CAP) break;
@@ -1045,11 +1052,7 @@ interface FoulCharge {
   readonly count: number;
 }
 
-function refreshFouls(
-  runtimes: readonly RotationRuntime[],
-  ctx: TripContext,
-  recorder: GameRecorder,
-): FoulCharge[] {
+function refreshFouls(runtimes: readonly RotationRuntime[], ctx: TripContext): FoulCharge[] {
   const charges: FoulCharge[] = [];
   for (const runtime of runtimes) {
     const map = ctx.personalFouls[runtime.side];
@@ -1060,7 +1063,6 @@ function refreshFouls(
       const count = current - Math.max(previous, FULL_COURT_FOUL_LIMIT - 1);
       if (count > 0) charges.push({ side: runtime.side, playerIndex: index, count });
     });
-    setRecorderActiveUnits(recorder, runtime.side, runtime.activeRecorderIndices());
   }
   return charges;
 }
@@ -1202,10 +1204,11 @@ function applySwap(
   runtime.beginStint(globalSeconds, recorder);
 }
 
-function refreshLineups(runtimes: readonly [RotationRuntime, RotationRuntime]): void {
+function refreshLineups(runtimes: readonly [RotationRuntime, RotationRuntime]): boolean {
   const [home, away] = runtimes;
-  home.refreshLineup(away.activePlayerIds());
-  away.refreshLineup(home.activePlayerIds());
+  const homeChanged = home.refreshLineup(away.activePlayerIds());
+  const awayChanged = away.refreshLineup(home.activePlayerIds());
+  return homeChanged || awayChanged;
 }
 
 function syncKernel(

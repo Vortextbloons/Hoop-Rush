@@ -22,6 +22,7 @@
     capStatusLabel,
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
+  import FullCourtAbandonRun from './FullCourtAbandonRun.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRating from './FullCourtRating.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
@@ -36,6 +37,7 @@
     onSkipSpin,
     onFinalize,
     onPurchaseReport,
+    onAbandon,
     art = null,
   }: {
     draft: FullCourtDraftState;
@@ -45,6 +47,7 @@
     onSkipSpin: () => void;
     onFinalize: () => void;
     onPurchaseReport: (target: FullCourtReportTarget) => void;
+    onAbandon?: () => void;
     art?: FullCourtArt | null;
   } = $props();
 
@@ -200,6 +203,12 @@
     <Button tone="primary" disabled={busy} onclick={onFinalize}>Finalize and start season</Button>
   </div>
 </Panel>
+
+{#if onAbandon !== undefined}
+  <div class="mt-3">
+    <FullCourtAbandonRun {busy} {onAbandon} />
+  </div>
+{/if}
 
 {#if index !== null}
   <div class="mt-3 flex flex-col gap-3">

@@ -29,6 +29,7 @@
   } = $props();
 
   let statScope = $state<'team' | 'leaders'>('team');
+  let statValues = $state<'game' | 'totals'>('game');
   let leaderCategory = $state<
     'scoring' | 'rebounding' | 'assists' | 'steals' | 'blocks' | 'threes'
   >('scoring');
@@ -57,19 +58,42 @@
   ] as const;
 
   const statColumns = $derived.by((): PlayerStatColumn<FullCourtPlayerSeasonRow>[] => {
+    const totals = statValues === 'totals';
+    const avg = (row: FullCourtPlayerSeasonRow, value: number): string =>
+      totals ? String(Math.round(value)) : value.toFixed(1);
     const base: PlayerStatColumn<FullCourtPlayerSeasonRow>[] = [
       { key: 'games', label: 'GP', value: (row) => row.games },
-      { key: 'mpg', label: 'MPG', value: (row) => row.mpg.toFixed(1) },
+      {
+        key: 'mpg',
+        label: totals ? 'MIN' : 'MPG',
+        value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
+      },
       {
         key: 'ppg',
         label: 'PPG',
-        value: (row) => row.ppg.toFixed(1),
-        cellClass: 'font-bold text-foreground',
+        value: (row) => avg(row, totals ? row.points : row.ppg),
+        cellClass: 'ui-stats-value-strong',
       },
-      { key: 'rpg', label: 'RPG', value: (row) => row.rpg.toFixed(1) },
-      { key: 'apg', label: 'APG', value: (row) => row.apg.toFixed(1) },
-      { key: 'spg', label: 'SPG', value: (row) => row.spg.toFixed(1) },
-      { key: 'bpg', label: 'BPG', value: (row) => row.bpg.toFixed(1) },
+      {
+        key: 'rpg',
+        label: 'RPG',
+        value: (row) => avg(row, totals ? row.rebounds : row.rpg),
+      },
+      {
+        key: 'apg',
+        label: 'APG',
+        value: (row) => avg(row, totals ? row.assists : row.apg),
+      },
+      {
+        key: 'spg',
+        label: 'SPG',
+        value: (row) => avg(row, totals ? row.steals : row.spg),
+      },
+      {
+        key: 'bpg',
+        label: 'BPG',
+        value: (row) => avg(row, totals ? row.blocks : row.bpg),
+      },
       { key: 'fgPct', label: 'FG%', value: (row) => pctText(row.fgPct) },
       { key: 'tpPct', label: '3P%', value: (row) => pctText(row.tpPct) },
       { key: 'tsPct', label: 'TS%', value: (row) => pctText(row.tsPct) },
@@ -80,7 +104,7 @@
           key: 'team',
           label: 'Team',
           align: 'start',
-          value: (row) => row.teamName,
+          value: (row) => franchiseAbbreviation(row.teamId),
           cellClass: 'text-muted-foreground',
         },
         ...base,
@@ -323,29 +347,35 @@
 </Panel>
 
 {#if awards.hasPlayerStats}
-  <Panel as="section" padding="md" aria-label="Full Court player stats and leaders">
-    <SectionHeading
-      eyebrow="Box Scores"
-      title={statScope === 'team' ? 'Your Roster Averages' : 'League Stat Leaders'}
-      level={2}
-      size="md"
-    >
-      {#snippet actions()}
-        <SegmentedControl
-          label="Choose player stats view"
-          size="md"
-          value={statScope}
-          onchange={(value) => (statScope = value)}
-          options={[
-            { value: 'team', label: 'Your Team' },
-            { value: 'leaders', label: 'League Leaders' },
-          ]}
-        />
-      {/snippet}
-    </SectionHeading>
-
-    {#if statScope === 'leaders'}
-      <div class="mt-3">
+  {@const tableRows = statScope === 'team' ? rosterStats : activeLeaders}
+  <PlayerStatsSection
+    ariaLabel="Full Court player season stats"
+    title={statScope === 'team' ? 'Your roster averages' : 'League leaders'}
+    description={statScope === 'team'
+      ? 'Season averages for your five, with every rotation player counted.'
+      : 'The top five qualified players in each category across all 30 franchises.'}
+    surface="panel"
+    sideLabel="Stats scope"
+    sideOptions={[
+      { value: 'team', label: 'Your Team' },
+      { value: 'leaders', label: 'League Leaders' },
+    ]}
+    side={statScope}
+    onsidechange={(value) => (statScope = value)}
+    values={statValues}
+    onvalueschange={(value) => (statValues = value)}
+    rows={tableRows.length > 0 ? tableRows : null}
+    columns={statColumns}
+    rowKey={(row) => row.teamId + row.playerId}
+    rowClass={(row) => (row.teamId === userTeamId ? 'bg-primary/5' : '')}
+    caption={`${statValues === 'totals' ? 'Season totals' : 'Per-game season averages'} for ${
+      statScope === 'team' ? 'your roster' : 'league leaders'
+    }`}
+    note={`${statValues === 'totals' ? 'Season totals' : 'Per-game averages'} · ${tableRows.length} players · PCT columns ignore volume`}
+    stickyIdentity
+  >
+    {#snippet actions()}
+      {#if statScope === 'leaders'}
         <SegmentedControl
           label="Stat category"
           size="sm"
@@ -353,33 +383,54 @@
           onchange={(value) => (leaderCategory = value)}
           options={leaderCategoryOptions}
         />
-      </div>
-    {/if}
-
-    {@const tableRows = statScope === 'team' ? rosterStats : activeLeaders}
-    <PlayerStatsSection
-      surface="none"
-      class="mt-3"
-      ariaLabel="Player season averages"
-      caption="Player season averages"
-      stickyIdentity
-      columns={statColumns}
-      rows={tableRows}
-      rowKey={(row) => row.teamId + row.playerId}
-      rowClass={(row) => (row.teamId === userTeamId ? 'bg-primary/5' : '')}
-    >
-      {#snippet identity(row)}
-        <span class="ui-stats-player">
-          <FullCourtPortrait player={row} {art} size="sm" />
-          <span class="ui-stats-player-text">
-            <span class="ui-stats-player-name {row.teamId === userTeamId ? 'text-primary' : ''}">
-              {row.displayName}
-            </span>
+      {/if}
+    {/snippet}
+    {#snippet identity(row)}
+      <span class="ui-stats-player">
+        <FullCourtPortrait player={row} {art} size="sm" />
+        <span class="ui-stats-player-text">
+          <span class="ui-stats-player-name {row.teamId === userTeamId ? 'text-primary' : ''}">
+            {row.displayName}
+          </span>
+          <span class="ui-stats-player-meta">
+            {franchiseAbbreviation(row.teamId)} · {row.positions.slice(0, 2).join('/')}
           </span>
         </span>
-      {/snippet}
-    </PlayerStatsSection>
-  </Panel>
+      </span>
+    {/snippet}
+    {#snippet empty()}
+      <p class="ui-stats-empty">Simulate a regular-season game to record player averages.</p>
+    {/snippet}
+    {#snippet cards()}
+      {#each tableRows as row (row.teamId + row.playerId)}
+        <article class="stat-card">
+          <div class="flex min-w-0 items-start gap-2.5">
+            <FullCourtPortrait player={row} {art} size="sm" />
+            <div class="min-w-0 flex-1">
+              <p class="stat-card-name" class:is-user={row.teamId === userTeamId}>
+                {row.displayName}
+              </p>
+              <p class="stat-card-meta">
+                {franchiseAbbreviation(row.teamId)} · {row.games} GP
+              </p>
+            </div>
+            <p class="stat-card-lead">
+              {statValues === 'totals' ? Math.round(row.points) : row.ppg.toFixed(1)}<span>PPG</span
+              >
+            </p>
+          </div>
+          <dl class="stat-card-grid">
+            {#each statColumns.filter((column) => column.key !== 'games' && column.key !== 'ppg' && column.key !== 'team') as column (column.key)}
+              <div>
+                <dt>{column.label}</dt>
+                <dd>{column.value(row)}</dd>
+              </div>
+            {/each}
+          </dl>
+        </article>
+      {/each}
+    {/snippet}
+  </PlayerStatsSection>
 {/if}
 
 <style>
@@ -669,15 +720,21 @@
 
   .award-stats {
     display: grid;
+    flex: 1 1 auto;
     margin: 0;
-    padding-top: 0.5rem;
+    padding-top: 0.55rem;
     border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-line-soft));
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
   }
 
   .award-stats > div {
+    display: flex;
     min-width: 0;
-    padding-left: 0.65rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    padding-left: 0.7rem;
     border-left: 1px solid var(--color-line-soft);
   }
 
@@ -689,23 +746,23 @@
   .award-stats dt {
     color: var(--color-muted-foreground);
     font-family: var(--font-mono);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
   }
 
   .award-stats dd {
-    margin: 0.15rem 0 0;
+    margin: 0;
     font-family: var(--font-display);
-    font-size: 1.15rem;
+    font-size: clamp(1.5rem, 2.6vw, 1.85rem);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
-    line-height: 1;
+    line-height: 0.95;
   }
 
   .award-card[data-featured='true'] .award-stats dd {
-    font-size: 1.4rem;
+    font-size: clamp(1.9rem, 3.4vw, 2.5rem);
   }
 
   .award-ladder {
@@ -878,6 +935,84 @@
     color: var(--color-muted-foreground);
     font-family: var(--font-mono);
     font-size: 0.5625rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Narrow screens swap the wide table for one card per player, as the other modes do. */
+  .stat-card {
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.75rem;
+    background: var(--color-surface-1);
+  }
+
+  .stat-card-name {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stat-card-name.is-user {
+    color: var(--color-primary);
+  }
+
+  .stat-card-meta {
+    margin: 0.15rem 0 0;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .stat-card-lead {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .stat-card-lead span {
+    margin-left: 0.2rem;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .stat-card-grid {
+    display: grid;
+    margin: 0.65rem 0 0;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--color-line-soft);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem 0.4rem;
+  }
+
+  .stat-card-grid dt {
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .stat-card-grid dd {
+    margin: 0.1rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 

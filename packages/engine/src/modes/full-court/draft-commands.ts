@@ -366,19 +366,23 @@ function applyPurchaseReport(
     );
   }
   if (command.target.kind === 'player-scouting') {
+    // A run-wide report has no single player to validate; legacy per-player
+    // purchases still have to point at a version in this draft.
     const targetVersionId = command.target.playerVersionId;
-    const inOffer =
-      state.offer?.cards.some((card) => card.player.playerVersionId === targetVersionId) === true;
-    if (!inOffer && fullCourtPoolPlayerOf(environment.index, state, targetVersionId) === null) {
-      const inCatalog = fullCourtPlayerOf(environment.index, targetVersionId) !== null;
-      return rejectFullCourtCommand(
-        state,
-        command,
-        'player-unavailable',
-        inCatalog
-          ? `player version ${targetVersionId} is not in this draft pool`
-          : `player version ${targetVersionId} is not in the loaded catalog`,
-      );
+    if (targetVersionId !== undefined) {
+      const inOffer =
+        state.offer?.cards.some((card) => card.player.playerVersionId === targetVersionId) === true;
+      if (!inOffer && fullCourtPoolPlayerOf(environment.index, state, targetVersionId) === null) {
+        const inCatalog = fullCourtPlayerOf(environment.index, targetVersionId) !== null;
+        return rejectFullCourtCommand(
+          state,
+          command,
+          'player-unavailable',
+          inCatalog
+            ? `player version ${targetVersionId} is not in this draft pool`
+            : `player version ${targetVersionId} is not in the loaded catalog`,
+        );
+      }
     }
   }
   const priceDollars = fullCourtReportPriceDollars(command.target.kind);

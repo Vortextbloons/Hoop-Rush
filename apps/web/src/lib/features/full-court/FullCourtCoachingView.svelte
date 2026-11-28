@@ -190,7 +190,7 @@
   const blueprintRotation = $derived(activeRotationForBlueprint(draft, defaultRotation));
   const mastermind = $derived(draft.interfaceLevel === 'mastermind' && !readOnly);
   const playerNames = $derived(
-    new Map(roster.map((player) => [player.playerId, player.displayName])),
+    new Map<string, string>(roster.map((player) => [player.playerId, player.displayName])),
   );
   const lineupNames = (ids: readonly string[]) =>
     ids.map((id) => playerNames.get(id) ?? 'Unavailable player').join(', ');
@@ -201,7 +201,7 @@
     draft.interfaceLevel === 'quick'
       ? 'Set a strategy, choose your starters, and manage bench minutes.'
       : draft.interfaceLevel === 'remix'
-        ? 'Set pace, offense, defense, rotation, and the closing five.'
+        ? 'Adjust tactics and choose who starts, sits, and closes.'
         : 'Fine-tune scoring roles, lineup groups, situational rules, and defensive matchups.',
   );
 
@@ -532,6 +532,62 @@
       </div>
 
       <div class="mt-3 grid gap-3">
+        <Panel as="section" padding="sm" aria-label="Tactics">
+          <SectionHeading level={4} size="sm" title="Tactics" />
+          <div class="mt-3 grid gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Pace</span>
+              <SegmentedControl
+                label="Pace"
+                value={draft.tactics.pace}
+                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  draft.tactics.pace = value;
+                  markEdited();
+                }}
+              />
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Offense</span>
+              <SegmentedControl
+                label="Offense"
+                value={draft.tactics.offense}
+                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  draft.tactics.offense = value;
+                  markEdited();
+                }}
+              />
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Defense</span>
+              <SegmentedControl
+                label="Defense"
+                value={draft.tactics.defense}
+                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  draft.tactics.defense = value;
+                  markEdited();
+                }}
+              />
+            </div>
+          </div>
+          {#if !readOnly}
+            <FullCourtBlueprintPicker
+              tactics={draft.tactics}
+              {roster}
+              rotation={blueprintRotation}
+              hierarchy={draft.hierarchy}
+              disabled={locked}
+              onApplyTactics={applyStrategyTactics}
+              onApplyBlueprint={applyStrategyBlueprint}
+              {onListBlueprints}
+              {onSaveBlueprint}
+              {onRemoveBlueprint}
+            />
+          {/if}
+        </Panel>
+
         <Panel as="section" padding="sm" aria-label="Rotation">
           <SectionHeading level={4} size="sm" title="Rotation">
             {#snippet actions()}
@@ -765,61 +821,6 @@
             </div>
           {/if}
         </Panel>
-        <Panel as="section" padding="sm" aria-label="Tactics">
-          <SectionHeading level={4} size="sm" title="Tactics" />
-          <div class="mt-3 grid gap-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Pace</span>
-              <SegmentedControl
-                label="Pace"
-                value={draft.tactics.pace}
-                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.pace = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Offense</span>
-              <SegmentedControl
-                label="Offense"
-                value={draft.tactics.offense}
-                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.offense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Defense</span>
-              <SegmentedControl
-                label="Defense"
-                value={draft.tactics.defense}
-                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.defense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-          </div>
-          {#if !readOnly}
-            <FullCourtBlueprintPicker
-              tactics={draft.tactics}
-              {roster}
-              rotation={blueprintRotation}
-              hierarchy={draft.hierarchy}
-              disabled={locked}
-              onApplyTactics={applyStrategyTactics}
-              onApplyBlueprint={applyStrategyBlueprint}
-              {onListBlueprints}
-              {onSaveBlueprint}
-              {onRemoveBlueprint}
-            />
-          {/if}
-        </Panel>
 
         {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Scoring hierarchy">
@@ -882,120 +883,132 @@
 
         {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Named units">
-            <SectionHeading
-              level={4}
-              size="sm"
-              title="Named units"
-              description="Reusable fives for closing rules or the closing five."
-            >
-              {#snippet actions()}
-                <Badge tone={draft.units.length > 0 ? 'primary' : 'neutral'}>
-                  {draft.units.length} / {FULL_COURT_MAX_UNITS}
-                </Badge>
-              {/snippet}
-            </SectionHeading>
-            {#if draft.units.length === 0}
-              <p
-                class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+            <details>
+              <summary
+                class="cursor-pointer rounded text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
               >
-                No named units. Add a unit to save a five you can reuse in a closing rule or copy to
-                the closing five.
+                Named units
+                <span class="ml-2 text-xs font-normal text-muted-foreground"
+                  >{draft.units.length} / {FULL_COURT_MAX_UNITS}</span
+                >
+              </summary>
+              <p class="mt-2 text-xs text-muted-foreground">
+                Save groups of five players for late-game lineups.
               </p>
-            {:else}
-              <ul class="mt-3 grid gap-2">
-                {#each draft.units as unit, index (index)}
-                  <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
-                    <div class="flex flex-wrap items-end justify-between gap-2">
-                      <label class="min-w-0 flex-1">
-                        <span class="ui-micro">Unit name</span>
-                        <input
-                          type="text"
-                          class="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                          maxlength={FULL_COURT_UNIT_NAME_MAX_LENGTH}
-                          value={unit.name}
-                          disabled={locked}
-                          oninput={(event) => renameUnit(index, event.currentTarget.value)}
-                        />
-                      </label>
-                      <div class="flex flex-wrap gap-1.5">
-                        <Button
-                          tone="secondary"
-                          type="button"
-                          disabled={locked}
-                          onclick={() => useUnitAsClosingFive(unit)}
-                        >
-                          Use as closing five
-                        </Button>
-                        <Button
-                          tone="ghost"
-                          type="button"
-                          disabled={locked}
-                          onclick={() => removeUnit(index)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                      {#each SLOTS as slot (slot)}
-                        <label class="min-w-0">
-                          <span class="ui-micro">Player {slot + 1}</span>
-                          <select
-                            class={SELECT_CLASS}
-                            value={unit.playerIds[slot] ?? ''}
+
+              {#if draft.units.length === 0}
+                <p
+                  class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+                >
+                  No named units. Add a unit to save a five you can reuse in a closing rule or copy
+                  to the closing five.
+                </p>
+              {:else}
+                <ul class="mt-3 grid gap-2">
+                  {#each draft.units as unit, index (index)}
+                    <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
+                      <div class="flex flex-wrap items-end justify-between gap-2">
+                        <label class="min-w-0 flex-1">
+                          <span class="ui-micro">Unit name</span>
+                          <input
+                            type="text"
+                            class="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                            maxlength={FULL_COURT_UNIT_NAME_MAX_LENGTH}
+                            value={unit.name}
                             disabled={locked}
-                            onchange={(event) =>
-                              setUnitPlayer(index, slot, event.currentTarget.value)}
-                          >
-                            {#each roster as player (player.playerId)}
-                              <option value={player.playerId}>
-                                {player.displayName} · {formatPositions(player.positions)}
-                              </option>
-                            {/each}
-                          </select>
+                            oninput={(event) => renameUnit(index, event.currentTarget.value)}
+                          />
                         </label>
-                      {/each}
-                    </div>
-                    {#if fullCourtUnitNameForLineup([unit], draft.closingFive ?? []) !== null}
-                      <p class="mt-2 text-[11px] font-semibold text-accent">Current closing five</p>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-            <div class="mt-3">
-              <Button
-                tone="secondary"
-                type="button"
-                disabled={locked || draft.units.length >= FULL_COURT_MAX_UNITS}
-                onclick={addUnit}
-              >
-                Add named unit
-              </Button>
-            </div>
+                        <div class="flex flex-wrap gap-1.5">
+                          <Button
+                            tone="secondary"
+                            type="button"
+                            disabled={locked}
+                            onclick={() => useUnitAsClosingFive(unit)}
+                          >
+                            Use as closing five
+                          </Button>
+                          <Button
+                            tone="ghost"
+                            type="button"
+                            disabled={locked}
+                            onclick={() => removeUnit(index)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                      <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                        {#each SLOTS as slot (slot)}
+                          <label class="min-w-0">
+                            <span class="ui-micro">Player {slot + 1}</span>
+                            <select
+                              class={SELECT_CLASS}
+                              value={unit.playerIds[slot] ?? ''}
+                              disabled={locked}
+                              onchange={(event) =>
+                                setUnitPlayer(index, slot, event.currentTarget.value)}
+                            >
+                              {#each roster as player (player.playerId)}
+                                <option value={player.playerId}>
+                                  {player.displayName} · {formatPositions(player.positions)}
+                                </option>
+                              {/each}
+                            </select>
+                          </label>
+                        {/each}
+                      </div>
+                      {#if fullCourtUnitNameForLineup([unit], draft.closingFive ?? []) !== null}
+                        <p class="mt-2 text-[11px] font-semibold text-accent">
+                          Current closing five
+                        </p>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              <div class="mt-3">
+                <Button
+                  tone="secondary"
+                  type="button"
+                  disabled={locked || draft.units.length >= FULL_COURT_MAX_UNITS}
+                  onclick={addUnit}
+                >
+                  Add named unit
+                </Button>
+              </div>
+            </details>
           </Panel>
         {/if}
 
         {#if mastermind}
           <Panel as="section" padding="sm" aria-label="Coaching rules">
-            <SectionHeading
-              level={4}
-              size="sm"
-              title="Rules"
-              description="Ordered reactions to the score, clock, and foul trouble."
-            />
-            <div class="mt-3">
-              <FullCourtRuleEditor
-                rules={draft.rules}
-                {roster}
-                units={draft.units}
-                {locked}
-                onAdd={addRule}
-                onUpdate={updateRule}
-                onRemove={removeRule}
-                onMove={moveRule}
-              />
-            </div>
+            <details>
+              <summary
+                class="cursor-pointer rounded text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Game situations
+                <span class="ml-2 text-xs font-normal text-muted-foreground"
+                  >{draft.rules.length} configured</span
+                >
+              </summary>
+              <p class="mt-2 text-xs text-muted-foreground">
+                Rules run in priority order and respond to the score, clock, or foul trouble.
+              </p>
+
+              <div class="mt-3">
+                <FullCourtRuleEditor
+                  rules={draft.rules}
+                  {roster}
+                  units={draft.units}
+                  {locked}
+                  onAdd={addRule}
+                  onUpdate={updateRule}
+                  onRemove={removeRule}
+                  onMove={moveRule}
+                />
+              </div>
+            </details>
           </Panel>
         {/if}
         {#if !mastermind}

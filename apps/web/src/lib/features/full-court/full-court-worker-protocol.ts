@@ -29,12 +29,14 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import type {
+  FullCourtAiGameChunk,
   FullCourtPlayoffGameOutcome,
   FullCourtPlayoffLock,
   FullCourtSeasonLock,
   FullCourtSeasonSlotOptions,
   FullCourtSeasonSlotOutcome,
   FullCourtTrainingCampOptions,
+  FullCourtUserSlotOutcome,
 } from '@hoop-rush/engine';
 import { z } from 'zod';
 
@@ -257,6 +259,37 @@ const playoffGameOutcomeSchema = z.custom<FullCourtPlayoffGameOutcome>((value) =
   );
 }, 'invalid full court playoff outcome');
 
+const userSlotOutcomeSchema = z.custom<FullCourtUserSlotOutcome>((value) => {
+  if (typeof value !== 'object' || value === null) return false;
+  const outcome = value as Record<string, unknown>;
+  if (outcome.kind === 'season-complete') return true;
+  if (outcome.kind === 'decision') {
+    return (
+      (outcome.reason === 'rest-conflict' || outcome.reason === 'confirm-forfeit') &&
+      fullCourtLeagueGameSchema.safeParse(outcome.fixture).success
+    );
+  }
+  if (outcome.kind !== 'user-ready') return false;
+  return (
+    typeof outcome.slot === 'number' &&
+    typeof outcome.userGameId === 'string' &&
+    fullCourtSeasonScoreSchema.safeParse(outcome.userScore).success &&
+    z.record(z.string().min(1).max(64), fullCourtTeamHealthSchema).safeParse(outcome.healthByTeam)
+      .success &&
+    isResolvedGameOutcome(outcome.userGame)
+  );
+}, 'invalid full court user slot outcome');
+
+const aiGameChunkSchema = z.custom<FullCourtAiGameChunk>((value) => {
+  if (typeof value !== 'object' || value === null) return false;
+  const chunk = value as Record<string, unknown>;
+  return (
+    z.array(fullCourtSeasonScoreSchema).min(1).max(SLOT_GAMES).safeParse(chunk.scores).success &&
+    z.record(z.string().min(1).max(64), fullCourtTeamHealthSchema).safeParse(chunk.healthByTeam)
+      .success
+  );
+}, 'invalid full court AI game chunk');
+
 const fullCourtWorkerBase = z.object({
   schemaVersion: z.literal(FULL_COURT_WORKER_WIRE_SCHEMA_VERSION),
   requestId: z.string().min(1).max(64),
@@ -358,8 +391,74 @@ export const fullCourtWorkerGameRequestSchema = fullCourtWorkerBase
     }
   });
 
+export const fullCourtWorkerUserSlotRequestSchema = fullCourtWorkerBase
+  .extend({
+    type: z.literal('full-court-simulate-user-slot'),
+    runId: idSchema,
+    lockDigest: seedSchema,
+    lock: fullCourtSeasonLockSchema.optional(),
+    checkpoint: fullCourtSeasonCheckpointSchema,
+    options: fullCourtSeasonSlotOptionsSchema.optional(),
+  })
+  .superRefine((request, context) => {
+    if (request.checkpoint.runId !== request.runId) {
+      context.addIssue({ code: 'custom', message: 'checkpoint run does not match the request' });
+    }
+    if (request.checkpoint.lockDigest !== request.lockDigest) {
+      context.addIssue({ code: 'custom', message: 'checkpoint lock does not match the request' });
+    }
+    if (request.lock !== undefined) {
+      if (request.lock.season.runId !== request.runId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season run does not match the request',
+        });
+      }
+      if (request.lock.digest !== request.lockDigest) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season digest does not match the request',
+        });
+      }
+    }
+  });
+
+export const fullCourtWorkerAiGamesRequestSchema = fullCourtWorkerBase
+  .extend({
+    type: z.literal('full-court-simulate-ai-games'),
+    runId: idSchema,
+    lockDigest: seedSchema,
+    lock: fullCourtSeasonLockSchema.optional(),
+    checkpoint: fullCourtSeasonCheckpointSchema,
+    gameIds: z.array(capRushLeagueGameIdSchema).min(1).max(SLOT_GAMES),
+  })
+  .superRefine((request, context) => {
+    if (request.checkpoint.runId !== request.runId) {
+      context.addIssue({ code: 'custom', message: 'checkpoint run does not match the request' });
+    }
+    if (request.checkpoint.lockDigest !== request.lockDigest) {
+      context.addIssue({ code: 'custom', message: 'checkpoint lock does not match the request' });
+    }
+    if (request.lock !== undefined) {
+      if (request.lock.season.runId !== request.runId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season run does not match the request',
+        });
+      }
+      if (request.lock.digest !== request.lockDigest) {
+        context.addIssue({
+          code: 'custom',
+          message: 'locked season digest does not match the request',
+        });
+      }
+    }
+  });
+
 export const fullCourtWorkerRequestSchema = z.discriminatedUnion('type', [
   fullCourtWorkerSlotRequestSchema,
+  fullCourtWorkerUserSlotRequestSchema,
+  fullCourtWorkerAiGamesRequestSchema,
   fullCourtWorkerGameRequestSchema,
   fullCourtWorkerPracticeRequestSchema,
 ]);
@@ -392,8 +491,26 @@ export const fullCourtWorkerErrorSchema = fullCourtWorkerBase.extend({
 });
 export type FullCourtWorkerErrorMessage = z.infer<typeof fullCourtWorkerErrorSchema>;
 
+export const fullCourtWorkerUserSlotResultSchema = fullCourtWorkerBase.extend({
+  type: z.literal('full-court-user-slot-result'),
+  outcome: userSlotOutcomeSchema,
+});
+export type FullCourtWorkerUserSlotResultMessage = z.infer<
+  typeof fullCourtWorkerUserSlotResultSchema
+>;
+
+export const fullCourtWorkerAiGamesResultSchema = fullCourtWorkerBase.extend({
+  type: z.literal('full-court-ai-games-result'),
+  chunk: aiGameChunkSchema,
+});
+export type FullCourtWorkerAiGamesResultMessage = z.infer<
+  typeof fullCourtWorkerAiGamesResultSchema
+>;
+
 export const fullCourtWorkerMessageSchema = z.discriminatedUnion('type', [
   fullCourtWorkerSlotResultSchema,
+  fullCourtWorkerUserSlotResultSchema,
+  fullCourtWorkerAiGamesResultSchema,
   fullCourtWorkerGameResultSchema,
   fullCourtWorkerPracticeResultSchema,
   fullCourtWorkerErrorSchema,
@@ -439,7 +556,31 @@ export interface FullCourtWorkerPracticeRequestInput {
   readonly options?: FullCourtTrainingCampOptions;
 }
 
+export interface FullCourtWorkerUserSlotRequestInput {
+  readonly schemaVersion: typeof FULL_COURT_WORKER_WIRE_SCHEMA_VERSION;
+  readonly type: 'full-court-simulate-user-slot';
+  readonly requestId: string;
+  readonly runId: string;
+  readonly lockDigest: Seed;
+  readonly lock?: FullCourtSeasonLock;
+  readonly checkpoint: FullCourtSeasonCheckpoint;
+  readonly options?: FullCourtSeasonSlotOptions;
+}
+
+export interface FullCourtWorkerAiGamesRequestInput {
+  readonly schemaVersion: typeof FULL_COURT_WORKER_WIRE_SCHEMA_VERSION;
+  readonly type: 'full-court-simulate-ai-games';
+  readonly requestId: string;
+  readonly runId: string;
+  readonly lockDigest: Seed;
+  readonly lock?: FullCourtSeasonLock;
+  readonly checkpoint: FullCourtSeasonCheckpoint;
+  readonly gameIds: readonly string[];
+}
+
 export type FullCourtWorkerRequestInput =
   | FullCourtWorkerSlotRequestInput
+  | FullCourtWorkerUserSlotRequestInput
+  | FullCourtWorkerAiGamesRequestInput
   | FullCourtWorkerGameRequestInput
   | FullCourtWorkerPracticeRequestInput;

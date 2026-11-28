@@ -264,7 +264,8 @@ describe('FullCourtCoachingView', () => {
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);
     expect(courtIndex).toBeGreaterThan(minutesIndex);
-    expect(tacticsIndex).toBeGreaterThan(courtIndex);
+    expect(tacticsIndex).toBeLessThan(minutesIndex);
+    expect(tacticsIndex).toBeLessThan(courtIndex);
     expect(presetsIndex).toBeGreaterThan(tacticsIndex);
     expect(saveBarIndex).toBeGreaterThan(-1);
     expect(saveBarIndex).toBeLessThan(courtIndex);

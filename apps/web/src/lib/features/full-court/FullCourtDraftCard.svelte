@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { FullCourtMoneyConfig } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { Check } from '@lucide/svelte';
+  import { Check, ChevronDown } from '@lucide/svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { buildPlayerProfile } from '#lib/players/player-profile.js';
+  import { capRushProfileInput } from '#lib/features/cap-rush/cap-rush-player-profile.js';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import {
@@ -13,29 +15,32 @@
   import type { FullCourtArt } from './full-court-art.js';
   import {
     fullCourtPickReasonLabel,
+    fullCourtProfileReferences,
     type FullCourtCatalogRow,
   } from './full-court-draft-presentation.js';
+  import type { FullCourtCatalogIndex } from '@hoop-rush/engine';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRating from './FullCourtRating.svelte';
 
   let {
     row,
+    index,
     art = null,
     money,
     busy,
     complete,
     selected,
-    scouted,
     onSelect,
     onPick,
   }: {
     row: FullCourtCatalogRow;
+    /** Only used to resolve positional reference traits for the playstyle read. */
+    index: FullCourtCatalogIndex;
     art?: FullCourtArt | null;
     money: FullCourtMoneyConfig;
     busy: boolean;
     complete: boolean;
     selected: boolean;
-    scouted: boolean;
     onSelect: () => void;
     onPick: () => void;
   } = $props();
@@ -46,6 +51,24 @@
   const signable = $derived(row.assessment.legal && !row.onRoster && !complete);
   const actionLabel = $derived(row.onRoster ? 'Signed' : row.playerRostered ? 'Rostered' : 'Sign');
   const blocker = $derived(fullCourtPickReasonLabel(row.assessment, money));
+
+  // Playstyle is free information, the way Cap Rush shows it on every card.
+  let expanded = $state(false);
+  const profile = $derived.by(() => {
+    const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
+    return buildPlayerProfile(
+      capRushProfileInput(player, team?.abbreviation ?? abbreviation),
+      reference,
+    );
+  });
+  const chips = $derived([
+    ...profile.strengths
+      .slice(0, 3)
+      .map((trait) => ({ label: trait.label, tone: 'good' as const })),
+    ...profile.weaknesses
+      .slice(0, 3)
+      .map((trait) => ({ label: trait.label, tone: 'bad' as const })),
+  ]);
 </script>
 
 <article
@@ -98,9 +121,6 @@
       {:else if row.playerRostered}
         <Badge tone="neutral">Rostered</Badge>
       {/if}
-      {#if scouted}
-        <Badge tone="accent">Scouted</Badge>
-      {/if}
     </div>
 
     <div
@@ -123,6 +143,48 @@
       </span>
     </div>
   </button>
+
+  <!-- Playstyle is always available, matching Cap Rush's card treatment. -->
+  <button
+    type="button"
+    class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5"
+    aria-expanded={expanded}
+    aria-controls={`${player.playerVersionId}-playstyle`}
+    aria-label={`${expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
+    onclick={() => (expanded = !expanded)}
+  >
+    <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+    <ChevronDown
+      size={11}
+      class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+      aria-hidden="true"
+    />
+  </button>
+
+  {#if expanded}
+    <div
+      id={`${player.playerVersionId}-playstyle`}
+      class="mx-2 mt-1.5 grid shrink-0 gap-2 sm:mx-2.5"
+    >
+      <p
+        class="w-full truncate font-mono text-[8px] font-bold tracking-[0.08em] text-accent uppercase"
+      >
+        {profile.archetype}
+      </p>
+      {#if chips.length > 0}
+        <div class="flex w-full flex-wrap items-start gap-1">
+          {#each chips as chip (chip.label)}
+            <span
+              class="shrink-0 rounded border px-1 py-0.5 font-mono text-[7.5px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
+              'good'
+                ? 'border-positive/40 bg-positive/10 text-positive'
+                : 'border-negative/45 bg-negative/10 text-negative'}">{chip.label}</span
+            >
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <div class="border-t border-line-soft p-2 pt-1.5">
     {#if blocker !== null && !row.onRoster}

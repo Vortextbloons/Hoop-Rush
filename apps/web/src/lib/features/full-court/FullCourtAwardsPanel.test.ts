@@ -70,8 +70,9 @@ describe('FullCourtAwardsPanel', () => {
       standings: { west: [], east: [], qualifiedTeamIds: [] },
       completedSlots: 1,
     });
+    const rosterStats = awards.mvp.finalists.map((candidate) => candidate.player);
     const body = render(FullCourtAwardsPanel, {
-      props: { awards, rosterStats: [], userTeamId: 'usr' },
+      props: { awards, rosterStats, userTeamId: 'usr' },
     }).body;
     expect(body).toContain('Awards Race');
     expect(body).toContain('award-ladder-row');
@@ -79,5 +80,33 @@ describe('FullCourtAwardsPanel', () => {
     expect(body.match(/User Player/g)?.length ?? 0).toBeGreaterThan(0);
     // Runner-up and All-League rows carry the small headshot slot (initials fallback without art).
     expect(body.match(/h-6 w-6/g)?.length ?? 0).toBeGreaterThan(0);
+    // The box score uses the shared season-box-score shell every other mode uses:
+    // one section owning title, scope switch, per-game/totals switch, mobile cards.
+    expect(body).toContain('Your roster averages');
+    expect(body).toContain('Stats scope');
+    expect(body).toContain('Per game');
+    expect(body).toContain('Totals');
+    expect(body).toContain('stat-card');
+    expect(body).toContain('ui-stats-table');
+  });
+
+  test('switches the box score between per-game and season totals', () => {
+    const teams = [
+      { teamId: 'usr', displayName: 'User Five', roster },
+      { teamId: 'opp', displayName: 'Opp Five', roster: opponent },
+    ];
+    const awards = buildFullCourtAwards({
+      teams,
+      regularScores: scores,
+      standings: { west: [], east: [], qualifiedTeamIds: [] },
+      completedSlots: 1,
+    });
+    const rosterStats = awards.mvp.finalists.map((candidate) => candidate.player);
+    const body = render(FullCourtAwardsPanel, {
+      props: { awards, rosterStats, userTeamId: 'usr' },
+    }).body;
+    // Per-game is the default, so the note and the MIN header both read per game.
+    expect(body).toContain('Per-game averages');
+    expect(body).toContain('MPG');
   });
 });

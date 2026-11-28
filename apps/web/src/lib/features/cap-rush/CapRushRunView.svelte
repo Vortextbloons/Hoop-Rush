@@ -1,9 +1,11 @@
 <script lang="ts">
+  import PauseSimulationButton from '#lib/components/screens/PauseSimulationButton.svelte';
+  import SimulationProgress from '#lib/components/screens/SimulationProgress.svelte';
   import {
     CAP_RUSH_GAME_COUNT,
     type CapRushBoxScore as CapRushBoxScoreData,
   } from '@hoop-rush/data-contracts';
-  import { Play, SkipForward, X } from '@lucide/svelte';
+  import { Play, SkipForward } from '@lucide/svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -216,15 +218,10 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
               {#if controller.busy}
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 text-sm font-bold outline-none hover:border-negative hover:text-negative focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                  disabled={controller.cancelling}
-                  onclick={() => controller.cancel()}
-                >
-                  <X size={15} aria-hidden="true" />
-                  {controller.cancelling ? 'Pausing…' : 'Pause'}
-                </button>
+                <PauseSimulationButton
+                  stopping={controller.cancelling}
+                  onStop={() => controller.cancel()}
+                />
               {:else}
                 <button
                   type="button"
@@ -247,19 +244,11 @@
           </div>
 
           {#if controller.progress !== null}
-            <div
-              class="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-3"
-              role="progressbar"
-              aria-label="Season simulation progress"
-              aria-valuemin={0}
-              aria-valuemax={controller.progress.total}
-              aria-valuenow={controller.progress.completed}
-            >
-              <span
-                class="block h-full rounded-full bg-primary motion-reduce:transition-none"
-                style:width={`${(controller.progress.completed / controller.progress.total) * 100}%`}
-              ></span>
-            </div>
+            <SimulationProgress
+              class="mt-3"
+              label="Season simulation progress"
+              progress={controller.progress}
+            />
           {/if}
 
           {#if leagueProgress !== null}
@@ -272,19 +261,12 @@
                   >{leagueProgress.completed}/{leagueProgress.total}</span
                 >
               </div>
-              <div
-                class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-3"
-                role="progressbar"
-                aria-label="Background league progress"
-                aria-valuemin={0}
-                aria-valuemax={leagueProgress.total}
-                aria-valuenow={leagueProgress.completed}
-              >
-                <span
-                  class="block h-full rounded-full bg-accent motion-reduce:transition-none"
-                  style:width={`${(leagueProgress.completed / leagueProgress.total) * 100}%`}
-                ></span>
-              </div>
+              <SimulationProgress
+                class="mt-1 h-1.5"
+                label="Background league progress"
+                progress={leagueProgress}
+                tone="accent"
+              />
             </div>
           {/if}
 

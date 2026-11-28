@@ -219,7 +219,11 @@
           size="sm"
           surface="tile"
           tone={fitOwned ? 'default' : 'muted'}
-          value={fitOwned ? 'Owned' : formatMillions(fullCourtReportPriceDollars('lineup-fit'))}
+          value={fitOwned
+            ? 'Owned'
+            : preseasonOpen
+              ? formatMillions(fullCourtReportPriceDollars('lineup-fit'))
+              : 'Closed'}
         />
         <StatTile
           label="Training Camp"
@@ -228,14 +232,20 @@
           tone={campOwned ? 'default' : 'muted'}
           value={campOwned
             ? 'Booked'
-            : formatMillions(fullCourtReportPriceDollars('training-camp'))}
+            : practiceOpen
+              ? formatMillions(fullCourtReportPriceDollars('training-camp'))
+              : 'Closed'}
         />
         <StatTile
           label="Opponent Film"
           size="sm"
           surface="tile"
           tone={leagueFilmRecord !== null ? 'default' : 'muted'}
-          value={leagueFilmRecord !== null ? 'Owned' : formatMillions(FILM_PRICE)}
+          value={leagueFilmRecord !== null
+            ? 'Owned'
+            : preseasonOpen
+              ? formatMillions(FILM_PRICE)
+              : 'Closed'}
         />
       </StatGrid>
     </div>

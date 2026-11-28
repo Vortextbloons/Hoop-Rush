@@ -429,7 +429,11 @@ export {
 export {
   createFullCourtSeasonCheckpoint,
   lockFullCourtRegularSeason,
+  simulateFullCourtAiGames,
   simulateFullCourtSeasonSlot,
+  simulateFullCourtUserSlot,
+  type FullCourtAiGameChunk,
+  type FullCourtUserSlotOutcome,
   type FullCourtSeasonLock,
   type FullCourtSeasonSlotOptions,
   type FullCourtSeasonSlotOutcome,

@@ -69,7 +69,7 @@ export const FULL_COURT_DEFAULT_MONEY: FullCourtMoneyConfig = fullCourtMoneyConf
   capLineDollars: CAP_RUSH_CAP_LINE_DOLLARS,
   firstApronDollars: CAP_RUSH_FIRST_APRON_DOLLARS,
   hardLimitDollars: CAP_RUSH_HARD_LIMIT_DOLLARS,
-  startingWarChestDollars: 200_000_000,
+  startingWarChestDollars: 250_000_000,
 });
 
 /**
@@ -125,7 +125,7 @@ export type FullCourtReportKind = z.infer<typeof fullCourtReportKindSchema>;
  * Tuning stays here so previews and command validation quote the same number.
  */
 export const FULL_COURT_REPORT_PRICES_DOLLARS = {
-  'player-scouting': 2_000_000,
+  'player-scouting': 5_000_000,
   'lineup-fit': 5_000_000,
   'opponent-film': 3_000_000,
   'training-camp': 15_000_000,
@@ -147,7 +147,11 @@ const fullCourtGameReferenceSchema = z.string().min(1).max(64);
 export const fullCourtReportTargetSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('player-scouting'),
-    playerVersionId: playerVersionIdSchema,
+    /**
+     * Legacy per-player scouting saves carry the version they paid for. New runs
+     * buy one run-wide report, which omits it and unlocks playstyle draft-wide.
+     */
+    playerVersionId: playerVersionIdSchema.optional(),
   }),
   z.object({ kind: z.literal('lineup-fit') }),
   z.object({
@@ -163,7 +167,10 @@ export type FullCourtReportTarget = z.infer<typeof fullCourtReportTargetSchema>;
 export function fullCourtReportTargetKey(target: FullCourtReportTarget): string {
   switch (target.kind) {
     case 'player-scouting':
-      return `player-scouting:${target.playerVersionId}`;
+      // One run-wide scouting report; legacy per-player records keep their own key.
+      return target.playerVersionId === undefined
+        ? 'player-scouting'
+        : `player-scouting:${target.playerVersionId}`;
     case 'lineup-fit':
       return 'lineup-fit';
     case 'opponent-film':

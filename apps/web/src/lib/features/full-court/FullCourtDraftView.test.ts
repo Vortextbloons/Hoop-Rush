@@ -80,25 +80,18 @@ function completedState(
   });
 }
 
-function scoutedState(
+function scoutingReportState(
   index: FullCourtCatalogIndex,
   state: FullCourtDraftState,
-  displayName: string,
 ): FullCourtDraftState {
-  const player = index.catalog.candidates.find(
-    (candidate) => candidate.displayName === displayName,
-  );
-  if (player === undefined) throw new Error(`missing test player ${displayName}`);
   return applyFullCourtCommand(
     state,
     {
       command: 'purchase-full-court-report',
-      commandId: commandIdSchema.parse(
-        `cmd-scout-${displayName.replace(/\s+/g, '-').toLowerCase()}`,
-      ),
+      commandId: commandIdSchema.parse('cmd-scouting-report'),
       runId: state.runId,
       expectedRevision: state.revision,
-      target: { kind: 'player-scouting', playerVersionId: player.playerVersionId },
+      target: { kind: 'player-scouting' },
     },
     { index },
   ).state;
@@ -136,8 +129,7 @@ describe('FullCourtDraftView', () => {
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
     expect(body).toContain('Round 1');
-    expect(body).toContain('Scout to unlock playstyle');
-    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} to unlock playstyle"`);
+    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
     expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
     expect(body).toContain('Legal finish');
@@ -164,17 +156,17 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Locked');
   });
 
-  test('keeps playstyle locked behind player scouting', () => {
+  test('shows playstyle for free on every card, like Cap Rush', () => {
     const { state, index } = setup();
     const body = renderView(state, index, () => undefined);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
-    expect(body).toContain('Scout $2M');
-    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} for $2M"`);
-    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} to unlock playstyle"`);
-    expect(body).not.toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
-    expect(body).not.toContain('aria-label="Shot profile"');
+    // Playstyle is free information now; scouting no longer gates it.
+    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
+    expect(body).not.toContain('Scout to unlock playstyle');
+    expect(body).not.toContain('Scout $2M');
+    expect(body).not.toContain(`aria-label="Scout ${firstPlayer.displayName} for $2M"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
 
@@ -186,7 +178,7 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Salary');
   });
 
-  test('keeps the selected player panel playstyle locked until scouted', () => {
+  test('shows playstyle in the selected player panel without any purchase', () => {
     const { state, index } = setup();
     const body = renderView(
       { ...state, offer: undefined, pool: undefined },
@@ -194,28 +186,36 @@ describe('FullCourtDraftView', () => {
       () => undefined,
     );
 
-    expect(body).toContain('Scout this player to reveal playstyle and usage.');
-    expect(body).not.toContain('aria-label="Shot profile"');
+    expect(body).toContain('aria-label=');
+    expect(body).toContain('Show');
+    expect(body).toContain('playstyle');
+    expect(body).not.toContain('Scout this player to reveal playstyle and usage.');
   });
 
-  test('unlocks playstyle on the same card after a scouting report is purchased', () => {
+  test('offers one $5M scouting report instead of per-player scouting', () => {
     const { state, index } = setup();
-    const targetName = state.offer?.cards[0]?.player.displayName ?? '';
-    const body = renderView(scoutedState(index, state, targetName), index, () => undefined);
+    const body = renderView(state, index, () => undefined);
 
-    expect(body).toContain('Scouted');
-    expect(body).toContain('Playstyle unlocked');
-    expect(body).toContain(`aria-label="Show ${targetName} playstyle"`);
-    expect(body).not.toContain(`aria-label="Scout ${targetName} to unlock playstyle"`);
-    expect(body).not.toContain(`aria-label="Scout ${targetName} for $2M"`);
-    expect(body).not.toContain(`aria-label="Open scouting report for ${targetName}"`);
+    expect(body).toContain('Scouting report');
+    expect(body).toContain('Buy · $5M');
+    expect(body).toContain('aria-label="Buy the $5M scouting report"');
+    expect(body).not.toContain('Scout $2M');
   });
 
-  test('blocks a scouting purchase when the budget cannot cover the cheapest legal finish', () => {
+  test('unlocks the paid read across the draft after the report is bought', () => {
+    const { state, index } = setup();
+    const body = renderView(scoutingReportState(index, state), index, () => undefined);
+
+    expect(body).toContain('Scouting report active');
+    expect(body).not.toContain('aria-label="Buy the $5M scouting report"');
+    expect(body).not.toContain('Scout $2M');
+  });
+
+  test('disables the scouting report when the budget cannot cover the cheapest legal finish', () => {
     const { state, index } = lowWarChestSetup();
     const body = renderView(state, index, () => undefined);
 
-    expect(body).toContain('Scout $2M');
+    expect(body).toContain('Scouting report');
     expect(body).toContain('disabled=""');
   });
 });

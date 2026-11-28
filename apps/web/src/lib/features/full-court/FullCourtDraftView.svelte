@@ -13,8 +13,6 @@
     POSITIONS,
     franchiseAbbreviation,
     fullCourtReportPriceDollars,
-    fullCourtReportScope,
-    fullCourtReportTargetKey,
   } from '@hoop-rush/data-contracts';
   import {
     fullCourtAssessPurchase,
@@ -63,6 +61,7 @@
     type FullCourtCatalogRow,
     type FullCourtCatalogSort,
   } from './full-court-draft-presentation.js';
+  import FullCourtAbandonRun from './FullCourtAbandonRun.svelte';
   import FullCourtDraftCard from './FullCourtDraftCard.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRating from './FullCourtRating.svelte';
@@ -77,6 +76,7 @@
     onRemove,
     onFinish,
     onPurchaseReport,
+    onAbandon,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
@@ -85,6 +85,7 @@
     onRemove: (versionId: string) => void;
     onFinish: () => void;
     onPurchaseReport?: (target: FullCourtReportTarget) => void;
+    onAbandon?: () => void;
   } = $props();
 
   const ROSTER_TICKS = Array.from({ length: FULL_COURT_MAX_ROSTER_SIZE }, (_, slot) => slot);
@@ -185,19 +186,16 @@
     return `Absorbs ${String(tolerance)} simultaneous ${tolerance === 1 ? 'absence' : 'absences'} before dropping below five.`;
   });
   const lock = $derived(fullCourtLockCopy(draft, summary));
-  const scoutPrice = fullCourtReportPriceDollars('player-scouting');
-  const scoutScopeLabel = $derived(
-    fullCourtReportScope('player-scouting') === 'run' ? 'Lifetime of this run' : 'This game only',
+  /**
+   * One scouting report covers the whole draft. Owning it reveals every card's
+   * playstyle and the full paid read in the inspector; the price is run-wide.
+   */
+  const scoutingPrice = fullCourtReportPriceDollars('player-scouting');
+  const scoutingOwned = $derived(
+    (draft.reports ?? []).some((report) => report.kind === 'player-scouting'),
   );
-  const scoutAssessment = $derived(
-    fullCourtAssessPurchase({ index, state: draft, priceDollars: scoutPrice }),
-  );
-  const scoutRecords = $derived(
-    new Map(
-      (draft.reports ?? [])
-        .filter((report) => report.target.kind === 'player-scouting')
-        .map((report) => [fullCourtReportTargetKey(report.target), report]),
-    ),
+  const scoutingAssessment = $derived(
+    fullCourtAssessPurchase({ index, state: draft, priceDollars: scoutingPrice }),
   );
   const selectedProfile = $derived.by(() => {
     if (profileVersionId === null) return null;
@@ -242,8 +240,6 @@
   }
 
   function toggleCardExpanded(versionId: string): void {
-    // Playstyle is paid information: the reveal stays shut until this player is scouted.
-    if (scoutRecordFor(versionId) === null) return;
     expandedCardIds = {
       ...expandedCardIds,
       [versionId]: !expandedCardIds[versionId],
@@ -302,27 +298,19 @@
     profileTab = tab;
   }
 
-  function scoutRecordFor(versionId: CapRushSourcePlayer['playerVersionId']) {
-    return (
-      scoutRecords.get(
-        fullCourtReportTargetKey({ kind: 'player-scouting', playerVersionId: versionId }),
-      ) ?? null
-    );
-  }
-
-  function scoutBlocker(assessment: ReturnType<typeof fullCourtAssessPurchase>): string | null {
-    if (assessment.legal) return null;
-    if (assessment.reason === 'completion') return 'No legal roster finish remains';
-    if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} to finish`;
+  function scoutingBlocker(): string | null {
+    if (scoutingAssessment.legal) return null;
+    if (scoutingAssessment.reason === 'completion') return 'No legal roster finish remains';
+    if (scoutingAssessment.minimumCompletionDollars !== null) {
+      return `Needs ${formatMillions(scoutingAssessment.minimumCompletionDollars)} to finish`;
     }
     return 'Budget short';
   }
 
-  function buyScout(player: CapRushSourcePlayer): void {
-    if (onPurchaseReport === undefined || busy || !scoutAssessment.legal) return;
-    if (scoutRecordFor(player.playerVersionId) !== null) return;
-    onPurchaseReport({ kind: 'player-scouting', playerVersionId: player.playerVersionId });
+  function buyScoutingReport(): void {
+    if (onPurchaseReport === undefined || busy || scoutingOwned) return;
+    if (!scoutingAssessment.legal) return;
+    onPurchaseReport({ kind: 'player-scouting' });
   }
 
   function rowActionLabel(row: FullCourtCatalogRow): string {
@@ -495,6 +483,63 @@
       </div>
     </Panel>
 
+    {#if onPurchaseReport !== undefined && !complete}
+      <Panel
+        as="section"
+        padding="sm"
+        aria-label="Scouting report"
+        class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
+      >
+        <div class="flex min-w-0 items-center gap-2.5">
+          <span
+            class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border {scoutingOwned
+              ? 'border-positive/40 bg-positive/10 text-positive'
+              : 'border-line-soft bg-surface-1 text-accent'}"
+            aria-hidden="true"
+          >
+            {#if scoutingOwned}
+              <Check size={15} />
+            {:else}
+              <FileSearch size={15} />
+            {/if}
+          </span>
+          <div class="min-w-0">
+            <p class="font-display text-sm leading-tight font-extrabold uppercase">
+              {scoutingOwned ? 'Scouting report active' : 'Scouting report'}
+            </p>
+            <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              {#if scoutingOwned}
+                Usage, role, shot profile, and strengths for every player in this draft. Playstyle
+                is always free.
+              {:else}
+                One {formatMillions(scoutingPrice)} purchase reveals usage, role, and shot profile for
+                every player in this draft. Playstyle stays free either way.
+              {/if}
+            </p>
+          </div>
+        </div>
+        {#if !scoutingOwned}
+          <div class="flex items-center gap-2">
+            {#if scoutingBlocker() !== null}
+              <span class="font-mono text-[10px] font-semibold text-negative"
+                >{scoutingBlocker()}</span
+              >
+            {/if}
+            <Button
+              size="sm"
+              tone={scoutingAssessment.legal ? 'secondary' : 'ghost'}
+              disabled={busy || !scoutingAssessment.legal}
+              aria-label={`Buy the ${formatMillions(scoutingPrice)} scouting report`}
+              onclick={buyScoutingReport}
+            >
+              <FileSearch size={13} aria-hidden="true" />
+              Buy · {formatMillions(scoutingPrice)}
+            </Button>
+          </div>
+        {/if}
+      </Panel>
+    {/if}
+
     {#if roundOffer !== null && !complete}
       <section aria-label={`Round ${String(roundOffer.round + 1)} offer`}>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
@@ -504,7 +549,6 @@
             {@const signable = row.assessment.legal && !row.onRoster && !complete}
             {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
             {@const impact = fullCourtSigningImpact(row, draft.money)}
-            {@const scoutRecord = scoutRecordFor(player.playerVersionId)}
             {@const expanded = Boolean(expandedCardIds[player.playerVersionId])}
             {@const profile = expanded ? profileFor(player) : null}
             {@const chips = profile === null ? [] : traitChips(profile)}
@@ -568,36 +612,21 @@
 
               <button
                 type="button"
-                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] uppercase outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5 {scoutRecord ===
-                null
-                  ? 'cursor-not-allowed border-line-soft/70 bg-surface-1/60 text-muted-foreground'
-                  : 'border-line-soft bg-surface-1 text-muted-foreground hover:border-line-strong hover:text-foreground'}"
-                aria-expanded={scoutRecord === null ? false : expanded}
-                aria-label={scoutRecord === null
-                  ? `Scout ${player.displayName} to unlock playstyle`
-                  : `${expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
-                disabled={scoutRecord === null || busy}
+                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase transition-colors outline-none hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5"
+                aria-expanded={expanded}
+                aria-controls={`${player.playerVersionId}-playstyle`}
+                aria-label={`${expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
                 onclick={() => toggleCardExpanded(player.playerVersionId)}
               >
-                <span
-                  >{scoutRecord === null
-                    ? 'Scout to unlock playstyle'
-                    : expanded
-                      ? 'Hide playstyle'
-                      : 'Show playstyle'}</span
-                >
-                {#if scoutRecord === null}
-                  <Lock size={11} class="shrink-0" aria-hidden="true" />
-                {:else}
-                  <ChevronDown
-                    size={11}
-                    class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
-                    aria-hidden="true"
-                  />
-                {/if}
+                <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+                <ChevronDown
+                  size={11}
+                  class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                  aria-hidden="true"
+                />
               </button>
 
-              {#if expanded && profile !== null && scoutRecord !== null}
+              {#if expanded && profile !== null}
                 <div class="mx-2 mt-1.5 grid shrink-0 gap-2 sm:mx-2.5">
                   <p
                     class="w-full truncate font-mono text-[8px] font-bold tracking-[0.08em] text-accent uppercase"
@@ -616,9 +645,17 @@
                       {/each}
                     </div>
                   {/if}
-                  <div class="rounded-lg border border-line-soft bg-surface-1/70 p-2">
-                    <FullCourtScoutReport report={fullCourtScoutPlayer(player)} compact />
-                  </div>
+                  {#if scoutingOwned}
+                    <div class="rounded-lg border border-line-soft bg-surface-1/70 p-2">
+                      <FullCourtScoutReport report={fullCourtScoutPlayer(player)} compact />
+                    </div>
+                  {:else}
+                    <p
+                      class="rounded-lg border border-dashed border-line-soft bg-surface-1/50 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground"
+                    >
+                      Buy the scouting report to see usage, role, and shoot profile.
+                    </p>
+                  {/if}
                   <button
                     type="button"
                     class="min-h-0 justify-self-center rounded border border-accent/40 bg-accent/10 px-2.5 py-1 font-mono text-[7.5px] leading-tight font-bold tracking-[0.07em] text-accent uppercase outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring"
@@ -670,33 +707,12 @@
                 </p>
               {/if}
 
-              {#if onPurchaseReport !== undefined}
-                <div class="mx-2 mb-1.5 flex items-center justify-between gap-1.5 sm:mx-2.5">
-                  {#if scoutRecord !== null}
-                    <span
-                      class="inline-flex items-center gap-1 font-mono text-[8px] font-bold text-positive uppercase"
-                    >
-                      <Check size={10} aria-hidden="true" /> Scouted
-                    </span>
-                    <span class="font-mono text-[8px] text-muted-foreground"
-                      >Playstyle unlocked</span
-                    >
-                  {:else}
-                    <span class="font-mono text-[8px] text-muted-foreground">
-                      Scout {formatMillions(scoutPrice)}
-                    </span>
-                    <Button
-                      size="sm"
-                      tone="secondary"
-                      disabled={busy || !scoutAssessment.legal}
-                      aria-label={`Scout ${player.displayName} for ${formatMillions(scoutPrice)}`}
-                      onclick={() => buyScout(player)}
-                    >
-                      <FileSearch size={12} aria-hidden="true" />
-                      Scout
-                    </Button>
-                  {/if}
-                </div>
+              {#if onPurchaseReport !== undefined && scoutingOwned}
+                <p
+                  class="mx-2 mb-1.5 inline-flex items-center gap-1 font-mono text-[8px] font-bold text-positive uppercase sm:mx-2.5"
+                >
+                  <Check size={10} aria-hidden="true" /> Scouting report active
+                </p>
               {/if}
 
               <div class="p-2 pt-0 sm:p-2.5">
@@ -883,18 +899,17 @@
                 class="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-2 p-2.5 sm:gap-2.5 sm:p-3"
               >
                 {#each catalogPage.rows as row (row.player.playerVersionId)}
-                  {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
                   {@const isInspected =
                     inspectedRow?.player.playerVersionId === row.player.playerVersionId}
                   <li class="min-w-0">
                     <FullCourtDraftCard
                       {row}
+                      {index}
                       {art}
                       money={draft.money}
                       {busy}
                       {complete}
                       selected={isInspected}
-                      scouted={scoutRecord !== null}
                       onSelect={() => selectPlayer(row.player.playerVersionId)}
                       onPick={() => onPick(row.player.playerVersionId)}
                     />
@@ -950,8 +965,6 @@
               {@const impact = fullCourtSigningImpact(row, draft.money)}
               {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
               {@const signable = row.assessment.legal && !row.onRoster && !complete}
-              {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
-              {@const scoutBlocked = scoutBlocker(scoutAssessment)}
               {@const expanded = Boolean(expandedCardIds[row.player.playerVersionId])}
 
               <div class="flex items-start gap-2.5">
@@ -993,54 +1006,54 @@
               </div>
 
               <div class="mt-2.5">
-                {#if scoutRecord === null}
-                  <p
-                    class="flex items-center gap-1.5 rounded-lg border border-line-soft bg-surface-1/70 px-2.5 py-2 text-[11px] text-muted-foreground"
-                  >
-                    <Lock size={12} class="shrink-0" aria-hidden="true" />
-                    Scout this player to reveal playstyle and usage.
-                  </p>
-                {:else}
-                  <button
-                    type="button"
-                    class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-expanded={expanded}
-                    aria-label={`${expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
-                    onclick={() => toggleCardExpanded(row.player.playerVersionId)}
-                  >
-                    <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
-                    <ChevronDown
-                      size={12}
-                      class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
-                      aria-hidden="true"
-                    />
-                  </button>
+                <button
+                  type="button"
+                  class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-expanded={expanded}
+                  aria-label={`${expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
+                  onclick={() => toggleCardExpanded(row.player.playerVersionId)}
+                >
+                  <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+                  <ChevronDown
+                    size={12}
+                    class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                    aria-hidden="true"
+                  />
+                </button>
 
-                  {#if expanded && inspectedProfile !== null}
-                    <div class="mt-2 grid gap-2">
-                      <p
-                        class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
-                      >
-                        {inspectedProfile.archetype}
-                      </p>
-                      {#if inspectedChips.length > 0}
-                        <div class="flex flex-wrap items-start gap-1">
-                          {#each inspectedChips as chip (chip.label)}
-                            <span
-                              class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
-                              'good'
-                                ? 'border-positive/40 bg-positive/10 text-positive'
-                                : 'border-negative/45 bg-negative/10 text-negative'}"
-                              >{chip.label}</span
-                            >
-                          {/each}
-                        </div>
-                      {/if}
+                {#if expanded && inspectedProfile !== null}
+                  <div class="mt-2 grid gap-2">
+                    <p
+                      class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
+                    >
+                      {inspectedProfile.archetype}
+                    </p>
+                    {#if inspectedChips.length > 0}
+                      <div class="flex flex-wrap items-start gap-1">
+                        {#each inspectedChips as chip (chip.label)}
+                          <span
+                            class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
+                            'good'
+                              ? 'border-positive/40 bg-positive/10 text-positive'
+                              : 'border-negative/45 bg-negative/10 text-negative'}"
+                            >{chip.label}</span
+                          >
+                        {/each}
+                      </div>
+                    {/if}
+                    {#if scoutingOwned}
                       <div class="rounded-xl border border-line-soft bg-surface-1/70 p-3">
                         <FullCourtScoutReport report={fullCourtScoutPlayer(row.player)} />
                       </div>
-                    </div>
-                  {/if}
+                    {:else}
+                      <p
+                        class="rounded-lg border border-dashed border-line-soft bg-surface-1/50 px-2.5 py-2 text-[11px] leading-snug text-muted-foreground"
+                      >
+                        Buy the {formatMillions(scoutingPrice)} scouting report to unlock usage, role,
+                        and shot profile for every player in this draft.
+                      </p>
+                    {/if}
+                  </div>
                 {/if}
               </div>
 
@@ -1103,37 +1116,27 @@
               {/if}
 
               {#if onPurchaseReport !== undefined}
-                <div
-                  class="mt-2.5 flex items-center justify-between gap-2 border-t border-line-soft pt-2.5"
-                >
-                  {#if scoutRecord !== null}
-                    <div class="min-w-0">
-                      <Badge tone="positive">Scouted</Badge>
-                      <p class="ui-micro mt-0.5">Playstyle unlocked · {scoutScopeLabel}</p>
+                <div class="mt-2.5 border-t border-line-soft pt-2.5">
+                  {#if scoutingOwned}
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="min-w-0">
+                        <Badge tone="positive">Scouting report</Badge>
+                        <p class="ui-micro mt-0.5">Unlocked for this draft</p>
+                      </div>
                     </div>
                   {:else}
                     <div class="min-w-0">
                       <p class="ui-micro">
-                        {#if scoutBlocked !== null}
-                          <span class="font-semibold text-negative">{scoutBlocked}</span>
+                        {#if scoutingBlocker() !== null}
+                          <span class="font-semibold text-negative">{scoutingBlocker()}</span>
                         {:else}
-                          Scout {formatMillions(scoutPrice)}
+                          Scouting report {formatMillions(scoutingPrice)}
                         {/if}
                       </p>
-                      <p class="ui-micro text-muted-foreground">
-                        Scout {formatMillions(scoutPrice)} · {scoutScopeLabel}
+                      <p class="ui-micro mt-0.5 text-muted-foreground">
+                        One purchase reveals usage, role, and shot profile for every player.
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      tone="secondary"
-                      disabled={busy || !scoutAssessment.legal}
-                      aria-label={`Scout ${row.player.displayName} for ${formatMillions(scoutPrice)}`}
-                      onclick={() => buyScout(row.player)}
-                    >
-                      <FileSearch size={13} aria-hidden="true" />
-                      Scout
-                    </Button>
                   {/if}
                 </div>
               {/if}
@@ -1285,6 +1288,12 @@
             <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
           {/if}
         </div>
+      </div>
+    {/if}
+
+    {#if onAbandon !== undefined}
+      <div class="border-t border-line-soft pt-3">
+        <FullCourtAbandonRun {busy} {onAbandon} />
       </div>
     {/if}
 

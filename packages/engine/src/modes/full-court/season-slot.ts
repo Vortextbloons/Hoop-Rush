@@ -163,12 +163,40 @@ export function createFullCourtSeasonCheckpoint(
   };
 }
 
-export function simulateFullCourtSeasonSlot(
+export interface FullCourtAiGameChunk {
+  readonly scores: readonly FullCourtSeasonScore[];
+  readonly healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'];
+}
+
+export type FullCourtUserSlotOutcome =
+  | { readonly kind: 'season-complete' }
+  | {
+      readonly kind: 'decision';
+      readonly reason: 'rest-conflict' | 'confirm-forfeit';
+      readonly fixture: FullCourtLeagueGame;
+    }
+  | {
+      readonly kind: 'user-ready';
+      readonly slot: number;
+      readonly userGameId: string;
+      readonly userScore: FullCourtSeasonScore;
+      readonly healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'];
+      readonly userGame: FullCourtGameHealthOutcome;
+    };
+
+function validatedSlotContext(
   lock: FullCourtSeasonLock,
   previous: FullCourtSeasonCheckpoint,
-  context: EngineContext,
-  options: FullCourtSeasonSlotOptions = {},
-): FullCourtSeasonSlotOutcome {
+):
+  | { readonly kind: 'season-complete' }
+  | {
+      readonly kind: 'ready';
+      readonly checkpoint: FullCourtSeasonCheckpoint;
+      readonly slot: number;
+      readonly entries: readonly FullCourtLeagueGame[];
+      readonly userFixture: FullCourtLeagueGame;
+      readonly userSide: 'home' | 'away';
+    } {
   const checkpoint = fullCourtSeasonCheckpointSchema.parse(previous);
   const { season } = lock;
   const seasonIndex = fullCourtSeasonIndexOf(season);
@@ -200,52 +228,166 @@ export function simulateFullCourtSeasonSlot(
   ) {
     throw new Error('Full Court slot must contain one fixture per team');
   }
-
   const userSide = userFixture.homeTeamId === season.userTeamId ? 'home' : 'away';
-  function daysAfter(fixture: FullCourtLeagueGame, teamId: string): readonly number[] {
-    return fullCourtFutureDaysOf(season, fixture, teamId);
-  }
-  function play(fixture: FullCourtLeagueGame, isUserGame: boolean) {
-    const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
-    const opponentTeamId = userSide === 'home' ? fixture.awayTeamId : fixture.homeTeamId;
-    const defensiveMatchups = isUserGame
-      ? fixtureFullCourtDefensiveMatchups(options.defensiveMatchups, fixture.gameId, opponentTeamId)
-      : undefined;
-    const game = isUserGame
-      ? {
-          ...input,
-          [userSide]: withFullCourtCoaching(input[userSide], {
-            ...options,
-            defensiveMatchups,
-          }),
-        }
-      : input;
-    return runFullCourtGameWithHealth(game, fixture.dayOffset, context, {
-      health: {
-        home: checkpoint.healthByTeam[fixture.homeTeamId],
-        away: checkpoint.healthByTeam[fixture.awayTeamId],
-      },
-      ...(lock.injuryProfiles === undefined
-        ? {}
-        : {
-            injuryProfiles: lock.injuryProfiles,
-            futureGameDays: {
-              home: daysAfter(fixture, fixture.homeTeamId),
-              away: daysAfter(fixture, fixture.awayTeamId),
-            },
-          }),
-      ...(isUserGame
-        ? {
-            restingPlayerIds: { [userSide]: options.restingPlayerIds },
-            // The user game is always recorded internally so compact lineup
-            // facts can be derived; the tape is discarded unless it was asked for.
-            record: true,
-          }
-        : {}),
-    });
-  }
+  return { kind: 'ready', checkpoint, slot, entries, userFixture, userSide };
+}
 
-  const userGame = play(userFixture, true);
+function playSlotFixture(
+  lock: FullCourtSeasonLock,
+  checkpoint: FullCourtSeasonCheckpoint,
+  fixture: FullCourtLeagueGame,
+  isUserGame: boolean,
+  userSide: 'home' | 'away',
+  context: EngineContext,
+  options: FullCourtSeasonSlotOptions,
+): FullCourtGameHealthOutcome {
+  const { season } = lock;
+  const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
+  const opponentTeamId = userSide === 'home' ? fixture.awayTeamId : fixture.homeTeamId;
+  const defensiveMatchups = isUserGame
+    ? fixtureFullCourtDefensiveMatchups(options.defensiveMatchups, fixture.gameId, opponentTeamId)
+    : undefined;
+  const game = isUserGame
+    ? {
+        ...input,
+        [userSide]: withFullCourtCoaching(input[userSide], {
+          ...options,
+          defensiveMatchups,
+        }),
+      }
+    : input;
+  return runFullCourtGameWithHealth(game, fixture.dayOffset, context, {
+    health: {
+      home: checkpoint.healthByTeam[fixture.homeTeamId],
+      away: checkpoint.healthByTeam[fixture.awayTeamId],
+    },
+    ...(lock.injuryProfiles === undefined
+      ? {}
+      : {
+          injuryProfiles: lock.injuryProfiles,
+          futureGameDays: {
+            home: fullCourtFutureDaysOf(season, fixture, fixture.homeTeamId),
+            away: fullCourtFutureDaysOf(season, fixture, fixture.awayTeamId),
+          },
+        }),
+    ...(isUserGame
+      ? {
+          restingPlayerIds: { [userSide]: options.restingPlayerIds },
+          // The user game is always recorded internally so compact lineup
+          // facts can be derived; the tape is discarded unless it was asked for.
+          record: true,
+        }
+      : {}),
+  });
+}
+
+function checkedScoreFor(
+  fixture: FullCourtLeagueGame,
+  game: FullCourtGameHealthOutcome,
+  isUserGame: boolean,
+  userLineups: ReturnType<typeof buildFullCourtGameLineups> | undefined,
+): FullCourtSeasonScore {
+  if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
+  if (game.kind === 'played') {
+    const failures = checkFullCourtGameResult(game.result);
+    if (failures.length > 0) {
+      throw new Error(
+        `Full Court game ${fixture.gameId} failed accounting: ${failures.join(', ')}`,
+      );
+    }
+  }
+  return fullCourtSeasonScoreSchema.parse({
+    ...fixture,
+    outcome: fullCourtScoreOutcome(game, isUserGame, userLineups, true),
+  });
+}
+
+export function simulateFullCourtUserSlot(
+  lock: FullCourtSeasonLock,
+  previous: FullCourtSeasonCheckpoint,
+  context: EngineContext,
+  options: FullCourtSeasonSlotOptions = {},
+): FullCourtUserSlotOutcome {
+  const validated = validatedSlotContext(lock, previous);
+  if (validated.kind === 'season-complete') return validated;
+  const { checkpoint, slot, userFixture, userSide } = validated;
+  const userGame = playSlotFixture(lock, checkpoint, userFixture, true, userSide, context, options);
+  if (userGame.kind === 'rest-conflict') {
+    return { kind: 'decision', reason: 'rest-conflict', fixture: userFixture };
+  }
+  if (
+    userGame.kind === 'forfeit' &&
+    userGame.sides.includes(userSide) &&
+    options.acceptForfeit !== true
+  ) {
+    return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
+  }
+  const userLineups =
+    userGame.kind === 'played' && userGame.tape !== null
+      ? buildFullCourtGameLineups({
+          kind: 'played',
+          gameId: userFixture.gameId,
+          userSide,
+          result: userGame.result,
+          tape: userGame.tape,
+        })
+      : undefined;
+  const userScore = checkedScoreFor(userFixture, userGame, true, userLineups);
+  return {
+    kind: 'user-ready',
+    slot,
+    userGameId: userFixture.gameId,
+    userScore,
+    healthByTeam: {
+      [userFixture.homeTeamId]: userGame.health.home,
+      [userFixture.awayTeamId]: userGame.health.away,
+    },
+    userGame:
+      userGame.kind === 'played' && options.record !== true
+        ? { ...userGame, tape: null }
+        : userGame,
+  };
+}
+
+export function simulateFullCourtAiGames(
+  lock: FullCourtSeasonLock,
+  previous: FullCourtSeasonCheckpoint,
+  gameIds: readonly string[],
+  context: EngineContext,
+): FullCourtAiGameChunk {
+  const validated = validatedSlotContext(lock, previous);
+  if (validated.kind === 'season-complete') {
+    return { scores: [], healthByTeam: {} };
+  }
+  const { checkpoint, entries, userFixture, userSide } = validated;
+  const byId = new Map(entries.map((fixture) => [fixture.gameId, fixture]));
+  const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
+  const scores: FullCourtSeasonScore[] = [];
+  for (const gameId of gameIds) {
+    const fixture = byId.get(gameId);
+    if (fixture === undefined || fixture === userFixture) {
+      throw new Error(`Invalid Full Court AI game id ${gameId}`);
+    }
+    const game = playSlotFixture(lock, checkpoint, fixture, false, userSide, context, {});
+    if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
+    healthByTeam[fixture.homeTeamId] = game.health.home;
+    healthByTeam[fixture.awayTeamId] = game.health.away;
+    scores.push(checkedScoreFor(fixture, game, false, undefined));
+  }
+  return { scores, healthByTeam };
+}
+
+export function simulateFullCourtSeasonSlot(
+  lock: FullCourtSeasonLock,
+  previous: FullCourtSeasonCheckpoint,
+  context: EngineContext,
+  options: FullCourtSeasonSlotOptions = {},
+): FullCourtSeasonSlotOutcome {
+  const validated = validatedSlotContext(lock, previous);
+  if (validated.kind === 'season-complete') return validated;
+  const { checkpoint, slot, entries, userFixture, userSide } = validated;
+
+  const userGame = playSlotFixture(lock, checkpoint, userFixture, true, userSide, context, options);
   if (userGame.kind === 'rest-conflict') {
     return { kind: 'decision', reason: 'rest-conflict', fixture: userFixture };
   }
@@ -269,26 +411,14 @@ export function simulateFullCourtSeasonSlot(
 
   const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
   const scores = entries.map((fixture) => {
-    const game = fixture === userFixture ? userGame : play(fixture, false);
+    const isUser = fixture === userFixture;
+    const game = isUser
+      ? userGame
+      : playSlotFixture(lock, checkpoint, fixture, false, userSide, context, {});
     if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
     healthByTeam[fixture.homeTeamId] = game.health.home;
     healthByTeam[fixture.awayTeamId] = game.health.away;
-    if (game.kind === 'played') {
-      const failures = checkFullCourtGameResult(game.result);
-      if (failures.length > 0)
-        throw new Error(
-          `Full Court game ${fixture.gameId} failed accounting: ${failures.join(', ')}`,
-        );
-    }
-    return fullCourtSeasonScoreSchema.parse({
-      ...fixture,
-      outcome: fullCourtScoreOutcome(
-        game,
-        fixture === userFixture,
-        fixture === userFixture ? userLineups : undefined,
-        true,
-      ),
-    });
+    return checkedScoreFor(fixture, game, isUser, isUser ? userLineups : undefined);
   });
   return {
     kind: 'simulated',

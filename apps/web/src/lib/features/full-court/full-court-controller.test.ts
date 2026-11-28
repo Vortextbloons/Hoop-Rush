@@ -1676,3 +1676,60 @@ describe('FullCourtController decision-aware simulation stops', () => {
     }
   });
 });
+
+describe('FullCourtController abandoned runs', () => {
+  test('abandonRun clears the active save and returns to draft setup', async () => {
+    installTestEnvironment();
+    const { first, second } = openTestDatabasePair('fc-controller-abandon-run');
+    const createWorker = (): FullCourtWorkerRunner => ({
+      simulateSlot: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulateGame: (lock, checkpoint, options) =>
+        Promise.resolve(
+          simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+        ),
+      simulatePractice: (lock, input) =>
+        Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+      dispose: () => {},
+    });
+    try {
+      const { runId, assets } = await seedCompletedDraft(first);
+      const controller = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(first),
+        createWorker,
+      });
+      await controller.load();
+      await controller.advance(1);
+      expect(controller.error).toBeNull();
+      expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
+      expect(localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY)).toBe(runId);
+
+      await controller.abandonRun();
+      expect(controller.error).toBeNull();
+      expect(controller.draft).toBeNull();
+      expect(controller.season).toBeNull();
+      expect(controller.playoffs).toBeNull();
+      expect(controller.latestGame).toBeNull();
+      expect(localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY)).toBeNull();
+      controller.dispose();
+
+      const reloaded = new FullCourtController({
+        loadAssets: () => Promise.resolve(assets),
+        loadHealthProfiles: () => Promise.resolve(null),
+        repositories: repositoriesFor(second),
+        createWorker,
+      });
+      await reloaded.load();
+      expect(reloaded.draft).toBeNull();
+      expect(reloaded.season).toBeNull();
+      reloaded.dispose();
+    } finally {
+      first.close();
+      second.close();
+    }
+  });
+});

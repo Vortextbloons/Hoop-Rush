@@ -1,8 +1,10 @@
 import {
   createEngineContext,
+  simulateFullCourtAiGames,
   simulateFullCourtPlayoffGame,
   simulateFullCourtSeasonSlot,
   simulateFullCourtTrainingCamp,
+  simulateFullCourtUserSlot,
   type FullCourtPlayoffLock,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
@@ -125,6 +127,38 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         type: 'full-court-slot-result',
         requestId: request.requestId,
         outcome,
+      });
+      return;
+    }
+    if (request.type === 'full-court-simulate-user-slot') {
+      const lock = seasonLockFor(request);
+      const outcome = simulateFullCourtUserSlot(
+        lock,
+        request.checkpoint,
+        engineContext,
+        request.options,
+      );
+      post({
+        schemaVersion: FULL_COURT_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'full-court-user-slot-result',
+        requestId: request.requestId,
+        outcome,
+      });
+      return;
+    }
+    if (request.type === 'full-court-simulate-ai-games') {
+      const lock = seasonLockFor(request);
+      const chunk = simulateFullCourtAiGames(
+        lock,
+        request.checkpoint,
+        request.gameIds,
+        engineContext,
+      );
+      post({
+        schemaVersion: FULL_COURT_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'full-court-ai-games-result',
+        requestId: request.requestId,
+        chunk,
       });
       return;
     }

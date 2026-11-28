@@ -10,7 +10,12 @@ const completed = { ...regular, completedThroughSlot: 82 };
 const playoffs = fullCourtTestPlayoffLock(lock);
 const playoff = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
 
-function renderPostseason(input: { playoff?: typeof playoff | null; checkpoint?: typeof regular }) {
+function renderPostseason(input: {
+  playoff?: typeof playoff | null;
+  checkpoint?: typeof regular;
+  simProgress?: { completed: number; total: number };
+  stopRequested?: boolean;
+}) {
   return render(FullCourtPostseasonView, {
     props: {
       lock,
@@ -18,7 +23,11 @@ function renderPostseason(input: { playoff?: typeof playoff | null; checkpoint?:
       playoff: input.playoff === undefined ? playoff : input.playoff,
       standings: playoffs.lock.standings,
       pendingForfeit: false,
-      busy: false,
+      busy: input.simProgress !== undefined,
+      simulating: input.simProgress !== undefined,
+      simProgress: input.simProgress ?? null,
+      stopRequested: input.stopRequested ?? false,
+      onStopAfterGame: () => {},
       onAdvance: () => {},
       onStartPlayoffs: () => {},
     },
@@ -32,6 +41,20 @@ describe('FullCourtPostseasonView', () => {
     expect(body).toContain('The bracket is ready to seed');
     expect(body).toContain('Start playoffs');
     expect(body).not.toContain('aria-label="Full Court playoff bracket"');
+  });
+
+  test('shows batch progress and saves the current game when pausing', () => {
+    const simProgress = { completed: 2, total: 5 };
+    const active = renderPostseason({ simProgress });
+    expect(active).toContain('aria-label="Postseason simulation progress"');
+    expect(active).toContain('aria-valuenow="2"');
+    expect(active).toContain('aria-valuemax="5"');
+    expect(active).toContain('Simulating 2 of 5 games');
+    expect(active).toContain('Pause');
+
+    const pausing = renderPostseason({ simProgress, stopRequested: true });
+    expect(pausing).toContain('Saving the current game');
+    expect(pausing).toContain('disabled');
   });
 
   test('shows the Cap Rush bracket with the user series', () => {

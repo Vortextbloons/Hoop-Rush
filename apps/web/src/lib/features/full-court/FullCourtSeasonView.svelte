@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SimulationStatus from '#lib/components/screens/SimulationStatus.svelte';
   import {
     CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
     CAP_RUSH_CONFERENCE_NAMES,
@@ -338,59 +339,13 @@
 
 {#snippet simControlsBar()}
   {#if simulating}
-    <div
-      class="mt-4 rounded-xl border border-primary/40 bg-primary/5 p-3"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="flex items-center gap-2.5">
-          <span class="relative flex h-2.5 w-2.5" aria-hidden="true">
-            <span
-              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75 motion-reduce:animate-none"
-            ></span>
-            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
-          </span>
-          <p class="font-display text-sm font-extrabold tracking-wide uppercase">
-            {#if stopRequested}
-              Saving current game…
-            {:else if simProgress !== null && simProgress.total > 1}
-              Simulating {simProgress.completed} of {simProgress.total} games…
-            {:else if simProgress !== null && simProgress.total === 1}
-              Simulating game…
-            {:else}
-              Simulating games…
-            {/if}
-          </p>
-        </div>
-        {#if onStopAfterGame !== undefined}
-          <Button size="sm" tone="secondary" disabled={stopRequested} onclick={onStopAfterGame}>
-            Stop after this game
-          </Button>
-        {/if}
-      </div>
-      {#if simProgress !== null && simProgress.total > 0}
-        <div
-          class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-3"
-          role="progressbar"
-          aria-label="Season simulation progress"
-          aria-valuemin={0}
-          aria-valuemax={simProgress.total}
-          aria-valuenow={simProgress.completed}
-        >
-          <span
-            class="block h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
-            style:width={`${Math.min(100, (simProgress.completed / simProgress.total) * 100)}%`}
-          ></span>
-        </div>
-      {:else}
-        <div class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-3">
-          <div
-            class="sim-sweep h-full w-1/3 rounded-full bg-primary motion-reduce:animate-none"
-          ></div>
-        </div>
-      {/if}
-    </div>
+    <SimulationStatus
+      class="mt-4"
+      label="Season simulation progress"
+      progress={simProgress}
+      stopping={stopRequested}
+      onStop={onStopAfterGame}
+    />
   {/if}
 
   <div
@@ -1063,6 +1018,7 @@
         {pendingForfeit}
         {busy}
         {simulating}
+        {simProgress}
         {stopRequested}
         {notice}
         {onDismissNotice}
@@ -1091,17 +1047,3 @@
     {@render latestResultPanel()}
   {/if}
 </div>
-
-<style>
-  @keyframes simSweep {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(300%);
-    }
-  }
-  .sim-sweep {
-    animation: simSweep 1.15s ease-in-out infinite;
-  }
-</style>

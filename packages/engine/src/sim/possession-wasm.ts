@@ -47,6 +47,24 @@ interface PickTableEntry {
   readonly table: WeightedPickTable;
 }
 
+interface RelativePickTable {
+  readonly offset: number;
+  readonly entry: PickTableEntry;
+}
+
+interface CachedTeamTables {
+  readonly profile: EraSimulationProfile;
+  readonly players: readonly SimulationPlayer[];
+  readonly passingAnchorFactor: number;
+  readonly pickData: readonly number[];
+  readonly pickTables: readonly RelativePickTable[];
+  readonly restData: readonly number[];
+  readonly restTables: readonly RelativePickTable[];
+  readonly assistData: readonly number[];
+}
+
+const teamTablesCache = new WeakMap<TeamPrep, CachedTeamTables>();
+
 interface StaticLayout {
   readonly prep: readonly [TeamPrep, TeamPrep];
   readonly struck: readonly [string | null, string | null];
@@ -220,6 +238,108 @@ export function assistBase(
   );
 }
 
+function buildCachedTeamTables(
+  team: SimulationTeam,
+  prep: TeamPrep,
+  profile: EraSimulationProfile,
+  passingAnchorFactor: number,
+): CachedTeamTables {
+  const existing = teamTablesCache.get(prep);
+  if (
+    existing !== undefined &&
+    existing.profile === profile &&
+    existing.players === team.players &&
+    existing.passingAnchorFactor === passingAnchorFactor
+  ) {
+    return existing;
+  }
+  const keyOf = (player: SimulationPlayer): string => prep.keyOf(player);
+  const count = team.players.length;
+  const pickData: number[] = [];
+  const pickTables: RelativePickTable[] = [];
+  const pushPick = (value: WeightedPickTable, items: readonly unknown[]): void => {
+    pickTables.push({ offset: pickData.length, entry: { items, table: value } });
+    pickData.push(value.total, ...value.weights);
+  };
+  encodeTeamPickTables(pickData, pushPick, prep, team.players, profile);
+
+  const restData: number[] = [];
+  const restTables: RelativePickTable[] = [];
+  const pushRest = (value: WeightedPickTable, items: readonly unknown[]): void => {
+    restTables.push({ offset: restData.length, entry: { items, table: value } });
+    restData.push(value.total, ...value.weights);
+  };
+  encodeTeamActionAndShotTables(restData, pushRest, prep, team.players, keyOf, 'possession');
+  for (const [slot, defender] of team.players.entries()) {
+    for (const zone of SHOT_ZONES) {
+      restData.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
+    }
+  }
+  const shotArrays = Array.from({ length: 7 }, () => new Array<number>(count * 7 * 5));
+  for (const [playerIndex, player] of team.players.entries()) {
+    const anchor = prep.twoPointAnchor.get(keyOf(player)) ?? null;
+    for (const [actionIndex, action] of ACTION_TYPES.entries()) {
+      for (const [zoneIndex, zone] of SHOT_ZONES.entries()) {
+        const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
+        const values = shotComponents(player, profile, zone, action, prep.spacing, anchor);
+        for (let component = 0; component < 7; component += 1) {
+          const array = shotArrays[component];
+          if (array !== undefined) array[index] = values[component] ?? 0;
+        }
+      }
+    }
+  }
+  for (let component = 0; component < 7; component += 1) {
+    restData.push(...(shotArrays[component] ?? []));
+  }
+  for (let component = 0; component < 7; component += 1) {
+    restData.push(...(shotArrays[component] ?? []));
+  }
+  for (const player of team.players) {
+    restData.push(prep.twoPointAnchor.get(keyOf(player)) ?? -1);
+  }
+  const blockCount = count * 7 * 5;
+  const blockValue = new Array<number>(blockCount);
+  const blockMax = new Array<number>(blockCount);
+  for (const [playerIndex, player] of team.players.entries()) {
+    for (const [actionIndex, action] of ACTION_TYPES.entries()) {
+      for (const [zoneIndex, zone] of SHOT_ZONES.entries()) {
+        const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
+        const components = blockComponents(player, zone, action);
+        blockValue[index] = components[0];
+        blockMax[index] = components[1];
+      }
+    }
+  }
+  restData.push(...blockValue, ...blockValue, ...blockMax, ...blockMax);
+
+  const assistData: number[] = [];
+  for (const initiator of team.players) {
+    for (const shooter of team.players) {
+      for (const action of ACTION_TYPES) {
+        for (const zone of SHOT_ZONES) {
+          assistData.push(
+            assistBase(profile, passingAnchorFactor, initiator, action, zone, shooter),
+          );
+        }
+      }
+    }
+  }
+
+  const cached: CachedTeamTables = {
+    profile,
+    players: team.players,
+    passingAnchorFactor,
+    pickData,
+    pickTables,
+    restData,
+    restTables,
+    assistData,
+  };
+  teamTablesCache.set(prep, cached);
+  return cached;
+}
+
 function struckKeyOf(ctx: TripContext, side: SideIndex): string | null {
   const apron = ctx.apron;
   if (apron === undefined) return null;
@@ -321,11 +441,16 @@ function buildStatic(ctx: TripContext): StaticLayout {
     const count = counts[side];
     const shooters = counts[other];
     const keyOf = (player: SimulationPlayer): string => prep.keyOf(player);
-    encodeTeamPickTables(data, table, prep, team.players, profile);
     const awayPressure = side === 1 ? (ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
-    const turnoverVariants: number[][] = [];
-    for (let variant = 0; variant < variantCount; variant += 1) {
-      const values: number[] = [];
+
+    if (ctx.havoc === undefined) {
+      const cached = buildCachedTeamTables(team, prep, profile, ctx.passingAnchorFactor);
+      const pickBase = data.length;
+      for (const rel of cached.pickTables) {
+        pickTables.set(pickBase + rel.offset, rel.entry);
+      }
+      data.push(...cached.pickData);
+      const turnoverValues: number[] = [];
       for (const player of team.players) {
         const effectsAdjustment =
           ctx.effects !== undefined
@@ -334,7 +459,7 @@ function buildStatic(ctx: TripContext): StaticLayout {
                 offenseSide: side,
               }) / 1000000
             : 0;
-        values.push(
+        turnoverValues.push(
           turnoverProbability(
             player,
             defensePrep.pressure,
@@ -342,110 +467,149 @@ function buildStatic(ctx: TripContext): StaticLayout {
             profile,
             awayPressure,
             effectsAdjustment,
-            variants[variant]?.(player),
           ),
         );
       }
-      turnoverVariants.push(values);
-    }
-    data.push(...(turnoverVariants[0] ?? []));
-    data.push(...(turnoverVariants[1] ?? turnoverVariants[0] ?? []));
-    encodeTeamActionAndShotTables(data, table, prep, team.players, keyOf, 'possession');
-    for (const [slot, defender] of team.players.entries()) {
-      for (const zone of SHOT_ZONES)
-        data.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
-    }
-    const shotVariants: number[][][] = [];
-    for (let variant = 0; variant < variantCount; variant += 1) {
-      const arrays = Array.from({ length: 7 }, () => new Array<number>(count * 7 * 5));
-      team.players.forEach((player, playerIndex) => {
-        const anchor = prep.twoPointAnchor.get(keyOf(player)) ?? null;
-        for (const action of ACTION_TYPES) {
+      data.push(...turnoverValues, ...turnoverValues);
+      const restBase = data.length;
+      for (const rel of cached.restTables) {
+        pickTables.set(restBase + rel.offset, rel.entry);
+      }
+      data.push(...cached.restData);
+      for (const shooter of team.players) {
+        for (const defender of teams[other].players) {
           for (const zone of SHOT_ZONES) {
-            const index =
-              (playerIndex * 7 + ACTION_TYPES.indexOf(action)) * 5 + SHOT_ZONES.indexOf(zone);
-            const values = shotComponents(
-              player,
-              profile,
-              zone,
-              action,
-              prep.spacing,
-              anchor,
-              variants[variant]?.(player),
-            );
-            for (let component = 0; component < 7; component += 1) {
-              const array = arrays[component];
-              if (array !== undefined) array[index] = values[component] ?? 0;
-            }
+            data.push(shootingFoulProbability(shooter, defender, zone, profile));
           }
-        }
-      });
-      shotVariants.push(arrays);
-    }
-    for (let component = 0; component < 7; component += 1) {
-      data.push(...(shotVariants[0]?.[component] ?? []));
-    }
-    for (let component = 0; component < 7; component += 1) {
-      data.push(...(shotVariants[1]?.[component] ?? shotVariants[0]?.[component] ?? []));
-    }
-    for (const player of team.players) {
-      data.push(prep.twoPointAnchor.get(keyOf(player)) ?? -1);
-    }
-    const blockVariants: Array<[number[], number[]]> = [];
-    for (let variant = 0; variant < variantCount; variant += 1) {
-      const counts = count * 7 * 5;
-      const value = new Array<number>(counts);
-      const maximum = new Array<number>(counts);
-      team.players.forEach((player, playerIndex) => {
-        for (const action of ACTION_TYPES) {
-          for (const zone of SHOT_ZONES) {
-            const index =
-              (playerIndex * 7 + ACTION_TYPES.indexOf(action)) * 5 + SHOT_ZONES.indexOf(zone);
-            const components = blockComponents(player, zone, action, variants[variant]?.(player));
-            value[index] = components[0];
-            maximum[index] = components[1];
-          }
-        }
-      });
-      blockVariants.push([value, maximum]);
-    }
-    data.push(...(blockVariants[0]?.[0] ?? []));
-    data.push(...(blockVariants[1]?.[0] ?? blockVariants[0]?.[0] ?? []));
-    data.push(...(blockVariants[0]?.[1] ?? []));
-    data.push(...(blockVariants[1]?.[1] ?? blockVariants[0]?.[1] ?? []));
-    for (const shooter of team.players) {
-      for (const defender of teams[other].players) {
-        for (const zone of SHOT_ZONES) {
-          data.push(shootingFoulProbability(shooter, defender, zone, profile));
         }
       }
-    }
-    const assistVariants: number[][] = [];
-    for (let variant = 0; variant < variantCount; variant += 1) {
-      const values: number[] = [];
-      for (const initiator of team.players) {
-        for (const shooter of team.players) {
+      data.push(...cached.assistData, ...cached.assistData);
+    } else {
+      encodeTeamPickTables(data, table, prep, team.players, profile);
+      const turnoverVariants: number[][] = [];
+      for (let variant = 0; variant < variantCount; variant += 1) {
+        const values: number[] = [];
+        for (const player of team.players) {
+          const effectsAdjustment =
+            ctx.effects !== undefined
+              ? ctx.effects.turnoverAdjustment({
+                  handlerVersion: playerVersion(player),
+                  offenseSide: side,
+                }) / 1000000
+              : 0;
+          values.push(
+            turnoverProbability(
+              player,
+              defensePrep.pressure,
+              eraPoss,
+              profile,
+              awayPressure,
+              effectsAdjustment,
+              variants[variant]?.(player),
+            ),
+          );
+        }
+        turnoverVariants.push(values);
+      }
+      data.push(...(turnoverVariants[0] ?? []));
+      data.push(...(turnoverVariants[1] ?? turnoverVariants[0] ?? []));
+      encodeTeamActionAndShotTables(data, table, prep, team.players, keyOf, 'possession');
+      for (const [slot, defender] of team.players.entries()) {
+        for (const zone of SHOT_ZONES)
+          data.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
+      }
+      const shotVariants: number[][][] = [];
+      for (let variant = 0; variant < variantCount; variant += 1) {
+        const arrays = Array.from({ length: 7 }, () => new Array<number>(count * 7 * 5));
+        team.players.forEach((player, playerIndex) => {
+          const anchor = prep.twoPointAnchor.get(keyOf(player)) ?? null;
           for (const action of ACTION_TYPES) {
             for (const zone of SHOT_ZONES) {
-              values.push(
-                assistBase(
-                  profile,
-                  ctx.passingAnchorFactor,
-                  initiator,
-                  action,
-                  zone,
-                  shooter,
-                  variants[variant]?.(initiator),
-                ),
+              const index =
+                (playerIndex * 7 + ACTION_TYPES.indexOf(action)) * 5 + SHOT_ZONES.indexOf(zone);
+              const values = shotComponents(
+                player,
+                profile,
+                zone,
+                action,
+                prep.spacing,
+                anchor,
+                variants[variant]?.(player),
               );
+              for (let component = 0; component < 7; component += 1) {
+                const array = arrays[component];
+                if (array !== undefined) array[index] = values[component] ?? 0;
+              }
             }
+          }
+        });
+        shotVariants.push(arrays);
+      }
+      for (let component = 0; component < 7; component += 1) {
+        data.push(...(shotVariants[0]?.[component] ?? []));
+      }
+      for (let component = 0; component < 7; component += 1) {
+        data.push(...(shotVariants[1]?.[component] ?? shotVariants[0]?.[component] ?? []));
+      }
+      for (const player of team.players) {
+        data.push(prep.twoPointAnchor.get(keyOf(player)) ?? -1);
+      }
+      const blockVariants: Array<[number[], number[]]> = [];
+      for (let variant = 0; variant < variantCount; variant += 1) {
+        const counts = count * 7 * 5;
+        const value = new Array<number>(counts);
+        const maximum = new Array<number>(counts);
+        team.players.forEach((player, playerIndex) => {
+          for (const action of ACTION_TYPES) {
+            for (const zone of SHOT_ZONES) {
+              const index =
+                (playerIndex * 7 + ACTION_TYPES.indexOf(action)) * 5 + SHOT_ZONES.indexOf(zone);
+              const components = blockComponents(player, zone, action, variants[variant]?.(player));
+              value[index] = components[0];
+              maximum[index] = components[1];
+            }
+          }
+        });
+        blockVariants.push([value, maximum]);
+      }
+      data.push(...(blockVariants[0]?.[0] ?? []));
+      data.push(...(blockVariants[1]?.[0] ?? blockVariants[0]?.[0] ?? []));
+      data.push(...(blockVariants[0]?.[1] ?? []));
+      data.push(...(blockVariants[1]?.[1] ?? blockVariants[0]?.[1] ?? []));
+      for (const shooter of team.players) {
+        for (const defender of teams[other].players) {
+          for (const zone of SHOT_ZONES) {
+            data.push(shootingFoulProbability(shooter, defender, zone, profile));
           }
         }
       }
-      assistVariants.push(values);
+      const assistVariants: number[][] = [];
+      for (let variant = 0; variant < variantCount; variant += 1) {
+        const values: number[] = [];
+        for (const initiator of team.players) {
+          for (const shooter of team.players) {
+            for (const action of ACTION_TYPES) {
+              for (const zone of SHOT_ZONES) {
+                values.push(
+                  assistBase(
+                    profile,
+                    ctx.passingAnchorFactor,
+                    initiator,
+                    action,
+                    zone,
+                    shooter,
+                    variants[variant]?.(initiator),
+                  ),
+                );
+              }
+            }
+          }
+        }
+        assistVariants.push(values);
+      }
+      data.push(...(assistVariants[0] ?? []));
+      data.push(...(assistVariants[1] ?? assistVariants[0] ?? []));
     }
-    data.push(...(assistVariants[0] ?? []));
-    data.push(...(assistVariants[1] ?? assistVariants[0] ?? []));
     for (const shooter of team.players) {
       for (const defenseSide of [0, 1] as const) {
         data.push(
@@ -836,7 +1000,7 @@ function cacheEntry(runtime: Runtime): StaticLayout {
   }
   const layout = buildStatic(ctx);
   runtime.entries.push(layout);
-  if (runtime.entries.length > 8) runtime.entries.shift();
+  if (runtime.entries.length > 64) runtime.entries.shift();
   return layout;
 }
 

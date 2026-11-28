@@ -1,11 +1,13 @@
 <script lang="ts">
+  import SimulationStatus from '#lib/components/screens/SimulationStatus.svelte';
+  import ResultHero from '#lib/components/screens/ResultHero.svelte';
+  import ChampionshipBanner from '#lib/components/screens/ChampionshipBanner.svelte';
   import { resolve } from '$app/paths';
-  import { ClipboardList, Dices } from '@lucide/svelte';
+  import { Check, ClipboardList, Dices } from '@lucide/svelte';
   import { onMount } from 'svelte';
   import { FULL_COURT_DEFAULT_MONEY, fullCourtReportPriceDollars } from '@hoop-rush/data-contracts';
   import {
     defaultFullCourtCoachingRotation,
-    fullCourtAssessPurchase,
     fullCourtStandings,
     fullCourtWarChestDollars,
   } from '@hoop-rush/engine';
@@ -14,16 +16,21 @@
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
+  import ModeCard from '#lib/components/ui/ModeCard.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import FullCourtAbandonRun from '#lib/features/full-court/FullCourtAbandonRun.svelte';
   import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtGamecast from '#lib/features/full-court/FullCourtGamecast.svelte';
   import FullCourtRouletteView from '#lib/features/full-court/FullCourtRouletteView.svelte';
+  import FullCourtRunSummary from '#lib/features/full-court/FullCourtRunSummary.svelte';
+  import { presentFullCourtHistoryEntry } from '#lib/features/full-court/full-court-history-presentation.js';
+  import { getPersistence } from '#lib/persistence.js';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
   import FullCourtWarRoom from '#lib/features/full-court/FullCourtWarRoom.svelte';
   import { loadFullCourtArt, type FullCourtArt } from '#lib/features/full-court/full-court-art.js';
@@ -50,7 +57,6 @@
     { value: 'stats', label: 'Stats & Awards' },
     { value: 'playoffs', label: 'Playoffs' },
   ] as const;
-  let section = $state<(typeof seasonSections)[number]['value']>('home');
   let confirmNewDraft = $state(false);
   let activeGamecast = $state<'latest' | 'saved' | null>(null);
   const RUN_PERK_OPTIONS = [
@@ -73,12 +79,32 @@
       description: 'Sandbox scrimmage simulator against random or chosen league opponents.',
     },
   ];
+  const RUN_VARIANT_OPTIONS = [
+    {
+      id: 'standard' as const,
+      title: 'Standard',
+      description:
+        'Find your franchise player and build a rotation around them while managing payroll.',
+      icon: ClipboardList,
+    },
+    {
+      id: 'roulette' as const,
+      title: 'Roulette',
+      description:
+        'Draft and lock your roster, then use spare budget to spin for player mutations.',
+      icon: Dices,
+    },
+  ];
+  let selectedVariant = $state<'standard' | 'roulette' | null>(null);
   let selectedPerks = $state<('lineup-fit' | 'opponent-film' | 'training-camp')[]>([]);
   const selectedPerkCost = $derived(
     selectedPerks.reduce((sum, kind) => sum + fullCourtReportPriceDollars(kind), 0),
   );
   const startingBudgetRemaining = $derived(
     FULL_COURT_DEFAULT_MONEY.startingWarChestDollars - selectedPerkCost,
+  );
+  const selectedVariantLabel = $derived(
+    RUN_VARIANT_OPTIONS.find((option) => option.id === selectedVariant)?.title ?? '',
   );
 
   function togglePerk(kind: 'lineup-fit' | 'opponent-film' | 'training-camp'): void {
@@ -87,10 +113,15 @@
       : [...selectedPerks, kind];
   }
 
+  function startRun(instance: FullCourtController): void {
+    if (selectedVariant === null) return;
+    void instance.startDraft(selectedVariant, selectedPerks);
+  }
+
   function selectSection(value: typeof section) {
     // During the postseason the bracket owns the page, so Overview and Playoffs
     // both land on the postseason screen instead of a dead overview.
-    section = postseasonMode && value === 'home' ? 'playoffs' : value;
+    section = postseasonMode && !runComplete && value === 'home' ? 'playoffs' : value;
     confirmNewDraft = false;
   }
 
@@ -100,6 +131,14 @@
     await instance.advance(1, false, true);
     if (instance.latestGame !== previous && instance.latestGame?.tape != null) {
       activeGamecast = 'latest';
+    }
+  }
+
+  async function abandonRun(instance: FullCourtController): Promise<void> {
+    await instance.abandonRun();
+    if (instance.draft === null) {
+      section = 'home';
+      activeGamecast = null;
     }
   }
 
@@ -139,22 +178,6 @@
     playoffPreview?.adaptation == null
       ? null
       : fullCourtPlayoffAdaptationRead(playoffPreview.adaptation),
-  );
-  const campBooked = $derived(
-    draft?.reports?.some((report) => report.target.kind === 'training-camp') ?? false,
-  );
-  const campAvailable = $derived(
-    season?.checkpoint.completedThroughSlot === 0 &&
-      playoff === null &&
-      current?.practice == null &&
-      draft != null &&
-      current?.index != null &&
-      (campBooked ||
-        fullCourtAssessPurchase({
-          index: current.index,
-          state: draft,
-          priceDollars: fullCourtReportPriceDollars('training-camp'),
-        }).legal),
   );
   const league = $derived(season?.lock.season);
   const userTeam = $derived(league?.teams.find((team) => team.teamId === league.userTeamId));
@@ -219,16 +242,18 @@
   const postseasonMode = $derived(
     playoff !== null || (season?.checkpoint.completedThroughSlot ?? 0) >= 82,
   );
-  let syncedPostseason = $state(false);
-  $effect(() => {
-    if (!postseasonMode) {
-      syncedPostseason = false;
-      return;
-    }
-    if (syncedPostseason) return;
-    syncedPostseason = true;
-    if (section !== 'playoffs') section = 'playoffs';
-  });
+  const runComplete = $derived(playoff?.championTeamId != null);
+  let section = $derived<(typeof seasonSections)[number]['value']>(
+    postseasonMode && !runComplete ? 'playoffs' : 'home',
+  );
+  const review = $derived(
+    runComplete && season && current?.busy === false
+      ? getPersistence()
+          .fullCourtHistoryRepository.load(season.lock.season.runId)
+          .then((record) => (record === null ? null : presentFullCourtHistoryEntry(record)))
+          .catch(() => null)
+      : null,
+  );
 </script>
 
 <svelte:head>
@@ -275,9 +300,11 @@
           <div class="min-w-0">
             <p class="ui-label">
               Full Court ·
-              {playoff !== null
-                ? 'Postseason'
-                : `Game ${String(season.checkpoint.completedThroughSlot)} of 82`}
+              {runComplete
+                ? 'Season complete'
+                : playoff !== null
+                  ? 'Postseason'
+                  : `Game ${String(season.checkpoint.completedThroughSlot)} of 82`}
             </p>
             <h1
               class="font-display mt-0.5 truncate text-3xl font-extrabold tracking-tight uppercase sm:text-4xl"
@@ -325,7 +352,7 @@
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
           >
-            {item.label}
+            {item.value === 'home' && runComplete ? 'Final Review' : item.label}
             {#if item.value === 'playoffs' && playoff !== null && playoff.championTeamId === null}
               <span
                 class="h-1.5 w-1.5 rounded-full {section === item.value
@@ -337,40 +364,17 @@
           </button>
         {/each}
       </nav>
+      <div class="mb-4">
+        <FullCourtAbandonRun busy={current.busy} onAbandon={() => void abandonRun(current)} />
+      </div>
       {#if current.simulating && (section === 'team' || section === 'war-room')}
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-          <p role="status" class="text-sm text-muted-foreground">
-            {#if current.stopRequested}
-              Saving the current game…
-            {:else if current.simProgress !== null && current.simProgress.total > 1}
-              Simulating {current.simProgress.completed} of {current.simProgress.total} games…
-            {:else}
-              Simulating…
-            {/if}
-          </p>
-          <Button
-            size="sm"
-            tone="secondary"
-            disabled={current.stopRequested}
-            onclick={() => current.stopAfterGame()}>Stop after this game</Button
-          >
-        </div>
-      {/if}
-      {#if section === 'home' && campAvailable}
-        <Alert
+        <SimulationStatus
           class="mb-4"
-          title={campBooked ? 'Training Camp is booked' : 'Training Camp is open'}
-        >
-          Scout your rotation and bench usage in a scrimmage before Game 1.
-          {#snippet icon()}
-            <ClipboardList size={18} />
-          {/snippet}
-          {#snippet actions()}
-            <Button size="sm" tone="secondary" onclick={() => selectSection('war-room')}>
-              Open War Room
-            </Button>
-          {/snippet}
-        </Alert>
+          label="Simulation progress"
+          progress={current.simProgress}
+          stopping={current.stopRequested}
+          onStop={() => current.stopAfterGame()}
+        />
       {/if}
       {#if userTeam && defaultRotation}
         <div hidden={section !== 'team'}>
@@ -414,8 +418,7 @@
             {playoffPreview}
             busy={current.busy}
             preseasonOpen={season.checkpoint.completedThroughSlot === 0}
-            practiceOpen={campBooked ||
-              (playoff === null && season.checkpoint.completedThroughSlot === 0)}
+            practiceOpen={playoff === null && season.checkpoint.completedThroughSlot === 0}
             practice={current.practice}
             {matchupContext}
             {art}
@@ -425,6 +428,48 @@
             onRunPractice={(opponentTeamId) => void current.runPractice(opponentTeamId)}
           />
         {/if}
+      {:else if section === 'home' && runComplete}
+        <section aria-label="Final review" class="space-y-4">
+          <SectionHeading title="Final review" />
+          {#if review === null}
+            <p role="status" class="text-sm text-muted-foreground">Loading season summary</p>
+          {:else}
+            {#await review}
+              <p role="status" class="text-sm text-muted-foreground">Loading season summary</p>
+            {:then entry}
+              {#if entry}
+                {#if entry.playoffStatus === 'champion'}
+                  <ChampionshipBanner team={entry.teamName} label="Full Court champions" />
+                {/if}
+                <ResultHero
+                  score={entry.regularRecordLabel}
+                  scoreLabel={entry.regularRecordLabel + ' regular-season record'}
+                  caption={entry.teamName}
+                  meta={entry.playoffLabel}
+                  tone={entry.playoffStatus === 'champion' ? 'champion' : 'default'}
+                />
+                <FullCourtRunSummary {entry} showHeadline={false} />
+              {:else}
+                <Alert tone="warning" title="Season summary unavailable">
+                  You can still review the standings, stats, awards, and playoff bracket.
+                </Alert>
+              {/if}
+            {/await}
+          {/if}
+          <div class="flex flex-wrap gap-2">
+            <Button tone="secondary" onclick={() => selectSection('playoffs')}
+              >Playoff bracket</Button
+            >
+            <Button tone="secondary" onclick={() => selectSection('league')}>Final standings</Button
+            >
+            <Button tone="secondary" onclick={() => selectSection('stats')}
+              >Stats &amp; awards</Button
+            >
+            <ActionLink href={resolve('/full-court/history')} tone="secondary"
+              >Run history</ActionLink
+            >
+          </div>
+        </section>
       {:else if section !== 'team'}
         <FullCourtSeasonView
           {section}
@@ -489,10 +534,11 @@
           </div>
         </div>
       {/if}
-      {#if section === 'home' && playoff !== null && playoff.nextGame === null}
+      {#if section === 'home' && runComplete}
         {#if confirmNewDraft}
           <Alert class="mt-6" tone="warning" title="Start a new draft?">
-            Your next roster will replace this run as the active save.
+            This run is already saved to history. Clearing the active save returns you to draft
+            setup, where you pick a format and pre-run perks.
             {#snippet actions()}
               <Button tone="secondary" onclick={() => (confirmNewDraft = false)}
                 >Keep this run</Button
@@ -500,16 +546,12 @@
               <Button
                 tone="primary"
                 loading={current.busy}
-                onclick={() => void current.startDraft()}
+                onclick={() => {
+                  confirmNewDraft = false;
+                  void abandonRun(current);
+                }}
               >
-                Start a new draft
-              </Button>
-              <Button
-                tone="secondary"
-                loading={current.busy}
-                onclick={() => void current.startDraft('roulette')}
-              >
-                Start Roulette draft
+                Back to draft setup
               </Button>
             {/snippet}
           </Alert>
@@ -528,6 +570,7 @@
         onSkipSpin={() => void current.skipSpin()}
         onFinalize={() => void current.finalizeRoulette()}
         onPurchaseReport={(target) => void current.purchaseReport(target)}
+        onAbandon={() => void abandonRun(current)}
       />
     {:else if draft?.stage === 'drafting' && current.index !== null}
       <FullCourtDraftView
@@ -537,6 +580,7 @@
         onPick={(versionId) => void current.editDraft('pick-full-court-player', versionId)}
         onRemove={(versionId) => void current.editDraft('remove-full-court-player', versionId)}
         onPurchaseReport={(target) => void current.purchaseReport(target)}
+        onAbandon={() => void abandonRun(current)}
         onFinish={() => {
           selectSection('home');
           void current.editDraft('finish-full-court-draft');
@@ -550,72 +594,118 @@
         level={2}
         size="md"
         align="start"
-        description="Sign 6–12 historical players from a $200M budget ($130M cap, $156M first apron, $182M hard limit), set your rotation, and face 29 historical teams."
+        description="Sign 6–12 historical players from a $250M budget ($130M cap, $156M first apron, $182M hard limit), set your rotation, and face 29 historical teams."
       />
 
-      <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <p class="ui-label text-muted-foreground">Pre-run perks</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">
-              Choose upgrades before draft night. Player scouting ({formatMillions(
-                fullCourtReportPriceDollars('player-scouting'),
-              )} each) is bought per player during the draft.
-            </p>
-          </div>
-          <Badge tone="neutral">
-            {formatMillions(startingBudgetRemaining)} starting budget
-          </Badge>
-        </div>
-
-        <div class="mt-3 grid gap-2 sm:grid-cols-3">
-          {#each RUN_PERK_OPTIONS as perk (perk.kind)}
-            {@const active = selectedPerks.includes(perk.kind)}
-            <button
-              type="button"
-              aria-pressed={active}
-              onclick={() => togglePerk(perk.kind)}
-              class="flex flex-col items-start rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {active
-                ? 'border-primary bg-primary/10'
-                : 'border-border bg-surface-1 hover:border-line-strong'}"
+      <ol class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Draft setup steps">
+        {#each [{ step: 1, label: 'Draft format' }, { step: 2, label: 'Pre-run perks' }] as item (item.step)}
+          {@const done = item.step === 1 && selectedVariant !== null}
+          {@const active = item.step === 1 ? selectedVariant === null : selectedVariant !== null}
+          <li class="flex items-center gap-2" aria-current={active ? 'step' : undefined}>
+            {#if item.step > 1}
+              <span class="h-px w-4 bg-line-strong" aria-hidden="true"></span>
+            {/if}
+            <span
+              class="font-display grid h-5 w-5 place-items-center rounded-md border text-[10px] font-extrabold tabular-nums {active
+                ? 'border-primary/50 bg-primary/15 text-primary'
+                : done
+                  ? 'border-line-strong text-foreground'
+                  : 'border-line-soft text-muted-foreground'}"
+              aria-hidden="true"
             >
-              <div class="flex w-full items-baseline justify-between gap-2">
-                <span class="font-display text-sm font-extrabold uppercase">{perk.title}</span>
-                <span class="font-mono text-xs font-bold tabular-nums text-accent">
-                  {formatMillions(perk.priceDollars)}
-                </span>
-              </div>
-              <p class="mt-1 text-xs leading-snug text-muted-foreground">{perk.description}</p>
-            </button>
-          {/each}
-        </div>
-      </Panel>
+              {#if done}<Check size={11} />{:else}{item.step}{/if}
+            </span>
+            <span class="ui-label" data-tone={active ? 'primary' : 'muted'}>{item.label}</span>
+          </li>
+        {/each}
+      </ol>
 
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <Panel padding="lg" class="flex flex-col items-start border-t-2 border-t-primary">
-          <ClipboardList class="mb-4 text-primary" size={24} aria-hidden="true" />
-          <SectionHeading title="Standard" level={3} size="sm" align="start" />
-          <p class="mt-2 mb-5 flex-1 text-sm text-muted-foreground">
-            Find your franchise player and build a rotation around them while managing payroll.
-          </p>
-          <Button tone="primary" onclick={() => void current.startDraft('standard', selectedPerks)}
-            >Start Standard draft</Button
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        {#each RUN_VARIANT_OPTIONS as option (option.id)}
+          {@const Icon = option.icon}
+          {@const active = selectedVariant === option.id}
+          <ModeCard
+            title={option.title}
+            description={option.description}
+            cta={active ? 'Selected' : `Choose ${option.title}`}
+            selected={active}
+            disabled={current.busy}
+            onclick={() => (selectedVariant = option.id)}
+            class="h-full"
           >
-        </Panel>
-        <Panel padding="lg" class="flex flex-col items-start border-t-2 border-t-accent">
-          <Dices class="mb-4 text-accent" size={24} aria-hidden="true" />
-          <SectionHeading title="Roulette" level={3} size="sm" align="start" />
-          <p class="mt-2 mb-5 flex-1 text-sm text-muted-foreground">
-            Draft and lock your roster, then use spare budget to spin for player mutations.
-          </p>
-          <Button
-            tone="secondary"
-            onclick={() => void current.startDraft('roulette', selectedPerks)}
-          >
-            Start Roulette draft
-          </Button>
-        </Panel>
+            {#snippet icon()}<Icon size={22} aria-hidden="true" />{/snippet}
+          </ModeCard>
+        {/each}
       </div>
+
+      {#if selectedVariant !== null}
+        <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
+          <SectionHeading
+            level={3}
+            size="sm"
+            align="start"
+            title="Pre-run perks"
+            description="Optional upgrades paid from the starting budget. The scouting report ({formatMillions(
+              fullCourtReportPriceDollars('player-scouting'),
+            )}) is bought once during the draft and covers every player. Playstyle is always free."
+          >
+            {#snippet actions()}
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge tone="neutral">
+                  {formatMillions(startingBudgetRemaining)} starting budget
+                </Badge>
+                <Button size="sm" tone="ghost" onclick={() => (selectedVariant = null)}
+                  >Change format</Button
+                >
+              </div>
+            {/snippet}
+          </SectionHeading>
+
+          <div class="mt-3 grid gap-2 sm:grid-cols-3">
+            {#each RUN_PERK_OPTIONS as perk (perk.kind)}
+              {@const active = selectedPerks.includes(perk.kind)}
+              <button
+                type="button"
+                aria-pressed={active}
+                onclick={() => togglePerk(perk.kind)}
+                class="flex flex-col items-start rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {active
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-surface-1 hover:border-line-strong'}"
+              >
+                <div class="flex w-full items-baseline justify-between gap-2">
+                  <span
+                    class="font-display flex items-center gap-1.5 text-sm font-extrabold uppercase"
+                  >
+                    {perk.title}
+                    {#if active}
+                      <Check class="text-primary" size={14} aria-hidden="true" />
+                    {/if}
+                  </span>
+                  <span class="font-mono text-xs font-bold tabular-nums text-accent">
+                    {formatMillions(perk.priceDollars)}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs leading-snug text-muted-foreground">{perk.description}</p>
+              </button>
+            {/each}
+          </div>
+
+          <div
+            class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4"
+          >
+            <p class="font-mono text-[10px] text-muted-foreground uppercase">
+              {selectedVariantLabel} draft ·
+              {selectedPerks.length === 0
+                ? 'no perks'
+                : `${String(selectedPerks.length)} perk${selectedPerks.length === 1 ? '' : 's'}`}
+              · {formatMillions(startingBudgetRemaining)} budget
+            </p>
+            <Button tone="primary" loading={current.busy} onclick={() => startRun(current)}>
+              Start {selectedVariantLabel} draft
+            </Button>
+          </div>
+        </Panel>
+      {/if}
     {/if}
   {/if}
 </PageShell>

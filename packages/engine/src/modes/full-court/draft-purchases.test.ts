@@ -128,7 +128,7 @@ describe('full court report purchases', () => {
   });
 
   it('publishes one price and one access scope per report kind', () => {
-    expect(fullCourtReportPriceDollars('player-scouting')).toBe(2_000_000);
+    expect(fullCourtReportPriceDollars('player-scouting')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('lineup-fit')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('opponent-film')).toBe(3_000_000);
     expect(fullCourtReportPriceDollars('training-camp')).toBe(15_000_000);
@@ -136,6 +136,22 @@ describe('full court report purchases', () => {
     expect(fullCourtReportScope('lineup-fit')).toBe('run');
     expect(fullCourtReportScope('opponent-film')).toBe('run');
     expect(fullCourtReportScope('training-camp')).toBe('run');
+  });
+
+  it('charges one run-wide scouting report without naming a player', () => {
+    const setup = fullCourtTestSetup();
+    const payrollBefore = fullCourtPayrollDollars(setup.state.picks);
+    const outcome = buy(setup, setup.state, { kind: 'player-scouting' });
+    expect(outcome.result.status).toBe('accepted');
+    expect(outcome.state.picks).toEqual([]);
+    expect(outcome.state.spending).toHaveLength(1);
+    expect(outcome.state.spending[0]?.dollars).toBe(5_000_000);
+    expect(outcome.state.reports ?? []).toHaveLength(1);
+    expect(outcome.state.reports?.[0]?.target).toEqual({ kind: 'player-scouting' });
+    expect(fullCourtPayrollDollars(outcome.state.picks)).toBe(payrollBefore);
+    // One report is all the draft sells, so a second copy is refused.
+    const again = buy(setup, outcome.state, { kind: 'player-scouting' });
+    expect(again.result.rejection?.code).toBe('report-owned');
   });
 
   it('charges one scouting receipt without touching payroll', () => {
