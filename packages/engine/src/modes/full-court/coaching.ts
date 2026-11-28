@@ -78,6 +78,11 @@ function hierarchyPlayerIds(hierarchy: FullCourtOffensiveHierarchy): string[] {
     hierarchy.primaryPlayerId,
     hierarchy.secondaryPlayerId,
     hierarchy.floorGeneralPlayerId,
+    ...Object.entries(hierarchy.passingReads ?? {}).flatMap(([handler, targets]) => [
+      handler,
+      ...targets,
+    ]),
+    ...(hierarchy.unitRoles ?? []).flatMap((unit) => unit.playerIds),
   ].filter((playerId): playerId is string => playerId !== undefined);
 }
 

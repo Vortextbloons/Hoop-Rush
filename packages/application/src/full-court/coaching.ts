@@ -59,7 +59,7 @@ export function fullCourtRotationInputForPlan(
   return {
     ...(plan.rotation ?? {}),
     ...staggerStars,
-    units: units.map((unit) => ({ name: unit.name, playerIds: [...unit.playerIds] })),
+    units: units.map((unit) => ({ ...unit, playerIds: [...unit.playerIds] })),
   };
 }
 
@@ -80,7 +80,18 @@ export function applyFullCourtBlueprintToPlan(options: {
     roster,
     rotation: plan.rotation ?? defaultRotation,
   });
-  const nextHierarchy = normalized.hierarchy === undefined ? plan.hierarchy : preview.hierarchy;
+  const nextHierarchy =
+    normalized.hierarchy === undefined
+      ? plan.hierarchy
+      : {
+          ...preview.hierarchy,
+          ...(plan.hierarchy?.passingReads === undefined
+            ? {}
+            : { passingReads: plan.hierarchy.passingReads }),
+          ...(plan.hierarchy?.unitRoles === undefined
+            ? {}
+            : { unitRoles: plan.hierarchy.unitRoles }),
+        };
   const nextPlan = fullCourtCoachingPlanSchema.parse({
     schemaVersion: plan.schemaVersion,
     tactics: { ...normalized.tactics },
@@ -89,7 +100,9 @@ export function applyFullCourtBlueprintToPlan(options: {
     ...(plan.rules === undefined ? {} : { rules: plan.rules }),
     ...(plan.staggerStars === undefined ? {} : { staggerStars: plan.staggerStars }),
     ...(plan.interfaceLevel === undefined ? {} : { interfaceLevel: plan.interfaceLevel }),
-    ...(nextHierarchy === undefined ? {} : { hierarchy: nextHierarchy }),
+    ...(nextHierarchy === undefined || Object.keys(nextHierarchy).length === 0
+      ? {}
+      : { hierarchy: nextHierarchy }),
   });
   assertFullCourtCoachingRoster(nextPlan, roster);
   return { plan: nextPlan, preview };

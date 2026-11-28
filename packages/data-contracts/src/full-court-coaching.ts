@@ -6,6 +6,7 @@ export const FULL_COURT_BLUEPRINT_SCHEMA_VERSION = 1;
 export const FULL_COURT_BLUEPRINT_MAX_NAME_LENGTH = 48;
 export const FULL_COURT_MAX_COACHING_RULES = 8;
 export const FULL_COURT_MAX_NAMED_UNITS = 6;
+export const FULL_COURT_UNIT_MINUTE_BUDGET = 12;
 export const FULL_COURT_MAX_UNIT_NAME_LENGTH = 32;
 
 const FULL_COURT_MINUTE_TOTAL = 240;
@@ -22,6 +23,7 @@ export const fullCourtTacticsSchema = z.object({
   pace: z.enum(['slow', 'balanced', 'fast']),
   offense: z.enum(['balanced', 'perimeter', 'interior', 'ball-movement']),
   defense: z.enum(['balanced', 'pressure', 'protect-paint']),
+  ballMovement: z.literal(true).optional(),
 });
 export type FullCourtTactics = z.infer<typeof fullCourtTacticsSchema>;
 
@@ -209,6 +211,7 @@ export const fullCourtNamedUnitSchema = z.object({
       `Use ${String(FULL_COURT_MAX_UNIT_NAME_LENGTH)} characters or fewer for the unit name.`,
     ),
   playerIds: z.array(playerRefSchema).length(FULL_COURT_MIN_ROTATION_PLAYERS),
+  plannedMinutes: z.number().int().min(1).max(FULL_COURT_UNIT_MINUTE_BUDGET).optional(),
 });
 export type FullCourtNamedUnit = z.infer<typeof fullCourtNamedUnitSchema>;
 
@@ -219,6 +222,13 @@ export const fullCourtNamedUnitsSchema = z
     `Use ${String(FULL_COURT_MAX_NAMED_UNITS)} named units or fewer.`,
   )
   .superRefine((units, context) => {
+    const total = units.reduce((minutes, unit) => minutes + (unit.plannedMinutes ?? 0), 0);
+    if (total > FULL_COURT_UNIT_MINUTE_BUDGET) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Named units share 12 planned minutes in the second quarter.',
+      });
+    }
     const names = new Set<string>();
     units.forEach((unit, index) => {
       const key = unit.name.toLowerCase();
@@ -394,6 +404,17 @@ export const fullCourtOffensiveHierarchySchema = z
     primaryPlayerId: playerRefSchema.optional(),
     secondaryPlayerId: playerRefSchema.optional(),
     floorGeneralPlayerId: playerRefSchema.optional(),
+    passingReads: z.record(playerRefSchema, z.array(playerRefSchema).min(1).max(2)).optional(),
+    unitRoles: z
+      .array(
+        z.object({
+          playerIds: z.array(playerRefSchema).length(5),
+          primaryPlayerId: playerRefSchema.optional(),
+          floorGeneralPlayerId: playerRefSchema.optional(),
+        }),
+      )
+      .max(FULL_COURT_MAX_NAMED_UNITS)
+      .optional(),
   })
   .superRefine((hierarchy, context) => {
     const assignments: Array<[keyof typeof hierarchy, string | undefined]> = [
@@ -413,7 +434,34 @@ export const fullCourtOffensiveHierarchySchema = z
       }
       seen.add(playerId);
     }
-    if (seen.size === 0) {
+    for (const [handler, targets] of Object.entries(hierarchy.passingReads ?? {})) {
+      if (targets.includes(handler) || new Set(targets).size !== targets.length) {
+        context.addIssue({
+          code: 'custom',
+          path: ['passingReads', handler],
+          message: 'Choose distinct teammates.',
+        });
+      }
+    }
+    const units = new Set<string>();
+    for (const unit of hierarchy.unitRoles ?? []) {
+      const key = JSON.stringify([...unit.playerIds].sort());
+      if (
+        units.has(key) ||
+        new Set(unit.playerIds).size !== 5 ||
+        [unit.primaryPlayerId, unit.floorGeneralPlayerId].some(
+          (id) => id !== undefined && !unit.playerIds.includes(id),
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['unitRoles'],
+          message: 'Choose one set of roles per lineup, using players from that lineup.',
+        });
+      }
+      units.add(key);
+    }
+    if (seen.size === 0 && !Object.keys(hierarchy.passingReads ?? {}).length && !units.size) {
       context.addIssue({
         code: 'custom',
         path: [],

@@ -201,6 +201,39 @@ describe('full court game accounting', () => {
     expect(firstStint?.playerIds.every((id) => starters.some((s) => s.playerId === id))).toBe(true);
   });
 
+  it('runs a scheduled unit in the second quarter', () => {
+    const roster = fullCourtTestRoster('scheduled', 10, () => ({ rating: 74 }));
+    const startingFive = roster.slice(0, 5).map((player) => player.playerId);
+    const playerIds = roster.slice(5).map((player) => player.playerId);
+    const input = fullCourtTestInput({
+      seed: 'scheduled',
+      homeRoster: roster,
+      homeRotation: {
+        startingFive,
+        units: [{ name: 'Bench five', playerIds, plannedMinutes: 3 }],
+      },
+    });
+    const result = simulateFullCourtGame(input, ctx);
+    const playedAsUnit = result.home.stints.filter((stint) =>
+      playerIds.every((id) => stint.playerIds.includes(id)),
+    );
+    const scheduledSeconds = playedAsUnit.reduce(
+      (total, stint) =>
+        total +
+        Math.max(
+          0,
+          Math.min(15 * 60, stint.startSeconds + stint.seconds) -
+            Math.max(12 * 60, stint.startSeconds),
+        ),
+      0,
+    );
+    expect(scheduledSeconds).toBeGreaterThanOrEqual(120);
+    expect(checkFullCourtGameResult(result)).toEqual([]);
+    expect(fullCourtGameDigest(result)).toBe(
+      fullCourtGameDigest(simulateFullCourtGame(input, ctx)),
+    );
+  });
+
   it('records configured named units without changing the seeded game result', () => {
     const roster = fullCourtTestRoster('namedunits', 8, () => ({ rating: 74 }));
     const startingFive = roster.slice(0, 5).map((player) => player.playerId);

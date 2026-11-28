@@ -374,6 +374,70 @@ describe('full court tactics API', () => {
     expect(absent).toBe(basePrep);
   });
 
+  it('combines shot emphasis with ball movement', () => {
+    const hybrid = { ...PERIMETER, ballMovement: true } as const;
+    const perimeter = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      PERIMETER,
+      'balanced',
+    );
+    const combined = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      hybrid,
+      'balanced',
+    );
+    expect(zoneShareOfPrep(combined, 'rim')).toBe(zoneShareOfPrep(perimeter, 'rim'));
+    expect(passValues(combined)[0] ?? 0).toBeGreaterThan(passValues(perimeter)[0] ?? 0);
+    expect(
+      fullCourtTacticsEffects(undefined, [hybrid, BALANCED])?.turnoverAdjustment({
+        handlerVersion: 'h',
+        offenseSide: 0,
+      }),
+    ).toBe(20_000);
+  });
+
+  it('weights ordered passing reads only for the selected handler and applies active unit roles', () => {
+    const [handler, first, second, scorer, initiator] = homeRoster;
+    if (!handler || !first || !second || !scorer || !initiator)
+      throw new Error('Expected five players');
+    const prepared = applyFullCourtTacticsToPrep(
+      basePrep,
+      homeRoster,
+      tacticsProfile,
+      BALANCED,
+      'balanced',
+      {
+        passingReads: { [handler.playerId]: [first.playerId, second.playerId] },
+        unitRoles: [
+          {
+            playerIds: homeRoster.map((player) => player.playerId),
+            primaryPlayerId: scorer.playerId,
+            floorGeneralPlayerId: initiator.playerId,
+          },
+        ],
+      },
+    );
+    expect(finishingWeightOf(prepared, homeRoster, 0, 1)).toBeCloseTo(
+      finishingWeightOf(basePrep, homeRoster, 0, 1) * 1.6,
+    );
+    expect(finishingWeightOf(prepared, homeRoster, 0, 2)).toBeCloseTo(
+      finishingWeightOf(basePrep, homeRoster, 0, 2) * 1.3,
+    );
+    expect(finishingWeightOf(prepared, homeRoster, 2, 1)).toBe(
+      finishingWeightOf(basePrep, homeRoster, 2, 1),
+    );
+    expect(finishingWeightOf(prepared, homeRoster, 0, 3)).toBeGreaterThan(
+      finishingWeightOf(basePrep, homeRoster, 0, 3),
+    );
+    expect(initiatorWeightOf(prepared, homeRoster, 4)).toBeGreaterThan(
+      initiatorWeightOf(basePrep, homeRoster, 4),
+    );
+  });
+
   it('shifts opportunity weight to a primary option without changing ratings', () => {
     const snapshot = JSON.stringify(homeRoster);
     const hierarchy = { primaryPlayerId: homeRoster[1]?.playerId };

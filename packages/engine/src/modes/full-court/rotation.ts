@@ -1,5 +1,5 @@
 import type { FullCourtCoachingRule, SimulationPlayer } from '@hoop-rush/data-contracts';
-import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+import { FULL_COURT_UNIT_MINUTE_BUDGET, LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { clamp } from '../../domain/math.ts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
@@ -91,6 +91,7 @@ export interface FullCourtAvailabilityEntry {
 export interface FullCourtRotationUnitInput {
   readonly name: string;
   readonly playerIds: readonly string[];
+  readonly plannedMinutes?: number;
 }
 
 export interface FullCourtRotationPlanInput {
@@ -155,6 +156,7 @@ export interface FullCourtRotationUnit {
   readonly name: string;
   /** Roster indices in tactical slot order. */
   readonly rosterIndices: readonly number[];
+  readonly plannedMinutes?: number;
 }
 
 export type FullCourtStaminaSource =
@@ -777,7 +779,24 @@ export function resolveRotationPlan(
     if (new Set(rosterIndices).size !== rosterIndices.length) {
       throw new FullCourtSetupError('invalid-lineup', `unit ${unit.name} repeats a player`);
     }
-    units.push({ name: unitName, rosterIndices });
+    const plannedMinutes = unit.plannedMinutes;
+    if (
+      plannedMinutes !== undefined &&
+      (!Number.isInteger(plannedMinutes) ||
+        plannedMinutes < 1 ||
+        units.reduce((total, entry) => total + (entry.plannedMinutes ?? 0), plannedMinutes) >
+          FULL_COURT_UNIT_MINUTE_BUDGET)
+    ) {
+      throw new FullCourtSetupError(
+        'invalid-lineup',
+        'Named units share 12 planned minutes in the second quarter.',
+      );
+    }
+    units.push({
+      name: unitName,
+      rosterIndices,
+      ...(plannedMinutes === undefined ? {} : { plannedMinutes }),
+    });
   }
 
   const rules: FullCourtRulePlan[] = [];
@@ -1072,26 +1091,26 @@ function withScorerCoverage(
   return null;
 }
 
-function closingRuleSwap(
+function lineupSwap(
   snapshot: FullCourtRotationSnapshot,
-  rule: Extract<FullCourtRulePlan, { kind: 'closing-lineup' }>,
+  lineup: readonly number[],
   bench: readonly number[],
 ): FullCourtSubstitutionDecision | null {
   const onCourt = new Set(snapshot.slots);
   const benchSet = new Set(bench);
-  for (const target of rule.lineup) {
+  for (const target of lineup) {
     if (onCourt.has(target)) continue;
     // An unavailable or spent target invalidates the whole rule rather than
     // leaving a partial lineup on the floor.
     if (!benchSet.has(target)) return null;
     if ((snapshot.energies[target] ?? 0) <= FULL_COURT_CLOSING_MIN_ENERGY) return null;
   }
-  const incoming = rule.lineup.find((target) => !onCourt.has(target));
+  const incoming = lineup.find((target) => !onCourt.has(target));
   if (incoming === undefined) return null;
   let outSlot = -1;
   let outIndex = -1;
   for (const [slot, index] of snapshot.slots.entries()) {
-    if (rule.lineup.includes(index)) continue;
+    if (lineup.includes(index)) continue;
     if (!mayLeave(snapshot, index)) continue;
     if (outIndex === -1 || priorityOf(snapshot, index) < priorityOf(snapshot, outIndex)) {
       outSlot = slot;
@@ -1199,7 +1218,7 @@ function evaluateCoachingRules(
         state.boundaryRuleIndex = index;
         return { kind: 'none' };
       }
-      const decision = closingRuleSwap(snapshot, rule, bench);
+      const decision = lineupSwap(snapshot, rule.lineup, bench);
       if (decision === null || decision.kind !== 'swap') continue;
       state.boundarySeconds = context.globalSeconds;
       state.boundaryRuleIndex = index;
@@ -1281,6 +1300,29 @@ export function planSubstitution(
   // A rule already handled this window; do not let the staff closing five or
   // pace logic immediately undo it at the same dead ball.
   if (rules.boundarySeconds === context.globalSeconds) return { kind: 'none' };
+
+  if (context.period === 1 && context.legalWindow !== false) {
+    let end = FULL_COURT_REGULATION_SECONDS / 4;
+    for (const unit of snapshot.plan.units) {
+      const start = end;
+      end += (unit.plannedMinutes ?? 0) * 60;
+      if (context.globalSeconds < start || context.globalSeconds >= end) continue;
+      if (
+        unit.rosterIndices.some(
+          (index) =>
+            snapshot.plan.available[index] !== true ||
+            (snapshot.fouls[index] ?? 0) >= FULL_COURT_FOUL_LIMIT ||
+            (snapshot.energies[index] ?? 0) <= FULL_COURT_SEVERE_FATIGUE_ENERGY,
+        )
+      )
+        break;
+      if (unit.rosterIndices.every((index) => snapshot.slots.includes(index)))
+        return { kind: 'none' };
+      const swap = lineupSwap(snapshot, unit.rosterIndices, bench);
+      if (swap !== null) return swap;
+      break;
+    }
+  }
 
   if (isClosingWindow(context)) {
     const closing = snapshot.plan.closingSlots;

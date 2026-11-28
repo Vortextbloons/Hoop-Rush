@@ -1,10 +1,11 @@
 <script lang="ts">
+  import type { CapRushSourcePlayer } from '@hoop-rush/data-contracts';
+  import { fullCourtLineupFitReport } from '@hoop-rush/engine';
   import type { SaveFullCourtBlueprintOptions } from '@hoop-rush/application/full-court';
   import type {
     FullCourtBlueprint,
     FullCourtCoachingPlan,
     FullCourtCoachingRule,
-    FullCourtDefensiveMatchupAssignment,
     FullCourtInterfaceLevel,
     FullCourtTactics,
     FullCourtTeamHealth,
@@ -21,12 +22,10 @@
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import { formatPositions } from '#lib/player-positions.js';
   import FullCourtBlueprintPicker from './FullCourtBlueprintPicker.svelte';
-  import FullCourtDefensiveMatchupsPanel from './FullCourtDefensiveMatchupsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRuleEditor from './FullCourtRuleEditor.svelte';
   import TeamCourtPreview from './TeamCourtPreview.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
-  import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
   import {
     FULL_COURT_MAX_PLAYER_MINUTES,
     FULL_COURT_MAX_UNITS,
@@ -51,9 +50,12 @@
     type FullCourtTeamMinutesRow,
   } from './full-court-coaching-presenter.ts';
 
+  import { LINEUP_FINDING_LABELS } from './full-court-scout-labels';
+
   let {
     roster,
     defaultRotation,
+    scoutedRoster = null,
     plan,
     busy,
     onSave,
@@ -63,12 +65,10 @@
     readOnly = false,
     health = null,
     dayOffset = null,
-    matchupContext = null,
-    onMatchupsChange,
-    onResetMatchups,
     art = null,
   }: {
     roster: readonly SimulationPlayer[];
+    scoutedRoster?: readonly CapRushSourcePlayer[] | null;
     defaultRotation: NonNullable<FullCourtCoachingPlan['rotation']>;
     plan: FullCourtCoachingPlan;
     busy: boolean;
@@ -83,9 +83,6 @@
     readOnly?: boolean;
     health?: FullCourtTeamHealth | null;
     dayOffset?: number | null;
-    matchupContext?: FullCourtMatchupEditorContext | null;
-    onMatchupsChange?: (assignments: readonly FullCourtDefensiveMatchupAssignment[]) => void;
-    onResetMatchups?: () => void;
     art?: FullCourtArt | null;
   } = $props();
 
@@ -99,7 +96,6 @@
     { value: 'balanced', label: 'Balanced' },
     { value: 'perimeter', label: 'Perimeter' },
     { value: 'interior', label: 'Interior' },
-    { value: 'ball-movement', label: 'Ball movement' },
   ] as const satisfies readonly { value: FullCourtTactics['offense']; label: string }[];
   const DEFENSE_OPTIONS = [
     { value: 'balanced', label: 'Balanced' },
@@ -119,7 +115,7 @@
     {
       key: 'primaryPlayerId',
       label: 'Primary option',
-      hint: 'Runs the most offense and takes the largest share of his own looks.',
+      hint: 'Gets the strongest boost to scoring opportunities.',
     },
     {
       key: 'secondaryPlayerId',
@@ -201,8 +197,8 @@
     draft.interfaceLevel === 'quick'
       ? 'Set a strategy, choose your starters, and manage bench minutes.'
       : draft.interfaceLevel === 'remix'
-        ? 'Adjust tactics and choose who starts, sits, and closes.'
-        : 'Fine-tune scoring roles, lineup groups, situational rules, and defensive matchups.',
+        ? 'Choose team tactics, offensive roles, and who starts and closes.'
+        : 'Set lineup groups, planned unit minutes, and situational rules.',
   );
 
   function setInterfaceLevel(level: FullCourtInterfaceLevel): void {
@@ -366,6 +362,22 @@
         playerIds[existingSlot] = playerIds[slot] ?? playerId;
       }
       playerIds[slot] = playerId;
+      const roles = unitRoles(unit);
+      if (roles && !playerIds.every((id) => unit.playerIds.includes(id))) {
+        draft.unitRoles = (draft.unitRoles ?? []).filter((entry) => entry !== roles);
+        if (!unitRoles({ ...unit, playerIds })) {
+          const primary = roles.primaryPlayerId;
+          const initiator = roles.floorGeneralPlayerId;
+          const next = {
+            playerIds,
+            ...(primary && playerIds.includes(primary) ? { primaryPlayerId: primary } : {}),
+            ...(initiator && playerIds.includes(initiator)
+              ? { floorGeneralPlayerId: initiator }
+              : {}),
+          };
+          if (next.primaryPlayerId || next.floorGeneralPlayerId) draft.unitRoles.push(next);
+        }
+      }
       return { ...unit, playerIds };
     });
     markEdited();
@@ -385,6 +397,46 @@
 
   function setHierarchyRole(role: keyof FullCourtOffensiveHierarchyDraft, raw: string): void {
     draft.hierarchy[role] = raw === '' ? null : raw;
+    markEdited();
+  }
+
+  let readHandler = $state('');
+  const starterStrengths = $derived(
+    scoutedRoster === null
+      ? []
+      : fullCourtLineupFitReport(
+          scoutedRoster.filter((player) => draft.startingFive.includes(player.playerId)),
+        ).strengths,
+  );
+  const reads = $derived(draft.passingReads?.[readHandler] ?? []);
+
+  function setRead(slot: number, target: string): void {
+    const next = [...reads];
+    if (target === '') next.splice(slot, 1);
+    else next[slot] = target;
+    draft.passingReads ??= {};
+    if (next.length === 0) delete draft.passingReads[readHandler];
+    else draft.passingReads[readHandler] = next;
+    markEdited();
+  }
+
+  function unitRoles(unit: FullCourtNamedUnitDraft) {
+    return draft.unitRoles?.find((entry) =>
+      entry.playerIds.every((id) => unit.playerIds.includes(id)),
+    );
+  }
+
+  function setUnitRole(
+    unit: FullCourtNamedUnitDraft,
+    role: 'primaryPlayerId' | 'floorGeneralPlayerId',
+    playerId: string,
+  ): void {
+    const current = unitRoles(unit);
+    const next = { ...current, playerIds: [...unit.playerIds] };
+    if (playerId === '') delete next[role];
+    else next[role] = playerId;
+    draft.unitRoles = (draft.unitRoles ?? []).filter((entry) => entry !== current);
+    if (next.primaryPlayerId || next.floorGeneralPlayerId) draft.unitRoles.push(next);
     markEdited();
   }
 
@@ -533,7 +585,12 @@
 
       <div class="mt-3 grid gap-3">
         <Panel as="section" padding="sm" aria-label="Tactics">
-          <SectionHeading level={4} size="sm" title="Tactics" />
+          <SectionHeading
+            level={4}
+            size="sm"
+            title="Team tactics"
+            description="Set how your team plays across games."
+          />
           <div class="mt-3 grid gap-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-sm font-semibold">Pace</span>
@@ -548,16 +605,43 @@
               />
             </div>
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Offense</span>
+              <span class="text-sm font-semibold">Shot emphasis</span>
               <SegmentedControl
-                label="Offense"
-                value={draft.tactics.offense}
+                label="Shot emphasis"
+                value={draft.tactics.offense === 'ball-movement'
+                  ? 'balanced'
+                  : draft.tactics.offense}
                 options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
                 onchange={(value) => {
+                  if (draft.tactics.offense === 'ball-movement') draft.tactics.ballMovement = true;
                   draft.tactics.offense = value;
                   markEdited();
                 }}
               />
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label class="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  class="mt-1 accent-primary"
+                  disabled={locked}
+                  checked={draft.tactics.ballMovement === true ||
+                    draft.tactics.offense === 'ball-movement'}
+                  onchange={(event) => {
+                    if (draft.tactics.offense === 'ball-movement')
+                      draft.tactics.offense = 'balanced';
+                    if (event.currentTarget.checked) draft.tactics.ballMovement = true;
+                    else delete draft.tactics.ballMovement;
+                    markEdited();
+                  }}
+                />
+                <span>
+                  <span class="block text-sm font-semibold">Move the ball</span>
+                  <span class="text-xs text-muted-foreground"
+                    >More passing and assists, with more turnover risk.</span
+                  >
+                </span>
+              </label>
             </div>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-sm font-semibold">Defense</span>
@@ -572,20 +656,13 @@
               />
             </div>
           </div>
-          {#if !readOnly}
-            <FullCourtBlueprintPicker
-              tactics={draft.tactics}
-              {roster}
-              rotation={blueprintRotation}
-              hierarchy={draft.hierarchy}
-              disabled={locked}
-              onApplyTactics={applyStrategyTactics}
-              onApplyBlueprint={applyStrategyBlueprint}
-              {onListBlueprints}
-              {onSaveBlueprint}
-              {onRemoveBlueprint}
-            />
-          {/if}
+          <p class="mt-2 text-xs text-muted-foreground">
+            {draft.tactics.defense === 'pressure'
+              ? 'Force more steals at the cost of energy and defensive rebounds.'
+              : draft.tactics.defense === 'protect-paint'
+                ? 'Give up more outside shots to protect the rim and secure rebounds.'
+                : 'Use each player’s usual defensive tendencies.'}
+          </p>
         </Panel>
 
         <Panel as="section" padding="sm" aria-label="Rotation">
@@ -614,6 +691,16 @@
                 ? 'The staff sets the starters and minutes for every game.'
                 : 'The staff sets the starters and minutes for every game. Choose Custom to lock in your own five and minute targets.'}
             </p>
+          {/if}
+
+          {#if starterStrengths.length > 0}
+            <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Starting five strengths">
+              {#each starterStrengths as strength (strength.code)}
+                <Badge tone="neutral">
+                  Starting five · {LINEUP_FINDING_LABELS[strength.code]}
+                </Badge>
+              {/each}
+            </div>
           {/if}
 
           <div class="mt-4 border-t border-line-soft pt-3" aria-label="Minutes" role="group">
@@ -822,12 +909,12 @@
           {/if}
         </Panel>
 
-        {#if mastermind}
-          <Panel as="section" padding="sm" aria-label="Scoring hierarchy">
+        {#if !readOnly && draft.interfaceLevel !== 'quick'}
+          <Panel as="section" padding="sm" aria-label="Offensive roles">
             <SectionHeading
               level={4}
               size="sm"
-              title="Scoring hierarchy"
+              title="Offensive roles"
               description="Choose who takes the lead on offense and who sets up teammates."
             />
             <div class="mt-3 grid gap-3 md:grid-cols-3">
@@ -852,6 +939,75 @@
                 </label>
               {/each}
             </div>
+            <div class="mt-4 grid gap-3 md:grid-cols-3">
+              <label class="grid gap-1">
+                <span class="text-sm font-semibold">Ball handler</span>
+                <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
+                  <option value="">Choose a player</option>
+                  {#each roster as player (player.playerId)}
+                    <option value={player.playerId}>{player.displayName}</option>
+                  {/each}
+                </select>
+              </label>
+              {#each [0, 1] as slot (slot)}
+                <label class="grid gap-1">
+                  <span class="text-sm font-semibold"
+                    >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
+                  >
+                  <select
+                    class={SELECT_CLASS}
+                    disabled={locked || readHandler === '' || (slot === 1 && reads.length === 0)}
+                    value={reads[slot] ?? ''}
+                    onchange={(event) => setRead(slot, event.currentTarget.value)}
+                  >
+                    <option value="">Use player tendencies</option>
+                    {#each roster as player (player.playerId)}
+                      {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
+                        <option value={player.playerId}>{player.displayName}</option>
+                      {/if}
+                    {/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+            <p class="mt-2 text-xs text-muted-foreground">
+              The top target gets the strongest preference. Players still follow their tendencies.
+            </p>
+            {#each draft.units as unit, index (index)}
+              <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
+                <legend class="text-sm font-semibold">{unit.name}</legend>
+                {#if scoutedRoster !== null}
+                  {@const strengths = fullCourtLineupFitReport(
+                    scoutedRoster.filter((player) => unit.playerIds.includes(player.playerId)),
+                  ).strengths}
+                  {#if strengths.length}
+                    <p class="text-xs text-muted-foreground md:col-span-2">
+                      {strengths.map((strength) => LINEUP_FINDING_LABELS[strength.code]).join(', ')}
+                    </p>
+                  {/if}
+                {/if}
+                {#each ['floorGeneralPlayerId', 'primaryPlayerId'] as role (role)}
+                  {@const key =
+                    role === 'primaryPlayerId' ? 'primaryPlayerId' : 'floorGeneralPlayerId'}
+                  <label class="grid gap-1">
+                    <span class="text-xs"
+                      >{key === 'primaryPlayerId' ? 'Scoring priority' : 'Initiator'}</span
+                    >
+                    <select
+                      class={SELECT_CLASS}
+                      disabled={locked}
+                      value={unitRoles(unit)?.[key] ?? ''}
+                      onchange={(event) => setUnitRole(unit, key, event.currentTarget.value)}
+                    >
+                      <option value="">Use team role</option>
+                      {#each unit.playerIds as id (id)}
+                        <option value={id}>{playerNames.get(id)}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {/each}
+              </fieldset>
+            {/each}
             <div class="mt-4 rounded-lg border border-line-soft bg-surface-1 px-3 py-2.5">
               <label class="flex items-start gap-2">
                 <input
@@ -893,7 +1049,8 @@
                 >
               </summary>
               <p class="mt-2 text-xs text-muted-foreground">
-                Save groups of five players for late-game lineups.
+                Plan up to 12 minutes across units at the start of the second quarter, in the order
+                shown. Fatigue, availability, and substitution rules can shorten their time.
               </p>
 
               {#if draft.units.length === 0}
@@ -908,6 +1065,25 @@
                   {#each draft.units as unit, index (index)}
                     <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
                       <div class="flex flex-wrap items-end justify-between gap-2">
+                        <label class="w-28">
+                          <span class="ui-micro">Planned minutes</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="12"
+                            step="1"
+                            class={SELECT_CLASS}
+                            value={unit.plannedMinutes ?? 0}
+                            disabled={locked}
+                            onchange={(event) => {
+                              const minutes = event.currentTarget.valueAsNumber;
+                              if (Number.isInteger(minutes) && minutes > 0 && minutes <= 12)
+                                unit.plannedMinutes = minutes;
+                              else delete unit.plannedMinutes;
+                              markEdited();
+                            }}
+                          />
+                        </label>
                         <label class="min-w-0 flex-1">
                           <span class="ui-micro">Unit name</span>
                           <input
@@ -1011,7 +1187,7 @@
             </details>
           </Panel>
         {/if}
-        {#if !mastermind}
+        {#if readOnly || draft.interfaceLevel === 'quick'}
           <Panel as="section" padding="sm" aria-label="Game plan summary">
             <SectionHeading
               level={4}
@@ -1019,7 +1195,7 @@
               title="Game plan"
               description={readOnly
                 ? undefined
-                : 'Edit scoring roles, lineup groups, and game situations in Mastermind.'}
+                : 'Open Remix for offensive roles and Mastermind for lineup rules.'}
             />
             <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               {#each HIERARCHY_ROLES as role (role.key)}
@@ -1071,6 +1247,22 @@
             </details>
           </Panel>
         {/if}
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Strategy presets">
+            <FullCourtBlueprintPicker
+              tactics={draft.tactics}
+              {roster}
+              rotation={blueprintRotation}
+              hierarchy={draft.hierarchy}
+              disabled={locked}
+              onApplyTactics={applyStrategyTactics}
+              onApplyBlueprint={applyStrategyBlueprint}
+              {onListBlueprints}
+              {onSaveBlueprint}
+              {onRemoveBlueprint}
+            />
+          </Panel>
+        {/if}
       </div>
 
       {#if !validation.valid}
@@ -1094,20 +1286,6 @@
       {/if}
     </fieldset>
   </form>
-
-  {#if matchupContext !== null}
-    <div class="mt-4">
-      <FullCourtDefensiveMatchupsPanel
-        context={matchupContext}
-        busy={busy || saving}
-        readOnly={!mastermind}
-        canCustomize={!readOnly && !mastermind}
-        {art}
-        {onMatchupsChange}
-        {onResetMatchups}
-      />
-    </div>
-  {/if}
 </div>
 
 <style>

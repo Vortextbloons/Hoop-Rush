@@ -132,6 +132,7 @@ export function presentFullCourtHistoryEntry(
   const strategySummary = [
     `${TACTICS_LABELS.pace[tactics.pace]} pace`,
     `${TACTICS_LABELS.offense[tactics.offense]} offense`,
+    ...(tactics.ballMovement && tactics.offense !== 'ball-movement' ? ['Ball movement'] : []),
     `${TACTICS_LABELS.defense[tactics.defense]} defense`,
   ].join(' · ');
 

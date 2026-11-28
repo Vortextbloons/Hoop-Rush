@@ -64,3 +64,21 @@ export function scoutFieldValue(field: ScoutField, value: number): string {
   const text = Number.isInteger(value) ? String(value) : value.toFixed(1);
   return isScoutTendency(field) ? `${text}%` : text;
 }
+
+export const LINEUP_FINDING_LABELS = {
+  'multiple-creators': 'Multiple creators',
+  'spacing-volume': 'Spacing volume',
+  'playmaking-depth': 'Playmaking depth',
+  'rim-protection': 'Rim protection',
+  'perimeter-defense': 'Perimeter defense',
+  'glass-control': 'Glass control',
+  'roster-depth': 'Roster depth',
+  'no-primary-creator': 'No primary creator',
+  'no-spacing': 'No spacing',
+  'thin-spacing': 'Thin spacing',
+  'no-rim-protection': 'No rim protection',
+  'no-perimeter-stopper': 'No perimeter stopper',
+  'weak-defensive-glass': 'Weak defensive glass',
+  'turnover-risk': 'Turnover risk',
+  'thin-depth': 'Thin depth',
+} as const;

@@ -2,9 +2,6 @@ import { z } from 'zod';
 import { commandIdSchema, idSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
-  CAP_RUSH_CAP_LINE_DOLLARS,
-  CAP_RUSH_FIRST_APRON_DOLLARS,
-  CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_OFFER_SIZE,
   capRushBucketSchema,
   capRushCatalogSourceSchema,
@@ -64,11 +61,15 @@ export type FullCourtMoneyConfig = z.infer<typeof fullCourtMoneyConfigSchema>;
 // while a six-player star-heavy build (~$428M) lands in the second apron and consumes
 // almost the whole War Chest, which is the intended choice between apron cost, depth, and
 // purchase room.
+export const FULL_COURT_CAP_LINE_DOLLARS = 200_000_000;
+export const FULL_COURT_FIRST_APRON_DOLLARS = FULL_COURT_CAP_LINE_DOLLARS * 1.2;
+export const FULL_COURT_HARD_LIMIT_DOLLARS = FULL_COURT_CAP_LINE_DOLLARS * 1.4;
+
 export const FULL_COURT_DEFAULT_MONEY: FullCourtMoneyConfig = fullCourtMoneyConfigSchema.parse({
   moneyVersion: FULL_COURT_MONEY_VERSION,
-  capLineDollars: CAP_RUSH_CAP_LINE_DOLLARS,
-  firstApronDollars: CAP_RUSH_FIRST_APRON_DOLLARS,
-  hardLimitDollars: CAP_RUSH_HARD_LIMIT_DOLLARS,
+  capLineDollars: FULL_COURT_CAP_LINE_DOLLARS,
+  firstApronDollars: FULL_COURT_FIRST_APRON_DOLLARS,
+  hardLimitDollars: FULL_COURT_HARD_LIMIT_DOLLARS,
   startingWarChestDollars: 250_000_000,
 });
 

@@ -8,7 +8,9 @@
   import { Award, Crown, Flame, Shield, Sparkles, Trophy } from '@lucide/svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
-  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
+  import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
+  import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
@@ -57,47 +59,69 @@
     { value: 'threes', label: '3PM/G' },
   ] as const;
 
+  const teamUsage = $derived(
+    rosterStats.reduce((sum, row) => sum + usagePossessions(row.fga, row.fta, row.turnovers), 0),
+  );
+
   const statColumns = $derived.by((): PlayerStatColumn<FullCourtPlayerSeasonRow>[] => {
     const totals = statValues === 'totals';
-    const avg = (row: FullCourtPlayerSeasonRow, value: number): string =>
-      totals ? String(Math.round(value)) : value.toFixed(1);
-    const base: PlayerStatColumn<FullCourtPlayerSeasonRow>[] = [
-      { key: 'games', label: 'GP', value: (row) => row.games },
+    const stat = (total: number, pg: number, games: number): string => {
+      if (totals) return String(Math.round(total));
+      return games === 0 ? '0.0' : pg.toFixed(1);
+    };
+    const rawStat = (total: number, games: number): string =>
+      totals ? String(Math.round(total)) : games === 0 ? '0.0' : perGameText(total, games);
+
+    const core = seasonStatColumns<FullCourtPlayerSeasonRow>(
       {
-        key: 'mpg',
-        label: totals ? 'MIN' : 'MPG',
-        value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
+        games: (row) => row.games,
+        points: (row) => stat(row.points, row.ppg, row.games),
+        rebounds: (row) => stat(row.rebounds, row.rpg, row.games),
+        assists: (row) => stat(row.assists, row.apg, row.games),
+        steals: (row) => stat(row.steals, row.spg, row.games),
+        blocks: (row) => stat(row.blocks, row.bpg, row.games),
+        turnovers: (row) => stat(row.turnovers, row.topg, row.games),
+        fgPct: (row) => pctText(row.fgPct),
+        threePct: (row) => pctText(row.tpPct),
+        ftPct: (row) => pctText(row.ftPct),
+        tsPct: (row) => pctText(row.tsPct),
+        ...(statScope === 'team'
+          ? {
+              usagePct: (row) =>
+                usagePct(usagePossessions(row.fga, row.fta, row.turnovers), teamUsage),
+            }
+          : {}),
+        fgAttempts: (row) => rawStat(row.fga, row.games),
+        threeAttempts: (row) => rawStat(row.tpa, row.games),
+        ftAttempts: (row) => rawStat(row.fta, row.games),
+        threeMade: (row) => stat(row.tpm, row.tpmPg, row.games),
       },
-      {
-        key: 'ppg',
-        label: 'PPG',
-        value: (row) => avg(row, totals ? row.points : row.ppg),
-        cellClass: 'ui-stats-value-strong',
-      },
-      {
-        key: 'rpg',
-        label: 'RPG',
-        value: (row) => avg(row, totals ? row.rebounds : row.rpg),
-      },
-      {
-        key: 'apg',
-        label: 'APG',
-        value: (row) => avg(row, totals ? row.assists : row.apg),
-      },
-      {
-        key: 'spg',
-        label: 'SPG',
-        value: (row) => avg(row, totals ? row.steals : row.spg),
-      },
-      {
-        key: 'bpg',
-        label: 'BPG',
-        value: (row) => avg(row, totals ? row.blocks : row.bpg),
-      },
-      { key: 'fgPct', label: 'FG%', value: (row) => pctText(row.fgPct) },
-      { key: 'tpPct', label: '3P%', value: (row) => pctText(row.tpPct) },
-      { key: 'tsPct', label: 'TS%', value: (row) => pctText(row.tsPct) },
+      { includeGames: true, includeDetailed: true },
+    ).map((column) =>
+      column.key === 'points' ? { ...column, cellClass: 'ui-stats-value-strong' } : column,
+    );
+
+    const minutesColumn: PlayerStatColumn<FullCourtPlayerSeasonRow> = {
+      key: 'mpg',
+      label: totals ? 'MIN' : 'MPG',
+      value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
+    };
+    const foulsColumn: PlayerStatColumn<FullCourtPlayerSeasonRow> = {
+      key: 'fouls',
+      label: 'PF',
+      value: (row) => rawStat(row.fouls, row.games),
+    };
+
+    const gamesIndex = core.findIndex((column) => column.key === 'games');
+    const tovIndex = core.findIndex((column) => column.key === 'turnovers');
+    const withMinutes = [
+      ...core.slice(0, gamesIndex + 1),
+      minutesColumn,
+      ...core.slice(gamesIndex + 1, tovIndex + 1),
+      foulsColumn,
+      ...core.slice(tovIndex + 1),
     ];
+
     if (statScope === 'leaders') {
       return [
         {
@@ -107,10 +131,82 @@
           value: (row) => franchiseAbbreviation(row.teamId),
           cellClass: 'text-muted-foreground',
         },
-        ...base,
+        ...withMinutes,
       ];
     }
-    return base;
+    return withMinutes;
+  });
+
+  const teamTotalsRow = $derived.by((): PlayerStatsTotals<FullCourtPlayerSeasonRow> | null => {
+    if (statScope !== 'team' || rosterStats.length === 0) return null;
+    const totals = statValues === 'totals';
+    const teamGames = rosterStats.reduce((max, row) => Math.max(max, row.games), 0);
+    const sum = (pick: (row: FullCourtPlayerSeasonRow) => number): number =>
+      rosterStats.reduce((acc, row) => acc + pick(row), 0);
+    const pts = sum((r) => r.points);
+    const reb = sum((r) => r.rebounds);
+    const ast = sum((r) => r.assists);
+    const stl = sum((r) => r.steals);
+    const blk = sum((r) => r.blocks);
+    const tov = sum((r) => r.turnovers);
+    const pf = sum((r) => r.fouls);
+    const min = sum((r) => r.minutes);
+    const fgm = sum((r) => r.fgm);
+    const fga = sum((r) => r.fga);
+    const tpm = sum((r) => r.tpm);
+    const tpa = sum((r) => r.tpa);
+    const ftm = sum((r) => r.ftm);
+    const fta = sum((r) => r.fta);
+    const fmt = (total: number): string =>
+      totals ? String(Math.round(total)) : teamGames === 0 ? '0.0' : perGameText(total, teamGames);
+    const ratio = (made: number, att: number): string =>
+      att === 0 ? '—' : `${((100 * made) / att).toFixed(1)}%`;
+
+    return {
+      label: 'Team',
+      value: (column) => {
+        switch (column.key) {
+          case 'games':
+            return teamGames;
+          case 'mpg':
+            return fmt(min);
+          case 'points':
+            return fmt(pts);
+          case 'rebounds':
+            return fmt(reb);
+          case 'assists':
+            return fmt(ast);
+          case 'steals':
+            return fmt(stl);
+          case 'blocks':
+            return fmt(blk);
+          case 'turnovers':
+            return fmt(tov);
+          case 'fouls':
+            return fmt(pf);
+          case 'fgPct':
+            return ratio(fgm, fga);
+          case 'threePct':
+            return ratio(tpm, tpa);
+          case 'ftPct':
+            return ratio(ftm, fta);
+          case 'tsPct':
+            return trueShootingPct(pts, fga, fta);
+          case 'usagePct':
+            return teamUsage > 0 ? '100.0%' : '—';
+          case 'fgAttempts':
+            return fmt(fga);
+          case 'threeAttempts':
+            return fmt(tpa);
+          case 'ftAttempts':
+            return fmt(fta);
+          case 'threeMade':
+            return fmt(tpm);
+          default:
+            return '—';
+        }
+      },
+    };
   });
 
   type AwardStat = { readonly label: string; readonly value: string };
@@ -352,7 +448,9 @@
     ariaLabel="Full Court player season stats"
     title={statScope === 'team' ? 'Your roster averages' : 'League leaders'}
     description={statScope === 'team'
-      ? 'Season averages for your five, with every rotation player counted.'
+      ? statValues === 'totals'
+        ? 'Season totals for every player on your roster.'
+        : 'Season averages for every player on your roster.'
       : 'The top five qualified players in each category across all 30 franchises.'}
     surface="panel"
     sideLabel="Stats scope"
@@ -366,8 +464,14 @@
     onvalueschange={(value) => (statValues = value)}
     rows={tableRows.length > 0 ? tableRows : null}
     columns={statColumns}
+    totalsRow={teamTotalsRow}
+    tableClass="min-w-[1060px] text-xs"
+    statCellClass="px-2 py-1 text-right font-mono"
     rowKey={(row) => row.teamId + row.playerId}
-    rowClass={(row) => (row.teamId === userTeamId ? 'bg-primary/5' : '')}
+    rowClass={(row) =>
+      row.teamId === userTeamId
+        ? 'border-b border-border/40 bg-primary/5'
+        : 'border-b border-border/40'}
     caption={`${statValues === 'totals' ? 'Season totals' : 'Per-game season averages'} for ${
       statScope === 'team' ? 'your roster' : 'league leaders'
     }`}
@@ -420,7 +524,7 @@
             </p>
           </div>
           <dl class="stat-card-grid">
-            {#each statColumns.filter((column) => column.key !== 'games' && column.key !== 'ppg' && column.key !== 'team') as column (column.key)}
+            {#each statColumns.filter((column) => column.key !== 'games' && column.key !== 'points' && column.key !== 'team') as column (column.key)}
               <div>
                 <dt>{column.label}</dt>
                 <dd>{column.value(row)}</dd>

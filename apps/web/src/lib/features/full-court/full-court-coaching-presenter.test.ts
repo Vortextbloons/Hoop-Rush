@@ -140,13 +140,22 @@ describe('Full Court coaching draft', () => {
     expect(fullCourtCoachingSignature(emitted)).toBe(fullCourtCoachingSignature(legacy));
   });
 
-  test('seeds and emits the optional scoring hierarchy', () => {
+  test('round-trips offensive roles, passing reads, and unit overrides', () => {
     const saved: FullCourtCoachingPlan = {
       ...CUSTOM_PLAN,
+      tactics: { ...CUSTOM_PLAN.tactics, offense: 'perimeter', ballMovement: true },
+      units: [{ name: 'Closing group', playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'] }],
       hierarchy: {
         primaryPlayerId: 'p2',
         secondaryPlayerId: 'p3',
         floorGeneralPlayerId: 'p1',
+        passingReads: { p1: ['p2', 'p3'] },
+        unitRoles: [
+          {
+            playerIds: ['p1', 'p2', 'p3', 'p4', 'p6'],
+            primaryPlayerId: 'p6',
+          },
+        ],
       },
     };
     const draft = fullCourtCoachingDraft(saved, DEFAULT_ROTATION, ROSTER_IDS);
@@ -157,6 +166,7 @@ describe('Full Court coaching draft', () => {
       floorGeneralPlayerId: 'p1',
     });
     const emitted = fullCourtCoachingPlan(draft);
+    expect(emitted.tactics).toEqual(saved.tactics);
     expect(emitted.hierarchy).toEqual(saved.hierarchy);
     expect(fullCourtCoachingPlanSchema.parse(emitted)).toEqual(emitted);
     expect(fullCourtCoachingSignature(emitted)).not.toBe(fullCourtCoachingSignature(CUSTOM_PLAN));

@@ -28,6 +28,7 @@ import {
   type FullCourtDraftState,
   type FullCourtPlayoffCheckpoint,
   type FullCourtPracticeReport,
+  type FullCourtReportKind,
   type FullCourtReportTarget,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
@@ -176,7 +177,7 @@ export class FullCourtController {
 
   startDraft(
     variant: 'standard' | 'roulette' = 'standard',
-    perks: readonly ('lineup-fit' | 'opponent-film' | 'training-camp')[] = [],
+    perks: readonly FullCourtReportKind[] = [],
   ): Promise<void> {
     return this.#act(async () => {
       if (this.#assets === null) return;

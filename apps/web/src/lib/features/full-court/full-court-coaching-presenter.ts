@@ -3,6 +3,7 @@ import {
   FULL_COURT_DEFAULT_TACTICS,
   FULL_COURT_MAX_COACHING_RULES,
   FULL_COURT_MAX_NAMED_UNITS,
+  FULL_COURT_UNIT_MINUTE_BUDGET,
   FULL_COURT_MAX_UNIT_NAME_LENGTH,
   type FullCourtBlueprint,
   type FullCourtBlueprintHierarchy,
@@ -47,6 +48,7 @@ export interface FullCourtOffensiveHierarchyDraft {
 export interface FullCourtNamedUnitDraft {
   name: string;
   playerIds: string[];
+  plannedMinutes?: number;
 }
 
 export interface FullCourtCoachingDraft {
@@ -61,6 +63,8 @@ export interface FullCourtCoachingDraft {
   hierarchy: FullCourtOffensiveHierarchyDraft;
   /** Keep one assigned primary or secondary scorer on the floor when viable. */
   staggerStars: boolean;
+  passingReads?: NonNullable<FullCourtCoachingPlan['hierarchy']>['passingReads'];
+  unitRoles?: NonNullable<FullCourtCoachingPlan['hierarchy']>['unitRoles'];
 }
 
 export interface FullCourtCoachingValidation {
@@ -100,7 +104,7 @@ function cloneRule(rule: FullCourtCoachingRule): FullCourtCoachingRule {
 }
 
 function cloneUnit(unit: FullCourtNamedUnit): FullCourtNamedUnitDraft {
-  return { name: unit.name, playerIds: [...unit.playerIds] };
+  return { ...unit, playerIds: [...unit.playerIds] };
 }
 
 function namedUnitNameKey(name: string): string {
@@ -184,6 +188,13 @@ export function fullCourtCoachingDraft(
       floorGeneralPlayerId: plan.hierarchy?.floorGeneralPlayerId ?? null,
     },
     staggerStars: plan.staggerStars === true,
+    passingReads: Object.fromEntries(
+      Object.entries(plan.hierarchy?.passingReads ?? {}).map(([id, reads]) => [id, [...reads]]),
+    ),
+    unitRoles: plan.hierarchy?.unitRoles?.map((unit) => ({
+      ...unit,
+      playerIds: [...unit.playerIds],
+    })),
   };
 }
 
@@ -229,14 +240,32 @@ export function fullCourtCoachingPlan(draft: FullCourtCoachingDraft): FullCourtC
   const tactics: FullCourtTactics = { ...draft.tactics };
   const rules = draft.rules.map(cloneRule);
   const hierarchy = fullCourtOffensiveHierarchy(draft.hierarchy);
+  const passingReads = draft.passingReads ?? {};
+  const unitRoles = (draft.unitRoles ?? []).filter((entry) =>
+    draft.units.some((unit) => unit.playerIds.every((id) => entry.playerIds.includes(id))),
+  );
+  const offensePlan = {
+    ...hierarchy,
+    ...(Object.keys(passingReads).length === 0
+      ? {}
+      : {
+          passingReads: Object.fromEntries(
+            Object.entries(passingReads).map(([id, reads]) => [id, [...reads]]),
+          ),
+        }),
+    ...(unitRoles.length === 0
+      ? {}
+      : { unitRoles: unitRoles.map((unit) => ({ ...unit, playerIds: [...unit.playerIds] })) }),
+  };
   const units = draft.units.map((unit) => ({
+    ...unit,
     name: unit.name.trim().normalize(),
     playerIds: [...unit.playerIds],
   }));
   const trailing = {
     ...(units.length === 0 ? {} : { units }),
     ...(rules.length === 0 ? {} : { rules }),
-    ...(hierarchy === undefined ? {} : { hierarchy }),
+    ...(Object.keys(offensePlan).length === 0 ? {} : { hierarchy: offensePlan }),
     ...(draft.staggerStars ? { staggerStars: true } : {}),
     ...(draft.interfaceLevel === 'remix' ? {} : { interfaceLevel: draft.interfaceLevel }),
   };
@@ -272,6 +301,12 @@ export function validateFullCourtCoachingDraft(
   }
   if (new Set(draft.rules.map((rule) => rule.ruleId)).size !== draft.rules.length) {
     errors.push('Every coaching rule needs a unique id.');
+  }
+  if (
+    draft.units.reduce((total, unit) => total + (unit.plannedMinutes ?? 0), 0) >
+    FULL_COURT_UNIT_MINUTE_BUDGET
+  ) {
+    errors.push('Named units share 12 planned minutes in the second quarter.');
   }
   const hierarchyIds = [
     draft.hierarchy.primaryPlayerId,
@@ -398,13 +433,22 @@ export function fullCourtCoachingSignature(plan: FullCourtCoachingPlan): string 
   );
   return JSON.stringify({
     interfaceLevel: plan.interfaceLevel ?? 'remix',
-    tactics: [plan.tactics.pace, plan.tactics.offense, plan.tactics.defense],
+    tactics: [
+      plan.tactics.pace,
+      plan.tactics.offense,
+      plan.tactics.defense,
+      plan.tactics.ballMovement ?? false,
+    ],
     staggerStars: plan.staggerStars === true,
     rotation:
       rotation === undefined
         ? null
         : [rotation.startingFive, minutes, rotation.closingFive ?? null],
-    units: (plan.units ?? []).map((unit) => [unit.name, [...unit.playerIds]]),
+    units: (plan.units ?? []).map((unit) => [
+      unit.name,
+      [...unit.playerIds],
+      unit.plannedMinutes ?? null,
+    ]),
     rules: (plan.rules ?? []).map((rule) =>
       rule.kind === 'closing-lineup'
         ? [rule.ruleId, rule.kind, rule.secondsRemainingMax, rule.scoreMarginMax, [...rule.lineup]]
@@ -414,6 +458,10 @@ export function fullCourtCoachingSignature(plan: FullCourtCoachingPlan): string 
       plan.hierarchy?.primaryPlayerId ?? null,
       plan.hierarchy?.secondaryPlayerId ?? null,
       plan.hierarchy?.floorGeneralPlayerId ?? null,
+      Object.entries(plan.hierarchy?.passingReads ?? {}).sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
+      plan.hierarchy?.unitRoles ?? [],
     ],
   });
 }
@@ -572,6 +620,7 @@ export function applyFullCourtBlueprintToDraft(
           floorGeneralPlayerId: preview.hierarchy?.floorGeneralPlayerId ?? null,
         };
   const tacticsChanged =
+    blueprint.tactics.ballMovement !== draft.tactics.ballMovement ||
     blueprint.tactics.pace !== draft.tactics.pace ||
     blueprint.tactics.offense !== draft.tactics.offense ||
     blueprint.tactics.defense !== draft.tactics.defense;
@@ -589,7 +638,7 @@ export function applyFullCourtBlueprintToDraft(
       startingFive: [...draft.startingFive],
       minuteTargets: { ...draft.minuteTargets },
       closingFive: draft.closingFive === null ? null : [...draft.closingFive],
-      units: draft.units.map((unit) => ({ name: unit.name, playerIds: [...unit.playerIds] })),
+      units: draft.units.map((unit) => ({ ...unit, playerIds: [...unit.playerIds] })),
       rules: draft.rules.map(cloneRule),
       hierarchy: nextHierarchy,
     },

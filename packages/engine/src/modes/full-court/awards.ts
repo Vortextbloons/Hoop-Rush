@@ -363,7 +363,31 @@ export function buildFullCourtAwards(input: {
     (row) => `${row.spg.toFixed(1)} SPG · ${row.bpg.toFixed(1)} BPG · ${row.rpg.toFixed(1)} RPG`,
   );
 
-  const sixthManPool = pool.filter((row) => row.starts / Math.max(1, row.games) < 0.5);
+  /**
+   * Sixth Man honors a bench role, so a candidate must start fewer than half his games.
+   * The stored start flag can drift from the rotation that produced it (a mis-flagged or
+   * legacy season reports starts: false for everyone), which let a team's best player win
+   * the award. A candidate therefore also has to sit outside his own team's two heaviest
+   * minute loads: those are the franchise cornerstones, never bench sparks.
+   */
+  const minutesByTeam = new Map<string, number[]>();
+  for (const row of activeRows) {
+    const minutes = minutesByTeam.get(row.teamId);
+    if (minutes === undefined) minutesByTeam.set(row.teamId, [row.mpg]);
+    else minutes.push(row.mpg);
+  }
+  const benchEligible = (row: FullCourtPlayerSeasonRow): boolean => {
+    if (row.starts / Math.max(1, row.games) >= 0.5) return false;
+    const teammates = minutesByTeam.get(row.teamId) ?? [];
+    // A roster shorter than a starting five has no bench to speak of.
+    if (teammates.length < 5) return true;
+    const secondHeaviest = [...teammates].sort((left, right) => right - left)[1];
+    return secondHeaviest === undefined || row.mpg < secondHeaviest;
+  };
+  const sixthManStartsOnly = pool.filter((row) => row.starts / Math.max(1, row.games) < 0.5);
+  const sixthManGuarded = pool.filter(benchEligible);
+  // Keep the award populated if a season's minutes are too flat to separate a top two.
+  const sixthManPool = sixthManGuarded.length > 0 ? sixthManGuarded : sixthManStartsOnly;
   const sixthManCandidates = rankCandidates(
     sixthManPool,
     (row) => {

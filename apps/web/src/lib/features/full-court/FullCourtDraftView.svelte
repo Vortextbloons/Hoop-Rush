@@ -17,7 +17,6 @@
   import {
     fullCourtAssessPurchase,
     fullCourtSalaryDollarsOf,
-    fullCourtScoutPlayer,
     type FullCourtCatalogIndex,
   } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
@@ -66,7 +65,6 @@
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRating from './FullCourtRating.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
-  import FullCourtScoutReport from './FullCourtScoutReport.svelte';
 
   let {
     draft,
@@ -187,8 +185,8 @@
   });
   const lock = $derived(fullCourtLockCopy(draft, summary));
   /**
-   * One scouting report covers the whole draft. Owning it reveals every card's
-   * playstyle and the full paid read in the inspector; the price is run-wide.
+   * One scouting report covers the whole draft. Owning it unlocks Show playstyle
+   * on every card and in the inspector; the price is run-wide.
    */
   const scoutingPrice = fullCourtReportPriceDollars('player-scouting');
   const scoutingOwned = $derived(
@@ -240,6 +238,7 @@
   }
 
   function toggleCardExpanded(versionId: string): void {
+    if (!scoutingOwned) return;
     expandedCardIds = {
       ...expandedCardIds,
       [versionId]: !expandedCardIds[versionId],
@@ -352,8 +351,8 @@
         {#if complete}
           Roster locked. Review your payroll and remaining budget before tip-off.
         {:else if roundOffer !== null}
-          Positionless 10-player draw sorted by overall. Sign 6 to 12 players under the $182M hard
-          limit.
+          Positionless 10-player draw sorted by overall. Sign 6 to 12 players under the
+          {formatMillions(draft.money.hardLimitDollars)} hard limit.
         {:else}
           Draft 6 to 12 players under the cap. Select any player to inspect playstyle, cap impact,
           and scouting.
@@ -612,21 +611,29 @@
 
               <button
                 type="button"
-                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase transition-colors outline-none hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5"
-                aria-expanded={expanded}
+                disabled={!scoutingOwned}
+                title={scoutingOwned
+                  ? undefined
+                  : `Buy the ${formatMillions(scoutingPrice)} Scouting perk to unlock playstyle`}
+                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase transition-colors outline-none hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line-soft disabled:hover:text-muted-foreground sm:mx-2.5"
+                aria-expanded={scoutingOwned && expanded}
                 aria-controls={`${player.playerVersionId}-playstyle`}
-                aria-label={`${expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
+                aria-label={`${scoutingOwned && expanded ? 'Hide' : 'Show'} ${player.displayName} playstyle`}
                 onclick={() => toggleCardExpanded(player.playerVersionId)}
               >
-                <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
-                <ChevronDown
-                  size={11}
-                  class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
-                  aria-hidden="true"
-                />
+                <span>{scoutingOwned && expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+                {#if scoutingOwned}
+                  <ChevronDown
+                    size={11}
+                    class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                    aria-hidden="true"
+                  />
+                {:else}
+                  <Lock size={11} class="shrink-0" aria-hidden="true" />
+                {/if}
               </button>
 
-              {#if expanded && profile !== null}
+              {#if scoutingOwned && expanded && profile !== null}
                 <div class="mx-2 mt-1.5 grid shrink-0 gap-2 sm:mx-2.5">
                   <p
                     class="w-full truncate font-mono text-[8px] font-bold tracking-[0.08em] text-accent uppercase"
@@ -644,17 +651,6 @@
                         >
                       {/each}
                     </div>
-                  {/if}
-                  {#if scoutingOwned}
-                    <div class="rounded-lg border border-line-soft bg-surface-1/70 p-2">
-                      <FullCourtScoutReport report={fullCourtScoutPlayer(player)} compact />
-                    </div>
-                  {:else}
-                    <p
-                      class="rounded-lg border border-dashed border-line-soft bg-surface-1/50 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground"
-                    >
-                      Buy the scouting report to see usage, role, and shoot profile.
-                    </p>
                   {/if}
                   <button
                     type="button"
@@ -1008,20 +1004,28 @@
               <div class="mt-2.5">
                 <button
                   type="button"
-                  class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-expanded={expanded}
-                  aria-label={`${expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
+                  disabled={!scoutingOwned}
+                  title={scoutingOwned
+                    ? undefined
+                    : `Buy the ${formatMillions(scoutingPrice)} Scouting perk to unlock playstyle`}
+                  class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line-soft disabled:hover:text-muted-foreground"
+                  aria-expanded={scoutingOwned && expanded}
+                  aria-label={`${scoutingOwned && expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
                   onclick={() => toggleCardExpanded(row.player.playerVersionId)}
                 >
-                  <span>{expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
-                  <ChevronDown
-                    size={12}
-                    class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
-                    aria-hidden="true"
-                  />
+                  <span>{scoutingOwned && expanded ? 'Hide playstyle' : 'Show playstyle'}</span>
+                  {#if scoutingOwned}
+                    <ChevronDown
+                      size={12}
+                      class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                      aria-hidden="true"
+                    />
+                  {:else}
+                    <Lock size={12} class="shrink-0" aria-hidden="true" />
+                  {/if}
                 </button>
 
-                {#if expanded && inspectedProfile !== null}
+                {#if scoutingOwned && expanded && inspectedProfile !== null}
                   <div class="mt-2 grid gap-2">
                     <p
                       class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
@@ -1040,18 +1044,6 @@
                           >
                         {/each}
                       </div>
-                    {/if}
-                    {#if scoutingOwned}
-                      <div class="rounded-xl border border-line-soft bg-surface-1/70 p-3">
-                        <FullCourtScoutReport report={fullCourtScoutPlayer(row.player)} />
-                      </div>
-                    {:else}
-                      <p
-                        class="rounded-lg border border-dashed border-line-soft bg-surface-1/50 px-2.5 py-2 text-[11px] leading-snug text-muted-foreground"
-                      >
-                        Buy the {formatMillions(scoutingPrice)} scouting report to unlock usage, role,
-                        and shot profile for every player in this draft.
-                      </p>
                     {/if}
                   </div>
                 {/if}

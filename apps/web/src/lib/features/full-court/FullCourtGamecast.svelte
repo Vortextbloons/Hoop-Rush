@@ -10,7 +10,8 @@
   import { onMount } from 'svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
-  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
+  import { ratioPct, trueShootingPct } from '#lib/format.js';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
@@ -36,15 +37,105 @@
   type LineupReportRow = NonNullable<typeof lineupReport>['lineupRows'][number];
   const columns: PlayerStatColumn<PlayerLine>[] = [
     { key: 'min', label: 'MIN', value: (player) => player.minutes.toFixed(1) },
-    { key: 'pts', label: 'PTS', value: (player) => player.points },
+    {
+      key: 'pts',
+      label: 'PTS',
+      value: (player) => player.points,
+      cellClass: 'ui-stats-value-strong',
+    },
     { key: 'reb', label: 'REB', value: (player) => player.rebounds.total },
     { key: 'ast', label: 'AST', value: (player) => player.assists },
+    { key: 'stl', label: 'STL', value: (player) => player.steals },
+    { key: 'blk', label: 'BLK', value: (player) => player.blocks },
+    { key: 'tov', label: 'TO', value: (player) => player.turnovers },
+    { key: 'pf', label: 'PF', value: (player) => player.fouls },
+    {
+      key: 'fg',
+      label: 'FG',
+      value: (player) => `${player.fieldGoals.made}-${player.fieldGoals.attempted}`,
+    },
+    {
+      key: 'tp',
+      label: '3P',
+      value: (player) => `${player.threes.made}-${player.threes.attempted}`,
+    },
+    {
+      key: 'ft',
+      label: 'FT',
+      value: (player) => `${player.freeThrows.made}-${player.freeThrows.attempted}`,
+    },
+    {
+      key: 'fgPct',
+      label: 'FG%',
+      value: (player) => ratioPct(player.fieldGoals.made, player.fieldGoals.attempted),
+    },
+    {
+      key: 'tsPct',
+      label: 'TS%',
+      value: (player) =>
+        trueShootingPct(player.points, player.fieldGoals.attempted, player.freeThrows.attempted),
+    },
     {
       key: 'energy',
       label: 'ENERGY',
       value: (player) => `${String(Math.round(player.energyRemaining * 100))}%`,
     },
   ];
+
+  function totalsForTeam(team: FullCourtGameResult['home']): PlayerStatsTotals<PlayerLine> {
+    const sum = (pick: (player: PlayerLine) => number): number =>
+      team.players.reduce((acc, player) => acc + pick(player), 0);
+    const min = sum((p) => p.minutes);
+    const pts = team.box.points;
+    const reb = sum((p) => p.rebounds.total);
+    const ast = sum((p) => p.assists);
+    const stl = sum((p) => p.steals);
+    const blk = sum((p) => p.blocks);
+    const tov = sum((p) => p.turnovers);
+    const pf = sum((p) => p.fouls);
+    const fgm = sum((p) => p.fieldGoals.made);
+    const fga = sum((p) => p.fieldGoals.attempted);
+    const tpm = sum((p) => p.threes.made);
+    const tpa = sum((p) => p.threes.attempted);
+    const ftm = sum((p) => p.freeThrows.made);
+    const fta = sum((p) => p.freeThrows.attempted);
+
+    return {
+      label: 'Team',
+      value: (column) => {
+        switch (column.key) {
+          case 'min':
+            return min.toFixed(1);
+          case 'pts':
+            return pts;
+          case 'reb':
+            return reb;
+          case 'ast':
+            return ast;
+          case 'stl':
+            return stl;
+          case 'blk':
+            return blk;
+          case 'tov':
+            return tov;
+          case 'pf':
+            return pf;
+          case 'fg':
+            return `${fgm}-${fga}`;
+          case 'tp':
+            return `${tpm}-${tpa}`;
+          case 'ft':
+            return `${ftm}-${fta}`;
+          case 'fgPct':
+            return ratioPct(fgm, fga);
+          case 'tsPct':
+            return trueShootingPct(pts, fga, fta);
+          default:
+            return '—';
+        }
+      },
+    };
+  }
   const lineupColumns: PlayerStatColumn<LineupReportRow>[] = [
     { key: 'min', label: 'MIN', value: (lineup) => lineup.minutes.toFixed(1) },
     { key: 'poss', label: 'POSS', value: (lineup) => lineup.pacePossessions },
@@ -290,6 +381,9 @@
         caption="Lineup Lab"
         playerLabel="Lineup"
         stickyIdentity
+        tableClass="min-w-[36rem] text-xs"
+        statCellClass="px-2 py-1 text-right font-mono"
+        rowClass={() => 'border-b border-border/40'}
         columns={lineupColumns}
         rows={lineupReport.lineupRows}
         rowKey={(lineup) => lineup.key}
@@ -334,14 +428,21 @@
         {/each}
       </ul>
     {/if}
-    {#each teams as team (team.teamId)}
+    {#each [game.result.away, game.result.home] as team (team.teamId)}
+      {@const isUserTeam = team.teamId === userTeamId}
       <PlayerStatsSection
         surface="none"
         class="mt-4"
         title={`${team.displayName} box score`}
+        description={`${team.box.points} PTS · ${team.players.filter((player) => player.minutes > 0).length} played`}
         ariaLabel={`${team.displayName} box score`}
         caption={`${team.displayName} box score`}
         stickyIdentity
+        tableClass="min-w-[54rem] text-xs"
+        statCellClass="px-2 py-1 text-right font-mono"
+        rowClass={() =>
+          isUserTeam ? 'border-b border-border/40 bg-primary/5' : 'border-b border-border/40'}
+        totalsRow={totalsForTeam(team)}
         {columns}
         rows={team.players}
         rowKey={(player) => player.playerId}
@@ -350,7 +451,9 @@
           <span class="ui-stats-player">
             <FullCourtPortrait {player} {art} size="sm" />
             <span class="ui-stats-player-text">
-              <span class="ui-stats-player-name">{player.displayName}</span>
+              <span class="ui-stats-player-name {isUserTeam ? 'text-primary' : ''}"
+                >{player.displayName}</span
+              >
             </span>
           </span>
         {/snippet}

@@ -20,30 +20,16 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import type { FullCourtArt } from './full-court-art.ts';
-  import { scoutFieldLabel, scoutFieldValue } from './full-court-scout-labels';
+  import {
+    LINEUP_FINDING_LABELS,
+    scoutFieldLabel,
+    scoutFieldValue,
+  } from './full-court-scout-labels';
 
   type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
 
   const FIT_TARGET = { kind: 'lineup-fit' } as const satisfies FullCourtReportTarget;
   const FIT_PRICE = fullCourtReportPriceDollars('lineup-fit');
-
-  const LINEUP_FINDING_LABELS = {
-    'multiple-creators': 'Multiple creators',
-    'spacing-volume': 'Spacing volume',
-    'playmaking-depth': 'Playmaking depth',
-    'rim-protection': 'Rim protection',
-    'perimeter-defense': 'Perimeter defense',
-    'glass-control': 'Glass control',
-    'roster-depth': 'Roster depth',
-    'no-primary-creator': 'No primary creator',
-    'no-spacing': 'No spacing',
-    'thin-spacing': 'Thin spacing',
-    'no-rim-protection': 'No rim protection',
-    'no-perimeter-stopper': 'No perimeter stopper',
-    'weak-defensive-glass': 'Weak defensive glass',
-    'turnover-risk': 'Turnover risk',
-    'thin-depth': 'Thin depth',
-  } as const;
 
   /** Only the roster-wide findings whose title alone leaves the threshold unclear. */
   const LINEUP_FINDING_READS: Partial<Record<keyof typeof LINEUP_FINDING_LABELS, string>> = {
@@ -160,7 +146,9 @@
         </p>
       </div>
     {/if}
-    <p class="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{supportLine(finding)}</p>
+    <p class="line-clamp-2 text-[10px] leading-snug text-muted-foreground">
+      {supportLine(finding)}
+    </p>
   </li>
 {/snippet}
 
@@ -191,10 +179,12 @@
     {#if fitReport !== null}
       <span class="ml-auto flex items-baseline gap-2">
         <span class="ui-micro tabular-nums text-positive">
-          {fitReport.strengths.length} {fitReport.strengths.length === 1 ? 'strength' : 'strengths'}
+          {fitReport.strengths.length}
+          {fitReport.strengths.length === 1 ? 'strength' : 'strengths'}
         </span>
         <span class="ui-micro tabular-nums text-negative">
-          {fitReport.gaps.length} {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
+          {fitReport.gaps.length}
+          {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
         </span>
       </span>
     {/if}

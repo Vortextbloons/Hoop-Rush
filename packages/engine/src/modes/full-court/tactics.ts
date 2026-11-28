@@ -105,6 +105,7 @@ const HIERARCHY_MATCHUP_CEILING = 1.08;
 export function resolveFullCourtTactics(tactics: FullCourtTactics | undefined): FullCourtTactics {
   if (tactics === undefined) return FULL_COURT_DEFAULT_TACTICS;
   return {
+    ...(tactics.ballMovement === true ? { ballMovement: true } : {}),
     pace: tacticValue(tactics.pace, ['slow', 'balanced', 'fast'], 'balanced', 'pace'),
     offense: tacticValue(
       tactics.offense,
@@ -168,6 +169,7 @@ export function applyFullCourtTacticsToPrep(
   if (
     !zoneChanged &&
     own.offense !== 'ball-movement' &&
+    own.ballMovement !== true &&
     !pressure &&
     !protectPaint &&
     hierarchy === undefined
@@ -184,7 +186,7 @@ export function applyFullCourtTacticsToPrep(
       combinedZoneScale(own.offense, opponentDefense),
     );
   }
-  if (own.offense === 'ball-movement') {
+  if (own.offense === 'ball-movement' || own.ballMovement === true) {
     next = { ...next, passP: adjustedPassProbabilities(next.passP) };
   }
   if (pressure) {
@@ -222,24 +224,36 @@ export function applyFullCourtHierarchyToPrep(
   opponentDefense: FullCourtTactics['defense'],
 ): TeamPrep {
   if (hierarchy === undefined) return prep;
+  const unit = hierarchy.unitRoles?.find((entry) =>
+    entry.playerIds.every((id) => players.some((player) => player.playerId === id)),
+  );
+  const primary = unit?.primaryPlayerId ?? hierarchy.primaryPlayerId;
+  const handler = unit?.floorGeneralPlayerId ?? hierarchy.floorGeneralPlayerId;
   const roles = new Map<string, OffensiveHierarchyRole>();
-  if (hierarchy.primaryPlayerId !== undefined) {
-    roles.set(hierarchy.primaryPlayerId, 'primary');
-  }
   if (hierarchy.secondaryPlayerId !== undefined) {
     roles.set(hierarchy.secondaryPlayerId, 'secondary');
   }
-  if (hierarchy.floorGeneralPlayerId !== undefined) {
-    roles.set(hierarchy.floorGeneralPlayerId, 'floor-general');
-  }
-  if (roles.size === 0) return prep;
+  if (handler !== undefined) roles.set(handler, 'floor-general');
+  if (primary !== undefined) roles.set(primary, 'primary');
+  if (roles.size === 0 && hierarchy.passingReads === undefined) return prep;
 
   const indexByKey = new Map<string, number>();
   players.forEach((player, index) => indexByKey.set(prep.keyOf(player), index));
-  if (players.every((player) => !roles.has(player.playerId))) return prep;
+  const activeIds = new Set<string>(players.map((player) => player.playerId));
+  const activeReads = new Map(
+    Object.entries(hierarchy.passingReads ?? {}).filter(
+      ([passer, targets]) =>
+        activeIds.has(passer) && targets.some((target) => activeIds.has(target)),
+    ),
+  );
+  if (activeReads.size === 0 && players.every((player) => !roles.has(player.playerId))) return prep;
   const scales = players.map((player): OffensiveRoleScale => {
     const role = roles.get(player.playerId);
-    return role === undefined ? IDENTITY_ROLE_SCALE : roleScaleFor(role, player, opponentDefense);
+    if (role === undefined) return IDENTITY_ROLE_SCALE;
+    const scale = roleScaleFor(role, player, opponentDefense);
+    if (role !== 'primary' || player.playerId !== handler) return scale;
+    const creation = roleScaleFor('floor-general', player, opponentDefense);
+    return { ...creation, finish: scale.finish };
   });
 
   const initiatorWeights = prep.initiatorWeights.map(
@@ -247,12 +261,17 @@ export function applyFullCourtHierarchyToPrep(
   );
   const teammateShots = new Map<string, TeammateShots>();
   for (const [key, shots] of prep.teammateShots) {
+    const handlerIndex = indexByKey.get(key);
+    const passer = handlerIndex === undefined ? undefined : players[handlerIndex];
+    const reads = passer === undefined ? undefined : activeReads.get(passer.playerId);
     teammateShots.set(key, {
       byAction: shots.byAction.map((action) => {
         const weights = action.teammates.map((teammate, teammateIndex) => {
           const index = indexByKey.get(prep.keyOf(teammate));
           const finishScale = index === undefined ? 1 : (scales[index]?.finish ?? 1);
-          return (action.weights[teammateIndex] ?? 0) * finishScale;
+          const read = reads?.indexOf(teammate.playerId);
+          const readScale = read === 0 ? 1.6 : read === 1 ? 1.3 : 1;
+          return (action.weights[teammateIndex] ?? 0) * finishScale * readScale;
         });
         return {
           teammates: action.teammates,
@@ -268,7 +287,9 @@ export function applyFullCourtHierarchyToPrep(
     const passScale = index === undefined ? 1 : (scales[index]?.pass ?? 1);
     passP.set(
       key,
-      values.map((value) => Math.min(0.97, Math.max(0.05, value * passScale))),
+      passScale === 1 && roles.size === 0
+        ? values
+        : values.map((value) => Math.min(0.97, Math.max(0.05, value * passScale))),
     );
   }
   return {
@@ -339,19 +360,19 @@ export function fullCourtTacticsEffects(
 ): EffectsHook | undefined {
   const make = (defense: FullCourtTactics['defense']): number =>
     defense === 'pressure' ? PRESSURE_MAKE_CONCESSION_MILLIONTHS : 0;
-  const turnover = (offense: FullCourtTactics['offense']): number =>
-    offense === 'ball-movement' ? BALL_MOVEMENT_TURNOVER_MILLIONTHS : 0;
-  const assist = (offense: FullCourtTactics['offense']): number =>
-    offense === 'ball-movement' ? BALL_MOVEMENT_ASSIST_MILLIONTHS : 0;
+  const turnover = ({ offense, ballMovement }: FullCourtTactics): number =>
+    offense === 'ball-movement' || ballMovement ? BALL_MOVEMENT_TURNOVER_MILLIONTHS : 0;
+  const assist = ({ offense, ballMovement }: FullCourtTactics): number =>
+    offense === 'ball-movement' || ballMovement ? BALL_MOVEMENT_ASSIST_MILLIONTHS : 0;
   const home = tactics[0];
   const away = tactics[1];
   const needed =
     make(home.defense) !== 0 ||
     make(away.defense) !== 0 ||
-    turnover(home.offense) !== 0 ||
-    turnover(away.offense) !== 0 ||
-    assist(home.offense) !== 0 ||
-    assist(away.offense) !== 0;
+    turnover(home) !== 0 ||
+    turnover(away) !== 0 ||
+    assist(home) !== 0 ||
+    assist(away) !== 0;
   if (!needed) return base;
 
   const side = (index: SideIndex): FullCourtTactics => tactics[index];
@@ -360,10 +381,10 @@ export function fullCourtTacticsEffects(
       return (base?.makeAdjustment(facts) ?? 0) + make(side(facts.defenseSide).defense);
     },
     turnoverAdjustment(facts) {
-      return (base?.turnoverAdjustment(facts) ?? 0) + turnover(side(facts.offenseSide).offense);
+      return (base?.turnoverAdjustment(facts) ?? 0) + turnover(side(facts.offenseSide));
     },
     assistAdjustment(facts) {
-      return (base?.assistAdjustment(facts) ?? 0) + assist(side(facts.offenseSide).offense);
+      return (base?.assistAdjustment(facts) ?? 0) + assist(side(facts.offenseSide));
     },
     setActiveUnits(homeUnit, awayUnit) {
       base?.setActiveUnits(homeUnit, awayUnit);

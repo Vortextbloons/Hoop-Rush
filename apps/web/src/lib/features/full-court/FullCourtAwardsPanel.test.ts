@@ -88,6 +88,12 @@ describe('FullCourtAwardsPanel', () => {
     expect(body).toContain('Totals');
     expect(body).toContain('stat-card');
     expect(body).toContain('ui-stats-table');
+    expect(body).toContain('TOV');
+    expect(body).toContain('FT%');
+    expect(body).toContain('USG%');
+    expect(body).toContain('FGA');
+    expect(body).toContain('3PM');
+    expect(body).toContain('Team');
   });
 
   test('switches the box score between per-game and season totals', () => {

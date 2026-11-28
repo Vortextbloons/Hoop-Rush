@@ -61,6 +61,13 @@
   let activeGamecast = $state<'latest' | 'saved' | null>(null);
   const RUN_PERK_OPTIONS = [
     {
+      kind: 'player-scouting' as const,
+      title: 'Scouting',
+      priceDollars: fullCourtReportPriceDollars('player-scouting'),
+      description:
+        'Unlock Show playstyle across the draft to view attributes, tendencies, and roles.',
+    },
+    {
       kind: 'lineup-fit' as const,
       title: 'Roster fit',
       priceDollars: fullCourtReportPriceDollars('lineup-fit'),
@@ -79,6 +86,7 @@
       description: 'Sandbox scrimmage simulator against random or chosen league opponents.',
     },
   ];
+  type RunPerkKind = (typeof RUN_PERK_OPTIONS)[number]['kind'];
   const RUN_VARIANT_OPTIONS = [
     {
       id: 'standard' as const,
@@ -96,7 +104,7 @@
     },
   ];
   let selectedVariant = $state<'standard' | 'roulette' | null>(null);
-  let selectedPerks = $state<('lineup-fit' | 'opponent-film' | 'training-camp')[]>([]);
+  let selectedPerks = $state<RunPerkKind[]>([]);
   const selectedPerkCost = $derived(
     selectedPerks.reduce((sum, kind) => sum + fullCourtReportPriceDollars(kind), 0),
   );
@@ -107,7 +115,7 @@
     RUN_VARIANT_OPTIONS.find((option) => option.id === selectedVariant)?.title ?? '',
   );
 
-  function togglePerk(kind: 'lineup-fit' | 'opponent-film' | 'training-camp'): void {
+  function togglePerk(kind: RunPerkKind): void {
     selectedPerks = selectedPerks.includes(kind)
       ? selectedPerks.filter((item) => item !== kind)
       : [...selectedPerks, kind];
@@ -378,27 +386,17 @@
       {/if}
       {#if userTeam && defaultRotation}
         <div hidden={section !== 'team'}>
-          {#if opponentAdjustment !== null}
-            <Alert class="mb-4" title={`Opponent adjustment · ${opponentAdjustment.settingLabel}`}>
-              {opponentAdjustment.reasonLabel} · {opponentAdjustment.detailLabel}
-              {#snippet actions()}
-                <Button size="sm" tone="secondary" onclick={() => selectSection('war-room')}>
-                  Review opponent film
-                </Button>
-              {/snippet}
-            </Alert>
-          {/if}
           <FullCourtCoachingView
             roster={userTeam.roster}
+            scoutedRoster={draft?.reports?.some((report) => report.target.kind === 'lineup-fit')
+              ? draft.picks.map((pick) => pick.player)
+              : null}
             {defaultRotation}
             plan={season.coaching}
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
             health={health ?? null}
             dayOffset={nextUserFixture?.dayOffset ?? null}
-            {matchupContext}
             {art}
-            onMatchupsChange={(assignments) => current.setDefensiveMatchups(assignments)}
-            onResetMatchups={() => current.clearDefensiveMatchups()}
             busy={current.busy}
             onSave={(plan) => current.saveCoaching(plan)}
             onListBlueprints={() => current.listBlueprints()}
@@ -409,6 +407,11 @@
         </div>
       {/if}
       {#if section === 'war-room'}
+        {#if opponentAdjustment !== null}
+          <Alert class="mb-4" title={`Opponent adjustment: ${opponentAdjustment.settingLabel}`}>
+            {opponentAdjustment.reasonLabel}. {opponentAdjustment.detailLabel}
+          </Alert>
+        {/if}
         {#if draft && current.index}
           <FullCourtWarRoom
             {draft}
@@ -594,7 +597,13 @@
         level={2}
         size="md"
         align="start"
-        description="Sign 6–12 historical players from a $250M budget ($130M cap, $156M first apron, $182M hard limit), set your rotation, and face 29 historical teams."
+        description="Sign 6–12 historical players from a {formatMillions(
+          FULL_COURT_DEFAULT_MONEY.startingWarChestDollars,
+        )} budget ({formatMillions(FULL_COURT_DEFAULT_MONEY.capLineDollars)} cap, {formatMillions(
+          FULL_COURT_DEFAULT_MONEY.firstApronDollars,
+        )} first apron, {formatMillions(
+          FULL_COURT_DEFAULT_MONEY.hardLimitDollars,
+        )} hard limit), set your rotation, and face 29 historical teams."
       />
 
       <ol class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Draft setup steps">
@@ -645,9 +654,7 @@
             size="sm"
             align="start"
             title="Pre-run perks"
-            description="Optional upgrades paid from the starting budget. The scouting report ({formatMillions(
-              fullCourtReportPriceDollars('player-scouting'),
-            )}) is bought once during the draft and covers every player. Playstyle is always free."
+            description="Optional upgrades paid from the starting budget. Every perk lasts for the entire run."
           >
             {#snippet actions()}
               <div class="flex flex-wrap items-center gap-2">
@@ -661,7 +668,7 @@
             {/snippet}
           </SectionHeading>
 
-          <div class="mt-3 grid gap-2 sm:grid-cols-3">
+          <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {#each RUN_PERK_OPTIONS as perk (perk.kind)}
               {@const active = selectedPerks.includes(perk.kind)}
               <button

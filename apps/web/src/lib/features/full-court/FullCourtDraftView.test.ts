@@ -156,17 +156,14 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Locked');
   });
 
-  test('shows playstyle for free on every card, like Cap Rush', () => {
+  test('gates Show playstyle behind the scouting perk on every card', () => {
     const { state, index } = setup();
     const body = renderView(state, index, () => undefined);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
-    // Playstyle is free information now; scouting no longer gates it.
     expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
-    expect(body).not.toContain('Scout to unlock playstyle');
-    expect(body).not.toContain('Scout $2M');
-    expect(body).not.toContain(`aria-label="Scout ${firstPlayer.displayName} for $2M"`);
+    expect(body).toContain(`disabled="" title="Buy the $5M Scouting perk to unlock playstyle"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
 
@@ -178,7 +175,7 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Salary');
   });
 
-  test('shows playstyle in the selected player panel without any purchase', () => {
+  test('gates Show playstyle in the selected player panel until scouting is owned', () => {
     const { state, index } = setup();
     const body = renderView(
       { ...state, offer: undefined, pool: undefined },
@@ -186,10 +183,8 @@ describe('FullCourtDraftView', () => {
       () => undefined,
     );
 
-    expect(body).toContain('aria-label=');
-    expect(body).toContain('Show');
-    expect(body).toContain('playstyle');
-    expect(body).not.toContain('Scout this player to reveal playstyle and usage.');
+    expect(body).toContain('Show playstyle');
+    expect(body).toContain('disabled="" title="Buy the $5M Scouting perk to unlock playstyle"');
   });
 
   test('offers one $5M scouting report instead of per-player scouting', () => {
@@ -202,13 +197,17 @@ describe('FullCourtDraftView', () => {
     expect(body).not.toContain('Scout $2M');
   });
 
-  test('unlocks the paid read across the draft after the report is bought', () => {
+  test('unlocks the paid read and Show playstyle across the draft after the report is bought', () => {
     const { state, index } = setup();
     const body = renderView(scoutingReportState(index, state), index, () => undefined);
+    const firstPlayer = state.offer?.cards[0]?.player;
+    if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
     expect(body).toContain('Scouting report active');
     expect(body).not.toContain('aria-label="Buy the $5M scouting report"');
     expect(body).not.toContain('Scout $2M');
+    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
+    expect(body).not.toContain('Buy the $5M Scouting perk to unlock playstyle');
   });
 
   test('disables the scouting report when the budget cannot cover the cheapest legal finish', () => {

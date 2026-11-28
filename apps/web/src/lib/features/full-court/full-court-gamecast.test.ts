@@ -270,3 +270,41 @@ test('rehydrates a saved watched replay into Gamecast from tipoff without rollin
   expect(body).toContain('Skip to final');
   expect(body).toContain('Pause');
 });
+
+test('renders full Cap Rush style box scores and team totals when finished', () => {
+  const { season } = fullCourtTestSeasonLock();
+  const fixture = season.games[0];
+  if (fixture === undefined) throw new Error('Expected an opening fixture');
+  const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
+  const { result } = simulateRecordedFullCourtGame(input, createEngineContext());
+  const health = {
+    home: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.homeTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+    away: {
+      version: 'full-court-health-v1' as const,
+      teamId: fixture.awayTeamId,
+      throughDay: fixture.dayOffset,
+      players: {},
+    },
+  };
+  const body = render(FullCourtGamecast, {
+    props: {
+      game: { kind: 'played', result, tape: null, health, injuries: [] },
+      userTeamId: season.userTeamId,
+      onClose: () => {},
+    },
+  }).body;
+
+  expect(body).toContain('box score');
+  expect(body).toContain('STL');
+  expect(body).toContain('BLK');
+  expect(body).toContain('TO');
+  expect(body).toContain('PF');
+  expect(body).toContain('FG%');
+  expect(body).toContain('TS%');
+  expect(body).toContain('Team');
+});

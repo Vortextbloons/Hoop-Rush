@@ -118,6 +118,26 @@ describe('Full Court offensive hierarchy', () => {
     expect(hierarchyBenchAttempts).toBeGreaterThan(baselineBenchAttempts * 0.75);
   });
 
+  it('uses passing reads in seeded games without changing accounting', () => {
+    const passingReads = Object.fromEntries(
+      IDS.filter((id) => id !== idAt(2)).map((id) => [id, [idAt(2)]]),
+    );
+    let baselineAttempts = 0;
+    let coachedAttempts = 0;
+    for (const seed of SEEDS) {
+      const baseline = simulateFullCourtGame(inputFor(seed, undefined), ctx);
+      const coachedInput = inputFor(seed, { passingReads });
+      const coached = simulateFullCourtGame(coachedInput, ctx);
+      expect(checkFullCourtGameResult(coached)).toEqual([]);
+      expect(fullCourtGameDigest(coached)).toBe(
+        fullCourtGameDigest(simulateFullCourtGame(coachedInput, ctx)),
+      );
+      baselineAttempts += attemptsOf(baseline, idAt(2));
+      coachedAttempts += attemptsOf(coached, idAt(2));
+    }
+    expect(coachedAttempts).toBeGreaterThan(baselineAttempts);
+  });
+
   it('changes nothing when the assigned scorer is unavailable', () => {
     const hierarchy = { primaryPlayerId: idAt(8) };
     for (const seed of SEEDS.slice(0, 4)) {

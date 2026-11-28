@@ -246,6 +246,102 @@ describe('full-court awards and player stats', () => {
     expect(awards.leaders.blocks[0]?.playerId).toBe('p-def');
   });
 
+  test('keeps a team-leading workload out of the Sixth Man race even when starts are missing', () => {
+    const star = makePlayer('p-star', 'Alex Star');
+    const heavy = makePlayer('p-heavy', 'Ben Heavy');
+    const spark = makePlayer('p-spark', 'Chris Spark');
+    const fillers = ['p-fill-1', 'p-fill-2', 'p-fill-3', 'p-fill-4', 'p-fill-5'].map((id) =>
+      makePlayer(id, id),
+    );
+
+    const teams = [
+      {
+        teamId: 'team-a',
+        displayName: 'Alpha',
+        conference: 'east' as const,
+        roster: [star, heavy, spark, ...fillers],
+      },
+    ];
+    // A legacy or mis-flagged season: nobody is recorded as a starter.
+    const makeLine = (playerId: string, points: number, seconds: number) => ({
+      playerId,
+      started: false,
+      seconds,
+      points,
+      rebounds: 4,
+      offRebounds: 1,
+      defRebounds: 3,
+      assists: 4,
+      steals: 1,
+      blocks: 0,
+      turnovers: 1,
+      fouls: 2,
+      fgm: 8,
+      fga: 16,
+      tpm: 2,
+      tpa: 5,
+      ftm: 4,
+      fta: 4,
+    });
+    const regularScores: FullCourtSeasonScore[] = [1, 2, 3, 4].map((slot) => ({
+      gameId: `fc-g-${String(slot)}`,
+      slot,
+      homeTeamId: 'team-a',
+      awayTeamId: 'team-a',
+      outcome: {
+        kind: 'played',
+        homePoints: 112,
+        awayPoints: 98,
+        playerStats: {
+          home: [
+            makeLine('p-star', 32, 2280),
+            makeLine('p-heavy', 29, 2220),
+            makeLine('p-spark', 18, 1260),
+            makeLine('p-fill-1', 9, 900),
+            makeLine('p-fill-2', 8, 840),
+            makeLine('p-fill-3', 7, 780),
+            makeLine('p-fill-4', 6, 720),
+            makeLine('p-fill-5', 5, 600),
+          ],
+          away: [],
+        },
+      },
+    }));
+    const standings: FullCourtStandings = {
+      east: [
+        {
+          teamId: 'team-a',
+          displayName: 'Alpha',
+          conference: 'east',
+          division: 'atlantic',
+          wins: 4,
+          losses: 0,
+          pointsFor: 448,
+          pointsAgainst: 392,
+          pointDifferential: 56,
+          conferenceWins: 4,
+          conferenceLosses: 0,
+          seed: 1,
+          qualified: true,
+        },
+      ],
+      west: [],
+      qualifiedTeamIds: ['team-a'],
+    };
+
+    const awards = buildFullCourtAwards({
+      teams,
+      regularScores,
+      standings,
+      completedSlots: 82,
+    });
+
+    expect(awards.sixthMan.winner?.player.playerId).toBe('p-spark');
+    const ids = awards.sixthMan.finalists.map((candidate) => candidate.player.playerId);
+    expect(ids).not.toContain('p-star');
+    expect(ids).not.toContain('p-heavy');
+  });
+
   test('handles empty or legacy scores without playerStats gracefully', () => {
     const star = makePlayer('p-star', 'Alex Star');
     const teams = [
@@ -261,5 +357,3 @@ describe('full-court awards and player stats', () => {
     expect(awards.hasPlayerStats).toBe(false);
     expect(awards.mvp.winner).toBeNull();
     expect(awards.finalsMvp.winner).toBeNull();
-  });
-});
