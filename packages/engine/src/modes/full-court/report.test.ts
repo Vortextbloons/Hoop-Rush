@@ -1,17 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  FULL_COURT_HEALTH_VERSION,
-  type HavocMutationEntry,
-  type HavocMutationId,
-  type Position,
-  type SimulationPlayer,
-} from '@hoop-rush/data-contracts';
-import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
+import { FULL_COURT_HEALTH_VERSION } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { createRng } from '../../sim/rng.ts';
-import { HAVOC_MUTATION_DEFINITIONS } from '../havoc/mutations.ts';
-import { materializeHavocBundle } from '../havoc/offers.ts';
-import { applyHavocMutationPackage } from '../havoc/transform.ts';
 import {
   buildFullCourtGameReport,
   fullCourtCompletedGameFacts,
@@ -22,69 +11,9 @@ import {
 } from './report.ts';
 import { simulateRecordedFullCourtGame } from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
-import { adaptCapRushSpinsToFullCourt, type FullCourtRouletteSpinReceiptLike } from './roulette.ts';
 import { fullCourtScoreOutcome } from './score.ts';
 
 const ctx = createEngineContext();
-const DEFINITIONS_BY_ID = new Map(
-  HAVOC_MUTATION_DEFINITIONS.map((definition) => [definition.mutationId, definition]),
-);
-
-function rouletteEntryFor(mutationId: HavocMutationId, seedTag: string): HavocMutationEntry {
-  const definition = DEFINITIONS_BY_ID.get(mutationId);
-  if (definition === undefined) throw new Error(`missing definition for ${mutationId}`);
-  const [entry] = materializeHavocBundle(
-    { tier: definition.tier, mutationIds: [mutationId] },
-    createRng(`${seedTag}:phys:${mutationId}`),
-    createRng(`${seedTag}:spec:${mutationId}`),
-    HAVOC_MUTATION_DEFINITIONS,
-  );
-  if (entry === undefined) throw new Error(`failed to materialize ${mutationId}`);
-  return entry;
-}
-
-function rouletteReceiptFor(
-  player: SimulationPlayer,
-  slot: Position,
-  entries: readonly HavocMutationEntry[],
-): FullCourtRouletteSpinReceiptLike {
-  if (player.playerVersionId === undefined) {
-    throw new Error(`player ${player.playerId} requires playerVersionId`);
-  }
-  const sourcePlayer = buildSimulationPlayer({ ...player });
-  const effective = applyHavocMutationPackage(
-    {
-      playerId: sourcePlayer.playerId,
-      playerVersionId: sourcePlayer.playerVersionId ?? null,
-      displayName: sourcePlayer.displayName,
-      franchiseId: null,
-      eraId: null,
-      seasonKey: null,
-      positions: [...sourcePlayer.positions],
-      originalOverall: sourcePlayer.overall ?? 75,
-      overallSource: 'catalog',
-      profile: {
-        ratings: sourcePlayer.ratings,
-        tendencies: sourcePlayer.tendencies,
-        ...(sourcePlayer.anchors === undefined ? {} : { anchors: sourcePlayer.anchors }),
-      },
-      physical: {
-        heightInches: sourcePlayer.heightInches,
-        weightLbs: sourcePlayer.weightLbs,
-      },
-    },
-    [...entries],
-    { slot },
-  );
-  const [head, ...rest] = entries;
-  if (head === undefined) throw new Error('expected at least one entry');
-  return {
-    target: { slot, playerVersionId: player.playerVersionId, playerId: player.playerId },
-    entry: head,
-    ...(rest.length > 0 ? { additionalEntries: rest } : {}),
-    effective,
-  };
-}
 
 function playedReport(input: {
   readonly seed: string;
@@ -371,105 +300,6 @@ describe('Full Court game report', () => {
           1000,
       ) / 10;
     expect(asymmetric.netRatingPer100).toBe(expectedOrtgMinusDrtg);
-  });
-
-  it('reports Roulette games with negative deltas, defensive bonus scoring, and team bonuses', () => {
-    const mutations: readonly HavocMutationId[] = [
-      'buzzer-bandit',
-      'charity-casino',
-      'cold-blooded',
-      'double-or-nothing',
-    ];
-    for (const mutationId of mutations) {
-      const homeRoster = fullCourtTestRoster(`r-${mutationId}-h`, 10, (index) => ({
-        rating: 72 + (index % 4),
-      }));
-      const awayRoster = fullCourtTestRoster(`r-${mutationId}-a`, 10, (index) => ({
-        rating: 72 + (index % 3),
-      }));
-      const receipts = homeRoster
-        .slice(0, 5)
-        .map((player, slotIndex) =>
-          rouletteReceiptFor(player, (['PG', 'SG', 'SF', 'PF', 'C'] as const)[slotIndex] ?? 'PG', [
-            rouletteEntryFor(mutationId, `seed-${mutationId}-${String(slotIndex)}`),
-          ]),
-        );
-      let sawNonStandardEvent = false;
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        const base = fullCourtTestInput({
-          seed: `roulette-report-${mutationId}-${String(attempt)}`,
-          homeRoster,
-          awayRoster,
-        });
-        const { result, tape } = simulateRecordedFullCourtGame(
-          {
-            ...base,
-            home: {
-              ...base.home,
-              roulette: adaptCapRushSpinsToFullCourt({ roster: homeRoster, receipts }),
-            },
-          },
-          ctx,
-        );
-        if (mutationId === 'buzzer-bandit') {
-          let prev = 0;
-          for (const ev of tape) {
-            if (ev.kind === 'trip') {
-              if (ev.homeScore < prev) sawNonStandardEvent = true;
-              prev = ev.homeScore;
-            }
-          }
-        } else if ((result.away.teamBonusPoints ?? 0) > 0) {
-          sawNonStandardEvent = true;
-        }
-        const report = asPlayed(
-          buildFullCourtGameReport({
-            kind: 'played',
-            gameId: `fc-r-${mutationId}-${String(attempt)}`,
-            userSide: 'away',
-            result,
-            tape,
-          }),
-        );
-        expect(sumRows(report, 'pointsFor')).toBe(result.away.box.points);
-        expect(sumRows(report, 'pointsAgainst')).toBe(result.home.box.points);
-        const facts = fullCourtCompletedGameFacts(report);
-        expect(facts).not.toBeNull();
-        if (facts !== null) {
-          expect(facts.teamBonusPoints).toBe(result.away.teamBonusPoints ?? 0);
-          expect(facts.starterPoints + facts.benchPoints + facts.teamBonusPoints).toBe(
-            facts.teamPoints,
-          );
-        }
-        const outcome = fullCourtScoreOutcome(
-          {
-            kind: 'played',
-            result,
-            tape,
-            health: {
-              home: {
-                version: FULL_COURT_HEALTH_VERSION,
-                teamId: 'home',
-                throughDay: 0,
-                players: {},
-              },
-              away: {
-                version: FULL_COURT_HEALTH_VERSION,
-                teamId: 'away',
-                throughDay: 0,
-                players: {},
-              },
-            },
-            injuries: [],
-          },
-          true,
-        );
-        if (outcome.kind === 'played' && (result.away.teamBonusPoints ?? 0) > 0) {
-          expect(outcome.teamBonusPoints?.away).toBe(result.away.teamBonusPoints);
-        }
-      }
-      expect(sawNonStandardEvent).toBe(true);
-    }
   });
 
   it('rejects a tape that misplaces points between lineups even when final scores match', () => {

@@ -35,7 +35,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { fullCourtHistoryFromSeason } from './history.ts';
 
-function buildRouletteDraft(): {
+function buildStandardDraft(): {
   draft: FullCourtDraftState;
   field: { teamId: string; displayName: string }[];
   catalog: SeasonDraftCatalog;
@@ -64,7 +64,7 @@ function buildRouletteDraft(): {
       commandId: commandIdSchema.parse('create'),
       runId: 'fc-signed-history',
       runSeed: seedSchema.parse('b'.repeat(32)),
-      variant: 'roulette',
+      variant: 'standard',
       catalog: catalogSource,
       money: { ...FULL_COURT_DEFAULT_MONEY, capLineDollars: 0, firstApronDollars: 0 },
     }),
@@ -94,21 +94,11 @@ function buildRouletteDraft(): {
     },
     { index },
   ).state;
-  draft = applyFullCourtCommand(
-    draft,
-    {
-      command: 'finalize-full-court-roulette',
-      commandId: commandIdSchema.parse('finalize-roulette'),
-      runId: draft.runId,
-      expectedRevision: draft.revision,
-    },
-    { index },
-  ).state;
   return { draft, field, catalog, catalogSource };
 }
 
 function signedRun() {
-  const { draft, field, catalog, catalogSource } = buildRouletteDraft();
+  const { draft, field, catalog, catalogSource } = buildStandardDraft();
   const seasonLock = lockFullCourtRegularSeason(
     buildFullCourtRegularSeason({
       draft,

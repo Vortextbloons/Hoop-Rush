@@ -73,7 +73,7 @@ export interface FullCourtBenchPlayer {
 }
 
 export interface FullCourtBenchScoring {
-  /** Signed bench subtotal; Roulette deductions can make it negative. */
+  /** Signed bench subtotal; deductions can make it negative. */
   readonly points: number;
   readonly starterPoints: number;
   readonly teamPoints: number;
@@ -94,7 +94,7 @@ export interface FullCourtCompletedGameFacts {
   readonly teamPoints: number;
   readonly starterPoints: number;
   readonly benchPoints: number;
-  /** Team-level Roulette bonus points that belong to no player line. */
+  /** Team-level bonus points that belong to no player line. */
   readonly teamBonusPoints: number;
   readonly benchPlayerCount: number;
 }
@@ -112,7 +112,7 @@ export interface FullCourtPlayedGameReport extends FullCourtGameReportBase {
   readonly userPoints: number;
   readonly opponentPoints: number;
   readonly userWon: boolean;
-  /** Roulette team bonus points, which are not part of any player line. */
+  /** Team bonus points, which are not part of any player line. */
   readonly teamBonusPoints: number;
   readonly lineupRows: readonly FullCourtLineupRow[];
   readonly bench: FullCourtBenchScoring;

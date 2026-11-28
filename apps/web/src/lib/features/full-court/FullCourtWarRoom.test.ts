@@ -199,7 +199,7 @@ describe('FullCourtWarRoom', () => {
     expect(body).not.toContain('Owned');
   });
 
-  test('offers training camp at $15M when open and withholds it when closed', () => {
+  test('offers training camp at $5M when open and withholds it when closed', () => {
     const { index, draft, season, nextFilmTarget } = setup();
     const open = renderWarRoom({
       draft,
@@ -210,7 +210,7 @@ describe('FullCourtWarRoom', () => {
     });
     expect(open).toContain('aria-label="Full Court War Room training camp"');
     expect(open).toContain('Book training camp');
-    expect(open).toContain('$15M');
+    expect(open).toContain('$5M');
     expect(open).not.toContain('Training camp closed before game 1.');
 
     const closed = renderWarRoom({

@@ -116,8 +116,7 @@ export function simulateFullCourtTrainingCamp(
     rotation: user.players.map((player) => ({
       playerId: player.playerId,
       displayName: player.displayName,
-      kind: player.kind ?? 'roster',
-      ...(player.ownerPlayerId === undefined ? {} : { ownerPlayerId: player.ownerPlayerId }),
+      kind: 'roster',
       starter: player.startedGame,
       minutes: oneDecimal(player.minutes),
       plannedMinutes: oneDecimal(player.plannedSeconds / 60),

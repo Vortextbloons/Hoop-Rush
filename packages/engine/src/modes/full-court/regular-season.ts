@@ -28,9 +28,6 @@ import {
   buildFullCourtLeagueSchedule,
   type FullCourtLeagueGame,
 } from './league.ts';
-import { adaptCapRushSpinsToFullCourt } from './roulette.ts';
-import { assertFullCourtSpinReceiptDigests } from './roulette-draft.ts';
-
 export interface FullCourtRegularSeasonTeam extends FullCourtTeamGameInput {
   readonly anchorSeason: SeasonKey | null;
 }
@@ -84,13 +81,6 @@ export function buildFullCourtRegularSeason(input: {
   if (draft.stage !== 'complete') {
     throw new Error('A confirmed Full Court roster is required to start the season');
   }
-  if (draft.variant === 'roulette' && draft.roulette?.status === 'open') {
-    throw new Error('Finalize Full Court Roulette before starting the season');
-  }
-  if (draft.variant === 'roulette' && draft.roulette?.status === 'skipped') {
-    throw new Error('Finalize Full Court Roulette before starting the season');
-  }
-  assertFullCourtSpinReceiptDigests(draft);
   const profile = eraSimulationProfileSchema.parse(input.profile);
   assertCapRushCatalogSourceMatches(catalogSource, draft.catalog);
   const index = fullCourtDraftIndexOf(catalog, catalogSource);
@@ -122,17 +112,6 @@ export function buildFullCourtRegularSeason(input: {
   });
   const apron = fullCourtPayrollStatus(fullCourtPayrollDollars(draft.picks), draft.money);
   const userRoster = simulationRoster(chosen, apron);
-  const userSourceRoster = simulationRoster(chosen, 'under-cap');
-  const rouletteReceipts = draft.roulette?.receipts ?? [];
-  const userRoulette =
-    rouletteReceipts.length === 0
-      ? undefined
-      : adaptCapRushSpinsToFullCourt({
-          roster: userRoster,
-          sourceRoster: userSourceRoster,
-          receipts: rouletteReceipts,
-          payrollStatus: apron,
-        });
   const teams: FullCourtRegularSeasonTeam[] = [
     {
       teamId: assignment.franchiseId,
@@ -140,7 +119,6 @@ export function buildFullCourtRegularSeason(input: {
       anchorSeason: null,
       roster: userRoster,
       availability: staminaAvailability(chosen),
-      ...(userRoulette === undefined ? {} : { roulette: userRoulette }),
     },
     ...opponents.map((team) => {
       const roster = simulationRoster(team.players, 'under-cap');

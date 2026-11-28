@@ -1,9 +1,7 @@
 <script lang="ts">
   import SimulationStatus from '#lib/components/screens/SimulationStatus.svelte';
-  import ResultHero from '#lib/components/screens/ResultHero.svelte';
-  import ChampionshipBanner from '#lib/components/screens/ChampionshipBanner.svelte';
   import { resolve } from '$app/paths';
-  import { Check, ClipboardList, Dices } from '@lucide/svelte';
+  import { Check } from '@lucide/svelte';
   import { onMount } from 'svelte';
   import { FULL_COURT_DEFAULT_MONEY, fullCourtReportPriceDollars } from '@hoop-rush/data-contracts';
   import {
@@ -16,7 +14,6 @@
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
-  import ModeCard from '#lib/components/ui/ModeCard.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
@@ -26,8 +23,8 @@
   import FullCourtAbandonRun from '#lib/features/full-court/FullCourtAbandonRun.svelte';
   import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
+  import FullCourtFinalReview from '#lib/features/full-court/FullCourtFinalReview.svelte';
   import FullCourtGamecast from '#lib/features/full-court/FullCourtGamecast.svelte';
-  import FullCourtRouletteView from '#lib/features/full-court/FullCourtRouletteView.svelte';
   import { presentFullCourtHistoryEntry } from '#lib/features/full-court/full-court-history-presentation.js';
   import { getPersistence } from '#lib/persistence.js';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
@@ -53,7 +50,7 @@
     { value: 'team', label: 'Team' },
     { value: 'war-room', label: 'War Room' },
     { value: 'league', label: 'League' },
-    { value: 'stats', label: 'Stats & Awards' },
+    { value: 'stats', label: 'Stats' },
     { value: 'playoffs', label: 'Playoffs' },
   ] as const;
   let confirmNewDraft = $state(false);
@@ -86,23 +83,6 @@
     },
   ];
   type RunPerkKind = (typeof RUN_PERK_OPTIONS)[number]['kind'];
-  const RUN_VARIANT_OPTIONS = [
-    {
-      id: 'standard' as const,
-      title: 'Standard',
-      description:
-        'Find your franchise player and build a rotation around them while managing payroll.',
-      icon: ClipboardList,
-    },
-    {
-      id: 'roulette' as const,
-      title: 'Roulette',
-      description:
-        'Draft and lock your roster, then use spare budget to spin for player mutations.',
-      icon: Dices,
-    },
-  ];
-  let selectedVariant = $state<'standard' | 'roulette' | null>(null);
   let selectedPerks = $state<RunPerkKind[]>([]);
   const selectedPerkCost = $derived(
     selectedPerks.reduce((sum, kind) => sum + fullCourtReportPriceDollars(kind), 0),
@@ -110,10 +90,6 @@
   const startingBudgetRemaining = $derived(
     FULL_COURT_DEFAULT_MONEY.startingWarChestDollars - selectedPerkCost,
   );
-  const selectedVariantLabel = $derived(
-    RUN_VARIANT_OPTIONS.find((option) => option.id === selectedVariant)?.title ?? '',
-  );
-
   function togglePerk(kind: RunPerkKind): void {
     selectedPerks = selectedPerks.includes(kind)
       ? selectedPerks.filter((item) => item !== kind)
@@ -121,8 +97,7 @@
   }
 
   function startRun(instance: FullCourtController): void {
-    if (selectedVariant === null) return;
-    void instance.startDraft(selectedVariant, selectedPerks);
+    void instance.startDraft('standard', selectedPerks);
   }
 
   function selectSection(value: typeof section) {
@@ -173,12 +148,6 @@
   const current = $derived(controller);
   const draft = $derived(current?.draft);
   const season = $derived(current?.season);
-  const roulettePreparing = $derived(
-    draft?.stage === 'complete' &&
-      draft.variant === 'roulette' &&
-      draft.roulette !== undefined &&
-      draft.roulette.status !== 'finalized',
-  );
   const playoff = $derived(current?.playoffs?.view ?? null);
   const playoffPreview = $derived(current?.nextPlayoffPreview() ?? null);
   const opponentAdjustment = $derived(
@@ -371,9 +340,6 @@
           </button>
         {/each}
       </nav>
-      <div class="mb-4">
-        <FullCourtAbandonRun busy={current.busy} onAbandon={() => void abandonRun(current)} />
-      </div>
       {#if current.simulating && (section === 'team' || section === 'war-room')}
         <SimulationStatus
           class="mb-4"
@@ -403,6 +369,10 @@
               current.saveBlueprint(name, tactics, options)}
             onRemoveBlueprint={(name) => current.removeBlueprint(name)}
           />
+          <div class="mt-6 border-t border-line-soft pt-3">
+            <p class="ui-micro mb-1">Run management</p>
+            <FullCourtAbandonRun busy={current.busy} onAbandon={() => void abandonRun(current)} />
+          </div>
         </div>
       {/if}
       {#if section === 'war-room'}
@@ -431,7 +401,7 @@
           />
         {/if}
       {:else if section === 'home' && runComplete}
-        <section aria-label="Final review" class="space-y-4">
+        <section aria-label="Final review">
           {#if review === null}
             <p role="status" class="text-sm text-muted-foreground">Loading season summary</p>
           {:else}
@@ -439,42 +409,14 @@
               <p role="status" class="text-sm text-muted-foreground">Loading season summary</p>
             {:then entry}
               {#if entry}
-                {#if entry.playoffStatus === 'champion'}
-                  <ChampionshipBanner team={entry.teamName} label="Full Court champions" />
-                {/if}
-                <ResultHero
-                  score={entry.regularRecordLabel}
-                  scoreLabel={entry.regularRecordLabel + ' regular-season record'}
-                  caption={entry.teamName}
-                  meta={entry.playoffLabel}
-                  tone={entry.playoffStatus === 'champion' ? 'champion' : 'default'}
+                <FullCourtFinalReview
+                  {entry}
+                  userRow={userStandingsRow}
+                  {art}
+                  identity={userIdentity}
+                  busy={current.busy}
+                  onStartNewGame={() => void abandonRun(current)}
                 />
-                <Panel as="section" padding="md" aria-label="Open the final report">
-                  <SectionHeading
-                    eyebrow="Season complete"
-                    title="Your final report"
-                    level={2}
-                    size="sm"
-                    description="Season results, roster detail, league stats and awards, and the full playoff bracket open on their own tabbed page."
-                  />
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <ActionLink
-                      href={resolve('/full-court/report/[runId]', { runId: entry.runId })}
-                    >
-                      Open final report
-                    </ActionLink>
-                    <Button
-                      tone="secondary"
-                      loading={current.busy}
-                      onclick={() => void abandonRun(current)}
-                    >
-                      Start new game
-                    </Button>
-                    <ActionLink href={resolve('/full-court/history')} tone="secondary">
-                      Run history
-                    </ActionLink>
-                  </div>
-                </Panel>
               {:else}
                 <Alert tone="warning" title="Season summary unavailable">
                   You can still review the standings, stats, awards, and playoff bracket.
@@ -508,6 +450,7 @@
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
           onWatchNextGame={() => void watchNextGame(current)}
+          onEditGamePlan={() => selectSection('team')}
         />
       {/if}
       {#if (section === 'home' || section === 'playoffs') && (current.latestGame !== null || savedReplay !== null)}
@@ -574,17 +517,6 @@
           </Button>
         {/if}
       {/if}
-    {:else if roulettePreparing && draft}
-      <FullCourtRouletteView
-        {draft}
-        index={current.index}
-        busy={current.busy}
-        onPurchaseSpin={(purchase, versionId) => void current.purchaseSpin(purchase, versionId)}
-        onSkipSpin={() => void current.skipSpin()}
-        onFinalize={() => void current.finalizeRoulette()}
-        onPurchaseReport={(target) => void current.purchaseReport(target)}
-        onAbandon={() => void abandonRun(current)}
-      />
     {:else if draft?.stage === 'drafting' && current.index !== null}
       <FullCourtDraftView
         {draft}
@@ -616,113 +548,62 @@
         )} hard limit), set your rotation, and face 29 historical teams."
       />
 
-      <ol class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Draft setup steps">
-        {#each [{ step: 1, label: 'Draft format' }, { step: 2, label: 'Pre-run perks' }] as item (item.step)}
-          {@const done = item.step === 1 && selectedVariant !== null}
-          {@const active = item.step === 1 ? selectedVariant === null : selectedVariant !== null}
-          <li class="flex items-center gap-2" aria-current={active ? 'step' : undefined}>
-            {#if item.step > 1}
-              <span class="h-px w-4 bg-line-strong" aria-hidden="true"></span>
-            {/if}
-            <span
-              class="font-display grid h-5 w-5 place-items-center rounded-md border text-[10px] font-extrabold tabular-nums {active
-                ? 'border-primary/50 bg-primary/15 text-primary'
-                : done
-                  ? 'border-line-strong text-foreground'
-                  : 'border-line-soft text-muted-foreground'}"
-              aria-hidden="true"
+      <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
+        <SectionHeading
+          level={3}
+          size="sm"
+          align="start"
+          title="Pre-run perks"
+          description="Optional upgrades paid from the starting budget. Every perk lasts for the entire run."
+        >
+          {#snippet actions()}
+            <Badge tone="neutral">{formatMillions(startingBudgetRemaining)} starting budget</Badge>
+          {/snippet}
+        </SectionHeading>
+
+        <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {#each RUN_PERK_OPTIONS as perk (perk.kind)}
+            {@const active = selectedPerks.includes(perk.kind)}
+            <button
+              type="button"
+              aria-pressed={active}
+              onclick={() => togglePerk(perk.kind)}
+              class="flex flex-col items-start rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {active
+                ? 'border-primary bg-primary/10'
+                : 'border-border bg-surface-1 hover:border-line-strong'}"
             >
-              {#if done}<Check size={11} />{:else}{item.step}{/if}
-            </span>
-            <span class="ui-label" data-tone={active ? 'primary' : 'muted'}>{item.label}</span>
-          </li>
-        {/each}
-      </ol>
-
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        {#each RUN_VARIANT_OPTIONS as option (option.id)}
-          {@const Icon = option.icon}
-          {@const active = selectedVariant === option.id}
-          <ModeCard
-            title={option.title}
-            description={option.description}
-            cta={active ? 'Selected' : `Choose ${option.title}`}
-            selected={active}
-            disabled={current.busy}
-            onclick={() => (selectedVariant = option.id)}
-            class="h-full"
-          >
-            {#snippet icon()}<Icon size={22} aria-hidden="true" />{/snippet}
-          </ModeCard>
-        {/each}
-      </div>
-
-      {#if selectedVariant !== null}
-        <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
-          <SectionHeading
-            level={3}
-            size="sm"
-            align="start"
-            title="Pre-run perks"
-            description="Optional upgrades paid from the starting budget. Every perk lasts for the entire run."
-          >
-            {#snippet actions()}
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge tone="neutral">
-                  {formatMillions(startingBudgetRemaining)} starting budget
-                </Badge>
-                <Button size="sm" tone="ghost" onclick={() => (selectedVariant = null)}
-                  >Change format</Button
+              <div class="flex w-full items-baseline justify-between gap-2">
+                <span
+                  class="font-display flex items-center gap-1.5 text-sm font-extrabold uppercase"
                 >
+                  {perk.title}
+                  {#if active}
+                    <Check class="text-primary" size={14} aria-hidden="true" />
+                  {/if}
+                </span>
+                <span class="font-mono text-xs font-bold tabular-nums text-accent">
+                  {formatMillions(perk.priceDollars)}
+                </span>
               </div>
-            {/snippet}
-          </SectionHeading>
+              <p class="mt-1 text-xs leading-snug text-muted-foreground">{perk.description}</p>
+            </button>
+          {/each}
+        </div>
 
-          <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {#each RUN_PERK_OPTIONS as perk (perk.kind)}
-              {@const active = selectedPerks.includes(perk.kind)}
-              <button
-                type="button"
-                aria-pressed={active}
-                onclick={() => togglePerk(perk.kind)}
-                class="flex flex-col items-start rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {active
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border bg-surface-1 hover:border-line-strong'}"
-              >
-                <div class="flex w-full items-baseline justify-between gap-2">
-                  <span
-                    class="font-display flex items-center gap-1.5 text-sm font-extrabold uppercase"
-                  >
-                    {perk.title}
-                    {#if active}
-                      <Check class="text-primary" size={14} aria-hidden="true" />
-                    {/if}
-                  </span>
-                  <span class="font-mono text-xs font-bold tabular-nums text-accent">
-                    {formatMillions(perk.priceDollars)}
-                  </span>
-                </div>
-                <p class="mt-1 text-xs leading-snug text-muted-foreground">{perk.description}</p>
-              </button>
-            {/each}
-          </div>
-
-          <div
-            class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4"
-          >
-            <p class="font-mono text-[10px] text-muted-foreground uppercase">
-              {selectedVariantLabel} draft ·
-              {selectedPerks.length === 0
-                ? 'no perks'
-                : `${String(selectedPerks.length)} perk${selectedPerks.length === 1 ? '' : 's'}`}
-              · {formatMillions(startingBudgetRemaining)} budget
-            </p>
-            <Button tone="primary" loading={current.busy} onclick={() => startRun(current)}>
-              Start {selectedVariantLabel} draft
-            </Button>
-          </div>
-        </Panel>
-      {/if}
+        <div
+          class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4"
+        >
+          <p class="font-mono text-[10px] text-muted-foreground uppercase">
+            {selectedPerks.length === 0
+              ? 'no perks'
+              : `${String(selectedPerks.length)} perk${selectedPerks.length === 1 ? '' : 's'}`}
+            · {formatMillions(startingBudgetRemaining)} budget
+          </p>
+          <Button tone="primary" loading={current.busy} onclick={() => startRun(current)}>
+            Start draft
+          </Button>
+        </div>
+      </Panel>
     {/if}
   {/if}
 </PageShell>

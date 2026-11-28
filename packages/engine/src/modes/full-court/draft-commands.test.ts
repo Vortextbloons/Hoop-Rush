@@ -86,11 +86,8 @@ describe('full court create', () => {
       ...FULL_COURT_DEFAULT_MONEY,
       startingWarChestDollars: 123_000_000,
     });
-    const state = createFullCourtDraftState(
-      { ...setup.createCommand, variant: 'roulette', money },
-      setup.index,
-    );
-    expect(state.variant).toBe('roulette');
+    const state = createFullCourtDraftState({ ...setup.createCommand, money }, setup.index);
+    expect(state.variant).toBe('standard');
     expect(state.money).toEqual(money);
   });
 
@@ -506,16 +503,11 @@ describe('full court command determinism', () => {
 });
 
 describe('full court seeded finite draft pool', () => {
-  it('assigns a versioned deterministic pool to both standard and roulette drafts', () => {
+  it('assigns a versioned deterministic pool to standard drafts', () => {
     const setup = fullCourtTestSetup();
     const standard = createFullCourtDraftState(setup.createCommand, setup.index);
-    const roulette = createFullCourtDraftState(
-      { ...setup.createCommand, variant: 'roulette' },
-      setup.index,
-    );
 
     expect(standard.pool).toBeDefined();
-    expect(roulette.pool).toEqual(standard.pool);
     expect(standard.pool?.playerVersionIds.length ?? 0).toBeGreaterThanOrEqual(60);
     expect(standard.pool?.playerVersionIds.length ?? 0).toBeLessThanOrEqual(90);
   });

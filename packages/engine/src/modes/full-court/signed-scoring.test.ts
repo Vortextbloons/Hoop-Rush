@@ -8,17 +8,8 @@ import {
   seedSchema,
   capRushLeagueGameId,
   type FullCourtSeasonScore,
-  type HavocMutationEntry,
-  type HavocMutationId,
-  type Position,
-  type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { createRng } from '../../sim/rng.ts';
-import { HAVOC_MUTATION_DEFINITIONS } from '../havoc/mutations.ts';
-import { materializeHavocBundle } from '../havoc/offers.ts';
-import { applyHavocMutationPackage } from '../havoc/transform.ts';
 import { checkFullCourtGameResult, simulateRecordedFullCourtGame } from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
 import {
@@ -27,69 +18,9 @@ import {
   fullCourtCompletedGameFacts,
 } from './report.ts';
 import { buildFullCourtSeasonSummary } from './report-season.ts';
-import { adaptCapRushSpinsToFullCourt, type FullCourtRouletteSpinReceiptLike } from './roulette.ts';
 import { fullCourtScoreOutcome } from './score.ts';
 
 const ctx = createEngineContext();
-const DEFINITIONS_BY_ID = new Map(
-  HAVOC_MUTATION_DEFINITIONS.map((definition) => [definition.mutationId, definition]),
-);
-
-function rouletteEntryFor(mutationId: HavocMutationId, seedTag: string): HavocMutationEntry {
-  const definition = DEFINITIONS_BY_ID.get(mutationId);
-  if (definition === undefined) throw new Error(`missing definition for ${mutationId}`);
-  const [entry] = materializeHavocBundle(
-    { tier: definition.tier, mutationIds: [mutationId] },
-    createRng(`${seedTag}:phys:${mutationId}`),
-    createRng(`${seedTag}:spec:${mutationId}`),
-    HAVOC_MUTATION_DEFINITIONS,
-  );
-  if (entry === undefined) throw new Error(`failed to materialize ${mutationId}`);
-  return entry;
-}
-
-function rouletteReceiptFor(
-  player: SimulationPlayer,
-  slot: Position,
-  entries: readonly HavocMutationEntry[],
-): FullCourtRouletteSpinReceiptLike {
-  if (player.playerVersionId === undefined) {
-    throw new Error(`player ${player.playerId} requires playerVersionId`);
-  }
-  const sourcePlayer = buildSimulationPlayer({ ...player });
-  const effective = applyHavocMutationPackage(
-    {
-      playerId: sourcePlayer.playerId,
-      playerVersionId: sourcePlayer.playerVersionId ?? null,
-      displayName: sourcePlayer.displayName,
-      franchiseId: null,
-      eraId: null,
-      seasonKey: null,
-      positions: [...sourcePlayer.positions],
-      originalOverall: sourcePlayer.overall ?? 75,
-      overallSource: 'catalog',
-      profile: {
-        ratings: sourcePlayer.ratings,
-        tendencies: sourcePlayer.tendencies,
-        ...(sourcePlayer.anchors === undefined ? {} : { anchors: sourcePlayer.anchors }),
-      },
-      physical: {
-        heightInches: sourcePlayer.heightInches,
-        weightLbs: sourcePlayer.weightLbs,
-      },
-    },
-    [...entries],
-    { slot },
-  );
-  const [head, ...rest] = entries;
-  if (head === undefined) throw new Error('expected at least one entry');
-  return {
-    target: { slot, playerVersionId: player.playerVersionId, playerId: player.playerId },
-    entry: head,
-    ...(rest.length > 0 ? { additionalEntries: rest } : {}),
-    effective,
-  };
-}
 
 function health(teamId: string) {
   return {
@@ -100,34 +31,11 @@ function health(teamId: string) {
   };
 }
 
-function signedSimulation() {
-  const homeRoster = fullCourtTestRoster('neg-home', 6, (index) => ({
-    rating: index === 5 ? 25 : 70 + (index % 4),
-    ...(index === 5 ? { usageRate: 0.32 } : {}),
-  }));
-  const awayRoster = fullCourtTestRoster('neg-away', 8, (index) => ({ rating: 71 + (index % 3) }));
-  const receipts = homeRoster.map((player, slotIndex) =>
-    rouletteReceiptFor(player, (['PG', 'SG', 'SF', 'PF', 'C', 'PG'] as const)[slotIndex] ?? 'PG', [
-      rouletteEntryFor('buzzer-bandit', `neg-97-${String(slotIndex)}`),
-    ]),
-  );
-  const minuteTargets = Object.fromEntries(
-    homeRoster.map((player, index) => [player.playerId, index < 5 ? 38 : 48]),
-  );
-  const base = fullCourtTestInput({
-    seed: 'negative-bench-97',
-    homeRoster,
-    awayRoster,
-    homeRotation: { minuteTargets },
-  });
+function playedSimulation() {
+  const homeRoster = fullCourtTestRoster('signed-home', 8);
+  const awayRoster = fullCourtTestRoster('signed-away', 8);
   const { result, tape } = simulateRecordedFullCourtGame(
-    {
-      ...base,
-      home: {
-        ...base.home,
-        roulette: adaptCapRushSpinsToFullCourt({ roster: homeRoster, receipts }),
-      },
-    },
+    fullCourtTestInput({ seed: 'signed-bench-standard', homeRoster, awayRoster }),
     ctx,
   );
   expect(checkFullCourtGameResult(result)).toEqual([]);
@@ -135,12 +43,11 @@ function signedSimulation() {
 }
 
 describe('signed Full Court scoring', () => {
-  it('round-trips an actually simulated deducted bench total through a compact score', () => {
-    const { result, tape } = signedSimulation();
+  it('round-trips bench and starter splits through a compact score', () => {
+    const { result, tape } = playedSimulation();
     const bench = result.home.players
       .filter((player) => !player.startedGame)
       .reduce((total, player) => total + player.points, 0);
-    expect(bench).toBe(-2);
 
     const lineups = buildFullCourtGameLineups({
       kind: 'played',
@@ -166,12 +73,10 @@ describe('signed Full Court scoring', () => {
       true,
       lineups,
     );
-    expect(outcome).toMatchObject({
-      kind: 'played',
-      benchPoints: { home: -2 },
-      starterPoints: { home: result.home.box.points + 2 },
-      lineups: { side: 'home', version: 1 },
-    });
+    if (outcome.kind !== 'played') throw new Error('expected a played outcome');
+    expect(outcome.benchPoints?.home).toBe(bench);
+    expect(outcome.homePoints).toBe(result.home.box.points);
+    expect(outcome.lineups?.side).toBe('home');
     const score = fullCourtSeasonScoreSchema.parse({
       gameId: 'fc-signed-bench',
       slot: 1,
@@ -180,15 +85,14 @@ describe('signed Full Court scoring', () => {
       outcome,
     });
     expect(JSON.parse(JSON.stringify(score))).toEqual(score);
-    expect(score.outcome).toMatchObject({ benchPoints: { home: -2 } });
     if (score.outcome.kind !== 'played' || score.outcome.lineups === undefined) {
       throw new Error('expected recorded lineup facts');
     }
     expect(score.outcome.lineups.side).toBe('home');
   });
 
-  it('keeps a signed watched replay valid with negative player and period points', () => {
-    const { result, tape } = signedSimulation();
+  it('keeps a watched replay valid with signed bench facts', () => {
+    const { result, tape } = playedSimulation();
     const gameId = capRushLeagueGameId(1, 'home', 'away');
     const report = buildFullCourtGameReport({
       kind: 'played',
@@ -233,12 +137,14 @@ describe('signed Full Court scoring', () => {
       result,
       tape,
     });
-    expect(replay.result.home.players.some((player) => player.points < 0)).toBe(true);
-    expect(replay.facts.benchPoints).toBe(-2);
+    expect(replay.facts.benchPoints).toBe(facts.benchPoints);
+    expect(
+      replay.facts.starterPoints + replay.facts.benchPoints + replay.facts.teamBonusPoints,
+    ).toBe(replay.facts.teamPoints);
   });
 
   it('keeps signed bench and starter facts valid in the season summary', () => {
-    const { result, tape } = signedSimulation();
+    const { result, tape } = playedSimulation();
     const report = buildFullCourtGameReport({
       kind: 'played',
       gameId: 'fc-1',
@@ -249,7 +155,6 @@ describe('signed Full Court scoring', () => {
     if (report.status !== 'played') throw new Error('expected a played report');
     const facts = fullCourtCompletedGameFacts(report);
     if (facts === null) throw new Error('expected completed-game facts');
-    expect(facts.benchPoints).toBe(-2);
 
     const scores: FullCourtSeasonScore[] = [];
     for (let slot = 1; slot <= 82; slot += 1) {
@@ -264,45 +169,32 @@ describe('signed Full Court scoring', () => {
           slot,
           homeTeamId: userHome ? 'home' : `opp-${String(slot)}`,
           awayTeamId: userHome ? `opp-${String(slot)}` : 'home',
-          outcome: {
-            kind: 'played',
-            homePoints,
-            awayPoints,
-            ...(slot === 1
+          outcome:
+            slot === 1
               ? {
-                  benchPoints: { home: -2, away: 0 },
-                  benchPlayers: { home: 1, away: 0 },
-                  starterPoints: { home: result.home.box.points + 2, away: report.opponentPoints },
+                  kind: 'played',
+                  homePoints,
+                  awayPoints,
+                  benchPoints: { home: facts.benchPoints, away: 0 },
+                  benchPlayers: { home: facts.benchPlayerCount, away: 0 },
+                  starterPoints: {
+                    home: facts.starterPoints,
+                    away: report.opponentPoints,
+                  },
                 }
-              : {}),
-          },
+              : { kind: 'played', homePoints, awayPoints },
         }),
       );
     }
     const summary = buildFullCourtSeasonSummary({
       runId: 'run-signed',
       userTeamId: 'home',
-      variant: 'roulette',
+      variant: 'standard',
       regularScores: scores,
       completedGames: [facts],
     });
-    expect(summary.bench).toMatchObject({
-      gamesRecorded: 1,
-      totalBenchPoints: -2,
-      averageBenchPoints: -2,
-      bestGame: { gameId: 'fc-1', benchPoints: -2 },
-    });
+    expect(summary.bench?.totalBenchPoints).toBe(facts.benchPoints);
     expect(summary.regularSeason.complete).toBe(true);
-
-    expect(() =>
-      buildFullCourtSeasonSummary({
-        runId: 'run-signed',
-        userTeamId: 'home',
-        variant: 'roulette',
-        regularScores: scores,
-        completedGames: [{ ...facts, benchPoints: -3 }],
-      }),
-    ).toThrow(/do not sum to team points/);
   });
 
   it('accepts negative starter facts whose bench plus bonus exceeds team points', () => {
@@ -331,7 +223,7 @@ describe('signed Full Court scoring', () => {
     const summary = buildFullCourtSeasonSummary({
       runId: 'run-negative-starter',
       userTeamId: 'user',
-      variant: 'roulette',
+      variant: 'standard',
       regularScores: scores,
       completedGames: [
         {
@@ -352,7 +244,7 @@ describe('signed Full Court scoring', () => {
       buildFullCourtSeasonSummary({
         runId: 'run-negative-starter',
         userTeamId: 'user',
-        variant: 'roulette',
+        variant: 'standard',
         regularScores: scores,
         completedGames: [
           {

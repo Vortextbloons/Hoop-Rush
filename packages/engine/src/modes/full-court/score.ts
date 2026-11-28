@@ -64,8 +64,8 @@ export function fullCourtScoreOutcome(
 ): FullCourtSeasonScore['outcome'] {
   if (game.kind === 'forfeit') return { kind: 'forfeit', losingSides: [...game.sides] };
   const { home, away } = game.result;
-  const homeBonus = home.teamBonusPoints ?? 0;
-  const awayBonus = away.teamBonusPoints ?? 0;
+  const homeBonus = 0;
+  const awayBonus = 0;
   const homeBench = fullCourtBenchPoints(home);
   const awayBench = fullCourtBenchPoints(away);
   const homeStarters = fullCourtStarterPoints(home);

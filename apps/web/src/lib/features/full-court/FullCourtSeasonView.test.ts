@@ -36,6 +36,7 @@ function renderView(input: {
   health?: ReturnType<typeof fullCourtTeamHealthSchema.parse> | null;
   restingPlayerIds?: readonly string[];
   notice?: FullCourtSimulationNotice | null;
+  onEditGamePlan?: () => void;
 }): string {
   return render(FullCourtSeasonView, {
     props: {
@@ -53,6 +54,7 @@ function renderView(input: {
       notice: input.notice ?? null,
       onDismissNotice: () => {},
       ...(input.section === undefined ? {} : { section: input.section }),
+      ...(input.onEditGamePlan === undefined ? {} : { onEditGamePlan: input.onEditGamePlan }),
     },
   }).body;
 }
@@ -153,6 +155,11 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).not.toContain('aria-label="Full Court standings"');
   });
 
+  test('home links to the game plan editor', () => {
+    const body = renderView({ section: 'home', onEditGamePlan: () => {} });
+    expect(body).toContain('Edit game plan');
+  });
+
   test('home shows game-day readiness and the review action', () => {
     const body = renderView({ section: 'home' });
     expect(body).toContain('aria-label="Full Court game-day readiness"');
@@ -241,11 +248,18 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).not.toContain('aria-label="Full Court final recap"');
   });
 
-  test('stats shows bench scoring and withholds lineup ranks below the sample floor', () => {
+  test('stats shows scoring averages and withholds lineup ranks below the sample floor', () => {
     const body = renderView({ section: 'stats', scores: [statsScore({ withLineups: true })] });
     expect(body).toContain('aria-label="Full Court season stats"');
     expect(body).toContain('aria-label="Full Court lineup lab"');
-    expect(body).toContain('Bench points');
+    expect(body).toContain('Points / game');
+    expect(body).toContain('Opponent points / game');
+    expect(body).toContain('Average diff');
+    expect(body).toContain('Net points');
+    expect(body).toContain('100.0');
+    expect(body).toContain('90.0');
+    expect(body).toContain('+10.0');
+    expect(body).toContain('>+10<');
     expect(body).toContain('Player A · Player B · Player C · Player D · Player E');
     expect(body).toContain('100 possessions are marked with *');
     expect(body).not.toContain('No lineup facts in this save');
@@ -256,7 +270,7 @@ describe('FullCourtSeasonView sections', () => {
     const body = renderView({ section: 'stats', scores: [statsScore({ withLineups: false })] });
     expect(body).toContain('0 of 1 games with');
     expect(body).toContain('No lineup facts in this save');
-    expect(body).toContain('Bench points');
+    expect(body).toContain('Points / game');
   });
 
   test('stats separates forfeits from played-game coverage', () => {

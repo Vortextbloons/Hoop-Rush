@@ -8,7 +8,6 @@ import {
 } from '@hoop-rush/engine';
 import {
   fullCourtTestPlayoffLock,
-  fullCourtTestRouletteSeasonLock,
   fullCourtTestSeasonLock,
 } from '../lib/features/full-court/full-court-test-support';
 import type { FullCourtWorkerMessage } from '../lib/features/full-court/full-court-worker-protocol';
@@ -166,34 +165,5 @@ describe('Full Court worker', () => {
     });
     if (slot.type !== 'full-court-slot-result') throw new Error('Expected a slot result');
     expect(slot.outcome).not.toMatchObject({ kind: 'season-complete' });
-  }, 120_000);
-
-  it('carries pinned roulette attachments through the season lock', async () => {
-    const rouletteLock = fullCourtTestRouletteSeasonLock();
-    const user = rouletteLock.season.teams.find(
-      (team) => team.teamId === rouletteLock.season.userTeamId,
-    );
-    expect(user?.roulette?.attachments).toHaveLength(1);
-    const initial = createFullCourtSeasonCheckpoint(rouletteLock);
-    const outcome = await send({
-      schemaVersion: 1,
-      type: 'full-court-simulate-slot',
-      requestId: 'roulette-slot',
-      runId: rouletteLock.season.runId,
-      lockDigest: rouletteLock.digest,
-      lock: rouletteLock,
-      checkpoint: initial,
-    });
-    if (outcome.type !== 'full-court-slot-result' || outcome.outcome.kind !== 'simulated') {
-      throw new Error('Expected a simulated roulette slot');
-    }
-    const expected = simulateFullCourtSeasonSlot(rouletteLock, initial, createEngineContext());
-    if (expected.kind !== 'simulated') throw new Error('Expected a direct roulette slot');
-    expect(outcome.outcome).toEqual(expected);
-    const userGame = outcome.outcome.userGame;
-    if (userGame.kind === 'played') {
-      const side = userGame.result.home.teamId === rouletteLock.season.userTeamId ? 'home' : 'away';
-      expect(userGame.result[side].mutationRollups?.length ?? 0).toBeGreaterThan(0);
-    }
   }, 120_000);
 });

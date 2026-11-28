@@ -18,8 +18,8 @@ export const fullCourtHistoryBenchGameSchema = z.object({
 export type FullCourtHistoryBenchGame = z.infer<typeof fullCourtHistoryBenchGameSchema>;
 
 /**
- * Compact season bench totals. Bench points are signed because Roulette
- * deductions can push a bench subtotal below zero; legacy records omit this
+ * Compact season bench totals. Bench points are signed because deductions
+ * can push a bench subtotal below zero; legacy records omit this
  * whole object and still load.
  */
 export const fullCourtHistoryBenchSchema = z

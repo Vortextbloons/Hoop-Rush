@@ -264,19 +264,6 @@ describe('Full Court season completion summary', () => {
     expect(result.summary).toContain('40-0 in 40 of 82 regular-season games');
   });
 
-  it('keeps Standard and Roulette summaries and achievements separate', () => {
-    const result = summary({
-      variant: 'roulette',
-      completedGames: [benchGame({ slot: 1, benchPoints: 60, benchPlayerCount: 5 })],
-      series: [],
-    });
-    expect(result.variant).toBe('roulette');
-    expect(result.achievements).toHaveLength(1);
-    expect(result.achievements[0]?.variant).toBe('roulette');
-    expect(result.postseason?.userOutcome).toBe('pending');
-    expect(result.completion.complete).toBe(false);
-  });
-
   it('awards Bench Mob at 50+ bench points even when starters scored more and reconciles team bonuses', () => {
     const highScoring = regularScores().map((score) =>
       score.slot === 1

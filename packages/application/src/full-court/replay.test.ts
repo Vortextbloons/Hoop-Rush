@@ -7,7 +7,7 @@ import {
   simulateFullCourtPlayoffGame,
   simulateFullCourtSeasonSlot,
 } from '@hoop-rush/engine';
-import { simulateFullCourtBuzzerBanditTestGame } from '../../../engine/src/modes/full-court/game-test-support.ts';
+import { fullCourtRegularSeasonGameInput, simulateRecordedFullCourtGame } from '@hoop-rush/engine';
 import {
   fullCourtTestPlayoffLock,
   fullCourtTestSeasonLock,
@@ -134,22 +134,16 @@ test('advanceFullCourtPlayoffs commits watchedReplay only for watched played use
   expect(firstReplay?.identity.lockDigest).toBe(lock.digest);
 });
 
-test('builds a playoff watched replay with negative live Buzzer Bandit scores', () => {
-  function liveScoresOf(tape: ReturnType<typeof simulateFullCourtBuzzerBanditTestGame>['tape']) {
-    let home = 0;
-    let away = 0;
-    for (const event of tape) {
-      if (event.kind !== 'trip' && event.kind !== 'period') continue;
-      home = Math.min(home, event.homeScore);
-      away = Math.min(away, event.awayScore);
-    }
-    return { home, away };
-  }
-
-  const home = simulateFullCourtBuzzerBanditTestGame({ seed: 'bz-replay-2', gameNumber: 83 });
-  expect(liveScoresOf(home.tape)).toEqual({ home: -1, away: 0 });
-  const away = simulateFullCourtBuzzerBanditTestGame({ seed: 'bz-replay-6', gameNumber: 83 });
-  expect(liveScoresOf(away.tape)).toEqual({ home: 0, away: -1 });
+test('builds a playoff watched replay from a recorded user game', () => {
+  const { season } = fullCourtTestSeasonLock();
+  const fixture = season.games.find(
+    (game) => game.homeTeamId === season.userTeamId || game.awayTeamId === season.userTeamId,
+  );
+  if (fixture === undefined) throw new Error('Expected a user fixture');
+  const home = simulateRecordedFullCourtGame(
+    fullCourtRegularSeasonGameInput(season, fixture.gameId),
+    createEngineContext(),
+  );
 
   const health = (teamId: string) => ({
     version: FULL_COURT_HEALTH_VERSION as 'full-court-health-v1',
@@ -165,17 +159,19 @@ test('builds a playoff watched replay with negative live Buzzer Bandit scores', 
     gameId: 'fcp-1-0-1',
     slot: null,
     dayOffset: 173,
-    userTeamId: 'home',
+    userTeamId: season.userTeamId,
     game: {
       kind: 'played',
       result: home.result,
       tape: home.tape,
-      health: { home: health('home'), away: health('away') },
+      health: {
+        home: health(fixture.homeTeamId),
+        away: health(fixture.awayTeamId),
+      },
       injuries: [],
     },
   });
 
-  expect(liveScoresOf(replay.tape)).toEqual({ home: -1, away: 0 });
   expect(replay.result.home.box.points).toBeGreaterThanOrEqual(0);
   expect(replay.result.away.box.points).toBeGreaterThanOrEqual(0);
   expect(replay.tape.at(-1)?.kind).not.toBeUndefined();

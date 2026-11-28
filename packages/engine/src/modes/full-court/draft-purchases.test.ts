@@ -131,7 +131,7 @@ describe('full court report purchases', () => {
     expect(fullCourtReportPriceDollars('player-scouting')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('lineup-fit')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('opponent-film')).toBe(3_000_000);
-    expect(fullCourtReportPriceDollars('training-camp')).toBe(15_000_000);
+    expect(fullCourtReportPriceDollars('training-camp')).toBe(5_000_000);
     expect(fullCourtReportScope('player-scouting')).toBe('run');
     expect(fullCourtReportScope('lineup-fit')).toBe('run');
     expect(fullCourtReportScope('opponent-film')).toBe('run');

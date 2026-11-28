@@ -8,7 +8,6 @@ import {
   type Id,
 } from '@hoop-rush/data-contracts';
 import {
-  assertFullCourtSpinReceiptDigests,
   fullCourtSalaryDollarsOf,
   fullCourtStateDigest,
   type FullCourtPurchasePhase,
@@ -50,7 +49,6 @@ function validateDraftState(row: StoredFullCourtDraft): StoredFullCourtDraft {
   if (row.stateDigest !== fullCourtStateDigest(row.state)) {
     throw new Error('Invalid Full Court save: draft digest differs from its state');
   }
-  assertFullCourtSpinReceiptDigests(row.state);
   return row;
 }
 

@@ -40,7 +40,7 @@ import {
   type FullCourtHistoryRepository,
 } from './history.ts';
 
-function buildCompletedDraft(variant: 'standard' | 'roulette') {
+function buildCompletedDraft() {
   const field = CAP_RUSH_FRANCHISE_ALIGNMENT.map(({ franchiseId }) => ({
     teamId: franchiseId,
     displayName: franchiseId,
@@ -64,7 +64,7 @@ function buildCompletedDraft(variant: 'standard' | 'roulette') {
       commandId: commandIdSchema.parse('create'),
       runId: 'fc-app-history',
       runSeed: seedSchema.parse('b'.repeat(32)),
-      variant,
+      variant: 'standard',
       catalog: catalogSource,
       money: { ...FULL_COURT_DEFAULT_MONEY, capLineDollars: 0, firstApronDollars: 0 },
     }),
@@ -94,26 +94,11 @@ function buildCompletedDraft(variant: 'standard' | 'roulette') {
     },
     { index },
   ).state;
-  if (variant === 'roulette') {
-    draft = applyFullCourtCommand(
-      draft,
-      {
-        command: 'finalize-full-court-roulette',
-        commandId: commandIdSchema.parse('finalize-roulette'),
-        runId: draft.runId,
-        expectedRevision: draft.revision,
-      },
-      { index },
-    ).state;
-  }
   return { draft, field, catalog, catalogSource };
 }
 
-function buildPlayoffRun(options: {
-  readonly variant: 'standard' | 'roulette';
-  readonly userQualifies: boolean;
-}) {
-  const { draft, field, catalog, catalogSource } = buildCompletedDraft(options.variant);
+function buildPlayoffRun(options: { readonly userQualifies: boolean }) {
+  const { draft, field, catalog, catalogSource } = buildCompletedDraft();
   const seasonLock = lockFullCourtRegularSeason(
     buildFullCourtRegularSeason({
       draft,
@@ -144,7 +129,7 @@ function buildPlayoffRun(options: {
         ? userHome
         : !userHome
       : fixture.homeTeamId < fixture.awayTeamId;
-    const userBonus = fixture.slot === 1 && options.variant === 'roulette' ? 4 : 0;
+    const userBonus = fixture.slot === 1 ? 4 : 0;
     return {
       ...fixture,
       outcome: {
@@ -214,10 +199,7 @@ function finishPlayoffs(
 }
 
 test('returns null before finals finish and reconciles teamBonusPoints + Bench Mob after completion', async () => {
-  const { draft, lock, initialCheckpoint } = buildPlayoffRun({
-    variant: 'roulette',
-    userQualifies: true,
-  });
+  const { draft, lock, initialCheckpoint } = buildPlayoffRun({ userQualifies: true });
   const coaching = {
     schemaVersion: FULL_COURT_COACHING_SCHEMA_VERSION as 1,
     tactics: FULL_COURT_DEFAULT_TACTICS,
@@ -261,7 +243,7 @@ test('returns null before finals finish and reconciles teamBonusPoints + Bench M
     repo,
   );
   expect(first).not.toBeNull();
-  expect(first?.draft.variant).toBe('roulette');
+  expect(first?.draft.variant).toBe('standard');
   expect(first?.regularSeason.wins).toBe(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
   expect(first?.playoffs.status).toBe('champion');
   expect(first?.playoffs.seriesWon).toBe(CAP_RUSH_PLAYOFF_ROUNDS);
@@ -285,10 +267,7 @@ test('returns null before finals finish and reconciles teamBonusPoints + Bench M
 });
 
 test('records non-qualified runs once the bracket finishes', () => {
-  const { draft, lock, initialCheckpoint } = buildPlayoffRun({
-    variant: 'standard',
-    userQualifies: false,
-  });
+  const { draft, lock, initialCheckpoint } = buildPlayoffRun({ userQualifies: false });
   const finished = finishPlayoffs(lock, initialCheckpoint);
   const record = fullCourtHistoryFromSeason({
     draft,

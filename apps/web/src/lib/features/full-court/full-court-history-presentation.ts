@@ -75,7 +75,6 @@ export interface FullCourtHistoryEntryView {
   readonly warChestSpentLabel: string;
   readonly warChestRemainingLabel: string;
   readonly scoutingSpentLabel: string;
-  readonly spinSpentLabel: string;
   readonly strategySummary: string;
   readonly customRotation: boolean;
   readonly roster: readonly FullCourtHistoryRosterRow[];
@@ -95,10 +94,6 @@ export function presentFullCourtHistoryEntry(
   const scoutingSpent = record.draft.spending
     .filter((entry) => entry.kind === 'scouting')
     .reduce((sum, entry) => sum + entry.dollars, 0);
-  const spinSpent = record.draft.spending
-    .filter((entry) => entry.kind === 'spin')
-    .reduce((sum, entry) => sum + entry.dollars, 0);
-
   const rotation = record.coaching.rotation;
   const starters = new Set(rotation?.startingFive ?? []);
   const closers = new Set(rotation?.closingFive ?? []);
@@ -185,7 +180,6 @@ export function presentFullCourtHistoryEntry(
     warChestSpentLabel: formatMillions(warChestSpent),
     warChestRemainingLabel: formatMillions(warChestRemaining),
     scoutingSpentLabel: formatMillions(scoutingSpent),
-    spinSpentLabel: formatMillions(spinSpent),
     strategySummary,
     customRotation: rotation !== undefined,
     roster,

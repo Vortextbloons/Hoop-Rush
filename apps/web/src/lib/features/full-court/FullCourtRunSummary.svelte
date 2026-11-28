@@ -21,9 +21,7 @@
             {entry.regularRecordLabel}
           </span>
         {/if}
-        <Badge tone={entry.variant === 'roulette' ? 'accent' : 'neutral'}>
-          {entry.variantLabel}
-        </Badge>
+        <Badge tone="neutral">{entry.variantLabel}</Badge>
         <Badge tone={entry.playoffTone}>{entry.playoffLabel}</Badge>
         <Badge class={entry.capStatusClass}>{entry.capStatusLabel}</Badge>
       </div>
@@ -67,7 +65,7 @@
         Budget spent: {entry.warChestSpentLabel} · Left: {entry.warChestRemainingLabel}
       </p>
       <p class="mt-1 text-xs text-muted-foreground">
-        Scouting: {entry.scoutingSpentLabel} · Roulette spins: {entry.spinSpentLabel}
+        Scouting: {entry.scoutingSpentLabel}
       </p>
     </div>
   </div>

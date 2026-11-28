@@ -7,13 +7,6 @@ import {
   capRushCatalogSourceSchema,
 } from './cap-rush-versions.ts';
 import { capRushSourcePlayerSchema } from './cap-rush-draft.ts';
-import {
-  fullCourtFinalizeRouletteCommandSchema,
-  fullCourtPurchaseSpinCommandSchema,
-  fullCourtSkipSpinCommandSchema,
-  fullCourtSpinReceiptSchema,
-} from './full-court-roulette.ts';
-
 export const FULL_COURT_DRAFT_SCHEMA_VERSION = 1;
 export const FULL_COURT_MONEY_VERSION = 'full-court-money-v1';
 export const FULL_COURT_POOL_VERSION = 'full-court-pool-v1';
@@ -24,7 +17,7 @@ export const FULL_COURT_MIN_ROSTER_SIZE = 6;
 export const FULL_COURT_MAX_ROSTER_SIZE = 12;
 export const FULL_COURT_MATCH_MINIMUM_PLAYERS = 5;
 
-export const fullCourtVariantSchema = z.enum(['standard', 'roulette']);
+export const fullCourtVariantSchema = z.literal('standard');
 export type FullCourtVariant = z.infer<typeof fullCourtVariantSchema>;
 
 export const fullCourtDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
@@ -57,20 +50,18 @@ export type FullCourtMoneyConfig = z.infer<typeof fullCourtMoneyConfigSchema>;
 
 // Provisional Phase 1 tuning, measured against the packaged catalog's cheapest version of
 // each real player: a twelve-player budget build (~$65M) and twelve-player depth build
-// (~$172M) and an eight-player competitive build (~$232M) all stay under the cap line,
-// while a six-player star-heavy build (~$428M) lands in the second apron and consumes
-// almost the whole War Chest, which is the intended choice between apron cost, depth, and
-// purchase room.
-export const FULL_COURT_CAP_LINE_DOLLARS = 200_000_000;
-export const FULL_COURT_FIRST_APRON_DOLLARS = FULL_COURT_CAP_LINE_DOLLARS * 1.2;
-export const FULL_COURT_HARD_LIMIT_DOLLARS = FULL_COURT_CAP_LINE_DOLLARS * 1.4;
+// (~$172M) stay under the cap line, while deeper competitive builds can cross apron tiers up
+// to the hard limit when cash allows.
+export const FULL_COURT_CAP_LINE_DOLLARS = 180_000_000;
+export const FULL_COURT_FIRST_APRON_DOLLARS = Math.round(FULL_COURT_CAP_LINE_DOLLARS * 1.2);
+export const FULL_COURT_HARD_LIMIT_DOLLARS = Math.round(FULL_COURT_CAP_LINE_DOLLARS * 1.4);
 
 export const FULL_COURT_DEFAULT_MONEY: FullCourtMoneyConfig = fullCourtMoneyConfigSchema.parse({
   moneyVersion: FULL_COURT_MONEY_VERSION,
   capLineDollars: FULL_COURT_CAP_LINE_DOLLARS,
   firstApronDollars: FULL_COURT_FIRST_APRON_DOLLARS,
   hardLimitDollars: FULL_COURT_HARD_LIMIT_DOLLARS,
-  startingWarChestDollars: 250_000_000,
+  startingWarChestDollars: 180_000_000,
 });
 
 /**
@@ -88,7 +79,7 @@ export function fullCourtCrAmount(dollars: number): number {
   return dollars / FULL_COURT_CR_DOLLARS;
 }
 
-export const fullCourtSpendingKindSchema = z.enum(['salary', 'scouting', 'spin']);
+export const fullCourtSpendingKindSchema = z.enum(['salary', 'scouting']);
 export type FullCourtSpendingKind = z.infer<typeof fullCourtSpendingKindSchema>;
 
 export const fullCourtSpendingEntrySchema = z
@@ -129,7 +120,7 @@ export const FULL_COURT_REPORT_PRICES_DOLLARS = {
   'player-scouting': 5_000_000,
   'lineup-fit': 5_000_000,
   'opponent-film': 3_000_000,
-  'training-camp': 15_000_000,
+  'training-camp': 5_000_000,
 } as const satisfies Record<FullCourtReportKind, number>;
 
 export function fullCourtReportPriceDollars(kind: FullCourtReportKind): number {
@@ -219,15 +210,6 @@ export type FullCourtDraftPick = z.infer<typeof fullCourtDraftPickSchema>;
 export const fullCourtDraftStageSchema = z.enum(['drafting', 'complete']);
 export type FullCourtDraftStage = z.infer<typeof fullCourtDraftStageSchema>;
 
-export const fullCourtRouletteStatusSchema = z.enum(['open', 'skipped', 'finalized']);
-export type FullCourtRouletteStatus = z.infer<typeof fullCourtRouletteStatusSchema>;
-
-export const fullCourtRouletteDraftStateSchema = z.object({
-  status: fullCourtRouletteStatusSchema,
-  receipts: z.array(fullCourtSpinReceiptSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
-});
-export type FullCourtRouletteDraftState = z.infer<typeof fullCourtRouletteDraftStateSchema>;
-
 export const fullCourtDraftPoolSchema = z
   .object({
     poolVersion: z.string().min(1).max(64),
@@ -288,7 +270,6 @@ export const fullCourtDraftStateSchema = z
     picks: z.array(fullCourtDraftPickSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
     spending: z.array(fullCourtSpendingEntrySchema).max(64),
     reports: z.array(fullCourtReportRecordSchema).max(FULL_COURT_MAX_REPORTS).optional(),
-    roulette: fullCourtRouletteDraftStateSchema.optional(),
   })
   .superRefine((state, ctx) => {
     const seenPeople = new Set<string>();
@@ -398,78 +379,6 @@ export const fullCourtDraftStateSchema = z
       });
     }
 
-    if (state.roulette !== undefined && state.variant !== 'roulette') {
-      ctx.addIssue({ code: 'custom', message: 'Standard runs cannot hold Roulette receipts' });
-    }
-    if (state.roulette !== undefined && state.stage !== 'complete') {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Roulette spins open after the roster is confirmed',
-      });
-    }
-    const rouletteReceipts = state.roulette?.receipts ?? [];
-    if (rouletteReceipts.length > 0 && state.variant !== 'roulette') {
-      ctx.addIssue({ code: 'custom', message: 'Standard runs cannot buy spins' });
-    }
-    const spinCharges = state.spending.filter((entry) => entry.kind === 'spin');
-    if (spinCharges.length !== rouletteReceipts.length) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'every Roulette receipt needs exactly one spin charge',
-      });
-    }
-    let spinPayroll = payroll;
-    const spinTargets = new Set<string>();
-    const spinCommands = new Set<string>();
-    for (const receipt of rouletteReceipts) {
-      const pick = state.picks.find(
-        (entry) => entry.player.playerVersionId === receipt.target.playerVersionId,
-      );
-      if (
-        pick === undefined ||
-        pick.player.playerId !== receipt.target.playerId ||
-        !pick.player.positions.includes(receipt.target.slot)
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'spin receipts must target a rostered player at a playable position',
-        });
-      }
-      if (spinTargets.has(receipt.target.playerVersionId)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `player version ${receipt.target.playerVersionId} has two mutations`,
-        });
-      }
-      spinTargets.add(receipt.target.playerVersionId);
-      if (spinCommands.has(receipt.commandId)) {
-        ctx.addIssue({ code: 'custom', message: 'one spin command cannot buy two mutations' });
-      }
-      spinCommands.add(receipt.commandId);
-      if (receipt.payrollDollars !== spinPayroll) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'spin receipts must account for prior spin spending',
-        });
-      }
-      if (receipt.payrollDollars + receipt.priceDollars > state.money.capLineDollars) {
-        ctx.addIssue({ code: 'custom', message: 'a spin must fit under the normal cap line' });
-      }
-      spinPayroll += receipt.priceDollars;
-      const charge = state.spending.find((entry) => entry.commandId === receipt.commandId);
-      if (
-        charge === undefined ||
-        charge.kind !== 'spin' ||
-        charge.dollars !== receipt.priceDollars ||
-        charge.entryId !== `fcs-${receipt.receiptDigest}`
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `spin ${receipt.receiptDigest} has no matching War Chest charge`,
-        });
-      }
-    }
-
     const spent = state.spending.reduce((total, entry) => total + entry.dollars, 0);
     if (spent > state.money.startingWarChestDollars) {
       ctx.addIssue({
@@ -539,9 +448,6 @@ export const fullCourtCommandSchema = z.discriminatedUnion('command', [
   fullCourtRemovePlayerCommandSchema,
   fullCourtFinishDraftCommandSchema,
   fullCourtPurchaseReportCommandSchema,
-  fullCourtPurchaseSpinCommandSchema,
-  fullCourtSkipSpinCommandSchema,
-  fullCourtFinalizeRouletteCommandSchema,
 ]);
 export type FullCourtCommand = z.infer<typeof fullCourtCommandSchema>;
 
@@ -559,10 +465,6 @@ export const fullCourtCommandRejectionCodeSchema = z.enum([
   'roster-too-small',
   'report-owned',
   'report-unavailable',
-  'spin-unavailable',
-  'spin-ineligible',
-  'spin-owned',
-  'spin-draw-unavailable',
 ]);
 export type FullCourtCommandRejectionCode = z.infer<typeof fullCourtCommandRejectionCodeSchema>;
 

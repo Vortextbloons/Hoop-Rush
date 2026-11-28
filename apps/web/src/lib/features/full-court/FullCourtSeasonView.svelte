@@ -54,6 +54,7 @@
     fullCourtNextUserFixture,
     fullCourtPlayoffAdaptationRead,
     fullCourtPlayoffRounds,
+    fullCourtResultOf,
     fullCourtSeriesGames,
     fullCourtUserSchedule,
     fullCourtUserSeries,
@@ -86,6 +87,7 @@
     simProgress = null,
     stopRequested = false,
     onStopAfterGame,
+    onEditGamePlan,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -108,6 +110,7 @@
     simProgress?: { readonly completed: number; readonly total: number } | null;
     stopRequested?: boolean;
     onStopAfterGame?: () => void;
+    onEditGamePlan?: () => void;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -151,6 +154,22 @@
       ...(playoff === null ? {} : { series: playoff.series }),
     }),
   );
+  const scoringTotals = $derived.by(() => {
+    let pointsFor = seasonStats.regular.pointsFor;
+    let pointsAgainst = seasonStats.regular.pointsAgainst;
+    let playedGames = seasonStats.regular.playedGames;
+    for (const series of playoff?.series ?? []) {
+      for (const game of series.games) {
+        if (game.homeTeamId !== userTeamId && game.awayTeamId !== userTeamId) continue;
+        const result = fullCourtResultOf(game, userTeamId);
+        if (result.userPoints === null || result.opponentPoints === null) continue;
+        pointsFor += result.userPoints;
+        pointsAgainst += result.opponentPoints;
+        playedGames += 1;
+      }
+    }
+    return { pointsFor, pointsAgainst, playedGames, pointDifferential: pointsFor - pointsAgainst };
+  });
   const rowByTeam = $derived(
     new Map([...standings.west, ...standings.east].map((row) => [row.teamId, row])),
   );
@@ -301,6 +320,16 @@
     return value > 0 ? `+${String(value)}` : String(value);
   }
 
+  function perGameLabel(total: number): string {
+    return scoringTotals.playedGames === 0 ? '—' : (total / scoringTotals.playedGames).toFixed(1);
+  }
+
+  function signedPerGameLabel(total: number): string {
+    if (scoringTotals.playedGames === 0) return '—';
+    const average = total / scoringTotals.playedGames;
+    return average > 0 ? `+${average.toFixed(1)}` : average.toFixed(1);
+  }
+
   function rateLabel(value: number | null): string {
     return value === null ? '—' : value.toFixed(1);
   }
@@ -382,6 +411,9 @@
         <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
           Watch next game
         </Button>
+      {/if}
+      {#if onEditGamePlan !== undefined && section === 'home'}
+        <Button tone="secondary" disabled={busy} onclick={onEditGamePlan}>Edit game plan</Button>
       {/if}
     </div>
 
@@ -781,7 +813,7 @@
     </SectionHeading>
     <p class="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
       {#if seasonStats.regular.playedGames === 0}
-        No played games yet. Bench scoring and lineup samples appear after your first result.
+        No played games yet. Scoring averages and lineup samples appear after your first result.
       {:else}
         Based on {seasonStats.regular.playedGames} played regular-season
         {seasonStats.regular.playedGames === 1 ? 'game' : 'games'}{seasonStats.playoff.playedGames >
@@ -794,40 +826,38 @@
     </p>
     <StatGrid class="mt-4" columns={4} mobile={2}>
       <StatTile
-        label="Bench points"
+        label="Points / game"
         size="md"
         surface="tile"
-        tone={seasonStats.bench !== null && seasonStats.bench.totalBenchPoints < 0
-          ? 'negative'
-          : 'muted'}
-        value={seasonStats.bench === null || seasonStats.bench.gamesRecorded === 0
-          ? '—'
-          : signed(seasonStats.bench.totalBenchPoints)}
+        value={perGameLabel(scoringTotals.pointsFor)}
       />
       <StatTile
-        label="Bench per game"
+        label="Opponent points / game"
         size="md"
         surface="tile"
-        value={seasonStats.bench === null || seasonStats.bench.gamesRecorded === 0
-          ? '—'
-          : seasonStats.bench.averageBenchPoints.toFixed(1)}
+        value={perGameLabel(scoringTotals.pointsAgainst)}
       />
       <StatTile
-        label="Regular points"
+        label="Average diff"
         size="md"
         surface="tile"
-        value={seasonStats.regular.playedGames === 0 ? '—' : seasonStats.regular.pointsFor}
-      />
-      <StatTile
-        label="Regular diff"
-        size="md"
-        surface="tile"
-        tone={seasonStats.regular.pointDifferential > 0
+        tone={scoringTotals.pointDifferential > 0
           ? 'primary'
-          : seasonStats.regular.pointDifferential < 0
+          : scoringTotals.pointDifferential < 0
             ? 'negative'
             : 'muted'}
-        value={signed(seasonStats.regular.pointDifferential)}
+        value={signedPerGameLabel(scoringTotals.pointDifferential)}
+      />
+      <StatTile
+        label="Net points"
+        size="md"
+        surface="tile"
+        tone={scoringTotals.pointDifferential > 0
+          ? 'primary'
+          : scoringTotals.pointDifferential < 0
+            ? 'negative'
+            : 'muted'}
+        value={signed(scoringTotals.pointDifferential)}
       />
     </StatGrid>
     {#if seasonStats.bench !== null && seasonStats.bench.bestGame !== null}

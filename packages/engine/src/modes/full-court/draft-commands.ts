@@ -47,8 +47,6 @@ import {
   type FullCourtCommandEnvironment,
   type FullCourtCommandOutcome,
 } from './draft-outcome.ts';
-import { applyFullCourtRouletteCommand } from './roulette-draft.ts';
-
 function salaryEntryIdOf(runId: string, playerVersionId: string): string {
   return `fcs-${seasonDigestHex(canonicalJson({ runId, playerVersionId }))}`;
 }
@@ -324,9 +322,6 @@ function applyFinishDraft(
     ...stateWithoutOffer,
     revision: state.revision + 1,
     stage: 'complete',
-    ...(state.variant === 'roulette'
-      ? { roulette: { status: 'open' as const, receipts: [] } }
-      : {}),
   });
   return acceptFullCourtCommand(state, command, nextState);
 }
@@ -511,9 +506,5 @@ export function applyFullCourtDraftCommand(
       return applyFinishDraft(state, command, environment);
     case 'purchase-full-court-report':
       return applyPurchaseReport(state, command, environment);
-    case 'purchase-full-court-spin':
-    case 'skip-full-court-spin':
-    case 'finalize-full-court-roulette':
-      return applyFullCourtRouletteCommand(state, command, environment);
   }
 }

@@ -70,7 +70,6 @@ const entry = {
   warChestSpentLabel: '$205.3M',
   warChestRemainingLabel: '$44.7M',
   scoutingSpentLabel: '$10M',
-  spinSpentLabel: '$0M',
   strategySummary: 'Fast pace · Balanced offense · Balanced defense',
   customRotation: false,
   roster: [

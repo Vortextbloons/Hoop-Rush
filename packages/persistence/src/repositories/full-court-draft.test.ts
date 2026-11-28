@@ -165,17 +165,14 @@ const PURCHASE_CATALOG = buildCapRushTestCatalog({ overalls: [70, 71, 72, 73, 74
 const PURCHASE_SOURCE = capRushTestCatalogSource(PURCHASE_CATALOG);
 const PURCHASE_INDEX = fullCourtDraftIndexOf(PURCHASE_CATALOG, PURCHASE_SOURCE);
 
-function confirmedDraftState(
-  runId: string,
-  variant: 'standard' | 'roulette' = 'standard',
-): FullCourtDraftState {
+function confirmedDraftState(runId: string): FullCourtDraftState {
   let draft = createFullCourtDraftState(
     fullCourtCreateDraftCommandSchema.parse({
       command: 'create-full-court-draft',
       commandId: commandIdSchema.parse(`create-${runId}`),
       runId: idSchema.parse(runId),
       runSeed: seedSchema.parse('a'.repeat(32)),
-      variant,
+      variant: 'standard',
       catalog: PURCHASE_SOURCE,
     }),
     PURCHASE_INDEX,
@@ -358,12 +355,11 @@ test('sells training camp on a legacy draft without a season checkpoint', async 
   }
 });
 
-test('sells training camp during an unopened Roulette pre-season', async () => {
+test('sells training camp before the season opens', async () => {
   resetIndexedDb();
-  const { first, second } = openTestDatabasePair('full-court-roulette-camp');
+  const { first, second } = openTestDatabasePair('full-court-camp');
   try {
-    const state = confirmedDraftState('full-court-roulette-run', 'roulette');
-    expect(state.roulette?.status).toBe('open');
+    const state = confirmedDraftState('full-court-camp-run');
     await putConfirmedDraft(first, state);
     const { command, outcome } = campPurchase(state);
     const repository = new DexieFullCourtDraftRepository(second);

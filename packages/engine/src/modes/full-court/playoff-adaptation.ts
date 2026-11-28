@@ -35,7 +35,7 @@ function teamSideEvidence(team: FullCourtTeamResult): FullCourtPlayoffSideEviden
   for (const player of team.players) {
     const rim = player.diagnostics.shotZones.find((entry) => entry.zone === 'rim')?.attempts ?? 0;
     rimAttempts += rim;
-    const ownerId = player.ownerPlayerId ?? player.playerId;
+    const ownerId = player.playerId;
     const usageCentis =
       100 * player.fieldGoals.attempted + 44 * player.freeThrows.attempted + 100 * player.turnovers;
     usageByOwner.set(ownerId, (usageByOwner.get(ownerId) ?? 0) + usageCentis);

@@ -9,7 +9,10 @@ import {
   unitNameForPlayerIds,
   type FullCourtTapeEvent,
 } from '@hoop-rush/engine';
-import { simulateFullCourtBuzzerBanditTestGame } from '../../../../../../packages/engine/src/modes/full-court/game-test-support.ts';
+import {
+  fullCourtTestInput,
+  fullCourtTestRoster,
+} from '../../../../../../packages/engine/src/modes/full-court/game-test-support.ts';
 import { render } from 'svelte/server';
 import FullCourtGamecast from './FullCourtGamecast.svelte';
 import {
@@ -156,12 +159,13 @@ test('records coaching-rule substitutions in the same order as the summary', () 
   expect(frames.at(-1)?.homeUnit).toEqual(lastStint?.playerIds);
 });
 
-test('captions deducted and simultaneous split scoring without hiding negative live scores', () => {
-  const { result, tape } = simulateFullCourtBuzzerBanditTestGame({ seed: 'bz-replay-2' });
-  const signedFrames = fullCourtGamecastFrames(result, tape);
-  expect(signedFrames.some((frame) => frame.homeScore < 0)).toBe(true);
-  expect(signedFrames.some((frame) => frame.caption?.includes('loses 1 point'))).toBe(true);
-
+test('captions simultaneous split scoring from signed tape events', () => {
+  const homeRoster = fullCourtTestRoster('gc-home', 8);
+  const awayRoster = fullCourtTestRoster('gc-away', 8);
+  const { result } = simulateRecordedFullCourtGame(
+    fullCourtTestInput({ seed: 'gc-split-score', homeRoster, awayRoster }),
+    createEngineContext(),
+  );
   const homeUnit = result.home.stints[0]?.playerIds ?? [];
   const awayUnit = result.away.stints[0]?.playerIds ?? [];
   const framedTape: FullCourtTapeEvent[] = [

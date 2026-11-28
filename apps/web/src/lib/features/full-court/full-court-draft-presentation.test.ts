@@ -201,7 +201,7 @@ describe('full court draft presentation', () => {
   });
 
   it('formats the budget in millions without credits', () => {
-    expect(formatMillions(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('$250M');
+    expect(formatMillions(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('$180M');
     expect(formatMillions(185_500_000)).toBe('$185.5M');
   });
 
@@ -268,10 +268,9 @@ describe('full court draft presentation', () => {
     expect(fullCourtProfileReferences(index)).toBe(references);
   });
 
-  it('labels both Full Court variants', () => {
+  it('labels the Full Court variant', () => {
     const { state } = setup();
     expect(fullCourtVariantLabel(state)).toBe('Full Court Standard');
-    expect(fullCourtVariantLabel({ ...state, variant: 'roulette' })).toBe('Full Court Roulette');
   });
 
   it('indexes faces by the player season tuple', () => {

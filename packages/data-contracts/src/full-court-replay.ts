@@ -36,7 +36,7 @@ export const fullCourtTapeEventSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('period'),
     period: z.number().int().min(0).max(12),
-    // Live scores are signed because Roulette deductions can land before a team scores.
+    // Live scores are signed because deductions can land before a team scores.
     homeScore: z.number().int(),
     awayScore: z.number().int(),
   }),

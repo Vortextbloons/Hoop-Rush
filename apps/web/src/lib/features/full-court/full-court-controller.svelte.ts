@@ -176,7 +176,7 @@ export class FullCourtController {
   #practiceRunCount = 0;
 
   startDraft(
-    variant: 'standard' | 'roulette' = 'standard',
+    variant: 'standard' = 'standard',
     perks: readonly FullCourtReportKind[] = [],
   ): Promise<void> {
     return this.#act(async () => {
@@ -615,48 +615,6 @@ export class FullCourtController {
       });
       if (this.#isDisposed()) return;
       this.practice = report;
-    });
-  }
-
-  purchaseSpin(purchase: 'standard' | 'surge', targetPlayerVersionId: string): Promise<void> {
-    return this.#act(async () => {
-      const draft = this.draft;
-      if (draft === null) return;
-      await this.#submit({
-        command: 'purchase-full-court-spin',
-        commandId: newSeasonId('command'),
-        runId: draft.runId,
-        expectedRevision: draft.revision,
-        purchase,
-        targetPlayerVersionId,
-      });
-    });
-  }
-
-  skipSpin(): Promise<void> {
-    return this.#act(async () => {
-      const draft = this.draft;
-      if (draft === null) return;
-      await this.#submit({
-        command: 'skip-full-court-spin',
-        commandId: newSeasonId('command'),
-        runId: draft.runId,
-        expectedRevision: draft.revision,
-      });
-    });
-  }
-
-  finalizeRoulette(): Promise<void> {
-    return this.#act(async () => {
-      const draft = this.draft;
-      if (draft === null) return;
-      await this.#submit({
-        command: 'finalize-full-court-roulette',
-        commandId: newSeasonId('command'),
-        runId: draft.runId,
-        expectedRevision: draft.revision,
-      });
-      await this.#openRun(draft.runId);
     });
   }
 
@@ -1179,16 +1137,6 @@ export class FullCourtController {
       this.playoffs = null;
       return;
     }
-    if (
-      draft.variant === 'roulette' &&
-      draft.roulette !== undefined &&
-      draft.roulette.status !== 'finalized'
-    ) {
-      this.season = null;
-      this.playoffs = null;
-      return;
-    }
-
     const assets = this.#assets;
     const regular = this.#repositories.fullCourtSeasonRepository;
     const reused = this.season?.lock.season.runId === runId ? this.season.lock : null;

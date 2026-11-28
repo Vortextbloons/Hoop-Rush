@@ -15,7 +15,6 @@ import {
   fullCourtOffensiveHierarchySchema,
   fullCourtPlayoffCheckpointSchema,
   fullCourtPracticeReportSchema,
-  fullCourtRouletteTeamSchema,
   fullCourtSeasonCheckpointSchema,
   fullCourtSeasonScoreSchema,
   fullCourtTacticsSchema,
@@ -86,7 +85,6 @@ const fullCourtSeasonTeamSchema = z.object({
   rotation: fullCourtRotationPlanInputSchema.optional(),
   tactics: fullCourtTacticsSchema.optional(),
   availability: z.array(fullCourtAvailabilitySchema).max(12).optional(),
-  roulette: fullCourtRouletteTeamSchema.optional(),
 });
 
 const fullCourtLeagueGameSchema = z.object({

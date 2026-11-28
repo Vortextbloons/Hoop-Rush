@@ -363,15 +363,6 @@ export {
 } from './modes/full-court/draft-economy.ts';
 export { fullCourtStateDigest } from './modes/full-court/state-digest.ts';
 export {
-  assertFullCourtSpinReceiptDigests,
-  buildFullCourtSpinReceipt,
-  fullCourtRouletteReceipts,
-  fullCourtSpinEligibility,
-  fullCourtSpinPayrollDollars,
-  fullCourtSpinReceiptDigest,
-  type FullCourtSpinEligibility,
-} from './modes/full-court/roulette-draft.ts';
-export {
   assertFullCourtCoachingRoster,
   defaultFullCourtCoachingRotation,
 } from './modes/full-court/coaching.ts';

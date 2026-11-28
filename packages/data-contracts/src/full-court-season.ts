@@ -31,7 +31,7 @@ export const FULL_COURT_MAX_GAME_LINEUP_FACTS = 64;
 /**
  * One actual five recorded for the user's game. `playerIds` is the canonical
  * sorted identity, so a unit that breaks and returns is the same fact. Players
- * are carried for display only; a generated Roulette clone is still its own id.
+ * are carried for display only.
  */
 export const fullCourtLineupFactSchema = z
   .object({
@@ -48,7 +48,7 @@ export const fullCourtLineupFactSchema = z
     seconds: z.number().int().nonnegative(),
     offensivePossessions: z.number().int().nonnegative(),
     defensivePossessions: z.number().int().nonnegative(),
-    /** Signed because Roulette deductions and technicals are recorded in tape order. */
+    /** Signed live points; technicals are recorded in tape order. */
     pointsFor: z.number().int(),
     pointsAgainst: z.number().int(),
   })
@@ -166,7 +166,7 @@ export const fullCourtGamePlayerStatsSchema = z.object({
 export type FullCourtGamePlayerStats = z.infer<typeof fullCourtGamePlayerStatsSchema>;
 
 /**
- * Player-attributed Roulette deductions can make a bench or starter subtotal
+ * Signed player-attributed scoring can make a bench or starter subtotal
  * negative. `starterPoints` is the explicit signed component contract for those
  * records; without it the legacy nonnegative accounting checks still apply.
  */

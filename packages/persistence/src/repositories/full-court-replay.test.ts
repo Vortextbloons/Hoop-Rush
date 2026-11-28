@@ -325,7 +325,7 @@ test('commits watched playoff replay atomically, bounds one replay per run, and 
       tape: outcome.game.tape,
     });
 
-    // Signed live Roulette scores survive storage parsing and reload.
+    // Signed live scores survive storage parsing and reload.
     const negativeIndex = playoffReplay.tape.findIndex(
       (event) => event.kind === 'trip' && event.homeScore === 0 && event.awayScore === 0,
     );

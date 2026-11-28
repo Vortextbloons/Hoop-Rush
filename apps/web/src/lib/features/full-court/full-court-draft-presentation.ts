@@ -72,7 +72,7 @@ export function fullCourtDraftSummary(
 }
 
 export function fullCourtVariantLabel(draft: FullCourtDraftState): string {
-  return draft.variant === 'roulette' ? 'Full Court Roulette' : 'Full Court Standard';
+  return 'Full Court Standard';
 }
 
 export interface FullCourtCatalogRow {

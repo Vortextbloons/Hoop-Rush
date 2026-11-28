@@ -86,7 +86,7 @@
       {entry.warChestSpentLabel} spent · {entry.warChestRemainingLabel} left
     </p>
     <p class="mt-1 text-xs text-muted-foreground">
-      Scouting {entry.scoutingSpentLabel} · Roulette spins {entry.spinSpentLabel}
+      Scouting {entry.scoutingSpentLabel}
     </p>
   </Panel>
 </div>

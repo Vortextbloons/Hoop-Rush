@@ -5,6 +5,8 @@ import {
 } from '@hoop-rush/application/full-court';
 import {
   FULL_COURT_DEFAULT_COACHING_PLAN,
+  FULL_COURT_HEALTH_VERSION,
+  fullCourtTeamHealthSchema,
   playerIdSchema,
   type FullCourtBlueprint,
   type FullCourtCoachingPlan,
@@ -40,6 +42,8 @@ function renderView(props: {
   plan: FullCourtCoachingPlan;
   readOnly?: boolean;
   busy?: boolean;
+  health?: ReturnType<typeof fullCourtTeamHealthSchema.parse> | null;
+  dayOffset?: number | null;
   onListBlueprints?: () => Promise<FullCourtBlueprint[]>;
   onSaveBlueprint?: (
     name: string,
@@ -56,6 +60,8 @@ function renderView(props: {
       busy: props.busy ?? false,
       onSave: () => Promise.resolve(true),
       ...(props.readOnly === undefined ? {} : { readOnly: props.readOnly }),
+      ...(props.health === undefined ? {} : { health: props.health }),
+      ...(props.dayOffset === undefined ? {} : { dayOffset: props.dayOffset }),
       ...(props.onListBlueprints === undefined ? {} : { onListBlueprints: props.onListBlueprints }),
       ...(props.onSaveBlueprint === undefined ? {} : { onSaveBlueprint: props.onSaveBlueprint }),
       ...(props.onRemoveBlueprint === undefined
@@ -69,7 +75,7 @@ describe('FullCourtCoachingView', () => {
   test('shows tactics, automatic rotation, and the next-game note', () => {
     const body = renderView({ plan: FULL_COURT_DEFAULT_COACHING_PLAN });
 
-    expect(body).toContain('Set the rotation and tactics that apply from your next game.');
+    expect(body).toContain('Set once. It applies from your next game.');
     expect(body).toContain('aria-label="Pace"');
     expect(body).toContain('aria-label="Shot emphasis"');
     expect(body).toContain('Move the ball');
@@ -78,10 +84,28 @@ describe('FullCourtCoachingView', () => {
     expect(body).toContain('The staff sets the starters and minutes for every game.');
     expect(body).toContain('Discard');
     expect(body).toContain('Reset');
+    expect(body).toContain('Game plan');
+    expect(body).toContain('Plan check');
+    expect(body).toContain('Availability');
+    expect(body).toContain('Ready');
     expect(body).toContain('type="submit"');
     expect(body).toContain('Starter 1');
     expect(body).toContain('240 / 240 min');
     expect(body).not.toContain('Minutes for Player 1');
+  });
+
+  test('surfaces unavailable starters in the plan glance', () => {
+    const health = fullCourtTeamHealthSchema.parse({
+      version: FULL_COURT_HEALTH_VERSION,
+      teamId: 'team',
+      throughDay: 4,
+      players: {
+        p1: { loadBasisPoints: 0, availableFromDay: 10 },
+      },
+    });
+    const body = renderView({ plan: CUSTOM_PLAN, health, dayOffset: 5 });
+    expect(body).toContain('1 unavailable');
+    expect(body).toContain('Player 1');
   });
 
   test('shows five starters, roster minute targets, and an optional closing five', () => {
@@ -113,7 +137,7 @@ describe('FullCourtCoachingView', () => {
   test('read-only browsing keeps the plan visible without save or discard controls', () => {
     const body = renderView({ plan: CUSTOM_PLAN, readOnly: true });
 
-    expect(body).toContain('The rotation and tactics used for this run.');
+    expect(body).toContain('The plan used for this run.');
     expect(body).toContain('Starter 1');
     expect(body).toContain('aria-label="Starting five on the court"');
     expect(body).not.toContain('type="submit"');
@@ -131,8 +155,8 @@ describe('FullCourtCoachingView', () => {
   test('shows the roster before coaching controls on legacy plans', () => {
     const body = renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' } });
     expect(body).not.toContain('aria-label="Coaching interface"');
-    expect(body.indexOf('aria-label="Rotation"')).toBeLessThan(
-      body.indexOf('aria-label="Tactics"'),
+    expect(body.indexOf('aria-label="Lineup and minutes"')).toBeLessThan(
+      body.indexOf('aria-label="Style"'),
     );
     expect(body).toContain('aria-label="Sit Player 7"');
     expect(body).toContain('data-testid="full-court-rule-editor"');
@@ -244,7 +268,7 @@ describe('FullCourtCoachingView', () => {
 
     const courtIndex = body.indexOf('aria-label="Starting five on the court"');
     const minutesIndex = body.indexOf('aria-label="Minutes"');
-    const tacticsIndex = body.indexOf('aria-label="Tactics"');
+    const tacticsIndex = body.indexOf('aria-label="Style"');
     const presetsIndex = body.indexOf('data-testid="full-court-strategy-presets"');
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);

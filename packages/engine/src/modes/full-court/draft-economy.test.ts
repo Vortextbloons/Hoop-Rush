@@ -157,12 +157,9 @@ describe('full court money', () => {
     const config = FULL_COURT_DEFAULT_MONEY;
     expect(twelveBudget).toBeLessThan(config.capLineDollars);
     expect(twelveDepth).toBeLessThan(config.capLineDollars);
-    expect(eightCompetitive).toBeLessThan(config.capLineDollars);
-    expect(sixStarHeavy).toBeGreaterThan(config.firstApronDollars);
-    // The top-heavy build must still be draftable, so it stays under the hard limit.
-    expect(sixStarHeavy).toBeLessThan(config.hardLimitDollars);
-    // But it consumes nearly the whole War Chest, which is the depth-versus-cash choice.
-    expect(config.startingWarChestDollars - sixStarHeavy).toBeLessThan(twelveDepth / 4);
+    expect(eightCompetitive).toBeGreaterThan(config.capLineDollars);
+    expect(eightCompetitive).toBeLessThan(config.hardLimitDollars);
+    expect(sixStarHeavy).toBeGreaterThan(config.hardLimitDollars);
   });
 });
 

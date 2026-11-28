@@ -39,7 +39,7 @@ export interface FullCourtSeasonAchievement {
   /** Full Court-local id; catalog registration belongs to the release slice. */
   readonly id: FullCourtSeasonAchievementId;
   readonly name: 'Bench Mob' | 'The Chess Match';
-  /** The draft variant this run used, so Standard and Roulette records stay separate. */
+  /** The draft variant this run used. */
   readonly variant: FullCourtVariant;
   readonly evidence: string;
 }
@@ -66,7 +66,7 @@ export interface FullCourtSeasonBenchSummary {
   /** Played user games in the supplied regular season plus playoff record. */
   readonly gamesExpected: number;
   readonly coverageComplete: boolean;
-  /** Signed aggregate; Roulette deductions can bring it below zero. */
+  /** Signed aggregate; deductions can bring it below zero. */
   readonly totalBenchPoints: number;
   /** Zero when no completed-game facts were supplied. */
   readonly averageBenchPoints: number;
