@@ -81,6 +81,7 @@ export interface FullCourtLeagueLeaders {
 export interface FullCourtAwardsBoard {
   readonly regularComplete: boolean;
   readonly hasPlayerStats: boolean;
+  readonly playerRows: readonly FullCourtPlayerSeasonRow[];
   readonly mvp: FullCourtAwardResult;
   readonly dpoy: FullCourtAwardResult;
   readonly sixthMan: FullCourtAwardResult;
@@ -437,6 +438,7 @@ export function buildFullCourtAwards(input: {
   return {
     regularComplete,
     hasPlayerStats,
+    playerRows: rows,
     mvp: {
       id: 'mvp',
       title: 'Most Valuable Player',

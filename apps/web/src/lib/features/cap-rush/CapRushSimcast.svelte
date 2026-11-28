@@ -18,6 +18,7 @@
     gamecastBattleFinalBoxes,
   } from '#lib/gamecast/gamecast-battle-view.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
+  import GamecastPlaybackControls from '#lib/gamecast/GamecastPlaybackControls.svelte';
   import {
     formatHavocClock,
     havocPeriodLabel,
@@ -201,22 +202,23 @@
     ></div>
   </div>
   <div class="mt-3 flex flex-wrap items-center gap-3">
+    <GamecastPlaybackControls
+      {paused}
+      complete={finished}
+      ontoggle={() => (paused = !paused)}
+      onskip={() => void controller.seekPlayback(items.length)}
+      skipDisabled={controller.playbackSaving}
+      size="md"
+    >
+      {#snippet trailing()}
+        <span class="font-mono text-xs text-muted-foreground uppercase">4× speed</span>
+      {/snippet}
+    </GamecastPlaybackControls>
     {#if finished}
       <button
         class="min-h-11 rounded-xl border border-primary px-4 font-bold text-primary"
         disabled={controller.playbackSaving || controller.busy}
         onclick={() => void controller.finishPlayback()}>Continue</button
-      >
-    {:else}
-      <button
-        class="min-h-11 rounded-xl border border-line-strong px-4"
-        onclick={() => (paused = !paused)}>{paused ? 'Resume' : 'Pause'}</button
-      >
-      <span class="font-mono text-xs text-muted-foreground uppercase">4× speed</span>
-      <button
-        class="min-h-11 rounded-xl border border-line-strong px-4"
-        disabled={controller.playbackSaving}
-        onclick={() => void controller.seekPlayback(items.length)}>Skip to final</button
       >
     {/if}
   </div>

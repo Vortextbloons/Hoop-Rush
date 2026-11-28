@@ -109,7 +109,7 @@ describe('FullCourtCoachingView', () => {
   test('shows five starters, roster minute targets, and an optional closing five', () => {
     const body = renderView({ plan: CUSTOM_PLAN });
 
-    expect(body).toContain('aria-label="Change Starter 1"');
+    expect(body).toContain('aria-label="Change Point Guard');
     expect(body).toContain('Autofill minutes');
     expect(body).toContain('Starter 1');
     expect(body).toContain('Starter 5');
@@ -178,10 +178,10 @@ describe('FullCourtCoachingView', () => {
     expect(mastermind).toContain('aria-label="Primary option"');
     expect(mastermind).toContain('aria-label="Second option"');
     expect(mastermind).toContain('aria-label="Floor general"');
-    expect(mastermind).toContain('Not set');
+    expect(mastermind).toContain('Choose a player');
+    expect(mastermind).toContain('Change primary option');
+    expect(mastermind).toContain('Change floor general');
     expect(mastermind).toContain('Gets the strongest boost to scoring opportunities');
-    expect(mastermind).toContain('value="p2"');
-    expect(mastermind).toContain('value="p1"');
     expect(mastermind).toContain('Stagger stars');
     expect(mastermind).toContain(
       'Foul-outs, injuries, exhaustion, and explicit rules still take priority.',
@@ -270,7 +270,7 @@ describe('FullCourtCoachingView', () => {
     const presetsIndex = body.indexOf('data-testid="full-court-strategy-presets"');
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);
-    expect(courtIndex).toBeGreaterThan(minutesIndex);
+    expect(courtIndex).toBeLessThan(minutesIndex);
     expect(tacticsIndex).toBeLessThan(minutesIndex);
     expect(tacticsIndex).toBeLessThan(courtIndex);
     expect(presetsIndex).toBeLessThan(tacticsIndex);

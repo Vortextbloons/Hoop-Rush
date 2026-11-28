@@ -39,12 +39,6 @@
     }
   }
 
-  function loadPercentOf(detail: string | null): number | null {
-    if (detail === null) return null;
-    const match = /^(\d+(?:\.\d+)?)%/.exec(detail);
-    return match ? Number(match[1]) : null;
-  }
-
   function toggle(playerId: string): void {
     if (busy || onRestingChange === undefined) return;
     const next = selected.has(playerId)
@@ -105,8 +99,8 @@
 
     <ul class="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3" aria-label="Player availability">
       {#each readiness.players as player (player.playerId)}
-        {@const loadPct = loadPercentOf(player.detail)}
-        {@const staminaPct = loadPct === null ? 100 : Math.max(8, Math.round(100 - loadPct))}
+        {@const loadPct = player.loadPercent}
+        {@const staminaPct = Math.max(8, Math.round(100 - loadPct))}
         <li
           class="flex min-h-11 items-center gap-2.5 rounded-lg border border-l-2 border-line-soft bg-surface-1 px-2.5 py-1.5 transition-colors"
           data-status={player.status}
@@ -121,7 +115,7 @@
                 {player.positions.slice(0, 2).join('/')}
               </span>
             </div>
-            {#if loadPct !== null && player.status !== 'injured' && player.status !== 'unavailable' && !player.resting}
+            {#if loadPct > 0 && (player.status === 'ready' || player.status === 'fatigued')}
               <div class="mt-1 flex items-center gap-2">
                 <div class="h-1 flex-1 overflow-hidden rounded-full bg-surface-3">
                   <div

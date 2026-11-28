@@ -6,8 +6,9 @@
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import { initialsOf } from '#lib/branding.js';
-  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import { usagePct, usagePossessions } from '#lib/format.js';
   import { gamecastTeamOf } from './gamecast-broadcast-view';
+  import { gamecastBoxScoreColumns, gamecastBoxScoreTotals } from './gamecast-box-score.js';
   import type {
     GamecastParticipantId,
     GamecastPlayer,
@@ -106,21 +107,18 @@
 
   const boxColumns: readonly PlayerStatColumn<GamecastBoxRow>[] = [
     { key: 'minutes', label: 'MIN', value: (row) => row.minutes },
-    { key: 'points', label: 'PTS', value: (row) => row.points, cellClass: 'is-strong' },
-    { key: 'rebounds', label: 'REB', value: (row) => row.rebounds.total },
-    { key: 'assists', label: 'AST', value: (row) => row.assists },
-    { key: 'turnovers', label: 'TO', value: (row) => row.turnovers },
-    { key: 'fieldGoals', label: 'FG', value: (row) => statLine(row) },
-    { key: 'threes', label: '3P', value: (row) => threeLine(row) },
-    { key: 'freeThrows', label: 'FT', value: (row) => freeThrowLine(row) },
+    ...gamecastBoxScoreColumns<GamecastBoxRow>([
+      'points',
+      'rebounds',
+      'assists',
+      'turnovers',
+      'fieldGoals',
+      'threes',
+      'freeThrows',
+      'trueShootingPct',
+    ]),
     {
-      key: 'trueShooting',
-      label: 'TS%',
-      value: (row) =>
-        trueShootingPct(row.points, row.fieldGoals.attempted, row.freeThrows.attempted),
-    },
-    {
-      key: 'usage',
+      key: 'usagePct',
       label: 'USG%',
       value: (row) =>
         usagePct(
@@ -145,38 +143,19 @@
   }
 
   function totalsOf(panel: TeamPanel): PlayerStatsTotals<GamecastBoxRow> {
-    return {
-      value: (column) => {
-        switch (column.key) {
-          case 'minutes':
-            return panel.team.players.reduce((total, player) => total + player.minutes, 0);
-          case 'points':
-            return panel.team.box.points;
-          case 'rebounds':
-            return panel.team.box.rebounds.total;
-          case 'assists':
-            return panel.team.box.assists;
-          case 'turnovers':
-            return panel.team.box.turnovers;
-          case 'fieldGoals':
-            return `${String(panel.team.box.fieldGoals.made)}-${String(panel.team.box.fieldGoals.attempted)}`;
-          case 'threes':
-            return `${String(panel.team.box.threes.made)}-${String(panel.team.box.threes.attempted)}`;
-          case 'freeThrows':
-            return `${String(panel.team.box.freeThrows.made)}-${String(panel.team.box.freeThrows.attempted)}`;
-          case 'trueShooting':
-            return trueShootingPct(
-              panel.team.box.points,
-              panel.team.box.fieldGoals.attempted,
-              panel.team.box.freeThrows.attempted,
-            );
-          case 'usage':
-            return '100.0%';
-          default:
-            return '';
-        }
-      },
-    };
+    return gamecastBoxScoreTotals<GamecastBoxRow>({
+      minutes: panel.team.players.reduce((total, player) => total + player.minutes, 0),
+      points: panel.team.box.points,
+      rebounds: panel.team.box.rebounds.total,
+      assists: panel.team.box.assists,
+      steals: panel.team.box.steals,
+      blocks: panel.team.box.blocks,
+      turnovers: panel.team.box.turnovers,
+      fouls: panel.team.box.fouls,
+      fieldGoals: panel.team.box.fieldGoals,
+      threes: panel.team.box.threes,
+      freeThrows: panel.team.box.freeThrows,
+    });
   }
 
   const verificationView = $derived.by(() => {
@@ -232,18 +211,6 @@
   const readyLabel = $derived(
     localReady ? 'Ready' : nextGameNumber !== null ? `Ready for Game ${nextGameNumber}` : 'Ready',
   );
-
-  function statLine(player: PlayerBoxScore): string {
-    return `${String(player.fieldGoals.made)}-${String(player.fieldGoals.attempted)}`;
-  }
-
-  function threeLine(player: PlayerBoxScore): string {
-    return `${String(player.threes.made)}-${String(player.threes.attempted)}`;
-  }
-
-  function freeThrowLine(player: PlayerBoxScore): string {
-    return `${String(player.freeThrows.made)}-${String(player.freeThrows.attempted)}`;
-  }
 </script>
 
 <section class="results" data-verification={verification}>
@@ -662,11 +629,6 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-  }
-
-  :global(.results tbody td.is-strong) {
-    color: var(--color-foreground);
-    font-weight: 800;
   }
 
   :global(.results tfoot tr) {

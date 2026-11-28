@@ -16,6 +16,7 @@ import {
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import { gameScore } from '../../challenge/league-value.ts';
+import { nextPlayoffGamePlan, type PlayoffSeriesLike } from '../../league/playoffs.ts';
 import { capRushBoxOf } from './league-simulation.ts';
 
 function compareCodeUnits(left: string, right: string): number {
@@ -111,43 +112,21 @@ export function capRushFinalsMvpOf(input: {
   };
 }
 
-interface PlayoffSeriesLike {
-  readonly seriesId: string;
-  readonly round: number;
-  readonly seriesSlot: number;
-  readonly games: readonly unknown[];
-  readonly highTeamId: string;
-  readonly lowTeamId: string;
-  readonly highSeed: number;
-  readonly lowSeed: number;
-}
+export type { PlayoffSeriesLike };
 
 export function capRushNextPlayoffGamePlan(input: {
   readonly series: PlayoffSeriesLike;
   readonly runSeed: Seed;
   readonly userTeamId: string;
 }): CapRushPlayoffGamePlan {
-  const { series, userTeamId } = input;
+  const { series, runSeed, userTeamId } = input;
   const ordinal = series.games.length + 1;
-  const highHome = [1, 2, 5, 7].includes(ordinal);
-  const homeTeamId = highHome ? series.highTeamId : series.lowTeamId;
-  const awayTeamId = highHome ? series.lowTeamId : series.highTeamId;
-  const homeSeed = highHome ? series.highSeed : series.lowSeed;
-  const awaySeed = highHome ? series.lowSeed : series.highSeed;
-  const userSide = homeTeamId === userTeamId ? 'home' : awayTeamId === userTeamId ? 'away' : null;
-  return {
-    seriesId: series.seriesId,
-    round: series.round,
-    seriesSlot: series.seriesSlot,
-    gameOrdinal: ordinal,
-    homeTeamId,
-    awayTeamId,
-    homeSeed,
-    awaySeed,
-    userSide,
-    isFinals: series.round === CAP_RUSH_PLAYOFF_ROUNDS,
-    seed: capRushPlayoffGameSeed(input.runSeed, series.round, series.seriesSlot, ordinal),
-  };
+  return nextPlayoffGamePlan({
+    series,
+    seed: capRushPlayoffGameSeed(runSeed, series.round, series.seriesSlot, ordinal),
+    userTeamId,
+    finalsRound: CAP_RUSH_PLAYOFF_ROUNDS,
+  });
 }
 
 function ownerSlotMapsOf(team: HavocTeamInput): {

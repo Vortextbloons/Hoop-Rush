@@ -3,7 +3,13 @@ import {
   FULL_COURT_MAX_GAME_LINEUP_FACTS,
   type FullCourtGameLineups,
 } from '@hoop-rush/data-contracts';
-import type { FullCourtGameResult, FullCourtPlayerLine, FullCourtTapeEvent } from './game.ts';
+import type {
+  FullCourtGameLineupFacts,
+  FullCourtGameResult,
+  FullCourtLineupFactRow,
+  FullCourtPlayerLine,
+  FullCourtTapeEvent,
+} from './game.ts';
 import { checkFullCourtGameResult } from './game.ts';
 
 /**
@@ -138,6 +144,15 @@ export interface FullCourtPlayedGameInput {
   readonly result: FullCourtGameResult;
   /** Required for verified possession and point attribution. */
   readonly tape: readonly FullCourtTapeEvent[];
+}
+
+export interface FullCourtPlayedGameFactsInput {
+  readonly kind: 'played';
+  readonly gameId: string;
+  readonly userSide: FullCourtReportSide;
+  readonly result: FullCourtGameResult;
+  /** Compact totals accumulated during simulation, without a playback tape. */
+  readonly facts: FullCourtGameLineupFacts;
 }
 
 export interface FullCourtForfeitGameInput {
@@ -409,34 +424,84 @@ function benchOf(result: FullCourtGameResult, side: FullCourtReportSide): FullCo
   };
 }
 
-function playedReport(
-  input: FullCourtPlayedGameInput,
-  options: FullCourtGameReportOptions,
-): FullCourtPlayedGameReport {
+function sampleThresholdOf(options: FullCourtGameReportOptions): number {
   const threshold = options.sampleThreshold ?? FULL_COURT_LINEUP_SAMPLE_POSSESSIONS;
   if (!Number.isFinite(threshold) || threshold < 0) {
     throw new Error('Full Court report: sample threshold must be a nonnegative number');
   }
-  const failures = checkFullCourtGameResult(input.result);
+  return threshold;
+}
+
+function lineupCapOf(options: FullCourtLineupFactsOptions): number {
+  const maxLineups = options.maxLineups ?? FULL_COURT_MAX_GAME_LINEUP_FACTS;
+  if (!Number.isSafeInteger(maxLineups) || maxLineups < 1) {
+    throw new Error('Full Court lineups: the lineup cap must be a positive integer');
+  }
+  return maxLineups;
+}
+
+function checkedPlayedResult(result: FullCourtGameResult, gameId: string): void {
+  const failures = checkFullCourtGameResult(result);
   if (failures.length > 0) {
-    throw new Error(
-      `Full Court report: game ${input.gameId} failed accounting: ${failures.join(', ')}`,
-    );
+    throw new Error(`Full Court report: game ${gameId} failed accounting: ${failures.join(', ')}`);
   }
-  if (input.tape.length === 0) {
-    throw new Error(`Full Court report: game ${input.gameId} has no possession tape`);
-  }
+}
 
+function verifiedTapeRows(
+  result: FullCourtGameResult,
+  tape: readonly FullCourtTapeEvent[],
+  gameId: string,
+): Record<FullCourtReportSide, Map<string, RowAccumulator>> {
+  if (tape.length === 0) {
+    throw new Error(`Full Court report: game ${gameId} has no possession tape`);
+  }
   const rowsBySide = {
-    home: buildRows(input.result, 'home'),
-    away: buildRows(input.result, 'away'),
+    home: buildRows(result, 'home'),
+    away: buildRows(result, 'away'),
   };
-  scanTape(input.result, input.tape, rowsBySide);
-  verifyRows(input.result, rowsBySide);
+  scanTape(result, tape, rowsBySide);
+  verifyRows(result, rowsBySide);
+  return rowsBySide;
+}
 
-  const opponentSide = oppositeSide(input.userSide);
-  const names = playerMapOf(input.result, input.userSide);
-  const lineupRows = [...rowsBySide[input.userSide].values()]
+function factRowsOf(facts: readonly FullCourtLineupFactRow[]): Map<string, RowAccumulator> {
+  const rows = new Map<string, RowAccumulator>();
+  for (const fact of facts) {
+    const key = fullCourtLineupKey(fact.playerIds);
+    if (rows.has(key)) throw new Error(`Full Court report: lineup ${key} appears twice`);
+    rows.set(key, {
+      key,
+      playerIds: [...fact.playerIds].sort(),
+      seconds: fact.seconds,
+      offensivePossessions: fact.offensivePossessions,
+      defensivePossessions: fact.defensivePossessions,
+      pointsFor: fact.pointsFor,
+      pointsAgainst: fact.pointsAgainst,
+    });
+  }
+  return rows;
+}
+
+function verifiedFactRows(
+  result: FullCourtGameResult,
+  facts: FullCourtGameLineupFacts,
+): Record<FullCourtReportSide, Map<string, RowAccumulator>> {
+  const rowsBySide = {
+    home: factRowsOf(facts.home),
+    away: factRowsOf(facts.away),
+  };
+  verifyRows(result, rowsBySide);
+  return rowsBySide;
+}
+
+function lineupRowsOf(
+  result: FullCourtGameResult,
+  side: FullCourtReportSide,
+  rows: Readonly<Record<FullCourtReportSide, Map<string, RowAccumulator>>>,
+  threshold: number,
+): FullCourtLineupRow[] {
+  const names = playerMapOf(result, side);
+  return [...rows[side].values()]
     .map((row): FullCourtLineupRow => {
       const pacePossessions = (row.offensivePossessions + row.defensivePossessions) / 2;
       const netPoints = row.pointsFor - row.pointsAgainst;
@@ -471,7 +536,54 @@ function playedReport(
       };
     })
     .sort((left, right) => right.seconds - left.seconds || left.key.localeCompare(right.key));
+}
 
+function lineupSummary(
+  result: FullCourtGameResult,
+  side: FullCourtReportSide,
+  rows: Readonly<Record<FullCourtReportSide, Map<string, RowAccumulator>>>,
+  threshold: number,
+  maxLineups: number,
+): FullCourtGameLineups {
+  const lineupRows = lineupRowsOf(result, side, rows, threshold);
+  const retained = lineupRows.slice(0, maxLineups);
+  const dropped = lineupRows.slice(maxLineups);
+  return {
+    version: FULL_COURT_LINEUP_SUMMARY_VERSION,
+    side,
+    sampleThreshold: threshold,
+    lineups: retained.map((row) => ({
+      playerIds: [...row.playerIds],
+      players: row.players.map((player) => ({
+        playerId: player.playerId,
+        displayName: player.displayName,
+      })),
+      seconds: row.seconds,
+      offensivePossessions: row.offensivePossessions,
+      defensivePossessions: row.defensivePossessions,
+      pointsFor: row.pointsFor,
+      pointsAgainst: row.pointsAgainst,
+    })),
+    omitted: {
+      lineups: dropped.length,
+      seconds: dropped.reduce((total, row) => total + row.seconds, 0),
+      offensivePossessions: dropped.reduce((total, row) => total + row.offensivePossessions, 0),
+      defensivePossessions: dropped.reduce((total, row) => total + row.defensivePossessions, 0),
+      pointsFor: dropped.reduce((total, row) => total + row.pointsFor, 0),
+      pointsAgainst: dropped.reduce((total, row) => total + row.pointsAgainst, 0),
+    },
+  };
+}
+
+function playedReport(
+  input: FullCourtPlayedGameInput,
+  options: FullCourtGameReportOptions,
+): FullCourtPlayedGameReport {
+  const threshold = sampleThresholdOf(options);
+  checkedPlayedResult(input.result, input.gameId);
+  const rowsBySide = verifiedTapeRows(input.result, input.tape, input.gameId);
+
+  const opponentSide = oppositeSide(input.userSide);
   const team = input.result[input.userSide];
   const opponent = input.result[opponentSide];
   return {
@@ -485,7 +597,7 @@ function playedReport(
     opponentPoints: opponent.box.points,
     userWon: team.box.points > opponent.box.points,
     teamBonusPoints: team.teamBonusPoints ?? 0,
-    lineupRows,
+    lineupRows: lineupRowsOf(input.result, input.userSide, rowsBySide, threshold),
     bench: benchOf(input.result, input.userSide),
   };
 }
@@ -526,47 +638,35 @@ export function buildFullCourtGameReport(
 }
 
 /**
- * Compact season-facing facts for one user game. The full report is the single
- * tape scanner; this keeps only the actual fives and drops the detailed rows.
- * The smallest groups are capped and explicitly counted rather than merged into
- * a synthetic lineup.
+ * Compact season-facing facts for one user game, built from an explicit tape.
+ * The full report remains the detailed tape scanner; this keeps only the actual
+ * fives and drops the detailed rows. The smallest groups are capped and
+ * explicitly counted rather than merged into a synthetic lineup.
  */
 export function buildFullCourtGameLineups(
   input: FullCourtPlayedGameInput,
   options: FullCourtLineupFactsOptions = {},
 ): FullCourtGameLineups {
-  const maxLineups = options.maxLineups ?? FULL_COURT_MAX_GAME_LINEUP_FACTS;
-  if (!Number.isSafeInteger(maxLineups) || maxLineups < 1) {
-    throw new Error('Full Court lineups: the lineup cap must be a positive integer');
-  }
-  const report = playedReport(input, options);
-  const retained = report.lineupRows.slice(0, maxLineups);
-  const dropped = report.lineupRows.slice(maxLineups);
-  return {
-    version: FULL_COURT_LINEUP_SUMMARY_VERSION,
-    side: input.userSide,
-    sampleThreshold: report.sampleThreshold,
-    lineups: retained.map((row) => ({
-      playerIds: [...row.playerIds],
-      players: row.players.map((player) => ({
-        playerId: player.playerId,
-        displayName: player.displayName,
-      })),
-      seconds: row.seconds,
-      offensivePossessions: row.offensivePossessions,
-      defensivePossessions: row.defensivePossessions,
-      pointsFor: row.pointsFor,
-      pointsAgainst: row.pointsAgainst,
-    })),
-    omitted: {
-      lineups: dropped.length,
-      seconds: dropped.reduce((total, row) => total + row.seconds, 0),
-      offensivePossessions: dropped.reduce((total, row) => total + row.offensivePossessions, 0),
-      defensivePossessions: dropped.reduce((total, row) => total + row.defensivePossessions, 0),
-      pointsFor: dropped.reduce((total, row) => total + row.pointsFor, 0),
-      pointsAgainst: dropped.reduce((total, row) => total + row.pointsAgainst, 0),
-    },
-  };
+  const maxLineups = lineupCapOf(options);
+  const threshold = sampleThresholdOf(options);
+  checkedPlayedResult(input.result, input.gameId);
+  const rowsBySide = verifiedTapeRows(input.result, input.tape, input.gameId);
+  return lineupSummary(input.result, input.userSide, rowsBySide, threshold, maxLineups);
+}
+
+/**
+ * The same compact facts, read from the game's accumulated per-lineup totals.
+ * Used by season summaries that never build a playback tape.
+ */
+export function buildFullCourtGameLineupsFromFacts(
+  input: FullCourtPlayedGameFactsInput,
+  options: FullCourtLineupFactsOptions = {},
+): FullCourtGameLineups {
+  const maxLineups = lineupCapOf(options);
+  const threshold = sampleThresholdOf(options);
+  checkedPlayedResult(input.result, input.gameId);
+  const rowsBySide = verifiedFactRows(input.result, input.facts);
+  return lineupSummary(input.result, input.userSide, rowsBySide, threshold, maxLineups);
 }
 
 /** Maps a verified played report to the minimal facts the season summary accepts. */

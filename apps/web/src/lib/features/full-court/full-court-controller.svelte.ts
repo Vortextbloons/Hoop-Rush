@@ -1,4 +1,5 @@
 import {
+  FullCourtAdvanceSession,
   advanceFullCourtPlayoffs,
   advanceFullCourtSeasonSlot,
   archiveFullCourtRun,
@@ -8,15 +9,19 @@ import {
   startFullCourtPlayoffs,
   startFullCourtSeason,
   submitFullCourtDraftCommand,
+  type FullCourtAdvanceOptions,
+  type FullCourtAdvancePlayoffCommandInput,
+  type FullCourtAdvancePlayoffState,
+  type FullCourtAdvanceSeasonCommandInput,
+  type FullCourtAdvanceSeasonState,
+  type FullCourtPinnedGamePlan,
+  type FullCourtPlayoffProgressionResult,
   type SaveFullCourtBlueprintOptions,
 } from '@hoop-rush/application/full-court';
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   FULL_COURT_DEFAULT_COACHING_PLAN,
   FULL_COURT_NEXT_GAME_PLAN_SCHEMA_VERSION,
-  capRushPlayoffSeriesId,
-  capRushSeriesWinner,
-  capRushSeriesWins,
   fullCourtDefensiveMatchupsSchema,
   idSchema,
   type FullCourtBlueprint,
@@ -29,8 +34,6 @@ import {
   type FullCourtPracticeReport,
   type FullCourtReportKind,
   type FullCourtReportTarget,
-  type FullCourtSeasonCheckpoint,
-  type FullCourtSeasonScore,
   type FullCourtTactics,
   type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
@@ -47,8 +50,6 @@ import {
   type FullCourtPlayoffLock,
   type FullCourtPlayoffOpponentPreview,
   type FullCourtSeasonLock,
-  type FullCourtSeasonSlotOptions,
-  type FullCourtSeasonSlotOutcome,
 } from '@hoop-rush/engine';
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
@@ -59,14 +60,9 @@ import { loadFullCourtHealthProfiles } from './full-court-health-profiles.js';
 import { resolveFullCourtSeasonLock } from './full-court-season-lock.js';
 import {
   fullCourtGameDayReadiness,
-  fullCourtNextReviewSlot,
   fullCourtNextUserFixture,
-  fullCourtPlayoffAdjustmentChanged,
   fullCourtSimulationNotice,
-  fullCourtUserSeries,
-  type FullCourtAdvanceOptions,
   type FullCourtSimulationNotice,
-  type FullCourtSimulationStop,
   type FullCourtUserFixture,
 } from './full-court-season-presenter.js';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner.js';
@@ -78,40 +74,9 @@ export interface FullCourtControllerDependencies {
   readonly createWorker?: typeof createFullCourtWorkerRunner;
 }
 
-interface SeasonState {
-  lock: FullCourtSeasonLock;
-  checkpoint: FullCourtSeasonCheckpoint;
-  scores: readonly FullCourtSeasonScore[];
-  coaching: FullCourtCoachingPlan;
-}
-
-type PlayoffState = Awaited<ReturnType<typeof startFullCourtPlayoffs>>;
+type SeasonState = FullCourtAdvanceSeasonState;
+type PlayoffState = FullCourtAdvancePlayoffState;
 type PlayedGame = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
-type RegularSimulatedOutcome = Extract<FullCourtSeasonSlotOutcome, { kind: 'simulated' }>;
-type FullCourtWorker = ReturnType<typeof createFullCourtWorkerRunner>;
-type SimulationHandoffOutcome =
-  | { readonly kind: 'decision'; readonly reason: 'rest-conflict' | 'confirm-forfeit' }
-  | { readonly kind: 'stale' };
-
-/** Pinned rest and matchup choices captured for the next user fixture. */
-interface PinnedGamePlan {
-  readonly restGameId: string | null;
-  readonly restingPlayerIds: readonly string[];
-  readonly matchupGameId: string | null;
-  readonly matchupOpponentId: string | null;
-  readonly matchupAssignments: readonly FullCourtDefensiveMatchupAssignment[];
-}
-
-interface AdvanceRunInput {
-  readonly count: number;
-  readonly acceptForfeit: boolean;
-  readonly record: boolean;
-  readonly options: FullCourtAdvanceOptions;
-  readonly lock: FullCourtSeasonLock;
-  readonly coaching: FullCourtCoachingPlan;
-  readonly pinned: PinnedGamePlan;
-  readonly worker: FullCourtWorker;
-}
 
 export class FullCourtController {
   index = $state.raw<FullCourtCatalogIndex | null>(null);
@@ -142,18 +107,43 @@ export class FullCourtController {
   #repositories: Persistence;
   #createWorker: typeof createFullCourtWorkerRunner;
   #worker: ReturnType<typeof createFullCourtWorkerRunner> | null = null;
+  #progression: FullCourtAdvanceSession;
   #nextGamePlanWrite = Promise.resolve();
-  /**
-   * The next-round series whose opponent change was already surfaced. It lets
-   * the next sim play that series instead of stopping on the same boundary.
-   */
-  #controlReturnedForSeriesId: string | null = null;
 
   constructor(dependencies: FullCourtControllerDependencies = {}) {
     this.#loadAssets = dependencies.loadAssets ?? loadFullCourtAssets;
     this.#loadHealthProfiles = dependencies.loadHealthProfiles ?? loadFullCourtHealthProfiles;
     this.#repositories = dependencies.repositories ?? getPersistence();
     this.#createWorker = dependencies.createWorker ?? createFullCourtWorkerRunner;
+    this.#progression = new FullCourtAdvanceSession({
+      advanceSeasonSlot: (input) => this.#advanceSeasonSlot(input),
+      advancePlayoffGame: (input) => this.#advancePlayoffGame(input),
+      observer: {
+        isActive: () => !this.#isDisposed(),
+        stopRequested: () => this.stopRequested,
+        progress: (completed, total) => {
+          this.simProgress = { completed, total };
+        },
+        seasonCommitted: (commit) => {
+          const season = this.season;
+          if (season === null) return;
+          this.season = {
+            ...season,
+            checkpoint: commit.checkpoint,
+            scores: [...season.scores, ...commit.scores],
+          };
+        },
+        playoffsCommitted: (commit) => {
+          this.playoffs = commit.state;
+        },
+        publishedGame: (game, watchedReplay) => {
+          this.#publishCommittedUserGame(game, watchedReplay);
+        },
+        clearGamePlan: (input) =>
+          this.#clearCommittedGamePlan(input.runId, input.gameId, input.pinned),
+        archiveRun: (lock, checkpoint) => this.#archiveCompletedRun(lock, checkpoint),
+      },
+    });
   }
 
   dispose(): void {
@@ -210,11 +200,15 @@ export class FullCourtController {
 
   abandonRun(): Promise<void> {
     return this.#act(async () => {
-      const runId = this.draft?.runId ?? this.season?.lock.season.runId ?? null;
-      if (runId === null) return;
-      await this.#nextGamePlanWrite;
-      await this.#repositories.fullCourtNextGamePlanRepository.clear(runId);
+      const runId =
+        this.draft?.runId ??
+        this.season?.lock.season.runId ??
+        localStorage.getItem(FULL_COURT_ACTIVE_RUN_KEY);
       localStorage.removeItem(FULL_COURT_ACTIVE_RUN_KEY);
+      if (runId !== null) {
+        await this.#nextGamePlanWrite;
+        await this.#repositories.fullCourtNextGamePlanRepository.clear(runId);
+      }
       this.draft = null;
       this.season = null;
       this.playoffs = null;
@@ -223,7 +217,7 @@ export class FullCourtController {
       this.savedReplay = null;
       this.notice = null;
       this.pendingForfeit = false;
-      this.#controlReturnedForSeriesId = null;
+      this.#progression.reset();
       this.#clearRest();
       this.#clearDefensiveMatchups();
     });
@@ -480,7 +474,7 @@ export class FullCourtController {
   async #clearCommittedGamePlan(
     runId: string,
     gameId: string | null,
-    plan: PinnedGamePlan,
+    plan: FullCourtPinnedGamePlan,
   ): Promise<void> {
     if (gameId === null) return;
     if (plan.restGameId === gameId) this.#clearRest();
@@ -704,30 +698,36 @@ export class FullCourtController {
           return;
         }
       }
-      const pinned: PinnedGamePlan = {
+      const pinned: FullCourtPinnedGamePlan = {
         restGameId: this.restingForGameId,
         restingPlayerIds: this.restingPlayerIds,
         matchupGameId: this.defensiveMatchupsForGameId,
         matchupOpponentId: this.defensiveMatchupsOpponentId,
         matchupAssignments: this.defensiveMatchupAssignments,
       };
-      const { lock, coaching } = season;
-      const worker = (this.#worker ??= this.#createWorker());
-      const input: AdvanceRunInput = {
+      const { lock } = season;
+      const outcome = await this.#progression.advance({
         count,
         acceptForfeit,
         record,
         options,
-        lock,
-        coaching,
+        season,
+        playoffs: this.playoffs,
         pinned,
-        worker,
-      };
-      const stop =
-        this.playoffs !== null
-          ? await this.#advancePlayoffGames(input)
-          : await this.#advanceRegularSeason(input);
-      if (this.#isDisposed() || stop === null) return;
+      });
+      if (this.#isDisposed()) return;
+      if (outcome.kind === 'decision') {
+        this.pendingForfeit = outcome.reason === 'confirm-forfeit';
+        if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
+        return;
+      }
+      if (outcome.kind === 'stale') {
+        await this.#openRun(lock.season.runId);
+        this.error = 'This run advanced in another tab. The latest results are loaded.';
+        return;
+      }
+      const stop = outcome.stop;
+      if (stop === null) return;
       const playerNames = new Map<string, string>(
         (
           lock.season.teams.find((team) => team.teamId === lock.season.userTeamId)?.roster ?? []
@@ -741,43 +741,6 @@ export class FullCourtController {
     });
   }
 
-  #slotOptions(input: {
-    readonly coaching: FullCourtCoachingPlan;
-    readonly pinned: PinnedGamePlan;
-    readonly userGameId: string | null;
-    readonly acceptForfeit: boolean;
-    readonly record: boolean;
-  }): FullCourtSeasonSlotOptions {
-    const { coaching, pinned, userGameId } = input;
-    const matchupGameId = pinned.matchupGameId;
-    const matchupOpponentId = pinned.matchupOpponentId;
-    return {
-      acceptForfeit: input.acceptForfeit,
-      rotation: fullCourtRotationInputForPlan(coaching),
-      tactics: coaching.tactics,
-      rules: coaching.rules,
-      hierarchy: coaching.hierarchy,
-      record: input.record,
-      ...(pinned.restGameId !== null &&
-      pinned.restGameId === userGameId &&
-      pinned.restingPlayerIds.length > 0
-        ? { restingPlayerIds: pinned.restingPlayerIds }
-        : {}),
-      ...(matchupGameId !== null &&
-      matchupOpponentId !== null &&
-      matchupGameId === userGameId &&
-      pinned.matchupAssignments.length > 0
-        ? {
-            defensiveMatchups: {
-              gameId: matchupGameId,
-              opponentTeamId: matchupOpponentId,
-              assignments: [...pinned.matchupAssignments],
-            },
-          }
-        : {}),
-    };
-  }
-
   #publishCommittedUserGame(
     game: PlayedGame | null,
     watchedReplay: FullCourtWatchedReplay | null,
@@ -787,300 +750,25 @@ export class FullCourtController {
     if (watchedReplay !== null) this.savedReplay = watchedReplay;
   }
 
-  async #handleSimulationHandoff(outcome: SimulationHandoffOutcome, runId: string): Promise<null> {
-    if (outcome.kind === 'decision') {
-      this.pendingForfeit = outcome.reason === 'confirm-forfeit';
-      if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
-      return null;
-    }
-    await this.#openRun(runId);
-    this.error = 'This run advanced in another tab. The latest results are loaded.';
-    return null;
+  #advanceSeasonSlot(input: FullCourtAdvanceSeasonCommandInput) {
+    const worker = (this.#worker ??= this.#createWorker());
+    return advanceFullCourtSeasonSlot(input, {
+      repository: this.#repositories.fullCourtSeasonRepository,
+      simulateSlot: (...args) => worker.simulateSlot(...args),
+    });
   }
 
-  #regularInjuryStop(
-    outcome: RegularSimulatedOutcome,
-    lock: FullCourtSeasonLock,
-  ): FullCourtSimulationStop | null {
-    if (outcome.userGame.kind !== 'played') return null;
-    const userTeamId = lock.season.userTeamId;
-    const injuries = outcome.userGame.injuries.filter((injury) => injury.teamId === userTeamId);
-    if (injuries.length === 0) return null;
-    const nextFixture = fullCourtNextUserFixture(lock, outcome.checkpoint, null);
-    const actionable = injuries.filter(
-      (injury) => nextFixture === null || injury.availableFromDay > nextFixture.dayOffset,
-    );
-    if (actionable.length === 0) return null;
-    return {
-      kind: 'injury',
-      slot: outcome.checkpoint.completedThroughSlot,
-      playerIds: [...new Set(actionable.map((injury) => injury.playerId))],
-      availableFromDay: Math.max(...actionable.map((injury) => injury.availableFromDay)),
-    };
-  }
-
-  async #advanceRegularSeason(input: AdvanceRunInput): Promise<FullCourtSimulationStop | null> {
-    const { lock, coaching, pinned, worker } = input;
-    const userTeamId = lock.season.userTeamId;
-    const repository = this.#repositories.fullCourtSeasonRepository;
-    let acceptNextForfeit = input.acceptForfeit;
-    let played = 0;
-    const initialSeason = this.season;
-    const total =
-      initialSeason === null
-        ? 0
-        : Math.min(
-            input.count,
-            Math.max(
-              0,
-              CAP_RUSH_CONFERENCE_GAMES_PER_TEAM - initialSeason.checkpoint.completedThroughSlot,
-            ),
-          );
-    if (total > 0) this.simProgress = { completed: 0, total };
-    while (!this.#isDisposed()) {
-      if (this.stopRequested) {
-        return { kind: 'stopped', userGames: played, bracketGames: 0 };
-      }
-      const season = this.season;
-      if (season === null) return null;
-      if (season.checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
-        return input.count > 1 && played > 0
-          ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
-          : null;
-      }
-      if (played >= input.count) {
-        return input.count > 1 && played > 0
-          ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
-          : null;
-      }
-      const slot = season.checkpoint.completedThroughSlot + 1;
-      const userFixture = lock.season.games.find(
-        (game) =>
-          game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
-      );
-      const userGameId = userFixture?.gameId ?? null;
-      const slotOptions = this.#slotOptions({
-        coaching,
-        pinned,
-        userGameId,
-        acceptForfeit: acceptNextForfeit,
-        record: input.record && input.count === 1,
-      });
-      const outcome = await advanceFullCourtSeasonSlot(
-        { lock, expectedThroughSlot: season.checkpoint.completedThroughSlot, options: slotOptions },
-        { repository, simulateSlot: (...args) => worker.simulateSlot(...args) },
-      );
-      if (this.#isDisposed()) return null;
-      if (outcome.kind === 'decision' || outcome.kind === 'stale') {
-        return this.#handleSimulationHandoff(outcome, lock.season.runId);
-      }
-      if (outcome.kind === 'season-complete') return null;
-
-      acceptNextForfeit = false;
-      played += 1;
-      this.simProgress = { completed: played, total: Math.max(total, played) };
-      this.#publishCommittedUserGame(
-        outcome.userGame.kind === 'played' ? outcome.userGame : null,
-        outcome.watchedReplay,
-      );
-      this.season = {
-        ...season,
-        checkpoint: outcome.checkpoint,
-        scores: [...season.scores, ...outcome.scores],
-      };
-      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
-      const completed = outcome.checkpoint.completedThroughSlot;
-      if (completed >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
-        if (input.options.stopAtReview === true) return { kind: 'review', slot: completed };
-        return input.count > 1 ? { kind: 'game-limit', userGames: played, bracketGames: 0 } : null;
-      }
-      if (input.options.stopAtInjury === true) {
-        const injury = this.#regularInjuryStop(outcome, lock);
-        if (injury !== null) return injury;
-      }
-      if (
-        input.options.stopAtReview === true &&
-        fullCourtNextReviewSlot(season.checkpoint.completedThroughSlot) === completed
-      ) {
-        return { kind: 'review', slot: completed };
-      }
-    }
-    return input.count > 1 && played > 0
-      ? { kind: 'game-limit', userGames: played, bracketGames: 0 }
-      : null;
-  }
-
-  async #advancePlayoffGames(input: AdvanceRunInput): Promise<FullCourtSimulationStop | null> {
-    const { lock, coaching, pinned, worker } = input;
-    const userTeamId = lock.season.userTeamId;
-    const repository = this.#repositories.fullCourtPlayoffRepository;
-    let acceptNextForfeit = input.acceptForfeit;
-    let userGames = 0;
-    let bracketGames = 0;
-    const total = Math.max(1, input.count);
-    this.simProgress = { completed: 0, total };
-    while (!this.#isDisposed()) {
-      if (this.stopRequested) {
-        return { kind: 'stopped', userGames, bracketGames };
-      }
-      const playoffs = this.playoffs;
-      if (playoffs === null) return null;
-      const view = playoffs.view;
-      if (view.nextGame === null) {
-        await this.#archiveCompletedRun(playoffs.lock, playoffs.checkpoint);
-        return {
-          kind: 'playoffs-complete',
-          championTeamId: view.championTeamId ?? '',
-          userTeamId,
-        };
-      }
-      const userAlive = view.userOutcome.status === 'pending';
-      if (userAlive ? userGames >= input.count : bracketGames >= input.count) {
-        return input.count > 1 ? { kind: 'game-limit', userGames, bracketGames } : null;
-      }
-      const fixture = view.nextGame;
-      const nextIsUser = fixture.userSide !== null;
-      if (userAlive && nextIsUser && !input.record) {
-        const preview = fullCourtUserNextPlayoffMatchup({
-          userTeamId,
-          runSeed: lock.season.runSeed,
-          series: view.series,
-        });
-        const lastDecided = view.series
-          .filter(
-            (series) =>
-              (series.highTeamId === userTeamId || series.lowTeamId === userTeamId) &&
-              capRushSeriesWinner(series) !== null,
-          )
-          .at(-1);
-        const nextSeriesId =
-          preview === null ? null : capRushPlayoffSeriesId(preview.round, preview.seriesSlot);
-        if (
-          preview !== null &&
-          nextSeriesId !== null &&
-          preview.gameOrdinal === 1 &&
-          lastDecided !== undefined &&
-          lastDecided.seriesId !== nextSeriesId &&
-          this.#controlReturnedForSeriesId !== nextSeriesId
-        ) {
-          this.#controlReturnedForSeriesId = nextSeriesId;
-          return {
-            kind: 'opponent-change',
-            round: preview.round,
-            opponentTeamId: preview.opponentTeamId,
-            gameOrdinal: preview.gameOrdinal,
-          };
-        }
-      }
-      const userGameId = nextIsUser ? fixture.gameId : null;
-      const slotOptions = this.#slotOptions({
-        coaching,
-        pinned,
-        userGameId,
-        acceptForfeit: acceptNextForfeit && nextIsUser,
-        record: input.record && input.count === 1 && nextIsUser,
-      });
-      const outcome = await advanceFullCourtPlayoffs(
-        {
-          lock: playoffs.lock,
-          expectedGames: playoffs.checkpoint.games.length,
-          options: slotOptions,
-        },
-        { repository, simulateGame: (...args) => worker.simulateGame(...args) },
-      );
-      if (this.#isDisposed()) return null;
-      if (outcome.kind === 'decision' || outcome.kind === 'stale') {
-        return this.#handleSimulationHandoff(outcome, lock.season.runId);
-      }
-      if (outcome.kind === 'playoffs-complete') {
-        return {
-          kind: 'playoffs-complete',
-          championTeamId: view.championTeamId ?? '',
-          userTeamId,
-        };
-      }
-
-      bracketGames += 1;
-      if (!userAlive) {
-        this.simProgress = { completed: bracketGames, total: Math.max(total, bracketGames) };
-      }
-      const nextView = fullCourtPlayoffView(playoffs.lock, outcome.checkpoint);
-      this.playoffs = { ...playoffs, checkpoint: outcome.checkpoint, view: nextView };
-      if (!nextIsUser) {
-        if (nextView.nextGame === null) {
-          await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
-          return {
-            kind: 'playoffs-complete',
-            championTeamId: nextView.championTeamId ?? '',
-            userTeamId,
-          };
-        }
-        continue;
-      }
-
-      userGames += 1;
-      this.simProgress = { completed: userGames, total: Math.max(total, userGames) };
-      acceptNextForfeit = false;
-      this.#controlReturnedForSeriesId = null;
-      this.#publishCommittedUserGame(
-        outcome.game.kind === 'played' ? outcome.game : null,
-        outcome.watchedReplay,
-      );
-      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
-      if (nextView.nextGame === null) {
-        await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
-        return {
-          kind: 'playoffs-complete',
-          championTeamId: nextView.championTeamId ?? '',
-          userTeamId,
-        };
-      }
-
-      const series = fullCourtUserSeries(nextView.series, userTeamId);
-      if (
-        series !== null &&
-        series.games.at(-1)?.gameId === fixture.gameId &&
-        capRushSeriesWinner(series) !== null
-      ) {
-        const opponentTeamId =
-          series.highTeamId === userTeamId ? series.lowTeamId : series.highTeamId;
-        return {
-          kind: 'series-complete',
-          round: series.round,
-          opponentTeamId,
-          won: capRushSeriesWinner(series) === userTeamId,
-          userWins: capRushSeriesWins(series, userTeamId),
-          opponentWins: capRushSeriesWins(series, opponentTeamId),
-        };
-      }
-
-      const nextPreview = fullCourtUserNextPlayoffMatchup({
-        userTeamId,
-        runSeed: lock.season.runSeed,
-        series: nextView.series,
-      });
-      const opponentSide = fixture.userSide === 'home' ? 'away' : 'home';
-      const applied = outcome.checkpoint.games.at(-1)?.adaptations?.[opponentSide];
-      if (
-        input.options.ignoreOpponentAdjustment !== true &&
-        nextPreview?.adaptation !== null &&
-        nextPreview?.adaptation !== undefined &&
-        fullCourtPlayoffAdjustmentChanged(applied, nextPreview.adaptation)
-      ) {
-        return {
-          kind: 'opponent-adjustment',
-          round: nextPreview.round,
-          opponentTeamId: nextPreview.opponentTeamId,
-          gameOrdinal: nextPreview.gameOrdinal,
-          adaptation: nextPreview.adaptation,
-        };
-      }
-
-      if (userGames >= input.count && input.count > 1) {
-        return { kind: 'game-limit', userGames, bracketGames };
-      }
-    }
-    return { kind: 'stopped', userGames, bracketGames };
+  async #advancePlayoffGame(
+    input: FullCourtAdvancePlayoffCommandInput,
+  ): Promise<FullCourtPlayoffProgressionResult> {
+    const worker = (this.#worker ??= this.#createWorker());
+    const outcome = await advanceFullCourtPlayoffs(input, {
+      repository: this.#repositories.fullCourtPlayoffRepository,
+      simulateGame: (...args) => worker.simulateGame(...args),
+    });
+    return outcome.kind === 'simulated'
+      ? { ...outcome, view: fullCourtPlayoffView(input.lock, outcome.checkpoint) }
+      : outcome;
   }
 
   async #submit(command: FullCourtCommand): Promise<void> {
@@ -1102,7 +790,7 @@ export class FullCourtController {
     this.draft = draft;
     this.pendingForfeit = false;
     this.notice = null;
-    this.#controlReturnedForSeriesId = null;
+    this.#progression.reset();
     this.latestGame = null;
     this.practice = null;
     this.savedReplay = null;
@@ -1163,7 +851,7 @@ export class FullCourtController {
       playoffs: this.#repositories.fullCourtPlayoffRepository,
     });
     if (this.#isDisposed()) return;
-    this.#controlReturnedForSeriesId = null;
+    this.#progression.reset();
     this.playoffs = state;
     if (state.view.nextGame === null) {
       await this.#archiveCompletedRun(state.lock, state.checkpoint);

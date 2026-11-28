@@ -129,26 +129,40 @@ export function deriveFullCourtHealthProfiles(
   if (eligibleCohorts['all-players'] === undefined) {
     throw new Error('Full Court health evidence has too few documented episodes to fit a prior');
   }
+  const careerByExternalId = new Map<string, { playedGames: number; totalEpisodes: number }>();
+  for (const row of usable.values()) {
+    const episodes = row.injuryEpisodesByDuration.reduce((sum, value) => sum + value, 0);
+    const current = careerByExternalId.get(row.externalId);
+    if (current === undefined) {
+      careerByExternalId.set(row.externalId, {
+        playedGames: row.playedGames,
+        totalEpisodes: episodes,
+      });
+    } else {
+      current.playedGames += row.playedGames;
+      current.totalEpisodes += episodes;
+    }
+  }
   const players = Object.fromEntries(
     cards.map((card) => {
       const cohortId =
         cohortIds(card).find((id) => eligibleCohorts[id] !== undefined) ?? 'all-players';
       const cohort = eligibleCohorts[cohortId];
       if (cohort === undefined) throw new Error(`Missing health cohort ${cohortId}`);
-      const row = usable.get(playerSeasonKey(card.seasonKey, card.playerExternalId));
-      const count = row?.injuryEpisodesByDuration.reduce((sum, value) => sum + value, 0) ?? 0;
+      const career = careerByExternalId.get(card.playerExternalId);
+      const count = career?.totalEpisodes ?? 0;
       const priorRate = episodesOf(cohort) / cohort.observedAppearances;
       const rate =
-        (count + PRIOR_APPEARANCES * priorRate) / (PRIOR_APPEARANCES + (row?.playedGames ?? 0));
+        (count + PRIOR_APPEARANCES * priorRate) / (PRIOR_APPEARANCES + (career?.playedGames ?? 0));
       return [
         card.playerVersionId,
         {
           cohortId,
           episodesPer10kAppearances: Math.round(rate * 100_000) / 10,
           playerEvidence:
-            row === undefined
+            career === undefined
               ? { source: 'population' }
-              : { source: 'player-season', observedAppearances: row.playedGames },
+              : { source: 'player-season', observedAppearances: career.playedGames },
         },
       ];
     }),

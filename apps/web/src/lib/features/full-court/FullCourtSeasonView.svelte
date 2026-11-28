@@ -19,7 +19,6 @@
   } from '@lucide/svelte';
   import {
     buildFullCourtAwards,
-    buildFullCourtPlayerSeasonStats,
     buildFullCourtSeasonStats,
     fullCourtStandings,
     type FullCourtSeasonLock,
@@ -84,6 +83,10 @@
     stopRequested = false,
     onStopAfterGame,
     onEditGamePlan,
+    onOpenPlayoffs,
+    onEditRotation,
+    onEditMatchups,
+    coachingDirty = false,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -106,6 +109,10 @@
     stopRequested?: boolean;
     onStopAfterGame?: () => void;
     onEditGamePlan?: () => void;
+    onOpenPlayoffs?: () => void;
+    onEditRotation?: () => void;
+    onEditMatchups?: () => void;
+    coachingDirty?: boolean;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -220,6 +227,11 @@
 
   /** The postseason screen owns every bracket action and every postseason view. */
   const playoffMode = $derived(playoff !== null || regularComplete);
+  const userCanPlay = $derived(
+    playoff === null
+      ? nextUserFixture !== null
+      : playoff.nextGame !== null && playoff.userOutcome.status === 'pending',
+  );
   const controls = $derived(
     fullCourtHomeControls({
       lock,
@@ -248,12 +260,7 @@
     }
   });
   const userRosterStats = $derived(
-    userTeam === null
-      ? []
-      : buildFullCourtPlayerSeasonStats({
-          teams: [userTeam],
-          scores,
-        }).filter((row) => row.games > 0),
+    awards?.playerRows.filter((row) => row.teamId === userTeamId && row.games > 0) ?? [],
   );
 
   function teamName(teamId: string): string {
@@ -494,7 +501,7 @@
 
     <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="ui-label">Full Court · Regular season</p>
+        <p class="ui-label">Regular season record</p>
         <div class="mt-2 flex items-center gap-3">
           {#if userIdentity !== null && manifest !== null}
             <TeamLogo
@@ -540,7 +547,17 @@
           >
           {@render matchupSide(nextUserFixture.awayTeamId, 'Away')}
         </div>
-        {@render simControlsBar()}
+        {@render homeActions()}
+        {#if onEditMatchups || (onEditRotation && gameDayReadiness.warnings.length > 0)}
+          <div class="mt-2 flex flex-wrap gap-2">
+            {#if onEditRotation && gameDayReadiness.warnings.length > 0}
+              <Button size="sm" tone="secondary" onclick={onEditRotation}>Review rotation</Button>
+            {/if}
+            {#if onEditMatchups}
+              <Button size="sm" tone="secondary" onclick={onEditMatchups}>Set matchups</Button>
+            {/if}
+          </div>
+        {/if}
         <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">
           Your five {nextUserFixture.userSide === 'home'
             ? 'host this game'
@@ -548,10 +565,13 @@
         </p>
       </div>
     {:else}
-      {@render simControlsBar()}
+      {@render homeActions()}
     {/if}
 
-    <details class="mt-4 rounded-lg border border-line-soft px-3">
+    <details
+      class="mt-4 rounded-lg border border-line-soft px-3"
+      open={gameDayReadiness.warnings.length > 0}
+    >
       <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold"
         >Game day readiness</summary
       >
@@ -564,6 +584,22 @@
       />
     </details>
   </Panel>
+{/snippet}
+
+{#snippet homeActions()}
+  {#if playoff === null}
+    {@render simControlsBar()}
+  {:else if simulating}
+    <SimulationStatus
+      class="mt-3"
+      label="Postseason simulation progress"
+      progress={simProgress}
+      stopping={stopRequested}
+      onStop={onStopAfterGame}
+    />
+  {:else if onOpenPlayoffs}
+    <Button class="mt-3" tone="primary" onclick={onOpenPlayoffs}>Open playoffs</Button>
+  {/if}
 {/snippet}
 
 {#snippet latestResultPanel()}
@@ -1020,11 +1056,23 @@
 {/snippet}
 
 <div class="flex flex-col gap-3">
+  {#if coachingDirty && userCanPlay && !simulating && (section === 'home' || section === 'playoffs')}
+    <Alert tone="warning" title="Unsaved coaching changes">
+      <p>Simulation uses your saved plan.</p>
+      {#if onEditGamePlan}
+        {#snippet actions()}
+          <Button size="sm" tone="secondary" disabled={busy} onclick={onEditGamePlan}
+            >Review changes</Button
+          >
+        {/snippet}
+      {/if}
+    </Alert>
+  {/if}
   {#if section === 'league'}
     {@render leaguePanel()}
   {:else if section === 'stats'}
     {@render statsPanel()}
-  {:else if playoffMode}
+  {:else if section === 'playoffs' && playoffMode}
     <FullCourtPostseasonView
       {lock}
       {checkpoint}

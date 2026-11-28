@@ -276,6 +276,8 @@ export type FullCourtTapeEvent =
 export interface FullCourtGameOptions {
   /** Opt-in event writer. It never consumes RNG, so results are unchanged. */
   readonly record?: boolean;
+  /** Accumulate compact lineup facts without retaining a playback tape. */
+  readonly lineupFacts?: boolean;
   /** Optional possession effects. Within-game fatigue applies through player ratings. */
   readonly effects?: EffectsHook;
 }
@@ -283,6 +285,21 @@ export interface FullCourtGameOptions {
 export interface FullCourtRecordedGameOutput {
   readonly result: FullCourtGameResult;
   readonly tape: readonly FullCourtTapeEvent[];
+}
+
+/** One line's compact totals, accumulated without a playback tape. */
+export interface FullCourtLineupFactRow {
+  readonly playerIds: readonly string[];
+  readonly seconds: number;
+  readonly offensivePossessions: number;
+  readonly defensivePossessions: number;
+  readonly pointsFor: number;
+  readonly pointsAgainst: number;
+}
+
+export interface FullCourtGameLineupFacts {
+  readonly home: readonly FullCourtLineupFactRow[];
+  readonly away: readonly FullCourtLineupFactRow[];
 }
 
 interface LineupState {
@@ -298,6 +315,152 @@ interface StintRecord {
   readonly startSeconds: number;
   readonly pointsAtStart: number;
   readonly possessionsAtStart: number;
+}
+
+interface MutableLineupFactRow {
+  readonly key: string;
+  readonly playerIds: readonly string[];
+  seconds: number;
+  offensivePossessions: number;
+  defensivePossessions: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
+function lineupFactKey(playerIds: readonly string[]): string {
+  return [...playerIds].sort().join('|');
+}
+
+/**
+ * Accumulates the same lineup attribution the tape scanner performs, but only
+ * for the user game and without materializing one event object per trip.
+ */
+class LineupFactTracker {
+  private readonly rows: [Map<string, MutableLineupFactRow>, Map<string, MutableLineupFactRow>] = [
+    new Map(),
+    new Map(),
+  ];
+  private readonly scores: [number, number] = [0, 0];
+
+  recordTrip(
+    homeUnit: readonly string[],
+    awayUnit: readonly string[],
+    offense: SideIndex,
+    ended: boolean,
+    homeScore: number,
+    awayScore: number,
+  ): void {
+    const homeDelta = homeScore - this.scores[0];
+    const awayDelta = awayScore - this.scores[1];
+    this.scores[0] = homeScore;
+    this.scores[1] = awayScore;
+    if (homeDelta !== 0) this.credit(0, homeUnit, awayUnit, homeDelta);
+    if (awayDelta !== 0) this.credit(1, awayUnit, homeUnit, awayDelta);
+    if (!ended) return;
+    if (offense === 0) {
+      this.row(0, homeUnit).offensivePossessions += 1;
+      this.row(1, awayUnit).defensivePossessions += 1;
+    } else {
+      this.row(1, awayUnit).offensivePossessions += 1;
+      this.row(0, homeUnit).defensivePossessions += 1;
+    }
+  }
+
+  recordTechnical(
+    homeUnit: readonly string[],
+    awayUnit: readonly string[],
+    side: SideIndex,
+    made: boolean,
+  ): void {
+    if (!made) return;
+    this.credit(side, side === 0 ? homeUnit : awayUnit, side === 0 ? awayUnit : homeUnit, 1);
+    this.scores[side] += 1;
+  }
+
+  finish(result: FullCourtGameResult): FullCourtGameLineupFacts {
+    return {
+      home: this.sideFacts(result.home, 0),
+      away: this.sideFacts(result.away, 1),
+    };
+  }
+
+  private credit(
+    side: SideIndex,
+    ownUnit: readonly string[],
+    opponentUnit: readonly string[],
+    points: number,
+  ): void {
+    this.row(side, ownUnit).pointsFor += points;
+    this.row((1 - side) as SideIndex, opponentUnit).pointsAgainst += points;
+  }
+
+  private row(side: SideIndex, playerIds: readonly string[]): MutableLineupFactRow {
+    const key = lineupFactKey(playerIds);
+    const rows = this.rows[side];
+    const existing = rows.get(key);
+    if (existing !== undefined) return existing;
+    const created: MutableLineupFactRow = {
+      key,
+      playerIds: [...playerIds].sort(),
+      seconds: 0,
+      offensivePossessions: 0,
+      defensivePossessions: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+    };
+    rows.set(key, created);
+    return created;
+  }
+
+  private sideFacts(team: FullCourtTeamResult, side: SideIndex): FullCourtLineupFactRow[] {
+    // Stints own the lineup's own minutes, points, and possessions; the tracker
+    // only contributes the opponent-side totals that need synchronized fives.
+    const rows = new Map<string, MutableLineupFactRow>();
+    for (const stint of team.stints) {
+      const key = lineupFactKey(stint.playerIds);
+      let row = rows.get(key);
+      if (row === undefined) {
+        row = {
+          key,
+          playerIds: [...stint.playerIds].sort(),
+          seconds: 0,
+          offensivePossessions: 0,
+          defensivePossessions: 0,
+          pointsFor: 0,
+          pointsAgainst: 0,
+        };
+        rows.set(key, row);
+      }
+      row.seconds += stint.seconds;
+      row.pointsFor += stint.points;
+      row.offensivePossessions += stint.possessions;
+    }
+    for (const tracked of this.rows[side].values()) {
+      let row = rows.get(tracked.key);
+      if (row === undefined) {
+        row = {
+          key: tracked.key,
+          playerIds: tracked.playerIds,
+          seconds: 0,
+          offensivePossessions: 0,
+          defensivePossessions: 0,
+          pointsFor: 0,
+          pointsAgainst: 0,
+        };
+        rows.set(tracked.key, row);
+      }
+      row.pointsAgainst += tracked.pointsAgainst;
+      row.defensivePossessions += tracked.defensivePossessions;
+    }
+    return [...rows.values()].map((row) => ({
+      playerIds: row.playerIds,
+      seconds: row.seconds,
+      offensivePossessions: row.offensivePossessions,
+      defensivePossessions: row.defensivePossessions,
+      pointsFor: row.pointsFor,
+      pointsAgainst: row.pointsAgainst,
+    }));
+  }
 }
 
 /**
@@ -570,6 +733,8 @@ export function simulateRecordedFullCourtGame(
 export interface FullCourtGameRun {
   readonly result: FullCourtGameResult;
   readonly tape: readonly FullCourtTapeEvent[] | null;
+  /** Null or absent when compact lineup facts were not requested. */
+  readonly lineupFacts?: FullCourtGameLineupFacts | null;
 }
 
 export function runFullCourtGame(
@@ -681,6 +846,7 @@ export function runFullCourtGame(
   effects?.setActiveUnits(home.lineup.units, away.lineup.units);
 
   const tape: FullCourtTapeEvent[] | null = options.record === true ? [] : null;
+  const lineupFacts = options.lineupFacts === true ? new LineupFactTracker() : null;
   home.beginStint(0, recorder);
   away.beginStint(0, recorder);
 
@@ -751,8 +917,9 @@ export function runFullCourtGame(
     let secondsRemaining = period < 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
     while (secondsRemaining > 0) {
       state.secondsRemaining = secondsRemaining;
-      const homeUnit = tape !== null ? home.activePlayerIds() : null;
-      const awayUnit = tape !== null ? away.activePlayerIds() : null;
+      const trackTrip = tape !== null || lineupFacts !== null;
+      const homeUnit = trackTrip ? home.activePlayerIds() : null;
+      const awayUnit = trackTrip ? away.activePlayerIds() : null;
       const trip = resolveTrip(ctx, offense);
       if (!trip.ended && trip.secondsElapsed === 0 && state.secondsRemaining > 0) {
         if (state.secondsRemaining >= ENGINE_CONSTANTS.minimumStartSeconds) {
@@ -783,6 +950,16 @@ export function runFullCourtGame(
           homeUnit,
           awayUnit,
         });
+      }
+      if (lineupFacts !== null && homeUnit !== null && awayUnit !== null) {
+        lineupFacts.recordTrip(
+          homeUnit,
+          awayUnit,
+          offense,
+          trip.ended,
+          recorder.sides[0].points,
+          recorder.sides[1].points,
+        );
       }
 
       if (trip.ended) offense = (1 - offense) as SideIndex;
@@ -815,6 +992,7 @@ export function runFullCourtGame(
           period,
           secondsRemaining,
           tape,
+          lineupFacts,
         );
       }
       resolveSubstitutions(
@@ -860,7 +1038,7 @@ export function runFullCourtGame(
     overtimePeriods,
     totalSeconds: globalSeconds,
   };
-  return { result, tape };
+  return { result, tape, lineupFacts: lineupFacts?.finish(result) ?? null };
 }
 
 function setRecorderActiveUnits(
@@ -950,6 +1128,7 @@ function awardEmergencyTechnicals(
   period: number,
   clockSeconds: number,
   tape: FullCourtTapeEvent[] | null,
+  lineupFacts: LineupFactTracker | null,
 ): void {
   for (const charge of charges) {
     const runtime = runtimes[charge.side];
@@ -959,11 +1138,14 @@ function awardEmergencyTechnicals(
     const slot = bestFreeThrowSlot(opponent, unitsAtFoul[opponentSide]);
     const shooter = opponent.lineup.players[slot];
     if (shooter === undefined) throw new Error('Full Court technical has no eligible shooter');
+    const homeUnit = runtimes[0].activePlayerIds();
+    const awayUnit = runtimes[1].activePlayerIds();
     for (let extra = 0; extra < charge.count; extra += 1) {
       runtime.technicalFouls += 1;
       const made = rng.chance(freeThrowProbability(shooter, profile));
       recorder.freeThrow(opponent.side, slot, made);
       if (!made) recorder.teamRebound(runtime.side);
+      lineupFacts?.recordTechnical(homeUnit, awayUnit, opponent.side, made);
       tape?.push({
         kind: 'technical',
         period,
@@ -972,8 +1154,8 @@ function awardEmergencyTechnicals(
         shooterPlayerId: shooter.playerId,
         made,
         againstPlayerId: runtime.playerAt(charge.playerIndex).playerId,
-        homeUnit: runtimes[0].activePlayerIds(),
-        awayUnit: runtimes[1].activePlayerIds(),
+        homeUnit,
+        awayUnit,
       });
     }
   }

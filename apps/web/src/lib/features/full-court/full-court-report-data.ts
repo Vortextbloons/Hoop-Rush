@@ -7,7 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   buildFullCourtAwards,
-  buildFullCourtPlayerSeasonStats,
   buildFullCourtRegularSeason,
   fullCourtPlayoffView,
   fullCourtStandings,
@@ -27,7 +26,7 @@ export interface FullCourtReportData {
   readonly regularScores: readonly FullCourtSeasonScore[];
   readonly playoffCheckpoint: FullCourtPlayoffCheckpoint | null;
   readonly standings: ReturnType<typeof fullCourtStandings>;
-  readonly playerRows: ReturnType<typeof buildFullCourtPlayerSeasonStats>;
+  readonly playerRows: ReturnType<typeof buildFullCourtAwards>['playerRows'];
   readonly awards: ReturnType<typeof buildFullCourtAwards>;
   readonly bracket: ReturnType<typeof fullCourtPlayoffView> | null;
 }
@@ -75,10 +74,6 @@ export async function loadFullCourtReport(runId: string): Promise<FullCourtRepor
   const playoffCheckpoint = await persistence.fullCourtPlayoffRepository.load(runId);
 
   const standings = fullCourtStandings(seasonLock.season.teams, regularScores);
-  const playerRows = buildFullCourtPlayerSeasonStats({
-    teams: seasonLock.season.teams,
-    scores: regularScores,
-  });
 
   let bracket: ReturnType<typeof fullCourtPlayoffView> | null = null;
   if (playoffCheckpoint !== null) {
@@ -110,7 +105,7 @@ export async function loadFullCourtReport(runId: string): Promise<FullCourtRepor
     regularScores,
     playoffCheckpoint,
     standings,
-    playerRows,
+    playerRows: awards.playerRows,
     awards,
     bracket,
   };

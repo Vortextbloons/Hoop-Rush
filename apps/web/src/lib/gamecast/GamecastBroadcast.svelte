@@ -7,7 +7,7 @@
     GamecastPlayer,
     GamecastRecordedGame,
   } from './gamecast-types';
-  import GamecastFeed from './GamecastFeed.svelte';
+  import GamecastLiveLayout from './GamecastLiveLayout.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -129,11 +129,17 @@
   const clockLabel = $derived(
     lastTrip === null ? '—' : formatClock(Math.max(0, Math.floor(lastTrip.clockSeconds))),
   );
-  const progressPct = $derived(
-    Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
-  );
   const complete = $derived(progress >= 1);
   const recentFeed = $derived([...feed].slice(-10).reverse());
+  const feedRows = $derived(
+    recentFeed.map((line) => ({
+      ...line,
+      side: line.offense === localParticipantId ? 'local' : 'opponent',
+      team: line.offense === localParticipantId ? 'You' : 'Opp',
+      tag: feedTag(line),
+      summary: displaySummary(line.summary),
+    })),
+  );
   const possession = $derived(
     lastTrip === null
       ? null
@@ -181,133 +187,123 @@
   }
 </script>
 
-<section class="broadcast" aria-label={`Game ${String(output.gameNumber)} broadcast`}>
-  <GameScoreboard
-    teams={[
-      { key: 'local', label: 'You', score: localScore },
-      { key: 'opponent', label: 'Opponent', score: opponentScore },
-    ]}
-    label={`Game ${String(output.gameNumber)} score`}
-    class="bc-board"
-  >
-    {#snippet team(entry)}
-      <div
-        class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}
-        data-leading={entry.key === leader}
-      >
-        <span class="bc-team-label">{entry.label}</span>
-        {#if entry.key === leader}<span class="bc-leader">{complete ? 'Winner' : 'Leading'}</span
-          >{/if}
-        {#key entry.score}
-          <span class="bc-score" data-score={entry.key === 'local' ? 'local' : 'opponent'}>
-            {entry.score}
-          </span>
-        {/key}
-      </div>
-    {/snippet}
-    {#snippet status()}
-      <div class="bc-center">
-        <span class="bc-live" data-tone={complete ? 'final' : 'live'}>
-          <span class="bc-live-dot" aria-hidden="true"></span>
-          {complete ? 'Final' : 'Live'}
-        </span>
-        <span class="bc-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
-        {#if !complete}
-          <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
-        {/if}
-        <span class="bc-quarters" aria-hidden="true">
-          {#each [1, 2, 3, 4] as quarter (quarter)}
-            <span
-              class="bc-quarter"
-              class:done={quarter < (lastTrip?.period ?? 1)}
-              class:now={quarter === (lastTrip?.period ?? 1)}
-            ></span>
-          {/each}
-        </span>
-      </div>
-    {/snippet}
-  </GameScoreboard>
-
-  <div class="bc-progress" aria-hidden="true">
-    <div
-      class="bc-progress-fill"
-      data-active={complete ? undefined : 'true'}
-      style:width={`${progressPct}%`}
-    ></div>
-  </div>
-
-  <div class="bc-panels">
-    {#each sides as side (side.key)}
-      <section class="bc-panel" data-side={side.key} aria-label={`${side.label} player stats`}>
-        <header class="bc-panel-head">
-          <span class="bc-panel-team" data-side={side.key}>{side.label}</span>
-          <strong class="bc-panel-score">{side.score}</strong>
-        </header>
-        <div class="bc-panel-cols" aria-hidden="true">
-          <span>Player</span>
-          <span>PTS</span>
-          <span>REB</span>
-          <span>AST</span>
-          <span>TO</span>
-          <span>FG%</span>
-          <span>3P%</span>
+<GamecastLiveLayout
+  label={`Game ${String(output.gameNumber)} broadcast`}
+  {progress}
+  feed={feedRows}
+  feedCountLabel={`${feed.length} ${feed.length === 1 ? 'possession' : 'possessions'}`}
+>
+  {#snippet scoreboard()}
+    <GameScoreboard
+      teams={[
+        { key: 'local', label: 'You', score: localScore },
+        { key: 'opponent', label: 'Opponent', score: opponentScore },
+      ]}
+      label={`Game ${String(output.gameNumber)} score`}
+      class="bc-board"
+    >
+      {#snippet team(entry)}
+        <div
+          class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}
+          data-leading={entry.key === leader}
+        >
+          <span class="bc-team-label">{entry.label}</span>
+          {#if entry.key === leader}<span class="bc-leader">{complete ? 'Winner' : 'Leading'}</span
+            >{/if}
+          {#key entry.score}
+            <span class="bc-score" data-score={entry.key === 'local' ? 'local' : 'opponent'}>
+              {entry.score}
+            </span>
+          {/key}
         </div>
-        <ul class="bc-rows">
-          {#each side.rows as row (row.key)}
-            <li class="bc-row" class:hot={row.hot} data-role="player-row">
-              <span class="bc-ident">
-                {#if manifest && row.player?.playerExternalId}
-                  <PlayerFace
-                    player={{
-                      playerId: row.player.playerId,
-                      playerExternalId: row.player.playerExternalId,
-                      altIds: row.player.altIds,
-                    }}
-                    {manifest}
-                    size="sm"
-                    fallbackInitials={initialsOf(row.name)}
-                  />
-                {:else}
-                  <span class="bc-face">{initialsOf(row.name)}</span>
-                {/if}
-                <span class="bc-ident-text">
-                  <span class="bc-name">{row.name}</span>
-                  <span class="bc-sub">
-                    {#if manifest && row.player && teamLogoSlot(row.player)}
-                      <TeamLogo
-                        {manifest}
-                        franchiseId={row.player.franchiseId ?? ''}
-                        teamExternalId={teamLogoSlot(row.player)?.teamExternalId ?? ''}
-                        logoCandidates={[]}
-                        className="h-3 w-3"
-                      />
-                    {/if}
-                    {row.position}
-                    {#if row.hot}<span class="bc-hot">Top scorer</span>{/if}
+      {/snippet}
+      {#snippet status()}
+        <div class="bc-center">
+          <span class="bc-live" data-tone={complete ? 'final' : 'live'}>
+            <span class="bc-live-dot" aria-hidden="true"></span>
+            {complete ? 'Final' : 'Live'}
+          </span>
+          <span class="bc-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
+          {#if !complete}
+            <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
+          {/if}
+          <span class="bc-quarters" aria-hidden="true">
+            {#each [1, 2, 3, 4] as quarter (quarter)}
+              <span
+                class="bc-quarter"
+                class:done={quarter < (lastTrip?.period ?? 1)}
+                class:now={quarter === (lastTrip?.period ?? 1)}
+              ></span>
+            {/each}
+          </span>
+        </div>
+      {/snippet}
+    </GameScoreboard>
+  {/snippet}
+
+  {#snippet content()}
+    <div class="bc-panels">
+      {#each sides as side (side.key)}
+        <section class="bc-panel" data-side={side.key} aria-label={`${side.label} player stats`}>
+          <header class="bc-panel-head">
+            <span class="bc-panel-team" data-side={side.key}>{side.label}</span>
+            <strong class="bc-panel-score">{side.score}</strong>
+          </header>
+          <div class="bc-panel-cols" aria-hidden="true">
+            <span>Player</span>
+            <span>PTS</span>
+            <span>REB</span>
+            <span>AST</span>
+            <span>TO</span>
+            <span>FG%</span>
+            <span>3P%</span>
+          </div>
+          <ul class="bc-rows">
+            {#each side.rows as row (row.key)}
+              <li class="bc-row" class:hot={row.hot} data-role="player-row">
+                <span class="bc-ident">
+                  {#if manifest && row.player?.playerExternalId}
+                    <PlayerFace
+                      player={{
+                        playerId: row.player.playerId,
+                        playerExternalId: row.player.playerExternalId,
+                        altIds: row.player.altIds,
+                      }}
+                      {manifest}
+                      size="sm"
+                      fallbackInitials={initialsOf(row.name)}
+                    />
+                  {:else}
+                    <span class="bc-face">{initialsOf(row.name)}</span>
+                  {/if}
+                  <span class="bc-ident-text">
+                    <span class="bc-name">{row.name}</span>
+                    <span class="bc-sub">
+                      {#if manifest && row.player && teamLogoSlot(row.player)}
+                        <TeamLogo
+                          {manifest}
+                          franchiseId={row.player.franchiseId ?? ''}
+                          teamExternalId={teamLogoSlot(row.player)?.teamExternalId ?? ''}
+                          logoCandidates={[]}
+                          className="h-3 w-3"
+                        />
+                      {/if}
+                      {row.position}
+                      {#if row.hot}<span class="bc-hot">Top scorer</span>{/if}
+                    </span>
                   </span>
                 </span>
-              </span>
-              <span class="bc-stat big" data-stat="pts">{row.points}</span>
-              <span class="bc-stat" data-stat="reb">{row.rebounds}</span>
-              <span class="bc-stat" data-stat="ast">{row.assists}</span>
-              <span class="bc-stat" data-stat="tov">{row.turnovers}</span>
-              <span class="bc-stat" data-stat="fg">{row.fieldGoals}</span>
-              <span class="bc-stat" data-stat="tp">{row.threes}</span>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/each}
-  </div>
-
-  <GamecastFeed
-    rows={recentFeed.map((line) => ({
-      ...line,
-      side: line.offense === localParticipantId ? 'local' : 'opponent',
-      team: line.offense === localParticipantId ? 'You' : 'Opp',
-      tag: feedTag(line),
-      summary: displaySummary(line.summary),
-    }))}
-    countLabel={`${feed.length} ${feed.length === 1 ? 'possession' : 'possessions'}`}
-  />
-</section>
+                <span class="bc-stat big" data-stat="pts">{row.points}</span>
+                <span class="bc-stat" data-stat="reb">{row.rebounds}</span>
+                <span class="bc-stat" data-stat="ast">{row.assists}</span>
+                <span class="bc-stat" data-stat="tov">{row.turnovers}</span>
+                <span class="bc-stat" data-stat="fg">{row.fieldGoals}</span>
+                <span class="bc-stat" data-stat="tp">{row.threes}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/each}
+    </div>
+  {/snippet}
+</GamecastLiveLayout>

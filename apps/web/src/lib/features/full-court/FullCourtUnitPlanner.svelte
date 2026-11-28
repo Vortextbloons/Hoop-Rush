@@ -18,6 +18,7 @@
   let {
     units,
     roster,
+    closingFive = null,
     art = null,
     locked = false,
     onAdd,
@@ -29,6 +30,7 @@
   }: {
     units: readonly FullCourtNamedUnitDraft[];
     roster: readonly SimulationPlayer[];
+    closingFive?: readonly string[] | null;
     art?: FullCourtArt | null;
     locked?: boolean;
     onAdd: () => void;
@@ -39,10 +41,9 @@
     onUseAsClosingFive: (unit: FullCourtNamedUnitDraft) => void;
   } = $props();
 
-  const playerNames = $derived(
-    new Map(roster.map((player) => [player.playerId, player.displayName])),
+  const playerById = $derived(
+    new Map<string, SimulationPlayer>(roster.map((player) => [player.playerId, player])),
   );
-  const playerById = $derived(new Map(roster.map((player) => [player.playerId, player])));
   const planned = $derived(units.reduce((total, unit) => total + (unit.plannedMinutes ?? 0), 0));
   const segments = $derived(
     units
@@ -61,6 +62,12 @@
     return unit.playerIds
       .map((playerId) => playerById.get(playerId))
       .filter((player): player is SimulationPlayer => player !== undefined);
+  }
+
+  function matchesClosingFive(unit: FullCourtNamedUnitDraft): boolean {
+    if (closingFive === null) return false;
+    const target = new Set(closingFive);
+    return unit.playerIds.length === target.size && unit.playerIds.every((id) => target.has(id));
   }
 </script>
 
@@ -211,6 +218,9 @@
             {/each}
           </div>
 
+          {#if matchesClosingFive(unit)}
+            <p class="unit-closing">Current closing five</p>
+          {/if}
           {#if players.length < SLOTS.length}
             <p class="unit-warning">
               This unit has {players.length} of 5 players. Choose a full five to use it.
@@ -447,5 +457,15 @@
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1.4;
+  }
+
+  .unit-closing {
+    margin: 0.45rem 0 0;
+    color: var(--color-accent);
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 </style>

@@ -40,6 +40,8 @@ export interface FullCourtGameHealthOptions {
   readonly health?: Readonly<Partial<Record<Side, FullCourtTeamHealth>>>;
   readonly restingPlayerIds?: Readonly<Partial<Record<Side, readonly string[]>>>;
   readonly record?: boolean;
+  /** Accumulate compact lineup facts without retaining a playback tape. */
+  readonly lineupFacts?: boolean;
   /**
    * Experimental explicit opt-in for postgame time-loss injuries. There is no
    * default profile set; the caller supplies packaged profiles and checks their
@@ -136,27 +138,56 @@ function prepareTeamHealth(
   return { team: { ...team, availability }, health, eligible, playing };
 }
 
+function playerStrainFactor(
+  playerId: string,
+  playerVersionId: string | undefined,
+  staminaRating: number | undefined,
+  injuryProfiles: FullCourtHealthProfileSet | undefined,
+): number {
+  const staminaScale =
+    staminaRating === undefined
+      ? 1
+      : Math.max(0.75, Math.min(1.35, 1 - (staminaRating - 75) * 0.01));
+  const rate =
+    playerVersionId === undefined
+      ? undefined
+      : injuryProfiles?.players[playerVersionId]?.episodesPer10kAppearances;
+  const durabilityScale =
+    rate === undefined ? 1 : Math.max(0.8, Math.min(1.25, 0.8 + (rate / 100) * 0.2));
+  void playerId;
+  return Math.max(0.65, Math.min(1.45, staminaScale * durabilityScale));
+}
+
 function addWorkload(
   health: FullCourtTeamHealth,
   result: FullCourtTeamResult,
-  roster: FullCourtTeamGameInput['roster'],
+  team: FullCourtTeamGameInput,
+  injuryProfiles: FullCourtHealthProfileSet | undefined,
 ): void {
-  const workloads = new Map(
-    roster.map((player) => [player.playerId, player.anchors?.minutesPerGame]),
+  const playersById = new Map(team.roster.map((player) => [player.playerId, player]));
+  const staminaById = new Map(
+    (team.availability ?? []).map((entry) => [entry.playerId, entry.staminaRating]),
   );
 
   for (const player of result.players) {
     if (player.seconds === 0) continue;
     const prior = health.players[player.playerId];
+    const rosterPlayer = playersById.get(player.playerId);
     const minutesLoad = Math.round(
       (player.seconds / FULL_COURT_REGULATION_SECONDS) * REGULATION_LOAD,
     );
-    const normalMinutes = Math.max(18, workloads.get(player.playerId) ?? 32);
+    const normalMinutes = Math.max(18, rosterPlayer?.anchors?.minutesPerGame ?? 32);
     const excessMinutes = Math.max(0, player.seconds / 60 - normalMinutes - 1);
+    const strainFactor = playerStrainFactor(
+      player.playerId,
+      rosterPlayer?.playerVersionId,
+      staminaById.get(player.playerId),
+      injuryProfiles,
+    );
     const cumulativeLoadBasisPoints = Math.min(
       FULL_LOAD,
       (prior?.cumulativeLoadBasisPoints ?? 0) +
-        Math.min(CUMULATIVE_GRACE, Math.round(excessMinutes * OVERLOAD_PER_MINUTE)),
+        Math.min(CUMULATIVE_GRACE, Math.round(excessMinutes * OVERLOAD_PER_MINUTE * strainFactor)),
     );
     health.players[player.playerId] = {
       ...(cumulativeLoadBasisPoints > 0 ? { cumulativeLoadBasisPoints } : {}),
@@ -208,6 +239,7 @@ export function runFullCourtGameWithHealth(
   }
   const run = runFullCourtGame({ ...game, home: home.team, away: away.team }, context, {
     record: options.record === true,
+    lineupFacts: options.lineupFacts === true,
   });
   const injuries: FullCourtInjuryEvent[] = [];
   const profiles = options.injuryProfiles;
@@ -237,6 +269,7 @@ export function runFullCourtGameWithHealth(
       injuries.push(...drawn);
     }
   }
-  for (const side of sides) addWorkload(health[side], run.result[side], prepared[side].team.roster);
+  for (const side of sides)
+    addWorkload(health[side], run.result[side], prepared[side].team, profiles);
   return { kind: 'played', ...run, health, injuries };
 }

@@ -311,6 +311,7 @@ export interface FullCourtGameDayPlayerView {
   readonly status: FullCourtGameDayPlayerStatus;
   readonly statusLabel: string;
   readonly detail: string | null;
+  readonly loadPercent: number;
   readonly resting: boolean;
   readonly canRest: boolean;
 }
@@ -403,6 +404,7 @@ export function fullCourtGameDayReadiness(input: {
       playerVersionId: row.player.playerVersionId,
       displayName: row.player.displayName,
       positions: row.player.positions,
+      loadPercent: row.loadPercent,
       resting: row.resting,
       canRest: row.eligible && (row.resting || availableCount > FULL_COURT_GAME_DAY_MIN_PLAYERS),
     };

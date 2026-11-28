@@ -44,7 +44,9 @@
     onChange: (role: keyof FullCourtOffensiveHierarchyDraft, playerId: string | null) => void;
   } = $props();
 
-  const playerById = $derived(new Map(roster.map((player) => [player.playerId, player])));
+  const playerById = $derived(
+    new Map<string, SimulationPlayer>(roster.map((player) => [player.playerId, player])),
+  );
   let activeRole = $state<keyof FullCourtOffensiveHierarchyDraft | null>(null);
 
   const activeRoleMeta = $derived(

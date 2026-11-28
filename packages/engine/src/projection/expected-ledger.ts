@@ -116,9 +116,16 @@ export function projectExpectedLedger(input: LedgerMatchup): ExpectedLedgerResul
   return computeExpectedLedger(input, false);
 }
 
-export function projectExpectedPoints(input: LedgerMatchup): readonly [number, number] {
+type ExpectedScoring = Pick<
+  ProjectionLedger,
+  'points' | 'offensiveRebounds' | 'nonShootingFoulRate'
+>;
+
+export function projectExpectedScoring(
+  input: LedgerMatchup,
+): readonly [ExpectedScoring, ExpectedScoring] {
   const { offense, defense } = computeExpectedLedger(input, true);
-  return [offense.ledger.points, defense.ledger.points];
+  return [offense.ledger, defense.ledger] as const;
 }
 
 function computeExpectedLedger(input: LedgerMatchup, pointsOnly: boolean): ExpectedLedgerResult {
@@ -209,8 +216,8 @@ function computeSide(input: {
   const zoneCount = ZONES.length;
   const totalKeys = playerCount * playerCount * zoneCount * actionCount;
   const massByKey = new Float64Array(totalKeys);
-  const passedMassByKey = new Float64Array(totalKeys);
-  const passedByInitiatorByKey = new Float64Array(totalKeys * playerCount);
+  const passedMassByKey = new Float64Array(input.pointsOnly ? 0 : totalKeys);
+  const passedByInitiatorByKey = new Float64Array(input.pointsOnly ? 0 : totalKeys * playerCount);
   const seenByKey = new Uint8Array(totalKeys);
   const keyOrder: number[] = [];
   const actionTotals: Record<string, number> = {};
@@ -291,25 +298,20 @@ function computeSide(input: {
             if (seenByKey[keyIndex] === 0) {
               seenByKey[keyIndex] = 1;
               keyOrder.push(keyIndex);
-              massByKey[keyIndex] = mass;
-              passedMassByKey[keyIndex] = shooterIndex !== initiatorIndex ? mass : 0;
-              if (shooterIndex !== initiatorIndex) {
-                passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] = mass;
-              }
-            } else {
-              massByKey[keyIndex] = (massByKey[keyIndex] ?? 0) + mass;
-              if (shooterIndex !== initiatorIndex) {
-                passedMassByKey[keyIndex] = (passedMassByKey[keyIndex] ?? 0) + mass;
-                passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] =
-                  (passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] ?? 0) + mass;
-              }
+            }
+            massByKey[keyIndex] = (massByKey[keyIndex] ?? 0) + mass;
+            if (input.pointsOnly) continue;
+            if (shooterIndex !== initiatorIndex) {
+              passedMassByKey[keyIndex] = (passedMassByKey[keyIndex] ?? 0) + mass;
+              passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] =
+                (passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] ?? 0) + mass;
             }
             actionTotals[action] = (actionTotals[action] ?? 0) + mass;
             zoneTotals[zone] = (zoneTotals[zone] ?? 0) + mass;
             shooterTotals[shooterIndex] = (shooterTotals[shooterIndex] ?? 0) + mass;
           }
         }
-        if (passP > 0) {
+        if (!input.pointsOnly && passP > 0) {
           passOpportunity += shotMass * initiatorShare * actionShare * shooterShare * passP;
         }
       }

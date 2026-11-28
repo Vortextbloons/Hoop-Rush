@@ -4,14 +4,21 @@
     unitNameForPlayerIds,
     type FullCourtGameHealthOutcome,
     type FullCourtGameResult,
+    type FullCourtTapeEvent,
   } from '@hoop-rush/engine';
-  import GamecastFeed, { type BroadcastFeedRow } from '#lib/gamecast/GamecastFeed.svelte';
+  import type { BroadcastFeedRow } from '#lib/gamecast/GamecastFeed.svelte';
+  import GamecastLiveLayout from '#lib/gamecast/GamecastLiveLayout.svelte';
+  import GamecastPlaybackControls from '#lib/gamecast/GamecastPlaybackControls.svelte';
+  import {
+    gamecastBoxScoreColumns,
+    gamecastBoxScoreLineTotals,
+    gamecastBoxScoreTotals,
+  } from '#lib/gamecast/gamecast-box-score.js';
   import { gamecastPeriodLabel } from '#lib/gamecast/gamecast-broadcast-view.js';
   import { onMount } from 'svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
-  import { ratioPct, trueShootingPct } from '#lib/format.js';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
@@ -36,45 +43,21 @@
   type PlayerLine = FullCourtGameResult['home']['players'][number];
   type LineupReportRow = NonNullable<typeof lineupReport>['lineupRows'][number];
   const columns: PlayerStatColumn<PlayerLine>[] = [
-    { key: 'min', label: 'MIN', value: (player) => player.minutes.toFixed(1) },
-    {
-      key: 'pts',
-      label: 'PTS',
-      value: (player) => player.points,
-      cellClass: 'ui-stats-value-strong',
-    },
-    { key: 'reb', label: 'REB', value: (player) => player.rebounds.total },
-    { key: 'ast', label: 'AST', value: (player) => player.assists },
-    { key: 'stl', label: 'STL', value: (player) => player.steals },
-    { key: 'blk', label: 'BLK', value: (player) => player.blocks },
-    { key: 'tov', label: 'TO', value: (player) => player.turnovers },
-    { key: 'pf', label: 'PF', value: (player) => player.fouls },
-    {
-      key: 'fg',
-      label: 'FG',
-      value: (player) => `${player.fieldGoals.made}-${player.fieldGoals.attempted}`,
-    },
-    {
-      key: 'tp',
-      label: '3P',
-      value: (player) => `${player.threes.made}-${player.threes.attempted}`,
-    },
-    {
-      key: 'ft',
-      label: 'FT',
-      value: (player) => `${player.freeThrows.made}-${player.freeThrows.attempted}`,
-    },
-    {
-      key: 'fgPct',
-      label: 'FG%',
-      value: (player) => ratioPct(player.fieldGoals.made, player.fieldGoals.attempted),
-    },
-    {
-      key: 'tsPct',
-      label: 'TS%',
-      value: (player) =>
-        trueShootingPct(player.points, player.fieldGoals.attempted, player.freeThrows.attempted),
-    },
+    { key: 'minutes', label: 'MIN', value: (player) => player.minutes.toFixed(1) },
+    ...gamecastBoxScoreColumns<PlayerLine>([
+      'points',
+      'rebounds',
+      'assists',
+      'steals',
+      'blocks',
+      'turnovers',
+      'fouls',
+      'fieldGoals',
+      'threes',
+      'freeThrows',
+      'fieldGoalPct',
+      'trueShootingPct',
+    ]),
     {
       key: 'energy',
       label: 'ENERGY',
@@ -83,57 +66,15 @@
   ];
 
   function totalsForTeam(team: FullCourtGameResult['home']): PlayerStatsTotals<PlayerLine> {
-    const sum = (pick: (player: PlayerLine) => number): number =>
-      team.players.reduce((acc, player) => acc + pick(player), 0);
-    const min = sum((p) => p.minutes);
-    const pts = team.box.points;
-    const reb = sum((p) => p.rebounds.total);
-    const ast = sum((p) => p.assists);
-    const stl = sum((p) => p.steals);
-    const blk = sum((p) => p.blocks);
-    const tov = sum((p) => p.turnovers);
-    const pf = sum((p) => p.fouls);
-    const fgm = sum((p) => p.fieldGoals.made);
-    const fga = sum((p) => p.fieldGoals.attempted);
-    const tpm = sum((p) => p.threes.made);
-    const tpa = sum((p) => p.threes.attempted);
-    const ftm = sum((p) => p.freeThrows.made);
-    const fta = sum((p) => p.freeThrows.attempted);
-
+    const lineTotals = gamecastBoxScoreLineTotals(team.players);
+    const totals = gamecastBoxScoreTotals<PlayerLine>({
+      ...lineTotals,
+      points: team.box.points,
+    });
     return {
       label: 'Team',
-      value: (column) => {
-        switch (column.key) {
-          case 'min':
-            return min.toFixed(1);
-          case 'pts':
-            return pts;
-          case 'reb':
-            return reb;
-          case 'ast':
-            return ast;
-          case 'stl':
-            return stl;
-          case 'blk':
-            return blk;
-          case 'tov':
-            return tov;
-          case 'pf':
-            return pf;
-          case 'fg':
-            return `${fgm}-${fga}`;
-          case 'tp':
-            return `${tpm}-${tpa}`;
-          case 'ft':
-            return `${ftm}-${fta}`;
-          case 'fgPct':
-            return ratioPct(fgm, fga);
-          case 'tsPct':
-            return trueShootingPct(pts, fga, fta);
-          default:
-            return '—';
-        }
-      },
+      value: (column) =>
+        column.key === 'minutes' ? lineTotals.minutes.toFixed(1) : totals.value(column),
     };
   }
   const lineupColumns: PlayerStatColumn<LineupReportRow>[] = [
@@ -202,12 +143,80 @@
     }
   });
 
+  const userTeam = $derived(
+    game.result.home.teamId === userTeamId ? game.result.home : game.result.away,
+  );
+  const userSideIndex = $derived(game.result.home.teamId === userTeamId ? 0 : 1);
+  const userSubstitutions = $derived(
+    (game.tape ?? []).filter(
+      (event): event is Extract<FullCourtTapeEvent, { kind: 'substitution' }> =>
+        event.kind === 'substitution' && event.side === userSideIndex,
+    ),
+  );
+  const foulTrouble = $derived(
+    userTeam.players.filter((player) => player.fouls >= 4 || player.foulsOut),
+  );
+  const starterMinutes = $derived(
+    userTeam.players
+      .filter((player) => player.startedGame)
+      .reduce((total, player) => total + player.minutes, 0),
+  );
+  const benchMinutes = $derived(
+    userTeam.players
+      .filter((player) => !player.startedGame)
+      .reduce((total, player) => total + player.minutes, 0),
+  );
+  const bestLineup = $derived.by(() => {
+    const rows = (lineupReport?.lineupRows ?? []).filter(
+      (row) => row.sampleMet && row.netRatingPer100 !== null,
+    );
+    return (
+      [...rows].sort(
+        (left, right) => (right.netRatingPer100 ?? 0) - (left.netRatingPer100 ?? 0),
+      )[0] ?? null
+    );
+  });
+
   onMount(() => {
     const timer = setInterval(() => {
       if (!paused && !finished) cursor = Math.min(frames.length - 1, cursor + speed);
     }, 240);
     return () => clearInterval(timer);
   });
+
+  function substitutionReasonLabel(
+    reason: Extract<FullCourtTapeEvent, { kind: 'substitution' }>['reason'],
+  ): string {
+    switch (reason) {
+      case 'foul-out':
+        return 'foul out';
+      case 'fatigue':
+        return 'fatigue';
+      case 'minute-target':
+        return 'minute target';
+      case 'closing-five':
+        return 'closing five';
+      case 'coach-rule':
+        return 'coach rule';
+      case 'emergency-continuation':
+        return 'emergency';
+    }
+  }
+
+  function substitutionSummary(
+    events: readonly Extract<FullCourtTapeEvent, { kind: 'substitution' }>[],
+  ): string {
+    const counts = new Map<string, number>();
+    for (const event of events) {
+      const label = substitutionReasonLabel(event.reason);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts].map(([label, count]) => `${String(count)} ${label}`).join(' · ');
+  }
+
+  function playerNameOf(team: FullCourtGameResult['home'], playerId: string): string {
+    return team.players.find((player) => player.playerId === playerId)?.displayName ?? 'Player';
+  }
 
   function clockLabel(secondsRemaining: number): string {
     const seconds = Math.ceil(secondsRemaining);

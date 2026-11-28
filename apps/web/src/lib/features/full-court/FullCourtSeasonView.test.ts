@@ -37,6 +37,8 @@ function renderView(input: {
   restingPlayerIds?: readonly string[];
   notice?: FullCourtSimulationNotice | null;
   onEditGamePlan?: () => void;
+  onOpenPlayoffs?: () => void;
+  coachingDirty?: boolean;
 }): string {
   return render(FullCourtSeasonView, {
     props: {
@@ -55,6 +57,8 @@ function renderView(input: {
       onDismissNotice: () => {},
       ...(input.section === undefined ? {} : { section: input.section }),
       ...(input.onEditGamePlan === undefined ? {} : { onEditGamePlan: input.onEditGamePlan }),
+      ...(input.onOpenPlayoffs === undefined ? {} : { onOpenPlayoffs: input.onOpenPlayoffs }),
+      ...(input.coachingDirty === undefined ? {} : { coachingDirty: input.coachingDirty }),
     },
   }).body;
 }
@@ -204,26 +208,32 @@ describe('FullCourtSeasonView sections', () => {
     expect(blocked).not.toContain('Play next game');
   });
 
-  test('home shows the postseason screen once the bracket exists', () => {
+  test('home remains a game-day overview once the bracket exists', () => {
     const body = renderView({
       section: 'home',
       checkpoint: completed,
       playoff: bracketView(),
+      onOpenPlayoffs: () => {},
     });
-    expect(body).toContain('Postseason');
-    expect(body).toContain('Play next game');
-    expect(body).toContain('aria-label="Full Court postseason"');
+    expect(body).toContain('Open playoffs');
+    expect(body).toContain('aria-label="Full Court season progress"');
+    expect(body).toContain('aria-label="Full Court game-day readiness"');
+    expect(body).not.toContain('aria-label="Full Court playoff bracket"');
   });
 
-  test('home hands the bracket to the postseason screen instead of simming it', () => {
+  test('playoffs warns about unsaved coaching changes before playing', () => {
     const body = renderView({
-      section: 'home',
+      section: 'playoffs',
       checkpoint: completed,
       playoff: bracketView(),
+      coachingDirty: true,
+      onEditGamePlan: () => {},
     });
     expect(body).toContain('aria-label="Full Court postseason"');
     expect(body).toContain('aria-label="Full Court playoff bracket"');
-    expect(body).not.toContain('aria-label="Full Court season progress"');
+    expect(body).toContain('Unsaved coaching changes');
+    expect(body).toContain('Simulation uses your saved plan.');
+    expect(body).toContain('Review changes');
   });
 
   test('playoffs keeps the completed bracket available after a champion', () => {
@@ -412,7 +422,8 @@ test('shows opponent tactical adjustment in playoff preview only once series evi
     checkpoint: completed,
     playoff: adaptedView,
   });
-  expect(homeBody).toContain('Your series is live');
+  expect(homeBody).toContain('Game 3 · First round');
+  expect(homeBody).toContain('Game day readiness');
   expect(homeBody).not.toContain('aria-label="Playoff opponent adjustment"');
 
   const playoffsBody = renderView({

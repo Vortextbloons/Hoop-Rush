@@ -28,7 +28,6 @@
 
   type WarRoomTab = 'all' | 'fit' | 'camp' | 'film' | 'matchups';
 
-  let activeTab = $state<WarRoomTab>('all');
   let showAllOpponents = $state(false);
 
   const FILM_FINDING_LABELS = {
@@ -73,6 +72,7 @@
   let {
     draft,
     season,
+    activeTab = $bindable('all'),
     playoffPreview = null,
     busy,
     practiceOpen = false,
@@ -85,6 +85,7 @@
   }: {
     draft: FullCourtDraftState;
     season: FullCourtRegularSeason;
+    activeTab?: WarRoomTab;
     playoffPreview?: FullCourtPlayoffOpponentPreview | null;
     busy: boolean;
     practiceOpen?: boolean;
@@ -102,6 +103,9 @@
   );
   const leagueFilmRecord = $derived(
     (draft.reports ?? []).find((report) => report.kind === 'opponent-film') ?? null,
+  );
+  const shownTab = $derived(
+    activeTab === 'matchups' && matchupContext === null ? 'all' : activeTab,
   );
   const warRoomTabOptions = $derived.by(() => {
     const base: { value: WarRoomTab; label: string }[] = [
@@ -164,7 +168,7 @@
       <SegmentedControl
         label="War Room sections"
         class="max-w-full flex-wrap max-sm:[&>button]:min-h-11"
-        value={activeTab}
+        value={shownTab}
         onchange={(next) => (activeTab = next)}
         options={warRoomTabOptions}
       />
@@ -200,12 +204,12 @@
     </div>
   </Panel>
 
-  <div class="grid gap-3 {activeTab === 'all' ? 'xl:grid-cols-2 xl:items-start' : ''}">
-    <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'fit'}>
+  <div class="grid gap-3 {shownTab === 'all' ? 'xl:grid-cols-2 xl:items-start' : ''}">
+    <div class="space-y-3" hidden={shownTab !== 'all' && shownTab !== 'fit'}>
       <FullCourtRosterFitPanel {draft} {art} />
     </div>
 
-    <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'camp'}>
+    <div class="space-y-3" hidden={shownTab !== 'all' && shownTab !== 'camp'}>
       <FullCourtTrainingCampPanel
         {draft}
         {busy}
@@ -218,7 +222,7 @@
     </div>
   </div>
 
-  <div hidden={activeTab !== 'all' && activeTab !== 'film'}>
+  <div hidden={shownTab !== 'all' && shownTab !== 'film'}>
     <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
       <SectionHeading eyebrow="War Room" title="League opponent film" level={2} size="md">
         {#snippet actions()}
@@ -284,7 +288,7 @@
   </div>
 
   {#if matchupContext !== null}
-    <div hidden={activeTab !== 'all' && activeTab !== 'matchups'}>
+    <div hidden={shownTab !== 'all' && shownTab !== 'matchups'}>
       <FullCourtDefensiveMatchupsPanel
         context={matchupContext}
         {art}

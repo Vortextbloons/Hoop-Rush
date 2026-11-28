@@ -27,7 +27,7 @@ import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './h
 import { FULL_COURT_INJURY_VERSION } from './injuries.ts';
 import type { FullCourtLeagueGame } from './league.ts';
 import { fixtureFullCourtDefensiveMatchups } from './matchups.ts';
-import { buildFullCourtGameLineups } from './report.ts';
+import { buildFullCourtGameLineupsFromFacts } from './report.ts';
 import {
   fullCourtFutureDaysOf,
   fullCourtRegularSeasonGameInput,
@@ -273,11 +273,27 @@ function playSlotFixture(
     ...(isUserGame
       ? {
           restingPlayerIds: { [userSide]: options.restingPlayerIds },
-          // The user game is always recorded internally so compact lineup
-          // facts can be derived; the tape is discarded unless it was asked for.
-          record: true,
+          // Summaries need compact lineup facts, not a playback tape. The tape
+          // is built only when a watched replay was requested.
+          record: options.record === true,
+          lineupFacts: true,
         }
       : {}),
+  });
+}
+
+function userLineupsOf(
+  game: FullCourtGameHealthOutcome,
+  gameId: string,
+  userSide: 'home' | 'away',
+): ReturnType<typeof buildFullCourtGameLineupsFromFacts> | undefined {
+  if (game.kind !== 'played' || game.lineupFacts == null) return undefined;
+  return buildFullCourtGameLineupsFromFacts({
+    kind: 'played',
+    gameId,
+    userSide,
+    result: game.result,
+    facts: game.lineupFacts,
   });
 }
 
@@ -285,7 +301,7 @@ function checkedScoreFor(
   fixture: FullCourtLeagueGame,
   game: FullCourtGameHealthOutcome,
   isUserGame: boolean,
-  userLineups: ReturnType<typeof buildFullCourtGameLineups> | undefined,
+  userLineups: ReturnType<typeof buildFullCourtGameLineupsFromFacts> | undefined,
 ): FullCourtSeasonScore {
   if (game.kind === 'rest-conflict') throw new Error(`Invalid AI rotation for ${fixture.gameId}`);
   if (game.kind === 'played') {
@@ -322,16 +338,7 @@ export function simulateFullCourtUserSlot(
   ) {
     return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
   }
-  const userLineups =
-    userGame.kind === 'played' && userGame.tape !== null
-      ? buildFullCourtGameLineups({
-          kind: 'played',
-          gameId: userFixture.gameId,
-          userSide,
-          result: userGame.result,
-          tape: userGame.tape,
-        })
-      : undefined;
+  const userLineups = userLineupsOf(userGame, userFixture.gameId, userSide);
   const userScore = checkedScoreFor(userFixture, userGame, true, userLineups);
   return {
     kind: 'user-ready',
@@ -398,16 +405,7 @@ export function simulateFullCourtSeasonSlot(
   ) {
     return { kind: 'decision', reason: 'confirm-forfeit', fixture: userFixture };
   }
-  const userLineups =
-    userGame.kind === 'played' && userGame.tape !== null
-      ? buildFullCourtGameLineups({
-          kind: 'played',
-          gameId: userFixture.gameId,
-          userSide,
-          result: userGame.result,
-          tape: userGame.tape,
-        })
-      : undefined;
+  const userLineups = userLineupsOf(userGame, userFixture.gameId, userSide);
 
   const healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'] = {};
   const scores = entries.map((fixture) => {

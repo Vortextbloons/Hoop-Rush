@@ -21,7 +21,7 @@ test('projected scores and strength differences track seeded Full Court games', 
     const predicted = projectFullCourtMatchup(home, input.away, input.profile);
     let homePoints = 0;
     let awayPoints = 0;
-    const samples = 16;
+    const samples = 48;
     for (let index = 0; index < samples; index++) {
       const result = simulateFullCourtGame(
         {
@@ -34,8 +34,8 @@ test('projected scores and strength differences track seeded Full Court games', 
       homePoints += result.home.box.points / samples;
       awayPoints += result.away.box.points / samples;
     }
-    expect(Math.abs(predicted.home - homePoints)).toBeLessThan(12);
-    expect(Math.abs(predicted.away - awayPoints)).toBeLessThan(12);
+    expect(Math.abs(predicted.home - homePoints)).toBeLessThan(9);
+    expect(Math.abs(predicted.away - awayPoints)).toBeLessThan(9);
     expect(Math.abs(predicted.home - predicted.away - homePoints + awayPoints)).toBeLessThan(11);
     return { projected: predicted.home - predicted.away, simulated: homePoints - awayPoints };
   });
@@ -47,6 +47,56 @@ test('projected scores and strength differences track seeded Full Court games', 
   expect(even.projected).toBeGreaterThan(weak.projected);
   expect(strong.simulated).toBeGreaterThan(even.simulated);
   expect(even.simulated).toBeGreaterThan(weak.simulated);
+});
+
+test('projection tracks pace and asymmetric depth against paired full games', () => {
+  const context = createEngineContext();
+  const input = fullCourtTestInput({
+    seed: 'pace-and-depth',
+    homeRoster: fullCourtTestRoster('short-rotation', 6, (index) => ({
+      rating: index === 5 ? 66 : 81,
+      minutesPerGame: 33,
+    })),
+    awayRoster: fullCourtTestRoster('deep-rotation', 12, (index) => ({
+      rating: 81 - index,
+      minutesPerGame: 29,
+    })),
+  });
+  const comparisons = (['slow', 'fast'] as const).map((pace) => {
+    const home = {
+      ...input.home,
+      tactics: { pace, offense: 'ball-movement', defense: 'balanced' } as const,
+    };
+    const away = {
+      ...input.away,
+      tactics: { pace, offense: 'perimeter', defense: 'protect-paint' } as const,
+    };
+    const prediction = projectFullCourtMatchup(home, away, input.profile);
+    let homePoints = 0;
+    let awayPoints = 0;
+    const samples = 48;
+    for (let index = 0; index < samples; index++) {
+      const result = simulateFullCourtGame(
+        {
+          ...input,
+          home,
+          away,
+          seed: fullCourtTestSeed(`pace-and-depth-${String(index)}`),
+        },
+        context,
+      );
+      homePoints += result.home.box.points / samples;
+      awayPoints += result.away.box.points / samples;
+    }
+    expect(Math.abs(prediction.home - homePoints)).toBeLessThan(9);
+    expect(Math.abs(prediction.away - awayPoints)).toBeLessThan(9);
+    expect(Math.abs(prediction.home - prediction.away - homePoints + awayPoints)).toBeLessThan(9);
+    return { projected: prediction.home + prediction.away, simulated: homePoints + awayPoints };
+  });
+  const [slow, fast] = comparisons;
+  if (slow === undefined || fast === undefined) throw new Error('Expected both pace comparisons');
+  expect(fast.projected).toBeGreaterThan(slow.projected);
+  expect(fast.simulated).toBeGreaterThan(slow.simulated);
 });
 
 test('opponent plans are deterministic and improve the projected matchup', () => {

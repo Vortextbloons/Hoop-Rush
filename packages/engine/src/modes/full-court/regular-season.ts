@@ -4,6 +4,7 @@ import {
   havocInstanceSeed,
   type CapRushCatalogSource,
   type CapRushPayrollStatus,
+  type CapRushPlayoffApplied,
   type EraSimulationProfile,
   type FullCourtDraftState,
   type SeasonDraftCandidate,
@@ -15,6 +16,7 @@ import {
 import type { EngineContext } from '../../sim/kernel.ts';
 import { assertCapRushCatalogSourceMatches } from '../cap-rush/catalog.ts';
 import { capRushAssignFranchise, type CapRushLeagueField } from '../cap-rush/league-schedule.ts';
+import { capRushPlayoffEffectOf, capRushPlayoffIsNeutral } from '../cap-rush/playoff.ts';
 import { fullCourtDraftIndexOf, fullCourtSalaryDollarsOf } from './draft-catalog.ts';
 import {
   fullCourtEffectiveRatings,
@@ -41,6 +43,7 @@ export interface FullCourtRegularSeason {
   readonly userTeamId: string;
   readonly teams: readonly FullCourtRegularSeasonTeam[];
   readonly games: readonly FullCourtLeagueGame[];
+  readonly playoffEffects?: Readonly<Record<string, CapRushPlayoffApplied>>;
 }
 
 function simulationRoster(
@@ -142,6 +145,19 @@ export function buildFullCourtRegularSeason(input: {
       };
     }),
   ];
+  const playoffEffects: Record<string, CapRushPlayoffApplied> = {};
+  for (const candidate of [...chosen, ...opponents.flatMap((team) => team.players)]) {
+    if (candidate.playoffPerformance === undefined) continue;
+    if (Object.hasOwn(playoffEffects, candidate.playerVersionId)) continue;
+    const applied = capRushPlayoffEffectOf({
+      profile: candidate.playoffPerformance,
+      authoritativeChannels: [],
+      observedFieldGoalAttemptsPerGame: candidate.anchors?.fieldGoalAttemptsPerGame ?? null,
+    });
+    if (!capRushPlayoffIsNeutral(applied)) {
+      playoffEffects[candidate.playerVersionId] = applied;
+    }
+  }
   return {
     runId: draft.runId,
     runSeed,
@@ -157,6 +173,7 @@ export function buildFullCourtRegularSeason(input: {
               : planFullCourtOpponent(team, teams.slice(1), profile),
           ),
     games,
+    ...(Object.keys(playoffEffects).length > 0 ? { playoffEffects } : {}),
   };
 }
 

@@ -1,38 +1,40 @@
 import {
+  CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
   CAP_RUSH_CONFERENCE_SIZE,
+  CAP_RUSH_FRANCHISE_ALIGNMENT,
+  CAP_RUSH_TAKEOVER_TEAMS,
+  capRushAlignmentOf,
   fullCourtSeasonScoreSchema,
   type CapRushConference,
   type CapRushDivision,
   type FullCourtSeasonScore,
 } from '@hoop-rush/data-contracts';
 import {
-  capRushValidateLeagueField,
-  type CapRushLeagueField,
-} from '../cap-rush/league-schedule.ts';
+  validateLeagueField,
+  type LeagueFieldRules,
+  type LeagueFieldTeam,
+} from '../../league/schedule.ts';
 import {
   conferenceStandingOf,
   createTeamTotals,
   rankConferenceTeams,
   recordHeadToHead,
   recordPlayed,
+  type LeagueStanding,
   type TeamTotals,
-} from '../conference-standings.ts';
+} from '../../league/standings.ts';
 
-export interface FullCourtStandingsRow {
-  readonly teamId: string;
-  readonly displayName: string;
-  readonly conference: CapRushConference;
-  readonly division: CapRushDivision;
-  readonly wins: number;
-  readonly losses: number;
-  readonly conferenceWins: number;
-  readonly conferenceLosses: number;
-  readonly pointsFor: number;
-  readonly pointsAgainst: number;
-  readonly pointDifferential: number;
-  readonly seed: number;
-  readonly qualified: boolean;
-}
+type FullCourtLeagueField = LeagueFieldTeam;
+type FullCourtTeamTotals = TeamTotals<CapRushConference, CapRushDivision>;
+
+const FULL_COURT_FIELD_RULES: LeagueFieldRules<CapRushConference, CapRushDivision> = {
+  label: 'Full Court',
+  teamCount: CAP_RUSH_TAKEOVER_TEAMS,
+  teamIds: CAP_RUSH_FRANCHISE_ALIGNMENT.map((entry) => entry.franchiseId),
+  alignmentOf: capRushAlignmentOf,
+};
+
+export type FullCourtStandingsRow = LeagueStanding<CapRushConference, CapRushDivision>;
 
 export interface FullCourtStandings {
   readonly west: readonly FullCourtStandingsRow[];
@@ -46,8 +48,8 @@ export interface FullCourtPlayoffSeeds {
 }
 
 function recordForfeit(
-  home: TeamTotals,
-  away: TeamTotals,
+  home: FullCourtTeamTotals,
+  away: FullCourtTeamTotals,
   losingSides: readonly ('home' | 'away')[],
 ): void {
   const homeLost = losingSides.includes('home');
@@ -69,11 +71,13 @@ function recordForfeit(
 }
 
 export function fullCourtStandings(
-  field: readonly CapRushLeagueField[],
+  field: readonly FullCourtLeagueField[],
   scores: readonly FullCourtSeasonScore[],
 ): FullCourtStandings {
-  capRushValidateLeagueField(field);
-  const totals = new Map(field.map((team) => [team.teamId, createTeamTotals(team)]));
+  validateLeagueField(field, FULL_COURT_FIELD_RULES);
+  const totals = new Map<string, FullCourtTeamTotals>(
+    field.map((team) => [team.teamId, createTeamTotals(team, capRushAlignmentOf(team.teamId))]),
+  );
   const seen = new Set<string>();
   for (const raw of scores) {
     const score = fullCourtSeasonScoreSchema.parse(raw);
@@ -103,14 +107,14 @@ export function fullCourtStandings(
 
 function buildConferenceRows(
   conference: CapRushConference,
-  totals: ReadonlyMap<string, TeamTotals>,
+  totals: ReadonlyMap<string, FullCourtTeamTotals>,
 ): FullCourtStandingsRow[] {
   const teams = [...totals.values()].filter((team) => team.conference === conference);
   if (teams.length !== CAP_RUSH_CONFERENCE_SIZE) {
     throw new Error(`Full Court standings: ${conference} holds ${String(teams.length)} teams`);
   }
   return rankConferenceTeams(teams, 'tied-group').map((team, index) =>
-    conferenceStandingOf(team, index + 1),
+    conferenceStandingOf(team, index + 1, CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS),
   );
 }
 

@@ -99,17 +99,18 @@ test('counts a dual-position pick at both positions', () => {
 });
 
 describe('FullCourtDraftView', () => {
-  test('renders a 10-card positionless round offer sorted by overall with Cap Rush card actions', () => {
+  test('shows the round offer and one signing action in the selected player inspector', () => {
     const { state, index } = setup();
     const body = renderView(state, index);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
     expect(body).toContain('Round 1');
-    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
     expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
-    expect(body).toContain('Legal finish');
+    expect(body.match(/aria-label="Sign [^"]+"/g)).toHaveLength(1);
+    expect(body).toContain('Budget after signing');
+    expect(body).toContain('Payroll at legal finish');
   });
 
   test('gates the lock on the six-player minimum and links the roster from the action bar', () => {
@@ -123,13 +124,13 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Lock the roster');
   });
 
-  test('gates Show playstyle behind the scouting perk on every card', () => {
+  test('gates the selected player playstyle behind the scouting perk', () => {
     const { state, index } = setup();
     const body = renderView(state, index);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
-    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
+    expect(body).not.toContain('Show playstyle');
     expect(body).toContain('Scouting was not purchased at run setup');
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
@@ -140,13 +141,15 @@ describe('FullCourtDraftView', () => {
 
     expect(body).toContain('Open catalog');
     expect(body).toContain('Salary');
+    expect(body.match(/aria-label="Selected player"/g)).toHaveLength(1);
+    expect(body.match(/id="draft-roster"/g)).toHaveLength(1);
   });
 
   test('gates Show playstyle in the selected player panel until scouting is owned', () => {
     const { state, index } = setup();
     const body = renderView({ ...state, offer: undefined, pool: undefined }, index);
 
-    expect(body).toContain('Show playstyle');
+    expect(body).not.toContain('Show playstyle');
     expect(body).toContain('Scouting was not purchased at run setup');
   });
 
@@ -173,7 +176,8 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Scouting report active');
     expect(body).not.toContain('aria-label="Buy the $5M scouting report"');
     expect(body).not.toContain('Scout $2M');
-    expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
+    expect(body).toContain('Show playstyle');
+    expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
     expect(body).not.toContain('Scouting was not purchased at run setup');
   });
 });

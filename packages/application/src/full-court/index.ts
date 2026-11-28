@@ -27,6 +27,36 @@ export {
   type FullCourtPlayoffRepository,
 } from './playoffs.ts';
 export {
+  FullCourtAdvanceSession,
+  type FullCourtAdvanceObserver,
+  type FullCourtAdvanceOutcome,
+  type FullCourtAdvancePlayoffCommandInput,
+  type FullCourtAdvanceRequest,
+  type FullCourtAdvanceSeasonCommandInput,
+  type FullCourtAdvanceSessionDependencies,
+  type FullCourtGamePlanClear,
+  type FullCourtPlayoffCommit,
+  type FullCourtPlayoffProgressionResult,
+  type FullCourtSeasonCommit,
+} from './advance-session.ts';
+export {
+  FULL_COURT_REVIEW_SLOTS,
+  fullCourtNextReviewSlot,
+  fullCourtNextUserFixture,
+  fullCourtPlayoffAdjustmentChanged,
+  fullCourtRegularSeasonInjuryStop,
+  fullCourtSlotOptions,
+  fullCourtUserSeries,
+  type FullCourtAdvanceOptions,
+  type FullCourtAdvancePlayoffState,
+  type FullCourtAdvanceSeasonState,
+  type FullCourtPinnedGamePlan,
+  type FullCourtPlayedGame,
+  type FullCourtPlayoffView,
+  type FullCourtSimulationStop,
+  type FullCourtUserFixture,
+} from './progression.ts';
+export {
   applyFullCourtBlueprintToPlan,
   fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,

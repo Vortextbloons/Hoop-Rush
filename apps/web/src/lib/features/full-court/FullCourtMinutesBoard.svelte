@@ -15,6 +15,7 @@
     summary,
     displayedMinutes,
     locked,
+    readOnly = false,
     lockedIds = [],
     art = null,
     onMinutes,
@@ -29,6 +30,7 @@
     summary: string;
     displayedMinutes: number;
     locked: boolean;
+    readOnly?: boolean;
     lockedIds?: readonly string[];
     art?: FullCourtArt | null;
     onMinutes: (playerId: string, minutes: number) => void;
@@ -37,6 +39,13 @@
   } = $props();
 
   const lockedSet = $derived(new Set(lockedIds));
+  const MINUTE_PRESETS = [
+    { label: 'Star 36', value: 36 },
+    { label: 'Starter 30', value: 30 },
+    { label: 'Rotation 20', value: 20 },
+    { label: 'Bench 8', value: 8 },
+    { label: 'Sit 0', value: 0 },
+  ] as const;
 
   function roleLabel(row: FullCourtTeamMinutesRow): string {
     if (row.starterSlot !== null) return `Starter ${String(row.starterSlot + 1)}`;
@@ -135,95 +144,119 @@
               </div>
             </div>
 
-            <div class="minute-control">
-              <div class="minute-stepper">
-                <button
-                  type="button"
-                  class="minute-step"
-                  disabled={locked || row.minutes <= 0}
-                  aria-label={`Decrease minutes for ${row.player.displayName}`}
-                  onclick={() => onMinutes(row.player.playerId, row.minutes - 1)}
-                >
-                  <Minus size={13} aria-hidden="true" />
-                </button>
-                <label class="minute-value">
-                  <span class="sr-only">Minutes for {row.player.displayName}</span>
-                  <input
-                    type="number"
-                    inputmode="numeric"
-                    min="0"
-                    max={FULL_COURT_MAX_PLAYER_MINUTES}
-                    step="1"
-                    class="minute-input"
-                    value={row.minutes}
-                    disabled={locked}
-                    oninput={(event) =>
-                      onMinutes(
-                        row.player.playerId,
-                        clampMinutes(event.currentTarget.valueAsNumber),
-                      )}
-                  />
-                  <span class="minute-unit" aria-hidden="true">min</span>
-                </label>
-                <button
-                  type="button"
-                  class="minute-step"
-                  disabled={locked || row.minutes >= FULL_COURT_MAX_PLAYER_MINUTES}
-                  aria-label={`Increase minutes for ${row.player.displayName}`}
-                  onclick={() => onMinutes(row.player.playerId, row.minutes + 1)}
-                >
-                  <Plus size={13} aria-hidden="true" />
-                </button>
-              </div>
-              <input
-                type="range"
-                class="minute-slider"
-                min="0"
-                max={FULL_COURT_MAX_PLAYER_MINUTES}
-                step="1"
-                value={row.minutes}
-                disabled={locked}
-                aria-label={`Minutes slider for ${row.player.displayName}`}
-                aria-valuetext={`${String(row.minutes)} minutes`}
-                oninput={(event) =>
-                  onMinutes(row.player.playerId, clampMinutes(event.currentTarget.valueAsNumber))}
-              />
-            </div>
-
-            <div class="minute-actions">
-              <button
-                type="button"
-                class="minute-lock"
-                data-locked={isLocked}
-                disabled={locked}
-                aria-pressed={isLocked}
-                aria-label={isLocked
-                  ? `Unlock minutes for ${row.player.displayName}`
-                  : `Lock minutes for ${row.player.displayName}`}
-                title={isLocked
-                  ? 'Keep this minute target when rebalancing'
-                  : 'Lock this minute target'}
-                onclick={() => onToggleLock(row.player.playerId)}
-              >
-                {#if isLocked}
-                  <Lock size={13} aria-hidden="true" />
-                {:else}
-                  <LockOpen size={13} aria-hidden="true" />
-                {/if}
-              </button>
-              {#if row.starterSlot === null && !row.closer && row.minutes > 0}
-                <Button
-                  type="button"
-                  tone="ghost"
-                  size="sm"
+            {#if readOnly}
+              <p class="minute-readout">
+                {row.minutes} <span>min</span>
+              </p>
+            {:else}
+              <div class="minute-control">
+                <div class="minute-stepper">
+                  <button
+                    type="button"
+                    class="minute-step"
+                    disabled={locked || row.minutes <= 0}
+                    aria-label={`Decrease minutes for ${row.player.displayName}`}
+                    onclick={() => onMinutes(row.player.playerId, row.minutes - 1)}
+                  >
+                    <Minus size={13} aria-hidden="true" />
+                  </button>
+                  <label class="minute-value">
+                    <span class="sr-only">Minutes for {row.player.displayName}</span>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      max={FULL_COURT_MAX_PLAYER_MINUTES}
+                      step="1"
+                      class="minute-input"
+                      value={row.minutes}
+                      disabled={locked}
+                      oninput={(event) =>
+                        onMinutes(
+                          row.player.playerId,
+                          clampMinutes(event.currentTarget.valueAsNumber),
+                        )}
+                    />
+                    <span class="minute-unit" aria-hidden="true">min</span>
+                  </label>
+                  <button
+                    type="button"
+                    class="minute-step"
+                    disabled={locked || row.minutes >= FULL_COURT_MAX_PLAYER_MINUTES}
+                    aria-label={`Increase minutes for ${row.player.displayName}`}
+                    onclick={() => onMinutes(row.player.playerId, row.minutes + 1)}
+                  >
+                    <Plus size={13} aria-hidden="true" />
+                  </button>
+                </div>
+                <input
+                  type="range"
+                  class="minute-slider"
+                  min="0"
+                  max={FULL_COURT_MAX_PLAYER_MINUTES}
+                  step="1"
+                  value={row.minutes}
                   disabled={locked}
-                  aria-label={`Sit ${row.player.displayName}`}
-                  onclick={() => onSit(row.player.playerId)}
+                  aria-label={`Minutes slider for ${row.player.displayName}`}
+                  aria-valuetext={`${String(row.minutes)} minutes`}
+                  oninput={(event) =>
+                    onMinutes(row.player.playerId, clampMinutes(event.currentTarget.valueAsNumber))}
+                />
+              </div>
+
+              <div class="minute-actions">
+                <select
+                  class="minute-preset"
+                  value=""
+                  disabled={locked}
+                  aria-label={`Quick minute preset for ${row.player.displayName}`}
+                  title="Quick set minutes"
+                  onchange={(event) => {
+                    const raw = event.currentTarget.value;
+                    if (raw === '') return;
+                    onMinutes(row.player.playerId, Number(raw));
+                    event.currentTarget.value = '';
+                  }}
                 >
-                  Sit
-                </Button>
-              {/if}
-            </div>
+                  <option value="">Set</option>
+                  {#each MINUTE_PRESETS as preset (preset.value)}
+                    <option value={preset.value}>{preset.label}</option>
+                  {/each}
+                </select>
+                <button
+                  type="button"
+                  class="minute-lock"
+                  data-locked={isLocked}
+                  disabled={locked}
+                  aria-pressed={isLocked}
+                  aria-label={isLocked
+                    ? `Unlock minutes for ${row.player.displayName}`
+                    : `Lock minutes for ${row.player.displayName}`}
+                  title={isLocked
+                    ? 'Keep this minute target when rebalancing'
+                    : 'Lock this minute target'}
+                  onclick={() => onToggleLock(row.player.playerId)}
+                >
+                  {#if isLocked}
+                    <Lock size={13} aria-hidden="true" />
+                  {:else}
+                    <LockOpen size={13} aria-hidden="true" />
+                  {/if}
+                </button>
+                {#if row.starterSlot === null && !row.closer && row.minutes > 0}
+                  <Button
+                    type="button"
+                    tone="ghost"
+                    size="sm"
+                    disabled={locked}
+                    aria-label={`Sit ${row.player.displayName}`}
+                    onclick={() => onSit(row.player.playerId)}
+                  >
+                    Sit
+                  </Button>
+                {/if}
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -378,6 +411,24 @@
     gap: 0.25rem;
   }
 
+  .minute-readout {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .minute-readout span {
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
   .minute-stepper {
     display: flex;
     align-items: center;
@@ -461,6 +512,31 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.2rem;
+  }
+
+  .minute-preset {
+    min-height: 1.8rem;
+    max-width: 4.6rem;
+    padding: 0 0.2rem;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.4rem;
+    background: var(--color-surface-2);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+  }
+
+  .minute-preset:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-foreground);
+  }
+
+  .minute-preset:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .minute-lock {

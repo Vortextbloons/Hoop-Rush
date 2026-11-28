@@ -277,7 +277,7 @@ export function capRushPlayoffPerformanceOf(input: {
   });
 }
 
-function adjustedAnchors(
+export function adjustedAnchors(
   anchors: SimulationAnchors,
   applied: CapRushPlayoffApplied,
 ): SimulationAnchors {
@@ -327,7 +327,7 @@ function adjustedAnchors(
   };
 }
 
-function adjustedTendencies(
+export function adjustedTendencies(
   tendencies: SimulationTendencies,
   applied: CapRushPlayoffApplied,
 ): SimulationTendencies {

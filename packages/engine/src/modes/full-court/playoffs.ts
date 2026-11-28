@@ -20,6 +20,7 @@ import {
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
   type Seed,
+  type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import {
@@ -28,6 +29,7 @@ import {
   playoffSeriesFields,
 } from '../conference-playoffs.ts';
 import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
+import { adjustedAnchors, adjustedTendencies } from '../cap-rush/playoff.ts';
 import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, type FullCourtTeamGameInput } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
@@ -39,7 +41,8 @@ import {
   fullCourtPlayoffMatchupAdaptations,
   fullCourtPlayoffSeriesEvidenceCount,
 } from './playoff-adaptation.ts';
-import { buildFullCourtGameLineups } from './report.ts';
+import { buildFullCourtGameLineupsFromFacts } from './report.ts';
+import type { FullCourtRegularSeason } from './regular-season.ts';
 import { fullCourtScoreOutcome } from './score.ts';
 import {
   frozenCopy,
@@ -413,6 +416,28 @@ export function fullCourtUserNextPlayoffMatchup(input: {
   };
 }
 
+function withFullCourtPlayoffEffects<T extends { readonly roster: readonly SimulationPlayer[] }>(
+  team: T,
+  playoffEffects: FullCourtRegularSeason['playoffEffects'],
+): T {
+  if (playoffEffects === undefined) return team;
+  return {
+    ...team,
+    roster: team.roster.map((player) => {
+      const applied =
+        player.playerVersionId === undefined ? undefined : playoffEffects[player.playerVersionId];
+      if (applied === undefined) return player;
+      return {
+        ...player,
+        tendencies: adjustedTendencies(player.tendencies, applied),
+        ...(player.anchors === undefined
+          ? {}
+          : { anchors: adjustedAnchors(player.anchors, applied) }),
+      };
+    }),
+  };
+}
+
 export function simulateFullCourtPlayoffGame(
   lock: FullCourtPlayoffLock,
   previous: FullCourtPlayoffCheckpoint,
@@ -449,6 +474,18 @@ export function simulateFullCourtPlayoffGame(
           fixture.gameId,
           side === 'home' ? away.teamId : home.teamId,
         );
+  const homeTeam = withFullCourtPlayoffEffects(
+    side === 'home'
+      ? withFullCourtCoaching(home, { ...options, defensiveMatchups: userDefensiveMatchups })
+      : applyAiAdaptation(home, adaptations?.home),
+    season.playoffEffects,
+  );
+  const awayTeam = withFullCourtPlayoffEffects(
+    side === 'away'
+      ? withFullCourtCoaching(away, { ...options, defensiveMatchups: userDefensiveMatchups })
+      : applyAiAdaptation(away, adaptations?.away),
+    season.playoffEffects,
+  );
   const game = runFullCourtGameWithHealth(
     {
       schemaVersion: 1,
@@ -456,14 +493,8 @@ export function simulateFullCourtPlayoffGame(
       gameNumber: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM + checkpoint.games.length + 1,
       dataVersion: season.catalog.dataVersion,
       profile: season.profile,
-      home:
-        side === 'home'
-          ? withFullCourtCoaching(home, { ...options, defensiveMatchups: userDefensiveMatchups })
-          : applyAiAdaptation(home, adaptations?.home),
-      away:
-        side === 'away'
-          ? withFullCourtCoaching(away, { ...options, defensiveMatchups: userDefensiveMatchups })
-          : applyAiAdaptation(away, adaptations?.away),
+      home: homeTeam,
+      away: awayTeam,
     },
     fixture.dayOffset,
     context,
@@ -479,9 +510,10 @@ export function simulateFullCourtPlayoffGame(
         ? {}
         : {
             restingPlayerIds: { [side]: options.restingPlayerIds },
-            // User games are recorded internally for compact lineup facts. The
-            // tape only reaches the caller when a watch replay was requested.
-            record: true,
+            // Summaries need compact lineup facts, not a playback tape. The tape
+            // only reaches the caller when a watch replay was requested.
+            record: options.record === true,
+            lineupFacts: true,
           }),
     },
   );
@@ -502,13 +534,13 @@ export function simulateFullCourtPlayoffGame(
     evidence = fullCourtPlayoffGameEvidence(game.result);
   }
   const userLineups =
-    side !== null && game.kind === 'played' && game.tape !== null
-      ? buildFullCourtGameLineups({
+    side !== null && game.kind === 'played' && game.lineupFacts != null
+      ? buildFullCourtGameLineupsFromFacts({
           kind: 'played',
           gameId: fixture.gameId,
           userSide: side,
           result: game.result,
-          tape: game.tape,
+          facts: game.lineupFacts,
         })
       : undefined;
   const score: Omit<FullCourtPlayoffScore, 'winnerTeamId'> = {

@@ -47,6 +47,8 @@ test('fits covered player seasons once and applies population priors to sparse s
   const hashes = { catalogHash: 'a'.repeat(64), evidenceHash: 'b'.repeat(64) };
   const profiles = deriveFullCourtHealthProfiles({ candidates }, evidence, hashes);
   expect(profiles.cohorts['2020s:starter']?.observedAppearances).toBe(25 * 30);
+  // player-1's sparseSeason lacked season-level coded absences, so coveredSeason's 30 games
+  // carry over to sparseCard via career-combined lookup instead of falling back to population.
   expect(profiles.players[first.playerVersionId]?.playerEvidence).toEqual({
     source: 'player-season',
     observedAppearances: 30,
@@ -54,9 +56,9 @@ test('fits covered player seasons once and applies population priors to sparse s
   expect(profiles.players[alternate.playerVersionId]).toEqual(
     profiles.players[first.playerVersionId],
   );
-  expect(profiles.players[sparseCard.playerVersionId]?.playerEvidence).toEqual({
-    source: 'population',
-  });
+  expect(profiles.players[sparseCard.playerVersionId]).toEqual(
+    profiles.players[first.playerVersionId],
+  );
   expect(
     deriveFullCourtHealthProfiles({ candidates: [...candidates].reverse() }, evidence, hashes),
   ).toEqual(profiles);

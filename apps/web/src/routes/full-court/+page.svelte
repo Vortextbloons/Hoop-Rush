@@ -55,6 +55,9 @@
     { value: 'playoffs', label: 'Playoffs' },
   ] as const;
   let confirmNewDraft = $state(false);
+  let dirtyCoachingRunId = $state<string | null>(null);
+  let coachingWorkspace = $state<'plan' | 'rotation' | 'situations'>('plan');
+  let warRoomTab = $state<'all' | 'fit' | 'camp' | 'film' | 'matchups'>('all');
   let activeGamecast = $state<'latest' | 'saved' | null>(null);
   const RUN_PERK_OPTIONS = [
     {
@@ -102,9 +105,7 @@
   }
 
   function selectSection(value: typeof section) {
-    // During the postseason the bracket owns the page, so Overview and Playoffs
-    // both land on the postseason screen instead of a dead overview.
-    section = postseasonMode && !runComplete && value === 'home' ? 'playoffs' : value;
+    section = value;
     confirmNewDraft = false;
   }
 
@@ -113,6 +114,8 @@
     if (instance.draft === null) {
       section = 'home';
       activeGamecast = null;
+      coachingWorkspace = 'plan';
+      warRoomTab = 'all';
     }
   }
 
@@ -258,6 +261,12 @@
         {#snippet actions()}
           <Button size="sm" tone="secondary" onclick={() => void current.load()}>Reload save</Button
           >
+          <Button
+            size="sm"
+            tone="danger"
+            disabled={current.busy}
+            onclick={() => void abandonRun(current)}>Abandon run</Button
+          >
         {/snippet}
       </Alert>
     {/if}
@@ -359,6 +368,7 @@
               : null}
             {defaultRotation}
             plan={season.coaching}
+            bind:workspace={coachingWorkspace}
             opponent={matchupContext?.opponentTeam ?? null}
             {leagueThreePointShare}
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
@@ -367,6 +377,9 @@
             {art}
             busy={current.busy}
             onSave={(plan) => current.saveCoaching(plan)}
+            onDirtyChange={(dirty) => {
+              dirtyCoachingRunId = dirty ? season.lock.season.runId : null;
+            }}
             onListBlueprints={() => current.listBlueprints()}
             onSaveBlueprint={(name, tactics, options) =>
               current.saveBlueprint(name, tactics, options)}
@@ -388,6 +401,7 @@
           <FullCourtWarRoom
             {draft}
             season={season.lock.season}
+            bind:activeTab={warRoomTab}
             {playoffPreview}
             busy={current.busy}
             practiceOpen={playoff === null && season.checkpoint.completedThroughSlot === 0}
@@ -460,6 +474,18 @@
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
           onEditGamePlan={() => selectSection('team')}
+          onOpenPlayoffs={() => selectSection('playoffs')}
+          onEditRotation={() => {
+            coachingWorkspace = 'rotation';
+            selectSection('team');
+          }}
+          onEditMatchups={matchupContext === null
+            ? undefined
+            : () => {
+                warRoomTab = 'matchups';
+                selectSection('war-room');
+              }}
+          coachingDirty={dirtyCoachingRunId === season.lock.season.runId}
         />
       {/if}
       {#if (section === 'home' || section === 'playoffs') && (current.latestGame !== null || savedReplay !== null)}

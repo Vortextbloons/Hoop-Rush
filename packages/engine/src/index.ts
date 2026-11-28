@@ -396,7 +396,9 @@ export {
   simulateFullCourtGame,
   simulateRecordedFullCourtGame,
   type FullCourtGameInput,
+  type FullCourtGameLineupFacts,
   type FullCourtGameResult,
+  type FullCourtLineupFactRow,
   type FullCourtRecordedGameOutput,
   type FullCourtTapeEvent,
 } from './modes/full-court/game.ts';
@@ -448,9 +450,11 @@ export {
 } from './modes/full-court/opponent-film.ts';
 export {
   buildFullCourtGameLineups,
+  buildFullCourtGameLineupsFromFacts,
   buildFullCourtGameReport,
   type FullCourtCompletedGameFacts,
   type FullCourtLineupFactsOptions,
+  type FullCourtPlayedGameFactsInput,
 } from './modes/full-court/report.ts';
 export {
   buildFullCourtAwards,

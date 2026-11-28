@@ -51,7 +51,6 @@
     type FullCourtNamedUnitDraft,
     type FullCourtOffensiveHierarchyDraft,
     type FullCourtRotationMode,
-    type FullCourtTeamMinutesRow,
   } from './full-court-coaching-presenter.ts';
 
   import { LINEUP_FINDING_LABELS } from './full-court-scout-labels';
@@ -63,6 +62,8 @@
     plan,
     busy,
     onSave,
+    onDirtyChange,
+    workspace = $bindable('plan'),
     onListBlueprints,
     onSaveBlueprint,
     onRemoveBlueprint,
@@ -79,6 +80,8 @@
     plan: FullCourtCoachingPlan;
     busy: boolean;
     onSave: (plan: FullCourtCoachingPlan) => Promise<boolean>;
+    onDirtyChange?: (dirty: boolean) => void;
+    workspace?: (typeof WORKSPACES)[number]['id'];
     onListBlueprints?: () => Promise<FullCourtBlueprint[]>;
     onSaveBlueprint?: (
       name: string,
@@ -143,6 +146,7 @@
     untrack(() => fullCourtCoachingDraft(plan, defaultRotation, rosterIds)),
   );
   let savedSignature = $state(untrack(() => fullCourtCoachingSignature(plan)));
+  let lockedMinutes = $state<string[]>([]);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
   let savedMessage = $state<string | null>(null);
@@ -180,6 +184,11 @@
   const dirty = $derived(
     fullCourtCoachingSignature(fullCourtCoachingPlan(draft)) !== savedSignature,
   );
+  $effect(() => {
+    const edited = dirty;
+    const notify = onDirtyChange;
+    untrack(() => notify?.(edited));
+  });
   const saveLabel = $derived(saving ? 'Saving…' : dirty ? 'Save plan' : 'Saved');
   const minuteGroups = $derived([
     { label: 'Starters', rows: minutes.starters, total: minutes.starterMinutes },
@@ -365,7 +374,6 @@
 
   function setRotationMode(mode: FullCourtRotationMode): void {
     draft.rotationMode = mode;
-    if (mode === 'automatic') focusedSlot = null;
     markEdited();
   }
 
@@ -501,8 +509,11 @@
     announcement = `${unit.name || 'Named unit'} copied to the closing five. Save changes to use it.`;
   }
 
-  function setHierarchyRole(role: keyof FullCourtOffensiveHierarchyDraft, raw: string): void {
-    draft.hierarchy[role] = raw === '' ? null : raw;
+  function setHierarchyRole(
+    role: keyof FullCourtOffensiveHierarchyDraft,
+    playerId: string | null,
+  ): void {
+    draft.hierarchy[role] = playerId === null || playerId === '' ? null : playerId;
     markEdited();
   }
 
@@ -511,9 +522,7 @@
     { id: 'rotation', label: 'Rotation' },
     { id: 'situations', label: 'Game Situations' },
   ] as const;
-  let workspace = $state<(typeof WORKSPACES)[number]['id']>('plan');
   let lastMinutesEdit: string | null = null;
-  let lockedMinutes = $state<string[]>([]);
   let readHandler = $state('');
   const starterStrengths = $derived(
     scoutedRoster === null
@@ -588,13 +597,6 @@
     }
     const amount = displayedMinutes - FULL_COURT_MINUTE_TOTAL;
     return `${String(amount)} ${amount === 1 ? 'minute' : 'minutes'} over ${String(FULL_COURT_MINUTE_TOTAL)}.`;
-  }
-
-  function roleLabel(row: FullCourtTeamMinutesRow): string {
-    if (row.starterSlot !== null) {
-      return `Starter ${String(row.starterSlot + 1)}`;
-    }
-    return row.minutes === 0 ? 'Out of rotation' : 'Bench';
   }
 
   async function save(): Promise<void> {
@@ -690,6 +692,18 @@
         </Badge>
       </div>
     </header>
+    {#if minutes.starters.length > 0}
+      <div
+        class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-line-soft bg-surface-1 px-3 py-2"
+      >
+        <span class="ui-label"
+          >{editingRotation ? 'Custom starting five' : 'Staff starting five'}</span
+        >
+        <span class="text-xs"
+          >{lineupNames(minutes.starters.map((row) => row.player.playerId))}</span
+        >
+      </div>
+    {/if}
     <nav class="workspace-nav" aria-label="Coaching workspace">
       {#each WORKSPACES as item (item.id)}
         <button
@@ -1078,6 +1092,7 @@
               summary={minutesSummary()}
               {displayedMinutes}
               locked={locked || !editingRotation}
+              readOnly={readOnly || !editingRotation}
               lockedIds={lockedMinutes}
               {art}
               onMinutes={setMinutes}
@@ -1143,6 +1158,7 @@
               <FullCourtUnitPlanner
                 units={draft.units}
                 {roster}
+                closingFive={draft.closingFive}
                 {art}
                 {locked}
                 onAdd={addUnit}
@@ -1276,6 +1292,39 @@
     margin-top: 0.4rem;
     font-size: 0.875rem;
     color: var(--color-muted-foreground);
+  }
+  .plan-pulse {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3rem;
+    max-width: 30rem;
+  }
+  .rotation-room {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 900px) {
+    .rotation-room {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    }
+  }
+  .rotation-room-column {
+    min-width: 0;
+    padding: 0.65rem 0.7rem;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.8rem;
+    background: var(--color-surface-1);
+  }
+  .rotation-room-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
   }
   .workspace-nav {
     display: grid;

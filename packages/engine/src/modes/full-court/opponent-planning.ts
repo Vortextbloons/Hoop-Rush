@@ -3,12 +3,13 @@ import type {
   FullCourtTactics,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { projectExpectedPoints } from '../../projection/expected-ledger.ts';
+import { projectExpectedScoring } from '../../projection/expected-ledger.ts';
 import {
   meanTripSeconds,
   REGULATION_PERIOD_SECONDS as PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
 } from '../../sim/clock.ts';
+import { ENGINE_CONSTANTS } from '../../sim/constants.ts';
 import { prepareTeam } from '../../sim/prepare.ts';
 import type { FullCourtTeamGameInput } from './game.ts';
 import {
@@ -16,7 +17,9 @@ import {
   drainedEnergy,
   fatigueLevelOf,
   fatiguedPlayer,
+  FULL_COURT_HALFTIME_RECOVERY,
   FULL_COURT_MAX_PLAYER_SECONDS,
+  FULL_COURT_PERIOD_BREAK_RECOVERY,
   FULL_COURT_REGULATION_TEAM_SECONDS,
   planSubstitution,
   recoveredEnergy,
@@ -50,6 +53,15 @@ function projectedLineups(
   for (let seconds = 0; seconds < REGULATION_TOTAL_SECONDS; seconds += STEP_SECONDS) {
     const periodSecondsRemaining = PERIOD_SECONDS - (seconds % PERIOD_SECONDS);
     if (seconds > 0) {
+      if (periodSecondsRemaining === PERIOD_SECONDS) {
+        const recovery =
+          seconds === 2 * PERIOD_SECONDS
+            ? FULL_COURT_HALFTIME_RECOVERY
+            : FULL_COURT_PERIOD_BREAK_RECOVERY;
+        for (const [index, energy] of energies.entries()) {
+          energies[index] = Math.min(1, energy + recovery);
+        }
+      }
       const decision = planSubstitution(
         { plan, slots, energies, fouls, emergency, playedSeconds, stintSeconds },
         {
@@ -112,10 +124,11 @@ export function projectFullCourtMatchup(
   const awayLineups = projectedLineups(away, awayTactics);
   let homePoints = 0;
   let awayPoints = 0;
+  const tripSeconds = meanTripSeconds(profile);
   for (const [index, team] of homeLineups.entries()) {
     const opponent = awayLineups[index];
     if (opponent === undefined) throw new Error('Projected matchup has missing lineup samples');
-    const [projectedHome, projectedAway] = projectExpectedPoints({
+    const [projectedHome, projectedAway] = projectExpectedScoring({
       team,
       prep: applyFullCourtTacticsToPrep(
         prepareTeam(team, profile),
@@ -146,12 +159,21 @@ export function projectFullCourtMatchup(
         },
       ],
     });
-    homePoints += projectedHome;
-    awayPoints += projectedAway;
+    const continuationSeconds =
+      (projectedHome.offensiveRebounds + projectedAway.offensiveRebounds) *
+      ENGINE_CONSTANTS.continuationConsumption;
+    const inboundSeconds =
+      (projectedHome.nonShootingFoulRate + projectedAway.nonShootingFoulRate) *
+      100 *
+      (1 - ENGINE_CONSTANTS.offensiveFoulShare) *
+      ENGINE_CONSTANTS.inboundConsumption;
+    const scale =
+      REGULATION_TOTAL_SECONDS /
+      ((200 * tripSeconds + continuationSeconds + inboundSeconds) * homeLineups.length);
+    homePoints += projectedHome.points * scale;
+    awayPoints += projectedAway.points * scale;
   }
-  const scale =
-    REGULATION_TOTAL_SECONDS / (2 * meanTripSeconds(profile) * 100 * homeLineups.length);
-  return { home: homePoints * scale, away: awayPoints * scale };
+  return { home: homePoints, away: awayPoints };
 }
 
 export function planFullCourtOpponent<T extends FullCourtTeamGameInput>(
