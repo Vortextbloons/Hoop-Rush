@@ -16,8 +16,11 @@ import {
 import { render } from 'svelte/server';
 import FullCourtGamecast from './FullCourtGamecast.svelte';
 import {
+  fullCourtBestLineup,
   fullCourtGamecastFrames,
   fullCourtPossessionCursor,
+  fullCourtRotationSummary,
+  fullCourtSubstitutionReasonLabel,
   fullCourtWatchedReplayOutcome,
   fullCourtWatchedReplaySummary,
 } from './full-court-gamecast.ts';
@@ -275,44 +278,44 @@ test('rehydrates a saved watched replay into Gamecast from tipoff without rollin
   expect(body).toContain('Pause');
 });
 
-test('highlights actual rotation and substitution evidence in the finished recap', () => {
+test('summarizes the recorded rotation and qualifies its lineups for the recap', () => {
   const { season } = fullCourtTestSeasonLock();
   const fixture = season.games[0];
   if (fixture === undefined) throw new Error('Expected an opening fixture');
   const input = fullCourtRegularSeasonGameInput(season, fixture.gameId);
   const { result, tape } = simulateRecordedFullCourtGame(input, createEngineContext());
-  const health = {
-    home: {
-      version: 'full-court-health-v1' as const,
-      teamId: fixture.homeTeamId,
-      throughDay: fixture.dayOffset,
-      players: {},
-    },
-    away: {
-      version: 'full-court-health-v1' as const,
-      teamId: fixture.awayTeamId,
-      throughDay: fixture.dayOffset,
-      players: {},
-    },
-  };
   const userSide = result.home.teamId === season.userTeamId ? 0 : 1;
-  const substitutions = tape.filter(
-    (event) => event.kind === 'substitution' && event.side === userSide,
+  const team = userSide === 0 ? result.home : result.away;
+  const summary = fullCourtRotationSummary(team, userSide, tape);
+
+  expect(summary.substitutions.length).toBeGreaterThan(0);
+  const firstSubstitution = summary.firstSubstitution;
+  expect(firstSubstitution).not.toBeNull();
+  if (firstSubstitution === null) throw new Error('Expected a recorded substitution');
+  expect(summary.reasonSummary).toContain(
+    fullCourtSubstitutionReasonLabel(firstSubstitution.reason),
   );
-  expect(substitutions.length).toBeGreaterThan(0);
+  expect(summary.playersUsed).toBeGreaterThan(0);
+  expect(summary.starterMinutes + summary.benchMinutes).toBeCloseTo(
+    team.players.reduce((total, player) => total + player.minutes, 0),
+    5,
+  );
 
-  const body = render(FullCourtGamecast, {
-    props: {
-      game: { kind: 'played', result, tape, health, injuries: [] },
-      userTeamId: season.userTeamId,
-      onClose: () => {},
-    },
-  }).body;
-
-  expect(body).toContain('starter minutes');
-  expect(body).toContain('bench minutes');
-  expect(body).toContain(`${substitutions.length} substitution`);
-  expect(body).toContain('First change:');
+  const report = buildFullCourtGameReport({
+    kind: 'played',
+    gameId: fixture.gameId,
+    userSide: userSide === 0 ? 'home' : 'away',
+    result,
+    tape,
+  });
+  expect(report.status).toBe('played');
+  if (report.status === 'played') {
+    const best = fullCourtBestLineup(report.lineupRows);
+    if (best !== null) {
+      expect(best.sampleMet).toBe(true);
+      expect(best.netRatingPer100).not.toBeNull();
+    }
+  }
 });
 
 test('renders full Cap Rush style box scores and team totals when finished', () => {

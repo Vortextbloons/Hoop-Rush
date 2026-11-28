@@ -34,7 +34,7 @@ describe('final report rebuild', () => {
     expect(checkpoint.completedThroughSlot).toBe(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
 
     // The report loader rebuilds the lock from the archived draft and matches its digest.
-    const rebuilt = lockFullCourtRegularSeason(lock.season as never);
+    const rebuilt = lockFullCourtRegularSeason(lock.season);
     expect(rebuilt.digest).toBe(lock.digest);
 
     const standings = fullCourtStandings(lock.season.teams, scores);

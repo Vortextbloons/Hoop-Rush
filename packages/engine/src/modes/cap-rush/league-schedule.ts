@@ -17,19 +17,21 @@ import {
 
 export type CapRushLeagueField = LeagueFieldTeam;
 
+const CAP_RUSH_LEAGUE_RULES = { ...NBA_LEAGUE_RULES, label: 'cap rush' };
+
 export function capRushAssignFranchise(input: {
   readonly runSeed: Seed;
   readonly field: readonly CapRushLeagueField[];
 }): CapRushFranchiseAssignment {
-  return assignLeagueFranchise({ ...input, rules: NBA_LEAGUE_RULES });
+  return assignLeagueFranchise({ ...input, rules: CAP_RUSH_LEAGUE_RULES });
 }
 
 export function capRushValidateLeagueField(field: readonly CapRushLeagueField[]): void {
-  validateLeagueField(field, NBA_LEAGUE_RULES);
+  validateLeagueField(field, CAP_RUSH_LEAGUE_RULES);
 }
 
 export function capRushLeagueFieldOf(bracket: OpponentBracketCore): CapRushLeagueField[] {
-  return leagueFieldOf(bracket, NBA_LEAGUE_RULES);
+  return leagueFieldOf(bracket, CAP_RUSH_LEAGUE_RULES);
 }
 
 export interface CapRushLeagueSchedule {
@@ -41,14 +43,14 @@ export function buildCapRushLeagueSchedule(input: {
   readonly runSeed: Seed;
   readonly field: readonly CapRushLeagueField[];
 }): CapRushLeagueSchedule {
-  return buildLeagueSchedule({ ...input, rules: NBA_LEAGUE_RULES });
+  return buildLeagueSchedule({ ...input, rules: CAP_RUSH_LEAGUE_RULES });
 }
 
 export function validateCapRushLeagueSchedule(
   games: readonly CapRushLeagueScheduleEntry[],
   field: readonly CapRushLeagueField[],
 ): string[] {
-  return validateLeagueSchedule(games, field, NBA_LEAGUE_RULES);
+  return validateLeagueSchedule(games, field, CAP_RUSH_LEAGUE_RULES);
 }
 
 export function capRushUserScheduleOf(input: {
@@ -57,7 +59,7 @@ export function capRushUserScheduleOf(input: {
 }): Array<{ gameNumber: number; opponentId: string; humanHome: boolean }> {
   return leagueUserScheduleOf({
     ...input,
-    gamesPerTeam: NBA_LEAGUE_RULES.gamesPerTeam,
-    ...(NBA_LEAGUE_RULES.label === undefined ? {} : { label: NBA_LEAGUE_RULES.label }),
+    gamesPerTeam: CAP_RUSH_LEAGUE_RULES.gamesPerTeam,
+    label: CAP_RUSH_LEAGUE_RULES.label,
   });
 }

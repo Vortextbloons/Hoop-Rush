@@ -10,7 +10,13 @@
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
-  import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import {
+    perGameText,
+    trueShootingPct,
+    usagePct,
+    usagePossessions,
+    usageSharePct,
+  } from '#lib/format.js';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
@@ -87,8 +93,7 @@
         tsPct: (row) => pctText(row.tsPct),
         ...(statScope === 'team'
           ? {
-              usagePct: (row) =>
-                usagePct(usagePossessions(row.fga, row.fta, row.turnovers), teamUsage),
+              usagePct: (row) => usageSharePct(row, rosterStats),
             }
           : {}),
         fgAttempts: (row) => rawStat(row.fga, row.games),
@@ -556,7 +561,7 @@
       ),
       linear-gradient(180deg, var(--color-surface-2), var(--color-surface-1) 72%);
     box-shadow:
-      inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--color-foreground) 6%, transparent),
       0 1px 2px rgb(0 0 0 / 22%);
   }
 

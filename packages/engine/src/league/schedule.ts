@@ -492,7 +492,7 @@ export function validateLeagueSchedule<Conference extends string, Division exten
   return failures;
 }
 
-export function leagueUserScheduleOf<Conference extends string, Division extends string>(input: {
+export function leagueUserScheduleOf(input: {
   readonly games: readonly LeagueScheduleEntry[];
   readonly userTeamId: string;
   readonly gamesPerTeam: number;

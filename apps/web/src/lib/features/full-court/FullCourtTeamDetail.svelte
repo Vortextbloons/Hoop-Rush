@@ -18,7 +18,13 @@
   import Badge from '#lib/components/ui/Badge.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
-  import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import {
+    perGameText,
+    trueShootingPct,
+    usagePct,
+    usagePossessions,
+    usageSharePct,
+  } from '#lib/format.js';
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
 
@@ -84,7 +90,7 @@
         threePct: (row) => pctText(row.tpPct),
         ftPct: (row) => pctText(row.ftPct),
         tsPct: (row) => pctText(row.tsPct),
-        usagePct: (row) => usagePct(usagePossessions(row.fga, row.fta, row.turnovers), teamUsage),
+        usagePct: (row) => usageSharePct(row, playerRows),
         fgAttempts: (row) => rawStat(row.fga, row.games),
         threeAttempts: (row) => rawStat(row.tpa, row.games),
         ftAttempts: (row) => rawStat(row.fta, row.games),

@@ -39,6 +39,26 @@ export function usagePossessions(
 export function usagePct(playerPossessions: number, teamPossessions: number): string {
   return teamPossessions <= 0 ? '—' : percentOneDecimal(playerPossessions / teamPossessions);
 }
+/** Per-game usage share, so missed games do not shrink a player's role. */
+export function usageSharePct(
+  row: {
+    readonly games: number;
+    readonly fga: number;
+    readonly fta: number;
+    readonly turnovers: number;
+  },
+  teamRows: readonly {
+    readonly games: number;
+    readonly fga: number;
+    readonly fta: number;
+    readonly turnovers: number;
+  }[],
+): string {
+  const perGame = (line: (typeof teamRows)[number]): number =>
+    usagePossessions(line.fga, line.fta, line.turnovers) / Math.max(1, line.games);
+  const teamPossessions = teamRows.reduce((sum, line) => sum + perGame(line), 0);
+  return usagePct(perGame(row), teamPossessions);
+}
 export function perGameText(total: number, games: number): string {
   return oneDecimal(total / Math.max(1, games));
 }

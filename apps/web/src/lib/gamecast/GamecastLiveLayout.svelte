@@ -14,8 +14,8 @@
     feedEmptyMessage = 'Waiting for the first possession.',
     feedShowTags = true,
     feedCountLabel,
-    feedPeriodLabel = undefined,
-    feedClockLabel = undefined,
+    feedPeriodLabel,
+    feedClockLabel,
     class: className = 'broadcast',
   }: {
     label: string;

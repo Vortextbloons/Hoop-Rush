@@ -3,6 +3,7 @@ import {
   advanceFullCourtPlayoffs,
   advanceFullCourtSeasonSlot,
   archiveFullCourtRun,
+  fullCourtNextUserFixture,
   fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,
   saveFullCourtCoaching,
@@ -16,6 +17,7 @@ import {
   type FullCourtAdvanceSeasonState,
   type FullCourtPinnedGamePlan,
   type FullCourtPlayoffProgressionResult,
+  type FullCourtUserFixture,
   type SaveFullCourtBlueprintOptions,
 } from '@hoop-rush/application/full-court';
 import {
@@ -60,10 +62,8 @@ import { loadFullCourtHealthProfiles } from './full-court-health-profiles.js';
 import { resolveFullCourtSeasonLock } from './full-court-season-lock.js';
 import {
   fullCourtGameDayReadiness,
-  fullCourtNextUserFixture,
   fullCourtSimulationNotice,
   type FullCourtSimulationNotice,
-  type FullCourtUserFixture,
 } from './full-court-season-presenter.js';
 import { createFullCourtWorkerRunner } from './full-court-worker-runner.js';
 
@@ -133,8 +133,8 @@ export class FullCourtController {
             scores: [...season.scores, ...commit.scores],
           };
         },
-        playoffsCommitted: (commit) => {
-          this.playoffs = commit.state;
+        playoffsCommitted: (state) => {
+          this.playoffs = state;
         },
         publishedGame: (game, watchedReplay) => {
           this.#publishCommittedUserGame(game, watchedReplay);

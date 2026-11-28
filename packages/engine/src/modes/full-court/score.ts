@@ -64,8 +64,6 @@ export function fullCourtScoreOutcome(
 ): FullCourtSeasonScore['outcome'] {
   if (game.kind === 'forfeit') return { kind: 'forfeit', losingSides: [...game.sides] };
   const { home, away } = game.result;
-  const homeBonus = 0;
-  const awayBonus = 0;
   const homeBench = fullCourtBenchPoints(home);
   const awayBench = fullCourtBenchPoints(away);
   const homeStarters = fullCourtStarterPoints(home);
@@ -85,9 +83,6 @@ export function fullCourtScoreOutcome(
       benchPlayers: { home: benchPlayers(home), away: benchPlayers(away) },
       ...((homeStarters < 0 || awayStarters < 0 || homeBench < 0 || awayBench < 0) && {
         starterPoints: { home: homeStarters, away: awayStarters },
-      }),
-      ...((homeBonus !== 0 || awayBonus !== 0) && {
-        teamBonusPoints: { home: homeBonus, away: awayBonus },
       }),
     }),
     ...(lineups !== undefined && { lineups }),

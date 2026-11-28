@@ -135,6 +135,12 @@
 
 <style>
   .court-shell {
+    --court-line: color-mix(in srgb, #ffffff 66%, transparent);
+    --court-line-soft: color-mix(in srgb, #ffffff 52%, transparent);
+    --court-ring: color-mix(in srgb, #ffffff 92%, transparent);
+    --court-grain: color-mix(in srgb, #ffffff 7%, transparent);
+    --court-shade: color-mix(in srgb, #4e2706 28%, transparent);
+    --court-ink: #241406;
     min-width: 0;
   }
   .court {
@@ -145,10 +151,10 @@
     background: var(--color-court-wood);
     background-image: repeating-linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.07) 0 2px,
+      var(--court-grain) 0 2px,
       transparent 2px 64px
     );
-    box-shadow: inset 0 0 70px rgba(78, 39, 6, 0.28);
+    box-shadow: inset 0 0 70px var(--court-shade);
   }
   .court::before {
     content: '';
@@ -157,7 +163,7 @@
     right: 9%;
     top: -2px;
     height: 62%;
-    border: 2px solid rgba(255, 255, 255, 0.66);
+    border: 2px solid var(--court-line);
     border-top: 0;
   }
   .court-arc {
@@ -166,7 +172,7 @@
     top: -38%;
     width: 62%;
     height: 84%;
-    border: 2px solid rgba(255, 255, 255, 0.66);
+    border: 2px solid var(--court-line);
     border-radius: 50%;
   }
   .court-key {
@@ -176,7 +182,7 @@
     width: 34%;
     height: 46%;
     transform: translateX(-50%);
-    border: 2px solid rgba(255, 255, 255, 0.52);
+    border: 2px solid var(--court-line-soft);
     border-top: 0;
     border-radius: 0 0 60px 60px;
   }
@@ -206,15 +212,15 @@
     margin: 0 auto;
     place-items: center;
     overflow: hidden;
-    border: 3px solid rgba(255, 255, 255, 0.92);
+    border: 3px solid var(--court-ring);
     border-radius: 999px;
-    background: #20242c;
-    color: #f3f5f8;
+    background: var(--color-card);
+    color: var(--color-foreground);
     font-family: var(--font-display);
     font-size: 0.95rem;
     font-weight: 800;
     letter-spacing: 0.02em;
-    box-shadow: 0 6px 16px rgba(35, 19, 5, 0.3);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--court-ink) 30%, transparent);
   }
   .portrait :global(> div) {
     border-radius: 999px;
@@ -232,7 +238,7 @@
   .portrait[data-tone='empty'] {
     border-style: dashed;
     background: transparent;
-    color: rgba(255, 255, 255, 0.82);
+    color: color-mix(in srgb, #ffffff 82%, transparent);
     font-size: 1.3rem;
     box-shadow: none;
   }
@@ -244,8 +250,8 @@
   }
   .slot[data-focused='true'] .portrait {
     box-shadow:
-      0 0 0 3px rgba(255, 255, 255, 0.55),
-      0 8px 18px rgba(35, 19, 5, 0.35);
+      0 0 0 3px color-mix(in srgb, var(--color-primary) 55%, transparent),
+      0 8px 18px color-mix(in srgb, #231309 35%, transparent);
   }
   .slot-badge {
     position: absolute;
@@ -265,7 +271,7 @@
     display: block;
     margin-top: 0.55rem;
     overflow: hidden;
-    color: #241406;
+    color: var(--court-ink);
     font-family: var(--font-display);
     font-size: 0.65rem;
     font-weight: 800;
@@ -278,7 +284,7 @@
     align-items: baseline;
     justify-content: center;
     gap: 0.15rem;
-    color: #3c2409;
+    color: color-mix(in srgb, var(--court-ink) 82%, transparent);
     font-family: var(--font-mono);
     font-size: 0.6rem;
     font-weight: 700;
@@ -292,8 +298,8 @@
     margin-left: 0.15rem;
     padding: 0 0.15rem;
     border-radius: 0.2rem;
-    background: rgba(36, 20, 6, 0.24);
-    color: #241406;
+    background: color-mix(in srgb, var(--court-ink) 24%, transparent);
+    color: var(--court-ink);
     font-size: 0.45rem;
     letter-spacing: 0.06em;
   }

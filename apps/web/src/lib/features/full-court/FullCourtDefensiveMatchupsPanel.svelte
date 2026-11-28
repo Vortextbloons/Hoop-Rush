@@ -139,7 +139,7 @@
                             <span class="text-xs text-muted-foreground"
                               >{formatPositions(player.positions)}{option.available
                                 ? ''
-                                : ' ? Out'}</span
+                                : ' · Out'}</span
                             >
                           </span>
                           <span class="shrink-0 text-right text-xs tabular-nums">
@@ -155,8 +155,8 @@
                       {#if player.anchors !== undefined}
                         <p class="mt-2 text-xs font-semibold">Source season averages</p>
                         <p class="mt-1 text-xs tabular-nums text-muted-foreground">
-                          {player.anchors.pointsPerGame.toFixed(1)} pts ?
-                          {player.anchors.reboundsPerGame.toFixed(1)} reb ?
+                          {player.anchors.pointsPerGame.toFixed(1)} pts ·
+                          {player.anchors.reboundsPerGame.toFixed(1)} reb ·
                           {player.anchors.assistsPerGame.toFixed(1)} ast
                         </p>
                       {/if}

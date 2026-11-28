@@ -35,7 +35,6 @@ export {
   type FullCourtAdvanceSeasonCommandInput,
   type FullCourtAdvanceSessionDependencies,
   type FullCourtGamePlanClear,
-  type FullCourtPlayoffCommit,
   type FullCourtPlayoffProgressionResult,
   type FullCourtSeasonCommit,
 } from './advance-session.ts';

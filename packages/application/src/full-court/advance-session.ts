@@ -54,10 +54,6 @@ export interface FullCourtSeasonCommit {
   readonly scores: readonly FullCourtSeasonScore[];
 }
 
-export interface FullCourtPlayoffCommit {
-  readonly state: FullCourtAdvancePlayoffState;
-}
-
 export interface FullCourtGamePlanClear {
   readonly runId: string;
   readonly gameId: string | null;
@@ -74,7 +70,7 @@ export interface FullCourtAdvanceObserver {
   readonly stopRequested: () => boolean;
   readonly progress: (completed: number, total: number) => void;
   readonly seasonCommitted: (commit: FullCourtSeasonCommit) => void;
-  readonly playoffsCommitted: (commit: FullCourtPlayoffCommit) => void;
+  readonly playoffsCommitted: (state: FullCourtAdvancePlayoffState) => void;
   readonly publishedGame: (
     game: FullCourtPlayedGame | null,
     watchedReplay: FullCourtWatchedReplay | null,
@@ -362,7 +358,7 @@ export class FullCourtAdvanceSession {
         checkpoint: outcome.checkpoint,
         view: outcome.view,
       };
-      observer.playoffsCommitted({ state: current });
+      observer.playoffsCommitted(current);
       if (!nextIsUser) {
         if (outcome.view.nextGame === null) {
           await observer.archiveRun(current.lock, current.checkpoint);

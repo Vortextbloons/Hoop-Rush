@@ -80,6 +80,9 @@ describe('Full Court rotation room', () => {
     expect(body).toContain('Star 36');
     expect(body).toContain('Sit Player 3');
     expect(body).toContain('80 of 240 minutes assigned');
+    expect(body).toContain('class="minute-slider ui-range');
+    expect(body).toContain('--ui-range-progress: 75%');
+    expect(body).toContain('Cumulative workload for Player 1: 0%');
   });
 
   test('read-only minutes board hides the editing controls', () => {

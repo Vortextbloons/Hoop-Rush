@@ -56,6 +56,15 @@
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(FULL_COURT_MAX_PLAYER_MINUTES, Math.round(value)));
   }
+
+  function rangeFill(minutes: number): string {
+    return `--ui-range-progress: ${String((minutes / FULL_COURT_MAX_PLAYER_MINUTES) * 100)}%`;
+  }
+
+  function loadTone(load: number): 'negative' | 'accent' | 'muted' {
+    if (load >= 60) return 'negative';
+    return load >= 25 ? 'accent' : 'muted';
+  }
 </script>
 
 <div class="minute-summary">
@@ -94,7 +103,9 @@
         {#each group.rows as row (row.player.playerId)}
           {@const isLocked = lockedSet.has(row.player.playerId)}
           <li class="minute-row" data-starter={row.starterSlot !== null} data-locked={isLocked}>
-            <FullCourtPortrait player={row.player} {art} size="md" />
+            <div class="minute-portrait">
+              <FullCourtPortrait player={row.player} {art} size="md" />
+            </div>
             <div class="minute-id">
               <span class="minute-name">{row.player.displayName}</span>
               <span class="ui-micro flex flex-wrap items-center gap-x-1.5">
@@ -121,24 +132,18 @@
               </span>
               <div class="minute-load">
                 <span class="minute-load-label">Workload</span>
-                <meter
-                  class="h-2 w-12 accent-primary"
-                  min="0"
-                  max="100"
-                  low="25"
-                  high="60"
-                  optimum="0"
-                  value={row.cumulativeLoad}
-                  aria-label={`Cumulative workload for ${row.player.displayName}`}
-                ></meter>
                 <span
-                  class="minute-load-value"
-                  data-tone={row.cumulativeLoad >= 60
-                    ? 'negative'
-                    : row.cumulativeLoad >= 25
-                      ? 'accent'
-                      : 'muted'}
+                  class="minute-load-track"
+                  role="img"
+                  aria-label={`Cumulative workload for ${row.player.displayName}: ${String(row.cumulativeLoad)}%`}
+                  data-tone={loadTone(row.cumulativeLoad)}
                 >
+                  <span
+                    class="minute-load-fill"
+                    style:width={`${String(Math.min(100, Math.max(0, row.cumulativeLoad)))}%`}
+                  ></span>
+                </span>
+                <span class="minute-load-value" data-tone={loadTone(row.cumulativeLoad)}>
                   {row.cumulativeLoad}%
                 </span>
               </div>
@@ -191,12 +196,13 @@
                 </div>
                 <input
                   type="range"
-                  class="minute-slider"
+                  class="minute-slider ui-range"
                   min="0"
                   max={FULL_COURT_MAX_PLAYER_MINUTES}
                   step="1"
                   value={row.minutes}
                   disabled={locked}
+                  style={rangeFill(row.minutes)}
                   aria-label={`Minutes slider for ${row.player.displayName}`}
                   aria-valuetext={`${String(row.minutes)} minutes`}
                   oninput={(event) =>
@@ -313,7 +319,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .minute-groups {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -344,12 +350,23 @@
     display: grid;
     min-width: 0;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem 0.5rem;
     padding: 0.45rem 0.5rem;
     border: 1px solid var(--color-line-soft);
     border-radius: 0.7rem;
     background: var(--color-surface-1);
-    grid-template-columns: auto minmax(0, 1fr) minmax(7.5rem, 10rem) auto;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'portrait id'
+      'portrait control'
+      'portrait actions';
+  }
+
+  @media (min-width: 640px) {
+    .minute-row {
+      grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 11rem) auto;
+      grid-template-areas: 'portrait id control actions';
+    }
   }
 
   .minute-row[data-starter='true'] {
@@ -360,10 +377,18 @@
     border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line-soft));
   }
 
+  .minute-portrait {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    grid-area: portrait;
+  }
+
   .minute-id {
     display: grid;
     min-width: 0;
     gap: 0.15rem;
+    grid-area: id;
   }
 
   .minute-name {
@@ -378,16 +403,45 @@
   .minute-load {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.375rem;
     margin-top: 0.1rem;
+    min-width: 0;
   }
 
   .minute-load-label {
+    flex: none;
     color: var(--color-muted-foreground);
     font-size: 0.625rem;
   }
 
+  .minute-load-track {
+    display: block;
+    height: 0.3rem;
+    min-width: 1.5rem;
+    flex: 0 1 3rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-surface-3);
+  }
+
+  .minute-load-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-muted-foreground);
+    transition: width 140ms ease;
+  }
+
+  .minute-load-track[data-tone='accent'] .minute-load-fill {
+    background: var(--color-accent);
+  }
+
+  .minute-load-track[data-tone='negative'] .minute-load-fill {
+    background: var(--color-negative);
+  }
+
   .minute-load-value {
+    flex: none;
     font-family: var(--font-mono);
     font-size: 0.625rem;
     font-variant-numeric: tabular-nums;
@@ -408,11 +462,13 @@
   .minute-control {
     display: grid;
     min-width: 0;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    grid-area: control;
   }
 
   .minute-readout {
     margin: 0;
+    grid-area: control;
     font-family: var(--font-display);
     font-size: 1.15rem;
     font-weight: 800;
@@ -496,9 +552,8 @@
 
   .minute-slider {
     width: 100%;
-    height: 1rem;
+    min-width: 0;
     margin: 0;
-    accent-color: var(--color-primary);
     cursor: pointer;
   }
 
@@ -511,13 +566,20 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.2rem;
+    gap: 0.25rem;
+    grid-area: actions;
+  }
+
+  .minute-actions :global(.ui-btn) {
+    min-height: 1.8rem;
+    padding-block: 0.25rem;
+    padding-inline: 0.5rem;
   }
 
   .minute-preset {
-    min-height: 1.8rem;
-    max-width: 4.6rem;
-    padding: 0 0.2rem;
+    min-height: var(--ui-control-height-sm);
+    max-width: 4.75rem;
+    padding: 0 0.25rem;
     border: 1px solid var(--color-line-soft);
     border-radius: 0.4rem;
     background: var(--color-surface-2);
@@ -563,17 +625,23 @@
   }
 
   @media (max-width: 639px) {
-    .minute-row {
-      grid-template-columns: auto minmax(0, 1fr) auto;
+    .minute-actions {
+      justify-content: flex-start;
+      flex-wrap: wrap;
     }
 
-    .minute-control {
-      grid-column: 2 / -1;
+    .minute-stepper {
+      justify-content: flex-start;
+    }
+
+    .minute-preset {
+      max-width: 5.75rem;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .minute-meter-fill {
+    .minute-meter-fill,
+    .minute-load-fill {
       transition: none;
     }
   }

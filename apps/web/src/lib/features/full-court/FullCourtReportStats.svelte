@@ -21,7 +21,7 @@
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
-  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import { trueShootingPct, usageSharePct } from '#lib/format.js';
 
   let {
     awards,
@@ -50,10 +50,6 @@
     };
   });
 
-  const teamUsage = $derived(
-    rosterStats.reduce((sum, row) => sum + usagePossessions(row.fga, row.fta, row.turnovers), 0),
-  );
-
   const statColumns = $derived.by(() => {
     const columns = seasonStatColumns<FullCourtPlayerSeasonRow>(
       {
@@ -68,7 +64,7 @@
         threePct: (row) => (row.tpPct === null ? '—' : row.tpPct.toFixed(1)),
         ftPct: (row) => (row.ftPct === null ? '—' : row.ftPct.toFixed(1)),
         tsPct: (row) => trueShootingPct(row.points, row.fga, row.fta),
-        usagePct: (row) => usagePct(usagePossessions(row.fga, row.fta, row.turnovers), teamUsage),
+        usagePct: (row) => usageSharePct(row, rosterStats),
       },
       { includeGames: true },
     );

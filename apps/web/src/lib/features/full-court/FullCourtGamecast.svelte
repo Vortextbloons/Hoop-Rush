@@ -4,7 +4,6 @@
     unitNameForPlayerIds,
     type FullCourtGameHealthOutcome,
     type FullCourtGameResult,
-    type FullCourtTapeEvent,
   } from '@hoop-rush/engine';
   import type { BroadcastFeedRow } from '#lib/gamecast/GamecastFeed.svelte';
   import GamecastLiveLayout from '#lib/gamecast/GamecastLiveLayout.svelte';
@@ -24,7 +23,12 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
-  import { fullCourtGamecastFrames, fullCourtPossessionCursor } from './full-court-gamecast.ts';
+  import {
+    fullCourtBestLineup,
+    fullCourtGamecastFrames,
+    fullCourtPossessionCursor,
+    fullCourtRotationSummary,
+  } from './full-court-gamecast.ts';
 
   let {
     game,
@@ -44,7 +48,7 @@
   type LineupReportRow = NonNullable<typeof lineupReport>['lineupRows'][number];
   const columns: PlayerStatColumn<PlayerLine>[] = [
     { key: 'minutes', label: 'MIN', value: (player) => player.minutes.toFixed(1) },
-    ...gamecastBoxScoreColumns<PlayerLine>([
+    ...(gamecastBoxScoreColumns([
       'points',
       'rebounds',
       'assists',
@@ -57,7 +61,7 @@
       'freeThrows',
       'fieldGoalPct',
       'trueShootingPct',
-    ]),
+    ]) as PlayerStatColumn<PlayerLine>[]),
     {
       key: 'energy',
       label: 'ENERGY',
@@ -67,10 +71,10 @@
 
   function totalsForTeam(team: FullCourtGameResult['home']): PlayerStatsTotals<PlayerLine> {
     const lineTotals = gamecastBoxScoreLineTotals(team.players);
-    const totals = gamecastBoxScoreTotals<PlayerLine>({
+    const totals = gamecastBoxScoreTotals({
       ...lineTotals,
       points: team.box.points,
-    });
+    }) as PlayerStatsTotals<PlayerLine>;
     return {
       label: 'Team',
       value: (column) =>
@@ -146,36 +150,9 @@
   const userTeam = $derived(
     game.result.home.teamId === userTeamId ? game.result.home : game.result.away,
   );
-  const userSideIndex = $derived(game.result.home.teamId === userTeamId ? 0 : 1);
-  const userSubstitutions = $derived(
-    (game.tape ?? []).filter(
-      (event): event is Extract<FullCourtTapeEvent, { kind: 'substitution' }> =>
-        event.kind === 'substitution' && event.side === userSideIndex,
-    ),
-  );
-  const foulTrouble = $derived(
-    userTeam.players.filter((player) => player.fouls >= 4 || player.foulsOut),
-  );
-  const starterMinutes = $derived(
-    userTeam.players
-      .filter((player) => player.startedGame)
-      .reduce((total, player) => total + player.minutes, 0),
-  );
-  const benchMinutes = $derived(
-    userTeam.players
-      .filter((player) => !player.startedGame)
-      .reduce((total, player) => total + player.minutes, 0),
-  );
-  const bestLineup = $derived.by(() => {
-    const rows = (lineupReport?.lineupRows ?? []).filter(
-      (row) => row.sampleMet && row.netRatingPer100 !== null,
-    );
-    return (
-      [...rows].sort(
-        (left, right) => (right.netRatingPer100 ?? 0) - (left.netRatingPer100 ?? 0),
-      )[0] ?? null
-    );
-  });
+  const userSideIndex = $derived.by((): 0 | 1 => (game.result.home.teamId === userTeamId ? 0 : 1));
+  const rotation = $derived(fullCourtRotationSummary(userTeam, userSideIndex, game.tape));
+  const bestLineup = $derived(fullCourtBestLineup(lineupReport?.lineupRows ?? []));
 
   onMount(() => {
     const timer = setInterval(() => {
@@ -183,36 +160,6 @@
     }, 240);
     return () => clearInterval(timer);
   });
-
-  function substitutionReasonLabel(
-    reason: Extract<FullCourtTapeEvent, { kind: 'substitution' }>['reason'],
-  ): string {
-    switch (reason) {
-      case 'foul-out':
-        return 'foul out';
-      case 'fatigue':
-        return 'fatigue';
-      case 'minute-target':
-        return 'minute target';
-      case 'closing-five':
-        return 'closing five';
-      case 'coach-rule':
-        return 'coach rule';
-      case 'emergency-continuation':
-        return 'emergency';
-    }
-  }
-
-  function substitutionSummary(
-    events: readonly Extract<FullCourtTapeEvent, { kind: 'substitution' }>[],
-  ): string {
-    const counts = new Map<string, number>();
-    for (const event of events) {
-      const label = substitutionReasonLabel(event.reason);
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    }
-    return [...counts].map(([label, count]) => `${String(count)} ${label}`).join(' · ');
-  }
 
   function playerNameOf(team: FullCourtGameResult['home'], playerId: string): string {
     return team.players.find((player) => player.playerId === playerId)?.displayName ?? 'Player';
@@ -329,11 +276,13 @@
         <label class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
           <span class="shrink-0">Game timeline</span>
           <input
-            class="w-full accent-primary"
+            class="ui-range w-full min-w-0"
             type="range"
             min="0"
-            max={frames.length - 1}
+            max={Math.max(0, frames.length - 1)}
             value={cursor}
+            style={`--ui-range-progress: ${String(frames.length > 1 ? (cursor / (frames.length - 1)) * 100 : 100)}%`}
+            aria-label="Game timeline"
             oninput={(event) => {
               paused = true;
               cursor = event.currentTarget.valueAsNumber;
@@ -397,8 +346,7 @@
       undefined,
     )}
     {@const unitSeconds = namedUnitSeconds(userTeam)}
-    {@const firstSubstitution = userSubstitutions[0]}
-    {@const playersUsed = userTeam.players.filter((player) => player.minutes > 0)}
+    {@const firstSubstitution = rotation.firstSubstitution}
     <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
       <h3 class="font-semibold">How your team played</h3>
       <p class="text-muted-foreground">
@@ -407,13 +355,13 @@
         {userTeam.box.turnovers} turnovers
       </p>
       <p class="text-muted-foreground">
-        {playersUsed.length} players used · {starterMinutes.toFixed(1)} starter minutes ·
-        {benchMinutes.toFixed(1)} bench minutes{#if userTeam.disqualifications > 0}
-          · {userTeam.disqualifications} foul out{userTeam.disqualifications === 1 ? '' : 's'}{/if}
+        {rotation.playersUsed} players used · {rotation.starterMinutes.toFixed(1)} starter minutes ·
+        {rotation.benchMinutes.toFixed(1)} bench minutes{#if rotation.disqualifications > 0}
+          · {rotation.disqualifications} foul out{rotation.disqualifications === 1 ? '' : 's'}{/if}
       </p>
-      {#if foulTrouble.length > 0}
+      {#if rotation.foulTrouble.length > 0}
         <p class="text-muted-foreground">
-          Foul trouble: {foulTrouble
+          Foul trouble: {rotation.foulTrouble
             .map(
               (player) =>
                 `${player.displayName} (${String(player.fouls)} PF${player.foulsOut ? ', fouled out' : ''})`,
@@ -438,12 +386,13 @@
           {/each}
         </ul>
       {/if}
-      {#if userSubstitutions.length > 0}
+      {#if rotation.substitutions.length > 0}
         <p class="text-muted-foreground">
-          {userSubstitutions.length} substitution{userSubstitutions.length === 1 ? '' : 's'} ·
-          {substitutionSummary(userSubstitutions)}
+          {rotation.substitutions.length} substitution{rotation.substitutions.length === 1
+            ? ''
+            : 's'} · {rotation.reasonSummary}
         </p>
-        {#if firstSubstitution !== undefined}
+        {#if firstSubstitution !== null}
           <p class="text-muted-foreground">
             First change: {playerNameOf(userTeam, firstSubstitution.inPlayerId)} in for
             {playerNameOf(userTeam, firstSubstitution.outPlayerId)} ·

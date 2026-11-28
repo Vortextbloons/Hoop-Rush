@@ -184,8 +184,8 @@ test('accumulates compact lineup facts through health without a playback tape', 
   expect(factsOnly.result).toEqual(recorded.result);
   expect(factsOnly.health).toEqual(recorded.health);
   expect(factsOnly.tape).toBeNull();
-  if (factsOnly.lineupFacts === null || factsOnly.lineupFacts === undefined) {
-    throw new Error('Expected compact lineup facts');
+  if (factsOnly.lineupFacts == null || recorded.tape === null) {
+    throw new Error('Expected compact lineup facts and a playback tape');
   }
   for (const side of ['home', 'away'] as const) {
     expect(
@@ -232,6 +232,33 @@ test('experimental injuries are opt-in and leave the completed game unchanged', 
     expect(enabled.health.home.players[event.playerId]?.availableFromDay).toBe(3);
   }
   expect(fullCourtTeamHealthSchema.parse(enabled.health.home)).toEqual(enabled.health.home);
+});
+
+test('injury draws cover both teams and persist on each side', () => {
+  const homeRoster = fullCourtTestRoster('injury-both-home', 6);
+  const awayRoster = fullCourtTestRoster('injury-both-away', 6);
+  const game = fullCourtTestInput({
+    seed: 'injury-both',
+    homeRoster,
+    awayRoster,
+  });
+  const futureGameDays = [2, 4, 6, 8, 10, 12];
+  const outcome = runFullCourtGameWithHealth(game, 0, context, {
+    injuryProfiles: injuryProfilesOf([...homeRoster, ...awayRoster]),
+    futureGameDays: { home: futureGameDays, away: futureGameDays },
+  });
+  if (outcome.kind !== 'played') throw new Error('Expected a playable injury game');
+
+  const injuredTeams = new Set(outcome.injuries.map((event) => event.teamId));
+  expect(injuredTeams.has(game.home.teamId)).toBe(true);
+  expect(injuredTeams.has(game.away.teamId)).toBe(true);
+  for (const event of outcome.injuries) {
+    const side = event.teamId === game.home.teamId ? 'home' : 'away';
+    expect(outcome.health[side].players[event.playerId]?.availableFromDay).toBe(
+      event.availableFromDay,
+    );
+    expect(outcome.health[side].throughDay).toBe(0);
+  }
 });
 
 test('injury draws replay deterministically and match Gamecast recording', () => {

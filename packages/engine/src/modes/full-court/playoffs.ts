@@ -4,6 +4,8 @@ import {
   CAP_RUSH_SERIES_WINS,
   FULL_COURT_PLAYOFFS_VERSION,
   canonicalJson,
+  capRushPlayoffGameSeed,
+  capRushPlayoffSeriesId,
   capRushSeriesWinner,
   capRushSeriesWins,
   fullCourtPlayoffCheckpointSchema,
@@ -12,7 +14,6 @@ import {
   havocInstanceSeed,
   seasonDigestHex,
   seedSchema,
-  type CapRushPlayoffGamePlan,
   type CapRushPostseasonUserOutcome,
   type FullCourtPlayoffAdaptation,
   type FullCourtPlayoffCheckpoint,
@@ -22,13 +23,14 @@ import {
   type Seed,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../../sim/kernel.ts';
 import {
-  conferenceOpeningSeries,
   finalsHomeCourtOf,
+  nextPlayoffGamePlan,
+  openingSeries,
   playoffSeriesFields,
-} from '../conference-playoffs.ts';
-import { capRushNextPlayoffGamePlan } from '../cap-rush/playoff-shared.ts';
+  type PlayoffGamePlan,
+} from '../../league/playoffs.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { adjustedAnchors, adjustedTendencies } from '../cap-rush/playoff.ts';
 import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, type FullCourtTeamGameInput } from './game.ts';
@@ -79,7 +81,7 @@ export interface FullCourtPlayoffSeries {
   readonly games: FullCourtPlayoffScore[];
 }
 
-export interface FullCourtPlayoffFixture extends CapRushPlayoffGamePlan {
+export interface FullCourtPlayoffFixture extends PlayoffGamePlan {
   readonly gameId: string;
   readonly dayOffset: number;
 }
@@ -201,6 +203,7 @@ function seriesOf(
   low: FullCourtStandingsRow,
 ): FullCourtPlayoffSeries {
   return {
+    seriesId: capRushPlayoffSeriesId(round, seriesSlot),
     ...playoffSeriesFields(round, seriesSlot, high, low),
     games: [],
   };
@@ -268,7 +271,7 @@ function playoffState(lock: FullCourtPlayoffLock, previous: FullCourtPlayoffChec
   if (checkpoint.runId !== season.runId || checkpoint.lockDigest !== lock.digest) {
     throw new Error('Full Court playoff checkpoint does not match the locked season');
   }
-  let current = conferenceOpeningSeries(
+  let current = openingSeries(
     [lock.standings.west, lock.standings.east],
     (slot, high, low) => seriesOf(1, slot, high, low),
     'Missing Full Court playoff seed',
@@ -296,10 +299,16 @@ function playoffState(lock: FullCourtPlayoffLock, previous: FullCourtPlayoffChec
       selected = current[0];
     }
     if (selected === undefined) return null;
-    const plan = capRushNextPlayoffGamePlan({
+    const plan = nextPlayoffGamePlan({
       series: selected,
-      runSeed: playoffSeed,
+      seed: capRushPlayoffGameSeed(
+        playoffSeed,
+        selected.round,
+        selected.seriesSlot,
+        selected.games.length + 1,
+      ),
       userTeamId: season.userTeamId,
+      finalsRound: CAP_RUSH_PLAYOFF_ROUNDS,
     });
     const fixture: FullCourtPlayoffFixture = {
       ...plan,
@@ -383,10 +392,16 @@ export function fullCourtUserNextPlayoffMatchup(input: {
     .at(-1);
   if (userSeries === undefined || capRushSeriesWinner(userSeries) !== null) return null;
   const playoffSeed = havocInstanceSeed(runSeed, 'full-court-playoffs-v1');
-  const plan = capRushNextPlayoffGamePlan({
+  const plan = nextPlayoffGamePlan({
     series: userSeries,
-    runSeed: playoffSeed,
+    seed: capRushPlayoffGameSeed(
+      playoffSeed,
+      userSeries.round,
+      userSeries.seriesSlot,
+      userSeries.games.length + 1,
+    ),
     userTeamId,
+    finalsRound: CAP_RUSH_PLAYOFF_ROUNDS,
   });
   if (plan.userSide === null) return null;
   const opponentTeamId = plan.userSide === 'home' ? plan.awayTeamId : plan.homeTeamId;

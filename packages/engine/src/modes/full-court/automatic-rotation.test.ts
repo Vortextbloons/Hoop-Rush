@@ -20,7 +20,7 @@ test('automatic rotations shift live minutes from tired players on both sides', 
 
   for (let sample = 0; sample < 12; sample++) {
     const input = fullCourtTestInput({
-      seed: `staff-rotation-${sample}`,
+      seed: `staff-rotation-${String(sample)}`,
       homeRoster,
       awayRoster,
       homeAvailability: withFatigue(homeRoster),
@@ -51,14 +51,21 @@ test('automatic rotations shift live minutes from tired players on both sides', 
 
     expect(checkFullCourtGameResult(automatic)).toEqual([]);
     for (const side of sides) {
-      const tiredId = input[side].roster[0]!.playerId;
-      const tired = automatic[side].players.find((player) => player.playerId === tiredId)!;
-      const comparison = baseline[side].players.find((player) => player.playerId === tiredId)!;
+      const tiredPlayer = input[side].roster[0];
+      const inactivePlayer = input[side].roster[7];
+      if (tiredPlayer === undefined || inactivePlayer === undefined) {
+        throw new Error(`Expected 8 players on ${side} roster`);
+      }
+      const tiredId = tiredPlayer.playerId;
+      const tired = automatic[side].players.find((player) => player.playerId === tiredId);
+      const comparison = baseline[side].players.find((player) => player.playerId === tiredId);
+      if (tired === undefined || comparison === undefined) {
+        throw new Error(`Expected player ${tiredId} in ${side} box score`);
+      }
       expect(tired.plannedSeconds).toBeLessThan(comparison.plannedSeconds);
       expect(
-        automatic[side].players.find(
-          (player) => player.playerId === input[side].roster[7]!.playerId,
-        )?.seconds,
+        automatic[side].players.find((player) => player.playerId === inactivePlayer.playerId)
+          ?.seconds,
       ).toBe(0);
       liveSeconds[side] += comparison.seconds - tired.seconds;
     }

@@ -19,7 +19,10 @@ import {
   type FullCourtSeasonScore,
   type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { submitFullCourtDraftCommand } from '@hoop-rush/application/full-court';
+import {
+  fullCourtNextUserFixture,
+  submitFullCourtDraftCommand,
+} from '@hoop-rush/application/full-court';
 import {
   buildFullCourtRegularSeason,
   createEngineContext,
@@ -64,7 +67,6 @@ import {
   fullCourtWatchedReplayOutcome,
   fullCourtWatchedReplaySummary,
 } from './full-court-gamecast.ts';
-import { fullCourtNextUserFixture } from './full-court-season-presenter.ts';
 import type { FullCourtWorkerRunner } from './full-court-worker-runner.ts';
 import { fullCourtWorkerRequestSchema } from './full-court-worker-protocol.ts';
 import {

@@ -18,9 +18,10 @@ import {
   type FullCourtHealthProfileSet,
   type Seed,
 } from '@hoop-rush/data-contracts';
+import { NBA_LEAGUE_RULES } from '../../league/nba.ts';
+import { validateLeagueSchedule } from '../../league/schedule.ts';
 import { ENGINE_VERSION } from '../../sim/constants.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
-import { validateCapRushLeagueSchedule } from '../cap-rush/league-schedule.ts';
 import { withFullCourtCoaching } from './coaching.ts';
 import { checkFullCourtGameResult, FULL_COURT_SEED_VERSION } from './game.ts';
 import { runFullCourtGameWithHealth, type FullCourtGameHealthOutcome } from './health.ts';
@@ -91,7 +92,7 @@ export function lockFullCourtRegularSeason(
     readonly catalogAssetHash: string;
   },
 ): FullCourtSeasonLock {
-  const failures = validateCapRushLeagueSchedule(input.games, input.teams);
+  const failures = validateLeagueSchedule(input.games, input.teams, NBA_LEAGUE_RULES);
   if (failures.length > 0) throw new Error(`Invalid Full Court schedule: ${failures.join(', ')}`);
   const gameIds = new Set<string>();
   const lastDay = new Map<string, number>();

@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  FullCourtPlayoffScore,
-  FullCourtSeasonScore,
-  SimulationPlayer,
+import {
+  playerIdSchema,
+  type FullCourtPlayoffScore,
+  type FullCourtSeasonScore,
+  type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { buildFullCourtAwards, buildFullCourtPlayerSeasonStats } from './awards.ts';
@@ -13,7 +14,7 @@ function makePlayer(
   name: string,
   overrides: Partial<SimulationPlayer['ratings']> = {},
 ): SimulationPlayer {
-  const base = buildSimulationPlayer({ playerId: id, displayName: name });
+  const base = buildSimulationPlayer({ playerId: playerIdSchema.parse(id), displayName: name });
   return {
     ...base,
     ratings: { ...base.ratings, ...overrides },
@@ -192,9 +193,9 @@ describe('full-court awards and player stats', () => {
           teamId: 'team-a',
           displayName: 'Alpha',
           conference: 'east',
+          division: 'atlantic',
           wins: 4,
           losses: 0,
-          winPct: 1,
           pointsFor: 448,
           pointsAgainst: 392,
           pointDifferential: 56,
@@ -209,9 +210,9 @@ describe('full-court awards and player stats', () => {
           teamId: 'team-b',
           displayName: 'Beta',
           conference: 'west',
+          division: 'northwest',
           wins: 0,
           losses: 4,
-          winPct: 0,
           pointsFor: 392,
           pointsAgainst: 448,
           pointDifferential: -56,
@@ -221,6 +222,7 @@ describe('full-court awards and player stats', () => {
           qualified: true,
         },
       ],
+      qualifiedTeamIds: ['team-a', 'team-b'],
     };
     const stats = buildFullCourtPlayerSeasonStats({ teams, scores: regularScores });
     expect(stats[0]?.playerId).toBe('p-star');

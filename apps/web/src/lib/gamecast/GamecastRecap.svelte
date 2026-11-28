@@ -107,7 +107,7 @@
 
   const boxColumns: readonly PlayerStatColumn<GamecastBoxRow>[] = [
     { key: 'minutes', label: 'MIN', value: (row) => row.minutes },
-    ...gamecastBoxScoreColumns<GamecastBoxRow>([
+    ...(gamecastBoxScoreColumns([
       'points',
       'rebounds',
       'assists',
@@ -116,7 +116,7 @@
       'threes',
       'freeThrows',
       'trueShootingPct',
-    ]),
+    ]) as PlayerStatColumn<GamecastBoxRow>[]),
     {
       key: 'usagePct',
       label: 'USG%',
@@ -143,7 +143,7 @@
   }
 
   function totalsOf(panel: TeamPanel): PlayerStatsTotals<GamecastBoxRow> {
-    return gamecastBoxScoreTotals<GamecastBoxRow>({
+    return gamecastBoxScoreTotals({
       minutes: panel.team.players.reduce((total, player) => total + player.minutes, 0),
       points: panel.team.box.points,
       rebounds: panel.team.box.rebounds.total,
@@ -155,7 +155,7 @@
       fieldGoals: panel.team.box.fieldGoals,
       threes: panel.team.box.threes,
       freeThrows: panel.team.box.freeThrows,
-    });
+    }) as PlayerStatsTotals<GamecastBoxRow>;
   }
 
   const verificationView = $derived.by(() => {

@@ -24,7 +24,7 @@ function line(overrides: Partial<GamecastBoxScoreLine> = {}): GamecastBoxScoreLi
 }
 
 test('shares box-score column values and team totals', () => {
-  const columns = gamecastBoxScoreColumns<GamecastBoxScoreLine>([
+  const columns = gamecastBoxScoreColumns([
     'points',
     'rebounds',
     'assists',
@@ -47,7 +47,7 @@ test('shares box-score column values and team totals', () => {
   expect(byKey.get('threes')?.value(player)).toBe('1-4');
   expect(byKey.get('freeThrows')?.value(player)).toBe('1-2');
   expect(byKey.get('fieldGoalPct')?.value(player)).toBe('50.0%');
-  expect(byKey.get('trueShootingPct')?.value(player)).toBe('51.0%');
+  expect(byKey.get('trueShootingPct')?.value(player)).toBe('55.1%');
   expect(byKey.get('points')?.cellClass).toBe('ui-stats-value-strong');
 
   const totals = gamecastBoxScoreLineTotals([player, line({ minutes: 12, points: 4 })]);
@@ -59,7 +59,12 @@ test('shares box-score column values and team totals', () => {
     fieldGoals: { made: 10, attempted: 20 },
   });
   const totalsRow = gamecastBoxScoreTotals(totals);
-  expect(totalsRow.value(byKey.get('points')!)).toBe(16);
-  expect(totalsRow.value(byKey.get('fieldGoals')!)).toBe('10-20');
+  const pointsColumn = byKey.get('points');
+  const fieldGoalsColumn = byKey.get('fieldGoals');
+  if (pointsColumn === undefined || fieldGoalsColumn === undefined) {
+    throw new Error('Expected shared box-score columns');
+  }
+  expect(totalsRow.value(pointsColumn)).toBe(16);
+  expect(totalsRow.value(fieldGoalsColumn)).toBe('10-20');
   expect(totalsRow.value({ key: 'minutes', label: 'MIN', value: () => 0 })).toBe(36);
 });

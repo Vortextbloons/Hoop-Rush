@@ -1,11 +1,7 @@
 <script lang="ts">
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import type { FullCourtArt, FullCourtArtPlayer } from './full-court-art.ts';
-  import {
-    scoutFieldLabel,
-    scoutFieldValue,
-    type ScoutField,
-  } from './full-court-scout-labels';
+  import { scoutFieldLabel, scoutFieldValue, type ScoutField } from './full-court-scout-labels';
 
   let {
     items,

@@ -13,9 +13,10 @@ import {
   type Seed,
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
+import { NBA_LEAGUE_RULES } from '../../league/nba.ts';
+import { assignLeagueFranchise, type LeagueFieldTeam } from '../../league/schedule.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { assertCapRushCatalogSourceMatches } from '../cap-rush/catalog.ts';
-import { capRushAssignFranchise, type CapRushLeagueField } from '../cap-rush/league-schedule.ts';
 import { capRushPlayoffEffectOf, capRushPlayoffIsNeutral } from '../cap-rush/playoff.ts';
 import { fullCourtDraftIndexOf, fullCourtSalaryDollarsOf } from './draft-catalog.ts';
 import {
@@ -75,7 +76,7 @@ function staminaAvailability(players: readonly SeasonDraftCandidate[]) {
 
 export function buildFullCourtRegularSeason(input: {
   readonly draft: FullCourtDraftState;
-  readonly field: readonly CapRushLeagueField[];
+  readonly field: readonly LeagueFieldTeam[];
   readonly catalog: SeasonDraftCatalog;
   readonly catalogSource: CapRushCatalogSource;
   readonly profile: EraSimulationProfile;
@@ -108,7 +109,7 @@ export function buildFullCourtRegularSeason(input: {
 
   const runSeed = draft.runSeed;
   const games = buildFullCourtLeagueSchedule({ field, runSeed });
-  const assignment = capRushAssignFranchise({ field, runSeed });
+  const assignment = assignLeagueFranchise({ field, runSeed, rules: NBA_LEAGUE_RULES });
   const opponents = buildFullCourtHistoricalField({
     field: field.filter((team) => team.teamId !== assignment.franchiseId),
     catalog,

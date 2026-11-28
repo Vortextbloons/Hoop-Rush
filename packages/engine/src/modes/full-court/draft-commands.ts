@@ -189,6 +189,12 @@ function rejectPick(
   }
 }
 
+function withoutOffer(state: FullCourtDraftState): Omit<FullCourtDraftState, 'offer'> {
+  const copy = { ...state };
+  delete copy.offer;
+  return copy;
+}
+
 function applyPickPlayer(
   state: FullCourtDraftState,
   command: FullCourtPickPlayerCommand,
@@ -239,9 +245,8 @@ function applyPickPlayer(
           state: { ...state, picks, spending },
           round: picks.length,
         });
-  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...stateWithoutOffer,
+    ...withoutOffer(state),
     revision: state.revision + 1,
     picks,
     spending,
@@ -285,9 +290,8 @@ function applyRemovePlayer(
           state: { ...state, picks, spending },
           round: picks.length,
         });
-  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...stateWithoutOffer,
+    ...withoutOffer(state),
     revision: state.revision + 1,
     picks,
     spending,
@@ -319,9 +323,8 @@ function applyFinishDraft(
       `finishing requires at least ${String(FULL_COURT_MIN_ROSTER_SIZE)} picks (have ${String(state.picks.length)})`,
     );
   }
-  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...stateWithoutOffer,
+    ...withoutOffer(state),
     revision: state.revision + 1,
     stage: 'complete',
   });

@@ -489,6 +489,35 @@ describe('FullCourtAdvanceSession playoffs', () => {
     });
   });
 
+  test('counts bracket games when the user is eliminated', async () => {
+    const fixture = playoffFixture('playoff-ai', null);
+    const view = playoffView({ nextGame: fixture, userStatus: 'not-qualified' });
+    let calls = 0;
+    const seen = observer();
+    const session = new FullCourtAdvanceSession({
+      advanceSeasonSlot: () => Promise.reject(new Error('unexpected season advance')),
+      advancePlayoffGame: () => {
+        calls += 1;
+        return Promise.resolve<FullCourtPlayoffProgressionResult>({
+          kind: 'simulated',
+          checkpoint: playoffCheckpoint(calls),
+          view,
+          game: { kind: 'forfeit', sides: ['home'], winner: 'away', health: {} } as never,
+          watchedReplay: null,
+        });
+      },
+      observer: seen.value,
+    });
+
+    const outcome = await session.advance(playoffRequest({ view, count: 2 }));
+
+    expect(calls).toBe(2);
+    expect(outcome).toEqual({
+      kind: 'finished',
+      stop: { kind: 'game-limit', userGames: 0, bracketGames: 2 },
+    });
+  });
+
   test('archives and reports completion when the bracket is already done', async () => {
     const seen = observer();
     const session = new FullCourtAdvanceSession({

@@ -560,13 +560,12 @@
       {@render homeActions()}
     {/if}
 
-    <details
-      class="mt-4 rounded-lg border border-line-soft px-3"
-      open={gameDayReadiness.warnings.length > 0}
-    >
-      <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold"
-        >Game day readiness</summary
+    <section class="mt-4" aria-label="Game day readiness">
+      <p
+        class="mb-2 font-mono text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase"
       >
+        Game day readiness
+      </p>
       <FullCourtGameDayPanel
         readiness={gameDayReadiness}
         {restingPlayerIds}
@@ -574,7 +573,7 @@
         {onRestingChange}
         {art}
       />
-    </details>
+    </section>
   </Panel>
 {/snippet}
 
@@ -1049,15 +1048,19 @@
 
 <div class="flex flex-col gap-3">
   {#if coachingDirty && userCanPlay && !simulating && (section === 'home' || section === 'playoffs')}
-    <Alert tone="warning" title="Unsaved coaching changes">
-      <p>Simulation uses your saved plan.</p>
+    {#snippet reviewCoachingAction()}
       {#if onEditGamePlan}
-        {#snippet actions()}
-          <Button size="sm" tone="secondary" disabled={busy} onclick={onEditGamePlan}
-            >Review changes</Button
-          >
-        {/snippet}
+        <Button size="sm" tone="secondary" disabled={busy} onclick={onEditGamePlan}
+          >Review changes</Button
+        >
       {/if}
+    {/snippet}
+    <Alert
+      tone="warning"
+      title="Unsaved coaching changes"
+      actions={onEditGamePlan ? reviewCoachingAction : null}
+    >
+      <p>Simulation uses your saved plan.</p>
     </Alert>
   {/if}
   {#if section === 'league'}

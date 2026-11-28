@@ -1224,7 +1224,7 @@
               >
               <ul class="mt-2 grid gap-2 text-sm">
                 {#each draft.units as unit, index (index)}
-                  <li><strong>{unit.name}</strong> ? {lineupNames(unit.playerIds)}</li>
+                  <li><strong>{unit.name}</strong> · {lineupNames(unit.playerIds)}</li>
                 {:else}
                   <li class="text-muted-foreground">No saved lineup groups.</li>
                 {/each}
@@ -1278,6 +1278,7 @@
   }
   .board-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;

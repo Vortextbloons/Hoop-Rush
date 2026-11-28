@@ -2,7 +2,7 @@ import type { MadeAttempted } from '@hoop-rush/data-contracts';
 import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
 import { ratioPct, trueShootingPct } from '#lib/format.js';
 
-/** The shared shape of a player line in every eliminated/neutral gamecast box score. */
+/** The shared shape of a player line in the neutral gamecast box scores. */
 export interface GamecastBoxScoreLine {
   readonly minutes: number;
   readonly points: number;
@@ -48,10 +48,7 @@ const LABELS: Record<GamecastBoxScoreColumnKey, string> = {
   usagePct: 'USG%',
 };
 
-function valueOf<Row extends GamecastBoxScoreLine>(
-  key: GamecastBoxScoreColumnKey,
-  row: Row,
-): string | number {
+function valueOf(key: GamecastBoxScoreColumnKey, row: GamecastBoxScoreLine): string | number {
   switch (key) {
     case 'points':
       return row.points;
@@ -86,13 +83,13 @@ function valueOf<Row extends GamecastBoxScoreLine>(
  * Column definitions shared by the five-man Gamecast recap and Full Court.
  * Callers choose the order and any mode-only columns (minutes, energy) themselves.
  */
-export function gamecastBoxScoreColumns<Row extends GamecastBoxScoreLine>(
+export function gamecastBoxScoreColumns(
   keys: readonly GamecastBoxScoreColumnKey[],
-): PlayerStatColumn<Row>[] {
+): PlayerStatColumn<GamecastBoxScoreLine>[] {
   return keys.map((key) => ({
     key,
     label: LABELS[key],
-    value: (row: Row) => valueOf(key, row),
+    value: (row: GamecastBoxScoreLine) => valueOf(key, row),
     ...(key === 'points' ? { cellClass: 'ui-stats-value-strong' } : {}),
   }));
 }
@@ -112,8 +109,8 @@ export interface GamecastBoxScoreTotals {
 }
 
 /** Sum player lines for the footer of a gamecast box score. */
-export function gamecastBoxScoreLineTotals<Row extends GamecastBoxScoreLine>(
-  players: readonly Row[],
+export function gamecastBoxScoreLineTotals(
+  players: readonly GamecastBoxScoreLine[],
 ): GamecastBoxScoreTotals {
   let minutes = 0;
   let points = 0;
@@ -161,9 +158,9 @@ export function gamecastBoxScoreLineTotals<Row extends GamecastBoxScoreLine>(
 }
 
 /** Map team totals onto the columns shared by the gamecast box scores. */
-export function gamecastBoxScoreTotals<Row extends GamecastBoxScoreLine>(
+export function gamecastBoxScoreTotals(
   totals: GamecastBoxScoreTotals,
-): PlayerStatsTotals<Row> {
+): PlayerStatsTotals<GamecastBoxScoreLine> {
   return {
     value: (column) => {
       switch (column.key) {

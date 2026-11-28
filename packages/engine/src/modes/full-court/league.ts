@@ -8,10 +8,8 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../../sim/rng.ts';
-import {
-  buildCapRushLeagueSchedule,
-  type CapRushLeagueField,
-} from '../cap-rush/league-schedule.ts';
+import { NBA_LEAGUE_RULES } from '../../league/nba.ts';
+import { buildLeagueSchedule, type LeagueFieldTeam } from '../../league/schedule.ts';
 import {
   adjacentHistoricalPlayers,
   chooseHistoricalTeam,
@@ -24,7 +22,7 @@ import {
 const MIN_HISTORICAL_ROSTER_SIZE = 10;
 const MAX_HISTORICAL_ROSTER_SIZE = 12;
 
-export interface FullCourtHistoricalTeam extends CapRushLeagueField {
+export interface FullCourtHistoricalTeam extends LeagueFieldTeam {
   readonly seasonKey: SeasonKey;
   readonly players: readonly SeasonDraftCandidate[];
   readonly starterVersionIds: readonly PlayerVersionId[];
@@ -62,7 +60,7 @@ function historicalDepth(
 }
 
 export function buildFullCourtHistoricalField(input: {
-  readonly field: readonly CapRushLeagueField[];
+  readonly field: readonly LeagueFieldTeam[];
   readonly catalog: SeasonDraftCatalog;
   readonly runSeed: Seed;
   readonly variedStrength?: boolean;
@@ -118,10 +116,10 @@ export interface FullCourtLeagueGame extends CapRushLeagueScheduleEntry {
 }
 
 export function buildFullCourtLeagueSchedule(input: {
-  readonly field: readonly CapRushLeagueField[];
+  readonly field: readonly LeagueFieldTeam[];
   readonly runSeed: Seed;
 }): readonly FullCourtLeagueGame[] {
-  const { games } = buildCapRushLeagueSchedule(input);
+  const { games } = buildLeagueSchedule({ ...input, rules: NBA_LEAGUE_RULES });
   return games.map((game) => {
     const slotIndex = game.slot - 1;
     const dayRng = createRng(

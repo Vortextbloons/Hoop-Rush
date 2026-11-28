@@ -137,11 +137,13 @@
               <span class="unit-minutes-control">
                 <input
                   type="range"
+                  class="ui-range unit-minutes-slider"
                   min="0"
                   max={FULL_COURT_UNIT_MINUTE_BUDGET}
                   step="1"
                   value={unit.plannedMinutes ?? 0}
                   disabled={locked}
+                  style={`--ui-range-progress: ${String(((unit.plannedMinutes ?? 0) / FULL_COURT_UNIT_MINUTE_BUDGET) * 100)}%`}
                   aria-label={`Planned minutes slider for ${unit.name || 'unit'}`}
                   aria-valuetext={`${String(unit.plannedMinutes ?? 0)} minutes`}
                   oninput={(event) =>
@@ -290,7 +292,7 @@
     overflow: hidden;
     padding: 0 0.35rem;
     background: var(--color-primary);
-    color: var(--color-primary-foreground, #0b0b0b);
+    color: var(--color-primary-foreground);
     font-family: var(--font-mono);
     font-size: 0.55rem;
     font-weight: 700;
@@ -326,7 +328,7 @@
   .unit-strip-over {
     flex: 1;
     background: var(--color-negative);
-    color: #fff;
+    color: var(--color-destructive-foreground);
   }
 
   .unit-strip-scale {
@@ -393,24 +395,27 @@
 
   .unit-minutes {
     display: grid;
-    min-width: 11rem;
+    min-width: 0;
+    flex: 1 1 11rem;
     gap: 0.15rem;
   }
 
   .unit-minutes-control {
     display: flex;
+    min-width: 0;
     align-items: center;
     gap: 0.35rem;
   }
 
-  .unit-minutes-control input[type='range'] {
-    width: 7rem;
-    accent-color: var(--color-primary);
+  .unit-minutes-slider {
+    min-width: 0;
+    flex: 1 1 5rem;
   }
 
   .unit-minutes-input {
     width: 2.6rem;
     min-height: 1.7rem;
+    flex: none;
     padding: 0 0.2rem;
     border: 1px solid var(--color-line-soft);
     border-radius: 0.4rem;

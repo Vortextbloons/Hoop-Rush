@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import { FULL_COURT_HEALTH_VERSION } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
 import {
   buildFullCourtGameReport,
@@ -11,7 +10,6 @@ import {
 } from './report.ts';
 import { simulateRecordedFullCourtGame } from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
-import { fullCourtScoreOutcome } from './score.ts';
 
 const ctx = createEngineContext();
 

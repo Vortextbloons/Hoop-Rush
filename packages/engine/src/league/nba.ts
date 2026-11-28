@@ -14,7 +14,6 @@ import {
 import type { LeagueScheduleRules } from './schedule.ts';
 
 export const NBA_LEAGUE_RULES: LeagueScheduleRules<CapRushConference, CapRushDivision> = {
-  label: 'cap rush',
   teamCount: CAP_RUSH_TAKEOVER_TEAMS,
   teamIds: CAP_RUSH_FRANCHISE_ALIGNMENT.map((entry) => entry.franchiseId),
   gamesPerTeam: CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,

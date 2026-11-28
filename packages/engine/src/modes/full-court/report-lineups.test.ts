@@ -117,7 +117,7 @@ describe('Full Court compact lineups', () => {
     expect(factsOnly.result).toEqual(first.result);
     expect(fullCourtGameDigest(factsOnly.result)).toBe(fullCourtGameDigest(first.result));
     expect(factsOnly.tape).toBeNull();
-    if (factsOnly.lineupFacts === null) throw new Error('expected compact lineup facts');
+    if (factsOnly.lineupFacts == null) throw new Error('expected compact lineup facts');
 
     const inputFor = (tape: readonly FullCourtTapeEvent[], userSide: 'home' | 'away') => ({
       kind: 'played' as const,
@@ -190,7 +190,7 @@ describe('Full Court compact lineups', () => {
       expect(factsOnly.result).toEqual(result);
       expect(fullCourtGameDigest(factsOnly.result)).toBe(fullCourtGameDigest(result));
       expect(factsOnly.tape).toBeNull();
-      if (factsOnly.lineupFacts === null) throw new Error(`missing facts for ${testCase.name}`);
+      if (factsOnly.lineupFacts == null) throw new Error(`missing facts for ${testCase.name}`);
       expect(
         fullCourtGameLineupsSchema.parse(
           buildFullCourtGameLineupsFromFacts({

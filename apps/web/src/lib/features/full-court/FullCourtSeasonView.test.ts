@@ -423,6 +423,8 @@ test('shows opponent tactical adjustment in playoff preview only once series evi
   });
   expect(homeBody).toContain('Game 3 · First round');
   expect(homeBody).toContain('Game day readiness');
+  expect(homeBody).not.toContain('<summary');
+  expect(homeBody).toContain('aria-label="Player availability"');
   expect(homeBody).not.toContain('aria-label="Playoff opponent adjustment"');
 
   const playoffsBody = renderView({

@@ -340,7 +340,7 @@ function lineupFactKey(playerIds: readonly string[]): string {
 
 /**
  * Accumulates the same lineup attribution the tape scanner performs, but only
- * for the user game and without materializing one event object per trip.
+ * when facts are requested and without materializing one event object per trip.
  */
 class LineupFactTracker {
   private readonly rows: [Map<string, OpponentLineupFactRow>, Map<string, OpponentLineupFactRow>] =
