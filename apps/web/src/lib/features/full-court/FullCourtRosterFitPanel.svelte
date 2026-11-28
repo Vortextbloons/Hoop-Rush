@@ -11,6 +11,7 @@
     fullCourtPayrollDollars,
     fullCourtWarChestDollars,
     type FullCourtCatalogIndex,
+    type FullCourtLineupFinding,
   } from '@hoop-rush/engine';
   import { FileSearch } from '@lucide/svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
@@ -19,7 +20,7 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import type { FullCourtArt } from './full-court-art.ts';
-  import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
+  import { scoutFieldLabel, scoutFieldValue } from './full-court-scout-labels';
 
   type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
 
@@ -43,6 +44,15 @@
     'turnover-risk': 'Turnover risk',
     'thin-depth': 'Thin depth',
   } as const;
+
+  /** Only the roster-wide findings whose title alone leaves the threshold unclear. */
+  const LINEUP_FINDING_READS: Partial<Record<keyof typeof LINEUP_FINDING_LABELS, string>> = {
+    'roster-depth': 'Nine or more players signed.',
+    'no-primary-creator': 'Nobody draws a real usage load.',
+    'no-spacing': 'Nobody shoots enough threes to pull a defender.',
+    'weak-defensive-glass': 'Nobody rebounds on the defensive end.',
+    'thin-depth': 'Fewer than eight players signed.',
+  };
 
   let {
     draft,
@@ -81,26 +91,33 @@
   const scopeLabel = $derived(
     fullCourtReportScope('lineup-fit') === 'run' ? 'Lifetime of this run' : 'This game only',
   );
+  const groups = $derived.by(() => {
+    if (fitReport === null) return [];
+    return [
+      {
+        label: 'Strengths',
+        tone: 'positive' as const,
+        empty: 'No strength cleared the evidence thresholds.',
+        findings: fitReport.strengths,
+      },
+      {
+        label: 'Gaps',
+        tone: 'negative' as const,
+        empty: 'No gap cleared the evidence thresholds.',
+        findings: fitReport.gaps,
+      },
+    ];
+  });
 
-  const rosterById = $derived(
-    new Map<string, (typeof roster)[number]>(
-      roster.map((player) => [player.playerId as string, player]),
-    ),
-  );
-  const rosterByName = $derived(
-    new Map<string, (typeof roster)[number]>(roster.map((player) => [player.displayName, player])),
-  );
-
-  function playerForEvidence(entry: { playerId?: string; displayName: string }) {
-    const matched =
-      (entry.playerId === undefined ? undefined : rosterById.get(entry.playerId)) ??
-      rosterByName.get(entry.displayName);
-    return (
-      matched ?? {
-        ...(entry.playerId === undefined ? {} : { playerId: entry.playerId }),
-        displayName: entry.displayName,
-      }
-    );
+  /** Second line of a card: what the number measures, then how deep that trait runs. */
+  function supportLine(finding: FullCourtLineupFinding): string {
+    const lead = finding.evidence[0];
+    if (lead === undefined) return LINEUP_FINDING_READS[finding.code] ?? 'No player behind it.';
+    const field = scoutFieldLabel(lead.field);
+    const others = finding.evidence.length - 1;
+    if (others === 0) return `${field} · only qualifier`;
+    const backup = finding.evidence[1];
+    return `${field} · ${others} more${backup === undefined ? '' : `, led by ${backup.displayName}`}`;
   }
 
   function purchaseAffordance(assessment: PurchaseAssessment): string {
@@ -122,13 +139,38 @@
   }
 </script>
 
+{#snippet findingCard(finding: FullCourtLineupFinding, tone: 'positive' | 'negative')}
+  {@const lead = finding.evidence[0]}
+  <li
+    class="flex min-w-0 flex-col gap-0.5 rounded-lg border border-line-soft/70 border-l-2 bg-surface-1/80 py-1.5 pr-2.5 pl-2 {tone ===
+    'positive'
+      ? 'border-l-positive/70'
+      : 'border-l-negative/70'}"
+  >
+    <p class="font-display text-[10px] leading-tight font-extrabold tracking-[0.06em] uppercase">
+      {LINEUP_FINDING_LABELS[finding.code]}
+    </p>
+    {#if lead !== undefined}
+      <div class="flex items-baseline justify-between gap-1.5">
+        <p class="min-w-0 flex-1 text-xs leading-tight font-semibold break-words text-foreground">
+          {lead.displayName}
+        </p>
+        <p class="shrink-0 font-mono text-sm leading-none font-bold tabular-nums text-foreground">
+          {scoutFieldValue(lead.field, lead.value)}
+        </p>
+      </div>
+    {/if}
+    <p class="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{supportLine(finding)}</p>
+  </li>
+{/snippet}
+
 <Panel as="section" padding="md" class="border-line-strong bg-surface-1/90" aria-label={ariaLabel}>
   <SectionHeading
     {eyebrow}
     title="Locked roster fit"
     level={2}
     size="md"
-    description="Team strengths, spacing, and defensive gaps."
+    description="What this roster does well, and where it runs thin."
   >
     {#snippet actions()}
       {#if fitRecord !== null}
@@ -142,90 +184,49 @@
   </SectionHeading>
 
   <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <p class="font-mono text-[10px] text-muted-foreground uppercase">
-      {roster.length} players · {formatMillions(payrollDollars)} payroll
+    <p class="ui-micro">
+      {roster.length} players · {formatMillions(payrollDollars)} payroll · {warChestCr} budget
     </p>
-    <p class="font-mono text-[10px] text-muted-foreground uppercase">{warChestCr} budget</p>
-    <p class="font-mono text-[9px] text-muted-foreground uppercase">{scopeLabel}</p>
+    <p class="ui-micro">{scopeLabel}</p>
+    {#if fitReport !== null}
+      <span class="ml-auto flex items-baseline gap-2">
+        <span class="ui-micro tabular-nums text-positive">
+          {fitReport.strengths.length} {fitReport.strengths.length === 1 ? 'strength' : 'strengths'}
+        </span>
+        <span class="ui-micro tabular-nums text-negative">
+          {fitReport.gaps.length} {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
+        </span>
+      </span>
+    {/if}
   </div>
 
   {#if fitReport !== null}
-    <div class="mt-3 grid items-start gap-2.5 sm:grid-cols-2">
-      <section
-        class="rounded-xl border border-positive/30 bg-positive/5 p-3"
-        aria-label="Roster strengths"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <p class="ui-label text-positive">Strengths</p>
-          <span class="font-mono text-[9px] font-bold text-positive/80 uppercase">
-            {fitReport.strengths.length}
-            {fitReport.strengths.length === 1 ? 'trait' : 'traits'}
-          </span>
-        </div>
-        {#if fitReport.strengths.length === 0}
-          <p class="mt-2 text-xs text-muted-foreground">
-            No strength cleared the evidence thresholds.
-          </p>
-        {:else}
-          <ul class="mt-2 flex flex-col gap-1.5">
-            {#each fitReport.strengths as finding (finding.code)}
-              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2">
-                <p class="text-xs font-bold text-foreground">
-                  {LINEUP_FINDING_LABELS[finding.code]}
-                </p>
-                {#if finding.evidence.length > 0}
-                  <div class="mt-1">
-                    <FullCourtScoutEvidence
-                      items={finding.evidence.map((entry) => ({
-                        name: entry.displayName,
-                        field: entry.field,
-                        value: entry.value,
-                      }))}
-                    />
-                  </div>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
+    <div class="mt-3 flex flex-col gap-3">
+      {#each groups as group (group.label)}
+        <section aria-label={`Roster ${group.label.toLowerCase()}`} class="min-w-0">
+          <div class="flex items-center gap-2">
+            <p class="ui-label {group.tone === 'positive' ? 'text-positive' : 'text-negative'}">
+              {group.label}
+            </p>
+            <span
+              class="h-px min-w-4 flex-1 {group.tone === 'positive'
+                ? 'bg-positive/25'
+                : 'bg-negative/25'}"
+              aria-hidden="true"
+            ></span>
+          </div>
 
-      <section
-        class="rounded-xl border border-negative/30 bg-negative/5 p-3"
-        aria-label="Roster gaps"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <p class="ui-label text-negative">Gaps</p>
-          <span class="font-mono text-[9px] font-bold text-negative/80 uppercase">
-            {fitReport.gaps.length}
-            {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
-          </span>
-        </div>
-        {#if fitReport.gaps.length === 0}
-          <p class="mt-2 text-xs text-muted-foreground">No gap cleared the evidence thresholds.</p>
-        {:else}
-          <ul class="mt-2 flex flex-col gap-1.5">
-            {#each fitReport.gaps as finding (finding.code)}
-              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2">
-                <p class="text-xs font-bold text-foreground">
-                  {LINEUP_FINDING_LABELS[finding.code]}
-                </p>
-                {#if finding.evidence.length > 0}
-                  <div class="mt-1">
-                    <FullCourtScoutEvidence
-                      items={finding.evidence.map((entry) => ({
-                        name: entry.displayName,
-                        field: entry.field,
-                        value: entry.value,
-                      }))}
-                    />
-                  </div>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
+          {#if group.findings.length === 0}
+            <p class="mt-1.5 text-xs leading-snug text-muted-foreground">{group.empty}</p>
+          {:else}
+            <ul class="mt-1.5 grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-1.5">
+              {#each group.findings as finding (finding.code)}
+                {@render findingCard(finding, group.tone)}
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      {/each}
     </div>
   {:else if fitRecord !== null}
     <p class="mt-3 text-xs text-muted-foreground">

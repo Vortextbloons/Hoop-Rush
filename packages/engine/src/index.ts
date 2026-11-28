@@ -1,5 +1,5 @@
 export { canPlay, type SlotGroup } from './domain/positions.ts';
-export { positionDefenseOf } from './sim/position-responsibilities.ts';
+export { positionDefenseOf, positionOffenseOf } from './sim/position-responsibilities.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export {
   planLineupReposition,
@@ -443,6 +443,9 @@ export {
   fullCourtFreePlayerReport,
   fullCourtLineupFitReport,
   fullCourtScoutPlayer,
+  type FullCourtLineupFinding,
+  type FullCourtLineupFindingCode,
+  type FullCourtLineupFitReport,
 } from './modes/full-court/scouting.ts';
 export {
   fullCourtFilmReport,
