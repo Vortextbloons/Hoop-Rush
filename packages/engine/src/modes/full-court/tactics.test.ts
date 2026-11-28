@@ -402,7 +402,14 @@ describe('full court tactics API', () => {
         handlerVersion: 'h',
         offenseSide: 0,
       }),
-    ).toBe(20_000);
+    ).toBe(11_000);
+    expect(
+      fullCourtTacticsEffects(undefined, [hybrid, BALANCED])?.makeAdjustment({
+        shooterVersion: 's',
+        offenseSide: 0,
+        defenseSide: 1,
+      }),
+    ).toBe(10_000);
   });
 
   it('weights ordered passing reads only for the selected handler and applies active unit roles', () => {
@@ -580,14 +587,14 @@ describe('full court tactics API', () => {
     expect(layered).toBeDefined();
     if (layered === undefined) return;
     expect(layered.makeAdjustment({ shooterVersion: 's', offenseSide: 0, defenseSide: 1 })).toBe(
-      111 + 6_000,
+      111 + 6_000 + 10_000,
     );
     expect(layered.makeAdjustment({ shooterVersion: 's', offenseSide: 1, defenseSide: 0 })).toBe(
       111,
     );
-    expect(layered.turnoverAdjustment({ handlerVersion: 'h', offenseSide: 0 })).toBe(222 + 20_000);
+    expect(layered.turnoverAdjustment({ handlerVersion: 'h', offenseSide: 0 })).toBe(222 + 11_000);
     expect(layered.turnoverAdjustment({ handlerVersion: 'h', offenseSide: 1 })).toBe(222);
-    expect(layered.assistAdjustment({ offenseSide: 0 })).toBe(333 + 25_000);
+    expect(layered.assistAdjustment({ offenseSide: 0 })).toBe(333 + 40_000);
     expect(layered.assistAdjustment({ offenseSide: 1 })).toBe(333);
   });
 });

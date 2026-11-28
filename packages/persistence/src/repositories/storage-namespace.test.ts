@@ -65,7 +65,6 @@ describe('storage namespace', () => {
     expect(await current.fullCourtCoaching.count()).toBe(0);
     expect(await current.fullCourtBlueprints.count()).toBe(0);
     expect(await current.fullCourtHistory.count()).toBe(0);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     current.close();
   });
 
@@ -149,7 +148,6 @@ describe('storage namespace', () => {
     expect(await current.fullCourtCoaching.count()).toBe(0);
     expect(await current.fullCourtBlueprints.count()).toBe(0);
     expect(await current.fullCourtHistory.count()).toBe(0);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     current.close();
   });
 
@@ -169,7 +167,6 @@ describe('storage namespace', () => {
     expect(await current.fullCourtCoaching.count()).toBe(0);
     expect(await current.fullCourtBlueprints.count()).toBe(0);
     expect(await current.fullCourtHistory.count()).toBe(0);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     current.close();
   });
 
@@ -195,7 +192,6 @@ describe('storage namespace', () => {
     expect(await current.table('fullCourtCoaching').get('saved-coaching')).toEqual(coaching);
     expect(await current.fullCourtBlueprints.count()).toBe(0);
     expect(await current.fullCourtHistory.count()).toBe(0);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     current.close();
   });
 
@@ -221,7 +217,6 @@ describe('storage namespace', () => {
     expect(current.verno).toBe(24);
     expect(await current.table('fullCourtBlueprints').get('fast break')).toEqual(blueprint);
     expect(await current.fullCourtHistory.count()).toBe(0);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     current.close();
   });
 
@@ -250,7 +245,6 @@ describe('storage namespace', () => {
     expect(current.verno).toBe(24);
     expect(await current.table('fullCourtHistory').get('saved-history')).toEqual(historyRow);
     expect(await current.table('fullCourtBlueprints').get('motion')).toEqual(blueprintRow);
-    expect(await current.fullCourtWatchedReplays.count()).toBe(0);
     expect(await current.fullCourtNextGamePlans.count()).toBe(0);
     current.close();
   });

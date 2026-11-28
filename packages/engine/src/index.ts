@@ -528,6 +528,19 @@ export {
 } from './achievements/cap-rush.ts';
 export { evaluateHavocAchievements, havocAchievementFactsFromRun } from './achievements/havoc.ts';
 export {
+  evaluateIndividualGameAchievements,
+  evaluateIndividualSeasonAchievements,
+  individualGameLineFromBoxScore,
+  INDIVIDUAL_ACHIEVEMENT_IDS,
+  type IndividualAchievement,
+  type IndividualAchievementId,
+  type IndividualAchievementMode,
+  type IndividualGameFacts,
+  type IndividualGamePlayerLine,
+  type IndividualSeasonFacts,
+  type IndividualSeasonPlayerFacts,
+} from './achievements/individual.ts';
+export {
   evaluateCapRushMultiplayerAchievements,
   evaluateSeriesAchievements,
   evaluateSharedSeasonAchievements,

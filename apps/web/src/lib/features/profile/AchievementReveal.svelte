@@ -25,6 +25,7 @@
     const rarity = achievements[id].rarity;
     if (rarity === 'mythic') return 4;
     if (rarity === 'legendary') return 3;
+    if (rarity === 'epic') return 2;
     return Number(collectionIds.has(id));
   }
 
@@ -170,6 +171,16 @@
     --rarity-inner: color-mix(in srgb, var(--color-accent) 16%, transparent);
     --rarity-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
     --rarity-shine: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  }
+
+  .badge-icon[data-rarity='epic'] {
+    --rarity-fg: color-mix(in srgb, hsl(199 90% 64%) 72%, var(--color-foreground));
+    --rarity-border: hsl(199 85% 62% / 0.55);
+    --rarity-bg-start: hsl(199 85% 62% / 0.16);
+    --rarity-bg-end: hsl(230 75% 62% / 0.07);
+    --rarity-inner: hsl(199 90% 85% / 0.12);
+    --rarity-glow: hsl(199 85% 62% / 0.24);
+    --rarity-shine: hsl(190 100% 92% / 0.6);
   }
 
   .badge-icon[data-rarity='mythic'] {

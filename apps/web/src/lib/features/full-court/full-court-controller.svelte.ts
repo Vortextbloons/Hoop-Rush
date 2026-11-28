@@ -37,7 +37,6 @@ import {
   type FullCourtReportKind,
   type FullCourtReportTarget,
   type FullCourtTactics,
-  type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
 import {
   buildFullCourtRegularSeason,
@@ -52,6 +51,7 @@ import {
   type FullCourtPlayoffLock,
   type FullCourtPlayoffOpponentPreview,
   type FullCourtSeasonLock,
+  type FullCourtUserFixture,
 } from '@hoop-rush/engine';
 import { errorMessageOf } from '#lib/errors.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
@@ -78,6 +78,15 @@ type SeasonState = FullCourtAdvanceSeasonState;
 type PlayoffState = FullCourtAdvancePlayoffState;
 type PlayedGame = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
 
+/** One recorded user game plus the broadcast cursor it is being watched at. */
+export interface FullCourtPlayback {
+  readonly game: PlayedGame;
+  readonly userTeamId: string;
+  readonly label: string;
+  readonly note: string | null;
+  cursor: number;
+}
+
 export class FullCourtController {
   index = $state.raw<FullCourtCatalogIndex | null>(null);
   draft = $state.raw<FullCourtDraftState | null>(null);
@@ -85,7 +94,11 @@ export class FullCourtController {
   playoffs = $state.raw<PlayoffState | null>(null);
   latestGame = $state.raw<PlayedGame | null>(null);
   practice = $state.raw<FullCourtPracticeReport | null>(null);
-  savedReplay = $state.raw<FullCourtWatchedReplay | null>(null);
+  /**
+   * The one broadcast awaiting a Continue. A watched sim lands here instead of
+   * the hub, so the next sim cannot begin until the player closes it.
+   */
+  playback = $state.raw<FullCourtPlayback | null>(null);
   /** Why the last simulation batch returned control, when it stopped for a decision. */
   notice = $state.raw<FullCourtSimulationNotice | null>(null);
   error = $state<string | null>(null);
@@ -136,8 +149,8 @@ export class FullCourtController {
         playoffsCommitted: (state) => {
           this.playoffs = state;
         },
-        publishedGame: (game, watchedReplay) => {
-          this.#publishCommittedUserGame(game, watchedReplay);
+        publishedGame: (game) => {
+          this.#publishCommittedUserGame(game);
         },
         clearGamePlan: (input) =>
           this.#clearCommittedGamePlan(input.runId, input.gameId, input.pinned),
@@ -214,7 +227,7 @@ export class FullCourtController {
       this.playoffs = null;
       this.latestGame = null;
       this.practice = null;
-      this.savedReplay = null;
+      this.playback = null;
       this.notice = null;
       this.pendingForfeit = false;
       this.#progression.reset();
@@ -669,6 +682,9 @@ export class FullCourtController {
     return this.#act(async () => {
       const season = this.season;
       if (season === null) return;
+      // A broadcast owns the screen until the player closes it, exactly like the
+      // Cap Rush Simcast gate: nothing new may start underneath playback.
+      if (this.playback !== null) return;
       this.simulating = true;
       await this.#nextGamePlanWrite;
       if (this.#isDisposed()) return;
@@ -706,6 +722,7 @@ export class FullCourtController {
         matchupAssignments: this.defensiveMatchupAssignments,
       };
       const { lock } = season;
+      const previousGame = this.latestGame;
       const outcome = await this.#progression.advance({
         count,
         acceptForfeit,
@@ -716,6 +733,21 @@ export class FullCourtController {
         pinned,
       });
       if (this.#isDisposed()) return;
+      if (
+        record &&
+        count === 1 &&
+        this.latestGame !== null &&
+        this.latestGame !== previousGame &&
+        this.latestGame.tape !== null
+      ) {
+        this.playback = {
+          game: this.latestGame,
+          userTeamId: lock.season.userTeamId,
+          label: nextFixture?.label ?? 'Full Court game',
+          note: nextFixture === null ? null : this.#playbackNote(lock, nextFixture),
+          cursor: 0,
+        };
+      }
       if (outcome.kind === 'decision') {
         this.pendingForfeit = outcome.reason === 'confirm-forfeit';
         if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
@@ -741,13 +773,43 @@ export class FullCourtController {
     });
   }
 
-  #publishCommittedUserGame(
-    game: PlayedGame | null,
-    watchedReplay: FullCourtWatchedReplay | null,
-  ): void {
+  #publishCommittedUserGame(game: PlayedGame | null): void {
     this.practice = null;
     this.latestGame = game;
-    if (watchedReplay !== null) this.savedReplay = watchedReplay;
+  }
+
+  /** Matchup and venue copy for the broadcast header, read from the locked fixture. */
+  #playbackNote(lock: FullCourtSeasonLock, fixture: FullCourtUserFixture): string {
+    const opponentId =
+      fixture.homeTeamId === lock.season.userTeamId ? fixture.awayTeamId : fixture.homeTeamId;
+    const opponent = lock.season.teams.find((team) => team.teamId === opponentId)?.displayName;
+    return [
+      fixture.userSide === 'home' ? 'vs' : 'at',
+      opponent ?? opponentId,
+      fixture.phase === 'playoff' ? '· Playoffs' : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(' ');
+  }
+
+  /** Advances the broadcast cursor in memory; closing the game commits the choice. */
+  seekPlayback(cursor: number): void {
+    const playback = this.playback;
+    if (playback === null || this.#isDisposed()) return;
+    if (cursor <= playback.cursor) return;
+    this.playback = { ...playback, cursor };
+  }
+
+  /** Ends the broadcast and returns to the hub, or keeps it open as a report. */
+  closePlayback(): void {
+    this.playback = null;
+  }
+
+  reportPlayback(): void {
+    const playback = this.playback;
+    if (playback === null) return;
+    this.latestGame = playback.game;
+    this.playback = null;
   }
 
   #advanceSeasonSlot(input: FullCourtAdvanceSeasonCommandInput) {
@@ -793,7 +855,7 @@ export class FullCourtController {
     this.#progression.reset();
     this.latestGame = null;
     this.practice = null;
-    this.savedReplay = null;
+    this.playback = null;
     this.#clearRest();
     this.#clearDefensiveMatchups();
     if (draft?.stage !== 'complete') {
@@ -824,18 +886,10 @@ export class FullCourtController {
               },
             }),
       }));
-    const [checkpoint, savedCoaching, savedReplay] = await Promise.all([
+    const [checkpoint, savedCoaching] = await Promise.all([
       startFullCourtSeason(lock, regular),
       this.#repositories.fullCourtCoachingRepository.load(runId),
-      this.#repositories.fullCourtWatchedReplayRepository.load(runId),
     ]);
-    if (
-      savedReplay !== null &&
-      (savedReplay.identity.seasonLockDigest !== lock.digest ||
-        savedReplay.identity.userTeamId !== lock.season.userTeamId)
-    ) {
-      throw new Error('Full Court watched replay does not match the locked season');
-    }
     const coaching = savedCoaching ?? FULL_COURT_DEFAULT_COACHING_PLAN;
     const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
     if (userTeam === undefined) throw new Error('The Full Court roster is unavailable.');
@@ -849,7 +903,6 @@ export class FullCourtController {
         : null;
     if (this.#isDisposed()) return;
     this.season = { lock, checkpoint, scores, coaching };
-    this.savedReplay = savedReplay;
     if (playoffSave === null) this.playoffs = null;
     else await this.#openPlayoffs(lock);
     if (!this.#isDisposed()) await this.#restoreNextGamePlan(runId);

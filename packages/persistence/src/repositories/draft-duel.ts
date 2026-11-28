@@ -5,7 +5,13 @@ import {
   type DraftDuelGameOutput,
   type DraftDuelPartiallyVerified,
 } from '@hoop-rush/data-contracts';
-import { evaluateSeriesAchievements, type SeriesAchievementFacts } from '@hoop-rush/engine';
+import {
+  evaluateIndividualGameAchievements,
+  evaluateSeriesAchievements,
+  individualGameLineFromBoxScore,
+  type IndividualAchievement,
+  type SeriesAchievementFacts,
+} from '@hoop-rush/engine';
 import {
   DRAFT_DUEL_SAVE_SCHEMA_VERSION,
   draftDuelCompletionRecapSchema,
@@ -192,16 +198,35 @@ export class DexieDraftDuelRepository {
           const participant = active.localParticipantId;
           const profileRepo = new DexieProfileRepository(this.db);
           const achievementGames: SeriesAchievementFacts['games'][number][] = [];
+          const individualCandidates: IndividualAchievement[] = [];
+          const displayNames = new Map(
+            active.draft?.status === 'complete'
+              ? active.draft.rounds
+                  .flatMap((round) => round.picks)
+                  .map((pick) => [pick.card.playerId, pick.card.displayName])
+              : [],
+          );
           for (const game of validated.series.games) {
             const row = await this.db.draftDuelResults.get([validated.roomId, game.gameNumber]);
             const parsedRow = row ? storedDraftDuelResultRowSchema.parse(row) : undefined;
             const output = parsedRow?.output ?? null;
             const side = game.homeParticipantId === participant ? 'home' : 'away';
+            const players = output?.result[side].players ?? [];
             await profileRepo.recordGame(bindingId, String(game.gameNumber), {
               won: game.winner === participant,
               multiplayer: true,
-              players: output?.result[side].players ?? [],
+              players,
             });
+            if (output !== null) {
+              individualCandidates.push(
+                ...evaluateIndividualGameAchievements({
+                  mode: 'multiplayer',
+                  players: players.map((line) =>
+                    individualGameLineFromBoxScore(line, displayNames.get(line.playerId) ?? null),
+                  ),
+                }),
+              );
+            }
             const scores = verifiedScores(active, game.gameNumber, parsedRow);
             achievementGames.push({
               gameNumber: game.gameNumber,
@@ -211,6 +236,7 @@ export class DexieDraftDuelRepository {
             });
           }
           await profileRepo.recordMatch(bindingId, validated.champion === participant);
+          await profileRepo.awardAchievements(bindingId, 'individual-games', individualCandidates);
           await profileRepo.awardAchievements(
             bindingId,
             'series',

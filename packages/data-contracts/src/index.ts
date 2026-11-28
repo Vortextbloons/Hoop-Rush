@@ -94,7 +94,7 @@ export * from './full-court-draft.ts';
 export * from './full-court-health.ts';
 export * from './full-court-history.ts';
 export * from './full-court-preparation.ts';
-export * from './full-court-replay.ts';
+export * from './full-court-tape.ts';
 export * from './full-court-season.ts';
 export * from './full-court-playoffs.ts';
 export * from './mode-catalog.ts';

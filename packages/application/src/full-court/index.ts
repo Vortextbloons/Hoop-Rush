@@ -69,12 +69,6 @@ export {
   fullCourtHistoryFromSeason,
   type FullCourtHistoryRepository,
 } from './history.ts';
-export {
-  buildFullCourtWatchedReplay,
-  type BuildFullCourtWatchedReplayInput,
-  type FullCourtPlayedGameOutcome,
-  type FullCourtWatchedReplayRepository,
-} from './replay.ts';
 
 export interface FullCourtDraftCommitOptions {
   /**

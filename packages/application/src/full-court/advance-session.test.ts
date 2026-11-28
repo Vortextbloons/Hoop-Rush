@@ -4,7 +4,6 @@ import {
   type FullCourtPlayoffCheckpoint,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
-  type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
 import type {
   FullCourtPlayoffLock,
@@ -82,7 +81,6 @@ function seasonStep(slot: number, userGame = playedSeasonGame()): SeasonStep {
     checkpoint: seasonCheckpoint(slot),
     scores: [seasonScore(slot)],
     userGame,
-    watchedReplay: null,
   };
 }
 
@@ -196,14 +194,14 @@ function observer(overrides: Partial<FullCourtAdvanceObserver> = {}) {
   const progress: { completed: number; total: number }[] = [];
   const cleared: { gameId: string | null }[] = [];
   const archived: FullCourtPlayoffCheckpoint[] = [];
-  const published: (FullCourtWatchedReplay | null)[] = [];
+  const published: (string | null)[] = [];
   const value: FullCourtAdvanceObserver = {
     isActive: () => true,
     stopRequested: () => false,
     progress: (completed, total) => progress.push({ completed, total }),
     seasonCommitted: () => {},
     playoffsCommitted: () => {},
-    publishedGame: (_game, watchedReplay) => published.push(watchedReplay),
+    publishedGame: (game) => published.push(game?.result.seed ?? null),
     clearGamePlan: (input) => {
       cleared.push({ gameId: input.gameId });
       return Promise.resolve();
@@ -474,7 +472,6 @@ describe('FullCourtAdvanceSession playoffs', () => {
           checkpoint: playoffCheckpoint(index),
           view,
           game: { kind: 'forfeit', sides: ['home'], winner: 'away', health: {} } as never,
-          watchedReplay: null,
         });
       },
       observer: seen.value,
@@ -503,7 +500,6 @@ describe('FullCourtAdvanceSession playoffs', () => {
           checkpoint: playoffCheckpoint(calls),
           view,
           game: { kind: 'forfeit', sides: ['home'], winner: 'away', health: {} } as never,
-          watchedReplay: null,
         });
       },
       observer: seen.value,
@@ -559,7 +555,6 @@ describe('FullCourtAdvanceSession playoffs', () => {
           checkpoint: playoffCheckpoint(1),
           view: playoffView({ nextGame: fixture, series: [series] }),
           game: { kind: 'forfeit', sides: ['home'], winner: 'away', health: {} } as never,
-          watchedReplay: null,
         }),
       observer: seen.value,
     });
@@ -614,7 +609,6 @@ describe('FullCourtAdvanceSession playoffs', () => {
             championTeamId: 'user',
           }),
           game: { kind: 'forfeit', sides: ['home'], winner: 'away', health: {} } as never,
-          watchedReplay: null,
         });
       },
       observer: seen.value,

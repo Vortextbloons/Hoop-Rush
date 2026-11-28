@@ -30,10 +30,6 @@
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
   import FullCourtWarRoom from '#lib/features/full-court/FullCourtWarRoom.svelte';
   import { loadFullCourtArt, type FullCourtArt } from '#lib/features/full-court/full-court-art.js';
-  import {
-    fullCourtWatchedReplayOutcome,
-    fullCourtWatchedReplaySummary,
-  } from '#lib/features/full-court/full-court-gamecast.js';
   import { FullCourtController } from '#lib/features/full-court/full-court-controller.svelte.js';
   import type { FullCourtMatchupEditorContext } from '#lib/features/full-court/full-court-matchup-presenter.js';
   import {
@@ -57,7 +53,6 @@
   let dirtyCoachingRunId = $state<string | null>(null);
   let coachingWorkspace = $state<'plan' | 'rotation' | 'situations'>('plan');
   let warRoomTab = $state<'all' | 'fit' | 'camp' | 'film' | 'matchups'>('all');
-  let activeGamecast = $state<'latest' | 'saved' | null>(null);
   const RUN_PERK_OPTIONS = [
     {
       kind: 'player-scouting' as const,
@@ -108,11 +103,19 @@
     confirmNewDraft = false;
   }
 
+  /**
+   * Playback owns the screen. The hub stays mounted so the sim that just
+   * finished keeps its own state, but only the broadcast and its Continue show.
+   */
+  function closePlayback(instance: FullCourtController, report: boolean): void {
+    if (report) instance.reportPlayback();
+    else instance.closePlayback();
+  }
+
   async function abandonRun(instance: FullCourtController): Promise<void> {
     await instance.abandonRun();
     if (instance.draft === null) {
       section = 'home';
-      activeGamecast = null;
       coachingWorkspace = 'plan';
       warRoomTab = 'all';
     }
@@ -205,15 +208,7 @@
   const defaultRotation = $derived(
     userTeam && fullCourtStaffRotation(userTeam, health, nextUserFixture?.dayOffset ?? null),
   );
-  const savedReplay = $derived(current?.savedReplay ?? null);
-  const savedReplaySummary = $derived(
-    savedReplay === null ? null : fullCourtWatchedReplaySummary(savedReplay),
-  );
-  const latestMatchesSaved = $derived(
-    current?.latestGame != null &&
-      savedReplaySummary !== null &&
-      current.latestGame.result.seed === savedReplaySummary.gameSeed,
-  );
+  const playback = $derived(current?.playback ?? null);
 
   /**
    * Once the regular season is over the postseason screen is the only place that
@@ -224,9 +219,17 @@
     playoff !== null || (season?.checkpoint.completedThroughSlot ?? 0) >= 82,
   );
   const runComplete = $derived(playoff?.championTeamId != null);
-  let section = $derived<(typeof seasonSections)[number]['value']>(
-    postseasonMode && !runComplete ? 'playoffs' : 'home',
-  );
+  let section = $state<(typeof seasonSections)[number]['value']>('home');
+  // Land on the postseason once the bracket exists, then let the nav own the
+  // selection: a derived section would fight every tab click.
+  let landedOnPostseason = $state(false);
+  $effect(() => {
+    if (postseasonMode && !runComplete && !landedOnPostseason) {
+      landedOnPostseason = true;
+      section = 'playoffs';
+    }
+    if (!postseasonMode) landedOnPostseason = false;
+  });
   const review = $derived(
     runComplete && season && current?.busy === false
       ? getPersistence()
@@ -272,7 +275,20 @@
       </Alert>
     {/if}
 
-    {#if season}
+    {#if playback !== null}
+      {#key `${playback.game.result.seed}:${String(playback.game.result.gameNumber)}`}
+        <FullCourtGamecast
+          game={playback.game}
+          userTeamId={playback.userTeamId}
+          label={playback.label}
+          note={playback.note}
+          {art}
+          draft={draft ?? null}
+          index={current.index ?? null}
+          onclose={() => closePlayback(current, true)}
+        />
+      {/key}
+    {:else if season}
       <header class="flex flex-wrap items-end justify-between gap-3">
         <div class="flex min-w-0 items-center gap-3">
           {#if userIdentity && art}
@@ -460,19 +476,7 @@
           {art}
           onDismissNotice={() => current.clearNotice()}
           onAdvance={(count, acceptForfeit, options) => {
-            if (count === 1) {
-              void (async () => {
-                const previous = current.latestGame;
-                activeGamecast = null;
-                await current.advance(1, acceptForfeit, true, options);
-                if (current.latestGame !== previous && current.latestGame?.tape != null) {
-                  activeGamecast = 'latest';
-                }
-              })();
-            } else {
-              activeGamecast = null;
-              void current.advance(count, acceptForfeit, false, options);
-            }
+            void current.advance(count, acceptForfeit, count === 1, options);
           }}
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
@@ -490,47 +494,6 @@
               }}
           coachingDirty={dirtyCoachingRunId === season.lock.season.runId}
         />
-      {/if}
-      {#if (section === 'home' || section === 'playoffs') && (current.latestGame !== null || savedReplay !== null)}
-        <div class="mt-3 space-y-3">
-          {#if activeGamecast === 'latest' && current.latestGame !== null}
-            {#key current.latestGame.result.seed}
-              <FullCourtGamecast
-                game={current.latestGame}
-                userTeamId={season.lock.season.userTeamId}
-                {art}
-                draft={draft ?? null}
-                index={current.index ?? null}
-                onClose={() => (activeGamecast = null)}
-              />
-            {/key}
-          {:else if activeGamecast === 'saved' && savedReplay !== null && savedReplaySummary !== null}
-            {#key `saved:${savedReplaySummary.gameId}:${savedReplaySummary.gameSeed}`}
-              <FullCourtGamecast
-                game={fullCourtWatchedReplayOutcome(savedReplay)}
-                userTeamId={season.lock.season.userTeamId}
-                replayNote={savedReplaySummary.replayNote}
-                {art}
-                draft={draft ?? null}
-                index={current.index ?? null}
-                onClose={() => (activeGamecast = null)}
-              />
-            {/key}
-          {/if}
-
-          <div class="flex flex-wrap items-center gap-2">
-            {#if current.latestGame !== null && activeGamecast !== 'latest'}
-              <Button tone="secondary" onclick={() => (activeGamecast = 'latest')}>
-                Game report
-              </Button>
-            {/if}
-            {#if savedReplaySummary !== null && !latestMatchesSaved && activeGamecast !== 'saved'}
-              <Button tone="secondary" onclick={() => (activeGamecast = 'saved')}>
-                Watch saved replay · {savedReplaySummary.gameLabel} ({savedReplaySummary.scoreLabel})
-              </Button>
-            {/if}
-          </div>
-        </div>
       {/if}
       {#if section === 'home' && runComplete}
         {#if confirmNewDraft}

@@ -3,7 +3,6 @@ import {
   fullCourtHistoryBenchSchema,
   fullCourtSeasonScoreSchema,
   fullCourtTapeEventSchema,
-  fullCourtWatchedReplayFactsSchema,
 } from './index.ts';
 
 function score(outcome: Record<string, unknown>) {
@@ -106,33 +105,6 @@ describe('signed Full Court scoring contract', () => {
         }),
       ),
     ).toThrow();
-  });
-
-  it('allows signed watched-replay facts while keeping the point identity', () => {
-    expect(
-      fullCourtWatchedReplayFactsSchema.parse({
-        teamPoints: 85,
-        opponentPoints: 98,
-        userWon: false,
-        starterPoints: 86,
-        benchPoints: -1,
-        teamBonusPoints: 0,
-        benchPlayerCount: 1,
-        lineupCount: 3,
-      }),
-    ).toMatchObject({ starterPoints: 86, benchPoints: -1 });
-    expect(() =>
-      fullCourtWatchedReplayFactsSchema.parse({
-        teamPoints: 85,
-        opponentPoints: 98,
-        userWon: false,
-        starterPoints: 86,
-        benchPoints: -2,
-        teamBonusPoints: 0,
-        benchPlayerCount: 1,
-        lineupCount: 3,
-      }),
-    ).toThrow(/do not reconcile/);
   });
 
   it('allows signed live tape scores while official team scores stay nonnegative', () => {

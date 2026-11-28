@@ -40,11 +40,6 @@ export {
 } from './repositories/full-court-history.ts';
 export * from './schemas/full-court-history-record.ts';
 export {
-  DexieFullCourtWatchedReplayRepository,
-  createFullCourtWatchedReplayRepository,
-} from './repositories/full-court-replay.ts';
-export * from './schemas/full-court-replay-record.ts';
-export {
   DexieFullCourtNextGamePlanRepository,
   createFullCourtNextGamePlanRepository,
 } from './repositories/full-court-next-game-plan.ts';

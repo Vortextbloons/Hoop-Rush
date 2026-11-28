@@ -48,7 +48,6 @@
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
-  import FullCourtGameMomentsStrip from './FullCourtGameMomentsStrip.svelte';
   import FullCourtMomentsPanel from './FullCourtMomentsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtPostseasonView from './FullCourtPostseasonView.svelte';
@@ -245,9 +244,6 @@
   );
   const latestCell = $derived(schedule.findLast((cell) => cell.result !== null) ?? null);
   const latestResult = $derived(latestCell?.result ?? null);
-  const latestMoments = $derived(
-    latestCell === null ? [] : (moments.byGameId.get(latestCell.gameId) ?? []),
-  );
 
   /** The postseason screen owns every bracket action and every postseason view. */
   const playoffMode = $derived(playoff !== null || regularComplete);
@@ -647,11 +643,6 @@
         status={latestStatus}
         label={`Game ${String(latestCell.slot)} result`}
         class="mt-2"
-      />
-      <FullCourtGameMomentsStrip
-        moments={latestMoments}
-        {art}
-        label="Latest game notable moments"
       />
     </Panel>
   {:else}

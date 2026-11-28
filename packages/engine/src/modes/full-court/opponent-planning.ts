@@ -150,11 +150,11 @@ export function projectFullCourtMatchup(
       profile,
       adjustments: [
         {
-          make: fullCourtMakeAdjustment(awayTactics.defense) / 1e6,
+          make: fullCourtMakeAdjustment(awayTactics.defense, homeTactics) / 1e6,
           turnover: fullCourtTurnoverAdjustment(homeTactics) / 1e6,
         },
         {
-          make: fullCourtMakeAdjustment(homeTactics.defense) / 1e6,
+          make: fullCourtMakeAdjustment(homeTactics.defense, awayTactics) / 1e6,
           turnover: fullCourtTurnoverAdjustment(awayTactics) / 1e6,
         },
       ],

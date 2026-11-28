@@ -43,7 +43,7 @@ function engineWasmChunkPlugin(): Plugin {
       const output = config.environments?.client?.build?.rolldownOptions?.output;
       if (output === undefined || Array.isArray(output)) return;
       const existing = output.codeSplitting;
-      if (typeof existing !== 'object' || existing === null) return;
+      if (existing === undefined || typeof existing === 'boolean') return;
       return {
         environments: {
           client: {

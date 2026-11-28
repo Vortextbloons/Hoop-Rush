@@ -1,4 +1,8 @@
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
+import {
+  evaluateIndividualSeasonAchievements,
+  type IndividualAchievementId,
+} from './individual.ts';
 
 /**
  * Classic and Sandbox achievement evaluation.
@@ -405,14 +409,24 @@ export function evaluateSandboxAchievements(
   return unlocks;
 }
 
-export function evaluateAchievements(facts: SeasonAchievementFacts): AchievementEvidence[] {
+export function evaluateAchievements(
+  facts: SeasonAchievementFacts,
+): AchievementEvidence<SeasonAchievementId | IndividualAchievementId>[] {
   return [
     ...evaluateClassicAchievements(facts),
     ...evaluatePlayerAchievements(facts),
     ...evaluateSandboxAchievements(facts),
+    ...(isEligibleFullSeason(facts)
+      ? evaluateIndividualSeasonAchievements({
+          mode: facts.mode,
+          players: facts.players,
+        })
+      : []),
   ];
 }
 
-export function evaluateRunAchievements(run: ChallengeRun): AchievementEvidence[] {
+export function evaluateRunAchievements(
+  run: ChallengeRun,
+): AchievementEvidence<SeasonAchievementId | IndividualAchievementId>[] {
   return evaluateAchievements(seasonAchievementFactsFromRun(run));
 }

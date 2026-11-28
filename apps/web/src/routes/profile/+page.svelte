@@ -31,6 +31,7 @@
   const achievementGroups = [
     { category: 'classic', name: 'Classic' },
     { category: 'player', name: 'Player and Sandbox' },
+    { category: 'individual', name: 'Individual' },
     { category: 'cap-rush', name: 'Cap Rush' },
     { category: 'havoc', name: 'Hoop Havoc' },
     { category: 'multiplayer', name: 'Multiplayer' },

@@ -7,8 +7,10 @@ import {
   type FixedFiveWorkerResultEntry,
 } from '@hoop-rush/data-contracts';
 import {
+  evaluateIndividualGameAchievements,
   evaluateSeriesAchievements,
   evaluateSharedSeasonAchievements,
+  individualGameLineFromBoxScore,
   type SeriesAchievementFacts,
 } from '@hoop-rush/engine';
 import { fixedFiveRepository } from './fixed-five-repo.js';
@@ -99,21 +101,42 @@ export function fixedFiveAchievementCandidates(
   entries: readonly FixedFiveWorkerResultEntry[],
   run: FixedFiveCompetitionRun | null,
 ): AchievementUnlock[] {
-  if (!fixedFiveCareerFacts(participant, result, entries)) return [];
+  const careerFacts = fixedFiveCareerFacts(participant, result, entries);
+  if (!careerFacts) return [];
+  const displayNames = new Map(
+    (run?.lineups[participant].players ?? []).map((player) => [
+      player.playerId,
+      player.displayName,
+    ]),
+  );
+  const individual = careerFacts.flatMap((game) =>
+    evaluateIndividualGameAchievements({
+      mode: 'multiplayer',
+      players: game.players.map((line) =>
+        individualGameLineFromBoxScore(line, displayNames.get(line.playerId) ?? null),
+      ),
+    }),
+  );
   if (result.competition === 'shared-82') {
     const summary = result.participants.find((entry) => entry.participantId === participant);
-    if (!summary) return [];
+    if (!summary) return individual;
     // The shared-82 result models both participants' seasons, so two distinct
     // summaries are the evidence that another human shared the season.
     const sharedWithHuman =
       new Set(result.participants.map((entry) => entry.participantId)).size === 2;
-    return evaluateSharedSeasonAchievements({
-      wins: summary.wins,
-      losses: summary.losses,
-      sharedWithHuman,
-    });
+    return [
+      ...individual,
+      ...evaluateSharedSeasonAchievements({
+        wins: summary.wins,
+        losses: summary.losses,
+        sharedWithHuman,
+      }),
+    ];
   }
-  return evaluateSeriesAchievements(fixedFiveSeriesFacts(participant, result, entries, run));
+  return [
+    ...individual,
+    ...evaluateSeriesAchievements(fixedFiveSeriesFacts(participant, result, entries, run)),
+  ];
 }
 
 export async function recordFixedFiveCareer(

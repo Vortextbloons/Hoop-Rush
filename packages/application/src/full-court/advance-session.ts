@@ -6,7 +6,6 @@ import {
   type FullCourtPlayoffCheckpoint,
   type FullCourtSeasonCheckpoint,
   type FullCourtSeasonScore,
-  type FullCourtWatchedReplay,
 } from '@hoop-rush/data-contracts';
 import {
   fullCourtUserNextPlayoffMatchup,
@@ -71,10 +70,7 @@ export interface FullCourtAdvanceObserver {
   readonly progress: (completed: number, total: number) => void;
   readonly seasonCommitted: (commit: FullCourtSeasonCommit) => void;
   readonly playoffsCommitted: (state: FullCourtAdvancePlayoffState) => void;
-  readonly publishedGame: (
-    game: FullCourtPlayedGame | null,
-    watchedReplay: FullCourtWatchedReplay | null,
-  ) => void;
+  readonly publishedGame: (game: FullCourtPlayedGame | null) => void;
   readonly clearGamePlan: (input: FullCourtGamePlanClear) => Promise<void>;
   readonly archiveRun: (
     lock: FullCourtPlayoffLock,
@@ -198,10 +194,7 @@ export class FullCourtAdvanceSession {
       acceptNextForfeit = false;
       played += 1;
       observer.progress(played, Math.max(total, played));
-      observer.publishedGame(
-        outcome.userGame.kind === 'played' ? outcome.userGame : null,
-        outcome.watchedReplay,
-      );
+      observer.publishedGame(outcome.userGame.kind === 'played' ? outcome.userGame : null);
       observer.seasonCommitted({ checkpoint: outcome.checkpoint, scores: outcome.scores });
       season = {
         ...season,
@@ -378,10 +371,7 @@ export class FullCourtAdvanceSession {
       observer.progress(userGames, Math.max(total, userGames));
       acceptNextForfeit = false;
       this.#controlReturnedForSeriesId = null;
-      observer.publishedGame(
-        outcome.game.kind === 'played' ? outcome.game : null,
-        outcome.watchedReplay,
-      );
+      observer.publishedGame(outcome.game.kind === 'played' ? outcome.game : null);
       await observer.clearGamePlan({
         runId: lock.season.runId,
         gameId: userGameId,

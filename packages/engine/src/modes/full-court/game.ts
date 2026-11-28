@@ -22,7 +22,7 @@ import {
   type TripContext,
 } from '../../sim/possession.ts';
 import { prepareTeam, type TeamPrep } from '../../sim/prepare.ts';
-import { GameRecorder, type SideIndex } from '../../sim/recorder.ts';
+import { GameRecorder, type RecorderPlayer, type SideIndex } from '../../sim/recorder.ts';
 import { createRng, type Rng } from '../../sim/rng.ts';
 import {
   FULL_COURT_FOUL_LIMIT,
@@ -272,6 +272,8 @@ export type FullCourtTapeEvent =
       readonly awayScore: number;
       readonly homeUnit: readonly string[];
       readonly awayUnit: readonly string[];
+      /** Players whose counters moved on this possession, so a broadcast can fold a live box. */
+      readonly deltas?: readonly FullCourtTapePlayerDelta[];
     };
 
 export interface FullCourtGameOptions {
@@ -848,6 +850,8 @@ export function runFullCourtGame(
 
   const tape: FullCourtTapeEvent[] | null = options.record === true ? [] : null;
   const lineupFacts = options.lineupFacts === true ? new LineupFactTracker() : null;
+  const tripDeltas =
+    tape === null ? null : new TripDeltaTracker([home.plan.roster, away.plan.roster]);
   home.beginStint(0, recorder);
   away.beginStint(0, recorder);
 
@@ -938,6 +942,7 @@ export function runFullCourtGame(
       const foulCharges = refreshFouls(runtimes, ctx);
 
       if (tape !== null && homeUnit !== null && awayUnit !== null) {
+        const deltas = tripDeltas?.capture(recorder);
         tape.push({
           kind: 'trip',
           period,
@@ -950,6 +955,7 @@ export function runFullCourtGame(
           awayScore: recorder.sides[1].points,
           homeUnit,
           awayUnit,
+          ...(deltas === undefined ? {} : { deltas }),
         });
       }
       if (lineupFacts !== null && homeUnit !== null && awayUnit !== null) {
@@ -1098,6 +1104,71 @@ interface FoulCharge {
   readonly side: SideIndex;
   readonly playerIndex: number;
   readonly count: number;
+}
+
+/** Per-player counters the broadcast folds into a live box. */
+const TAPE_DELTA_FIELDS = [
+  'points',
+  'fieldGoalMakes',
+  'fieldGoalAttempts',
+  'threeMakes',
+  'threeAttempts',
+  'freeThrowMakes',
+  'freeThrowAttempts',
+  'offensiveRebounds',
+  'defensiveRebounds',
+  'assists',
+  'steals',
+  'blocks',
+  'turnovers',
+  'fouls',
+] as const satisfies readonly (keyof RecorderPlayer)[];
+
+export type FullCourtTapePlayerDelta = {
+  readonly playerId: string;
+  readonly line: readonly number[];
+};
+
+/**
+ * Diffs the recorder between two tape writes so each possession carries only
+ * the players whose counters moved. Technical free throws are credited by their
+ * own tape event, so the next trip never repeats them.
+ */
+class TripDeltaTracker {
+  #previous: [number[][], number[][]] = [[], []];
+  readonly #playerIds: readonly [readonly string[], readonly string[]];
+
+  constructor(
+    rosters: readonly [
+      readonly { readonly playerId: string }[],
+      readonly { readonly playerId: string }[],
+    ],
+  ) {
+    this.#playerIds = [
+      rosters[0].map((player) => player.playerId),
+      rosters[1].map((player) => player.playerId),
+    ];
+  }
+
+  capture(recorder: GameRecorder): readonly FullCourtTapePlayerDelta[] | undefined {
+    const deltas: FullCourtTapePlayerDelta[] = [];
+    for (const side of [0, 1] as const) {
+      const players = recorder.players[side];
+      const previous = this.#previous[side];
+      const ids = this.#playerIds[side];
+      for (let index = 0; index < players.length; index += 1) {
+        const player = players[index];
+        const playerId = ids[index];
+        if (player === undefined || playerId === undefined) continue;
+        const line = TAPE_DELTA_FIELDS.map(
+          (field, fieldIndex) => player[field] - (previous[index]?.[fieldIndex] ?? 0),
+        );
+        previous[index] = TAPE_DELTA_FIELDS.map((field) => player[field]);
+        if (line.some((value) => value !== 0)) deltas.push({ playerId, line });
+      }
+    }
+    return deltas.length > 0 ? deltas : undefined;
+  }
 }
 
 function refreshFouls(runtimes: readonly RotationRuntime[], ctx: TripContext): FoulCharge[] {

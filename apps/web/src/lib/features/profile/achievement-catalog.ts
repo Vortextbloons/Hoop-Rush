@@ -3,6 +3,7 @@ import {
   ArrowDown,
   Award,
   Banknote,
+  Blocks,
   CalendarCheck,
   CircleDot,
   ClipboardList,
@@ -11,12 +12,16 @@ import {
   Dice5,
   Dna,
   Droplets,
+  Dumbbell,
   Eye,
   Flame,
   Gauge,
   Gem,
   Ghost,
   Goal,
+  Grip,
+  Hand,
+  HandMetal,
   HardHat,
   Heart,
   HeartHandshake,
@@ -46,9 +51,10 @@ import {
 } from '@lucide/svelte';
 import type { Component } from 'svelte';
 
-export type AchievementCategory = 'classic' | 'player' | 'cap-rush' | 'havoc' | 'multiplayer';
+export type AchievementCategory =
+  'classic' | 'player' | 'individual' | 'cap-rush' | 'havoc' | 'multiplayer';
 
-export type AchievementRarity = 'legendary' | 'mythic';
+export type AchievementRarity = 'epic' | 'legendary' | 'mythic';
 
 export type AchievementCatalogEntry = {
   name: string;
@@ -159,6 +165,113 @@ export const achievementCatalog = {
     description: 'Win 70+ games with at least three players from pre-1980 seasons.',
     category: 'player',
     icon: ScrollText,
+  },
+  'the-hakeem-special': {
+    name: 'The Hakeem Special',
+    description: 'Record a quadruple-double in a single game.',
+    category: 'individual',
+    icon: Layers,
+    rarity: 'mythic',
+  },
+  'the-ak-47': {
+    name: 'The AK-47',
+    description: 'Record at least five points, rebounds, assists, steals, and blocks in one game.',
+    category: 'individual',
+    icon: Crosshair,
+    rarity: 'legendary',
+  },
+  'board-man-gets-paid': {
+    name: 'Board Man Gets Paid',
+    description: 'Record 30+ rebounds in a game.',
+    category: 'individual',
+    icon: Dumbbell,
+    rarity: 'legendary',
+  },
+  'the-klay-thompson-experience': {
+    name: 'The Klay Thompson Experience',
+    description: 'Score 40+ points with no more than one assist and one turnover.',
+    category: 'individual',
+    icon: Droplets,
+    rarity: 'epic',
+  },
+  'agent-zero': {
+    name: 'Agent Zero',
+    description: 'Score 50+ points without committing a turnover.',
+    category: 'individual',
+    icon: Zap,
+    rarity: 'legendary',
+  },
+  'the-point-god': {
+    name: 'The Point God',
+    description: 'Record 20+ assists without committing a turnover.',
+    category: 'individual',
+    icon: Hand,
+    rarity: 'legendary',
+  },
+  'the-glove': {
+    name: 'The Glove',
+    description: 'Record 10+ steals in one game.',
+    category: 'individual',
+    icon: Grip,
+    rarity: 'legendary',
+  },
+  'the-human-highlight-film': {
+    name: 'The Human Highlight Film',
+    description: 'Make 10+ shots at the rim in one game.',
+    category: 'individual',
+    icon: HandMetal,
+    rarity: 'epic',
+  },
+  'logo-lillard': {
+    name: 'Logo Lillard',
+    description: 'Make 12+ three-pointers in one game.',
+    category: 'individual',
+    icon: Target,
+    rarity: 'legendary',
+  },
+  'the-rodman-paradox': {
+    name: 'The Rodman Paradox',
+    description: 'Record 20+ rebounds without scoring a single point.',
+    category: 'individual',
+    icon: Blocks,
+    rarity: 'epic',
+  },
+  'the-jokers-masterpiece': {
+    name: "The Joker's Masterpiece",
+    description:
+      'Record a triple-double without missing a field goal, with at least eight attempts.',
+    category: 'individual',
+    icon: Sparkles,
+    rarity: 'legendary',
+  },
+  'the-moses-malone-special': {
+    name: 'The Moses Malone Special',
+    description: 'Record 15+ offensive rebounds in a single game.',
+    category: 'individual',
+    icon: TrendingUp,
+    rarity: 'legendary',
+  },
+  'the-quiet-superstar': {
+    name: 'The Quiet Superstar',
+    description:
+      'Average a double-double for a full season while attempting fewer than 10 field goals per game.',
+    category: 'individual',
+    icon: Star,
+    rarity: 'epic',
+  },
+  'kobes-revenge': {
+    name: "Kobe's Revenge",
+    description: 'Score 81+ points in a non-Havoc game.',
+    category: 'individual',
+    icon: Medal,
+    rarity: 'mythic',
+  },
+  'wilt-was-here': {
+    name: 'Wilt Was Here',
+    description: 'Score 100+ points in a non-Havoc game.',
+    category: 'individual',
+    icon: Trophy,
+    rarity: 'mythic',
   },
   '73-9-hold-my-ring': {
     name: '73-9? Hold My Ring',

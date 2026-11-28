@@ -1,12 +1,19 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import type {
+  PlayerBoxScore,
   PlayerProfile,
   ProfileBinding,
   ProfileGame,
   ProfileSelection,
 } from '@hoop-rush/data-contracts';
 import { SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
-import { challengeRunProgressDigest, evaluateRunAchievements } from '@hoop-rush/engine';
+import {
+  challengeRunProgressDigest,
+  evaluateIndividualGameAchievements,
+  evaluateRunAchievements,
+  individualGameLineFromBoxScore,
+  type IndividualGamePlayerLine,
+} from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -88,7 +95,6 @@ import type { StoredFullCourtPlayoffs } from '../schemas/full-court-playoff-reco
 import type { StoredFullCourtCoaching } from '../schemas/full-court-coaching-record.ts';
 import type { StoredFullCourtBlueprint } from '../schemas/full-court-blueprint-record.ts';
 import type { StoredFullCourtHistory } from '../schemas/full-court-history-record.ts';
-import type { StoredFullCourtWatchedReplay } from '../schemas/full-court-replay-record.ts';
 import type { StoredFullCourtNextGamePlan } from '../schemas/full-court-next-game-plan-record.ts';
 import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
@@ -221,9 +227,10 @@ export const HOOP_RUSH_DATABASE_STORES_V22: Record<string, string> = {
 };
 
 /**
- * Version 23 adds the bounded latest watched replay table for Full Court;
- * opening a version-22 database only creates that table and keeps every
- * existing record.
+ * Version 23 added the bounded latest watched replay table for Full Court. That
+ * table is no longer read or written: the broadcast replays the committed game
+ * straight from the season checkpoint. It stays in the schema so old databases
+ * still upgrade without losing their other records.
  */
 export const HOOP_RUSH_DATABASE_STORES_V23: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V22,
@@ -233,6 +240,10 @@ export const HOOP_RUSH_DATABASE_STORES_V23: Record<string, string> = {
 /**
  * Version 24 adds the fixture-scoped Full Court next-game plan table; opening a
  * version-23 database only creates that table and keeps every existing record.
+ *
+ * The watched-replay table introduced in version 23 is no longer read or
+ * written; the broadcast replays the committed game directly from the season
+ * checkpoint, so the table stays behind for old saves only.
  */
 export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_STORES_V23,
@@ -297,7 +308,6 @@ export class HoopRushDatabase extends Dexie {
   fullCourtCoaching!: EntityTable<StoredFullCourtCoaching, 'runId'>;
   fullCourtBlueprints!: EntityTable<StoredFullCourtBlueprint, 'key'>;
   fullCourtHistory!: EntityTable<StoredFullCourtHistory, 'runId'>;
-  fullCourtWatchedReplays!: EntityTable<StoredFullCourtWatchedReplay, 'runId'>;
   fullCourtNextGamePlans!: EntityTable<StoredFullCourtNextGamePlan, 'runId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
@@ -323,6 +333,15 @@ export class HoopRushDatabase extends Dexie {
     this.version(24).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
+function individualPlayerLines(
+  players: readonly PlayerBoxScore[],
+  displayNames: ReadonlyMap<string, string>,
+): IndividualGamePlayerLine[] {
+  return players.map((line) =>
+    individualGameLineFromBoxScore(line, displayNames.get(line.playerId) ?? null),
+  );
+}
+
 export class DexieChallengeRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase) {
@@ -392,8 +411,15 @@ export class DexieChallengeRepository {
         if (checkpoint === undefined) {
           throw new Error('appendActiveGames: no active run checkpoint to update');
         }
-        const { runId, gamesPlayed } = activeRunCheckpointSchema
-          .pick({ recordId: true, saveSchemaVersion: true, runId: true, gamesPlayed: true })
+        const { runId, gamesPlayed, mode, players } = activeRunCheckpointSchema
+          .pick({
+            recordId: true,
+            saveSchemaVersion: true,
+            runId: true,
+            gamesPlayed: true,
+            mode: true,
+            players: true,
+          })
           .parse(checkpoint);
         for (const row of rows) {
           if (row.runId !== runId) {
@@ -414,12 +440,24 @@ export class DexieChallengeRepository {
         const bindingId = `challenge:${runId}`;
         if (await this.db.profileBindings.get(bindingId)) {
           const profiles = new DexieProfileRepository(this.db);
+          const displayNames = new Map(
+            players.map((player) => [player.playerId, player.displayName]),
+          );
           for (const row of rows) {
-            await profiles.recordGame(bindingId, String(row.gameNumber), {
+            const gameNumber = String(row.gameNumber);
+            await profiles.recordGame(bindingId, gameNumber, {
               won: row.result.winner === 'home',
               multiplayer: false,
               players: row.result.home.players,
             });
+            await profiles.awardAchievements(
+              bindingId,
+              `individual:${gameNumber}`,
+              evaluateIndividualGameAchievements({
+                mode,
+                players: individualPlayerLines(row.result.home.players, displayNames),
+              }),
+            );
           }
         }
       },
@@ -517,10 +555,20 @@ export class DexieChallengeRepository {
         await this.db.history.put({ ...validatedIndex, recordId: validatedIndex.runId });
         const bindingId = `challenge:${storedRun.runId}`;
         if (await this.db.profileBindings.get(bindingId)) {
-          await new DexieProfileRepository(this.db).awardAchievements(
+          const profiles = new DexieProfileRepository(this.db);
+          await profiles.awardAchievements(bindingId, 'season', evaluateRunAchievements(storedRun));
+          const displayNames = new Map(
+            storedRun.players.map((player) => [player.playerId, player.displayName]),
+          );
+          await profiles.awardAchievements(
             bindingId,
-            'season',
-            evaluateRunAchievements(storedRun),
+            'season-individual',
+            storedRun.games.flatMap((game) =>
+              evaluateIndividualGameAchievements({
+                mode: storedRun.mode,
+                players: individualPlayerLines(game.home.players, displayNames),
+              }),
+            ),
           );
         }
       },

@@ -59,8 +59,9 @@ const PROTECT_PAINT_ZONE_SCALE: Readonly<Record<ShotZone, number>> = {
 };
 
 const BALL_MOVEMENT_PASS_DELTA = 0.08;
-const BALL_MOVEMENT_ASSIST_MILLIONTHS = 25_000;
-const BALL_MOVEMENT_TURNOVER_MILLIONTHS = 20_000;
+const BALL_MOVEMENT_ASSIST_MILLIONTHS = 40_000;
+const BALL_MOVEMENT_TURNOVER_MILLIONTHS = 11_000;
+const BALL_MOVEMENT_MAKE_MILLIONTHS = 10_000;
 
 const PRESSURE_DEFENSE_PRESSURE_DELTA = 0.08;
 const PRESSURE_STEAL_ABILITY_DELTA = 8;
@@ -354,8 +355,16 @@ function boundedHierarchyScale(value: number): number {
  * Layers tactical probability changes over an optional caller hook. The
  * millionth units match the shared effects contract.
  */
-export function fullCourtMakeAdjustment(defense: FullCourtTactics['defense']): number {
-  return defense === 'pressure' ? PRESSURE_MAKE_CONCESSION_MILLIONTHS : 0;
+export function fullCourtMakeAdjustment(
+  defense: FullCourtTactics['defense'],
+  own?: FullCourtTactics,
+): number {
+  const defenseConcession = defense === 'pressure' ? PRESSURE_MAKE_CONCESSION_MILLIONTHS : 0;
+  const ballMovementBonus =
+    own !== undefined && (own.offense === 'ball-movement' || own.ballMovement)
+      ? BALL_MOVEMENT_MAKE_MILLIONTHS
+      : 0;
+  return defenseConcession + ballMovementBonus;
 }
 
 export function fullCourtTurnoverAdjustment({ offense, ballMovement }: FullCourtTactics): number {
@@ -373,8 +382,8 @@ export function fullCourtTacticsEffects(
   const home = tactics[0];
   const away = tactics[1];
   const needed =
-    make(home.defense) !== 0 ||
-    make(away.defense) !== 0 ||
+    make(home.defense, away) !== 0 ||
+    make(away.defense, home) !== 0 ||
     turnover(home) !== 0 ||
     turnover(away) !== 0 ||
     assist(home) !== 0 ||
@@ -384,7 +393,10 @@ export function fullCourtTacticsEffects(
   const side = (index: SideIndex): FullCourtTactics => tactics[index];
   return {
     makeAdjustment(facts) {
-      return (base?.makeAdjustment(facts) ?? 0) + make(side(facts.defenseSide).defense);
+      return (
+        (base?.makeAdjustment(facts) ?? 0) +
+        make(side(facts.defenseSide).defense, side(facts.offenseSide))
+      );
     },
     turnoverAdjustment(facts) {
       return (base?.turnoverAdjustment(facts) ?? 0) + turnover(side(facts.offenseSide));

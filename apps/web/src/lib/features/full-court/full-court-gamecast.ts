@@ -1,60 +1,7 @@
-import type { FullCourtWatchedReplay } from '@hoop-rush/data-contracts';
-import type {
-  FullCourtGameHealthOutcome,
-  FullCourtGameResult,
-  FullCourtTapeEvent,
-} from '@hoop-rush/engine';
+import { FULL_COURT_TAPE_STAT_FIELDS, type FullCourtTapeEvent } from '@hoop-rush/data-contracts';
+import type { FullCourtGameHealthOutcome, FullCourtGameResult } from '@hoop-rush/engine';
 
 export type FullCourtPlayedGameOutcome = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
-
-export interface FullCourtWatchedReplaySummary {
-  readonly gameId: string;
-  readonly gameSeed: string;
-  readonly phase: FullCourtWatchedReplay['identity']['phase'];
-  readonly gameLabel: string;
-  readonly matchupLabel: string;
-  readonly scoreLabel: string;
-  readonly replayNote: string;
-}
-
-/**
- * Rehydrates a stored watched replay into the Gamecast view payload without
- * rolling any possessions or invoking simulation workers. Saved replays start
- * from tipoff (cursor 0) so playback never writes per-frame checkpoints.
- */
-export function fullCourtWatchedReplayOutcome(
-  replay: FullCourtWatchedReplay,
-): FullCourtPlayedGameOutcome {
-  return {
-    kind: 'played',
-    result: replay.result,
-    tape: replay.tape,
-    health: replay.health,
-    injuries: replay.injuries,
-  };
-}
-
-export function fullCourtWatchedReplaySummary(
-  replay: FullCourtWatchedReplay,
-): FullCourtWatchedReplaySummary {
-  const { identity, result, facts } = replay;
-  const gameLabel =
-    identity.phase === 'regular' && identity.slot !== null
-      ? `Game ${String(identity.slot)}`
-      : `Playoffs · Game ${String(identity.gameNumber)}`;
-  const matchupLabel = `${result.away.displayName} @ ${result.home.displayName}`;
-  const scoreLabel = `${String(result.away.box.points)}–${String(result.home.box.points)}`;
-  const outcomeTag = facts.userWon ? 'W' : 'L';
-  return {
-    gameId: identity.gameId,
-    gameSeed: identity.gameSeed,
-    phase: identity.phase,
-    gameLabel,
-    matchupLabel,
-    scoreLabel,
-    replayNote: `${gameLabel} · ${matchupLabel} (${outcomeTag} ${scoreLabel}) · Starts from tipoff`,
-  };
-}
 
 export type FullCourtGamecastSubstitution = Extract<FullCourtTapeEvent, { kind: 'substitution' }>;
 
@@ -168,6 +115,10 @@ function scoreEventCaption(
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/**
+ * One frame per tape event, so frame `index + 1` always describes tape event
+ * `index`. Playback and the live-box fold share that index space.
+ */
 export function fullCourtGamecastFrames(
   result: FullCourtGameResult,
   tape: readonly FullCourtTapeEvent[],
@@ -285,4 +236,172 @@ export function fullCourtPossessionCursor(
     }
   }
   return direction === 1 ? Math.max(0, frames.length - 1) : 0;
+}
+
+/** One player's live line during the broadcast. */
+export interface FullCourtLiveLine {
+  readonly playerId: string;
+  readonly displayName: string;
+  readonly startedGame: boolean;
+  points: number;
+  fieldGoalsMade: number;
+  fieldGoalsAttempted: number;
+  threeMade: number;
+  threeAttempted: number;
+  freeThrowsMade: number;
+  freeThrowsAttempted: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  fouls: number;
+}
+
+export interface FullCourtLiveBox {
+  readonly home: readonly FullCourtLiveLine[];
+  readonly away: readonly FullCourtLiveLine[];
+}
+
+function fieldIndex(field: (typeof FULL_COURT_TAPE_STAT_FIELDS)[number]): number {
+  return FULL_COURT_TAPE_STAT_FIELDS.indexOf(field);
+}
+const POINTS = fieldIndex('points');
+const FG_MADE = fieldIndex('fieldGoalMakes');
+const FG_ATTEMPTED = fieldIndex('fieldGoalAttempts');
+const THREE_MADE = fieldIndex('threeMakes');
+const THREE_ATTEMPTED = fieldIndex('threeAttempts');
+const FT_MADE = fieldIndex('freeThrowMakes');
+const FT_ATTEMPTED = fieldIndex('freeThrowAttempts');
+const OFF_REBOUNDS = fieldIndex('offensiveRebounds');
+const DEF_REBOUNDS = fieldIndex('defensiveRebounds');
+const ASSISTS = fieldIndex('assists');
+const STEALS = fieldIndex('steals');
+const BLOCKS = fieldIndex('blocks');
+const TURNOVERS = fieldIndex('turnovers');
+const FOULS = fieldIndex('fouls');
+
+export interface FullCourtLiveBoxFold {
+  linesAt(cursor: number): FullCourtLiveBox;
+}
+
+/**
+ * Folds the recorded possession deltas into live player lines. A backward seek
+ * rebuilds from tipoff, so the result is identical however the cursor arrived.
+ */
+export function fullCourtLiveBoxFold(game: FullCourtPlayedGameOutcome): FullCourtLiveBoxFold {
+  const tape = game.tape ?? [];
+  const finalBox = (): FullCourtLiveBox => ({
+    home: game.result.home.players.map((player) => ({
+      playerId: player.playerId,
+      displayName: player.displayName,
+      startedGame: player.startedGame,
+      points: player.points,
+      fieldGoalsMade: player.fieldGoals.made,
+      fieldGoalsAttempted: player.fieldGoals.attempted,
+      threeMade: player.threes.made,
+      threeAttempted: player.threes.attempted,
+      freeThrowsMade: player.freeThrows.made,
+      freeThrowsAttempted: player.freeThrows.attempted,
+      rebounds: player.rebounds.total,
+      assists: player.assists,
+      steals: player.steals,
+      blocks: player.blocks,
+      turnovers: player.turnovers,
+      fouls: player.fouls,
+    })),
+    away: game.result.away.players.map((player) => ({
+      playerId: player.playerId,
+      displayName: player.displayName,
+      startedGame: player.startedGame,
+      points: player.points,
+      fieldGoalsMade: player.fieldGoals.made,
+      fieldGoalsAttempted: player.fieldGoals.attempted,
+      threeMade: player.threes.made,
+      threeAttempted: player.threes.attempted,
+      freeThrowsMade: player.freeThrows.made,
+      freeThrowsAttempted: player.freeThrows.attempted,
+      rebounds: player.rebounds.total,
+      assists: player.assists,
+      steals: player.steals,
+      blocks: player.blocks,
+      turnovers: player.turnovers,
+      fouls: player.fouls,
+    })),
+  });
+  const blank = (side: 'home' | 'away'): FullCourtLiveLine[] =>
+    game.result[side].players.map((player) => ({
+      playerId: player.playerId,
+      displayName: player.displayName,
+      startedGame: player.startedGame,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threeMade: 0,
+      threeAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      rebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    }));
+  let home = blank('home');
+  let away = blank('away');
+  const byId = {
+    home: new Map(home.map((line) => [line.playerId, line])),
+    away: new Map(away.map((line) => [line.playerId, line])),
+  };
+  let folded = 0;
+  let published: FullCourtLiveBox = { home, away };
+
+  function reset(): void {
+    home = blank('home');
+    away = blank('away');
+    byId.home = new Map(home.map((line) => [line.playerId, line]));
+    byId.away = new Map(away.map((line) => [line.playerId, line]));
+    folded = 0;
+  }
+
+  function apply(event: FullCourtTapeEvent): void {
+    if (event.kind !== 'trip' || event.deltas === undefined) return;
+    for (const delta of event.deltas) {
+      const line = byId.home.get(delta.playerId) ?? byId.away.get(delta.playerId);
+      if (line === undefined) continue;
+      line.points += delta.line[POINTS] ?? 0;
+      line.fieldGoalsMade += delta.line[FG_MADE] ?? 0;
+      line.fieldGoalsAttempted += delta.line[FG_ATTEMPTED] ?? 0;
+      line.threeMade += delta.line[THREE_MADE] ?? 0;
+      line.threeAttempted += delta.line[THREE_ATTEMPTED] ?? 0;
+      line.freeThrowsMade += delta.line[FT_MADE] ?? 0;
+      line.freeThrowsAttempted += delta.line[FT_ATTEMPTED] ?? 0;
+      line.rebounds += (delta.line[OFF_REBOUNDS] ?? 0) + (delta.line[DEF_REBOUNDS] ?? 0);
+      line.assists += delta.line[ASSISTS] ?? 0;
+      line.steals += delta.line[STEALS] ?? 0;
+      line.blocks += delta.line[BLOCKS] ?? 0;
+      line.turnovers += delta.line[TURNOVERS] ?? 0;
+      line.fouls += delta.line[FOULS] ?? 0;
+    }
+  }
+
+  return {
+    linesAt(cursor: number): FullCourtLiveBox {
+      const count = Number.isNaN(cursor)
+        ? 0
+        : Math.max(0, Math.min(tape.length, Math.trunc(cursor)));
+      // The final frame reads the audited result so late technical free throws
+      // and point adjustments can never leave the recap short.
+      if (count >= tape.length) return finalBox();
+      if (count < folded) reset();
+      for (let index = folded; index < count; index += 1) {
+        const event = tape[index];
+        if (event !== undefined) apply(event);
+      }
+      folded = count;
+      published = { home: [...home], away: [...away] };
+      return published;
+    },
+  };
 }

@@ -25,6 +25,7 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import { formatClock } from '#lib/format.js';
   import FullCourtGameMomentsStrip from './FullCourtGameMomentsStrip.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtPlayerScoutSheet from './FullCourtPlayerScoutSheet.svelte';
@@ -32,6 +33,7 @@
   import {
     fullCourtBestLineup,
     fullCourtGamecastFrames,
+    fullCourtLiveBoxFold,
     fullCourtPossessionCursor,
     fullCourtRotationSummary,
   } from './full-court-gamecast.ts';
@@ -39,19 +41,21 @@
   let {
     game,
     userTeamId,
-    replayNote = null,
-    onClose,
+    label,
+    note = null,
     art = null,
     draft = null,
     index = null,
+    onclose,
   }: {
     game: Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
     userTeamId: string;
-    replayNote?: string | null;
-    onClose: () => void;
+    label: string;
+    note?: string | null;
     art?: FullCourtArt | null;
     draft?: FullCourtDraftState | null;
     index?: FullCourtCatalogIndex | null;
+    onclose: () => void;
   } = $props();
 
   let scoutPlayerId = $state<string | null>(null);
@@ -104,30 +108,83 @@
         `${lineup.netRatingPer100?.toFixed(1) ?? '—'}${lineup.sampleMet ? '' : ' *'}`,
     },
   ];
-  const teams = $derived([game.result.home, game.result.away] as const);
+
+  const homeIsUser = $derived(game.result.home.teamId === userTeamId);
+  const userSide = $derived(homeIsUser ? 'home' : 'away');
+  const userSideIndex = $derived(homeIsUser ? 0 : 1);
+  const teams = $derived([
+    game.result[userSide],
+    game.result[homeIsUser ? 'away' : 'home'],
+  ] as const);
   const frames = $derived(
     game.tape === null ? [] : fullCourtGamecastFrames(game.result, game.tape),
   );
+  const totalFrames = $derived(Math.max(1, frames.length - 1));
+
   let cursor = $state(0);
   let paused = $state(false);
-  let speed = $state(1);
+
+  const fold = $derived(fullCourtLiveBoxFold(game));
+  const liveBox = $derived(fold.linesAt(cursor));
   const frame = $derived(frames[cursor]);
   const finished = $derived(cursor >= frames.length - 1);
-  const visibleFeed = $derived.by(() => {
+  const progress = $derived(cursor / totalFrames);
+
+  const userBox = $derived(homeIsUser ? liveBox.home : liveBox.away);
+  const opponentBox = $derived(homeIsUser ? liveBox.away : liveBox.home);
+  const userScore = $derived(
+    finished
+      ? game.result[userSide].box.points
+      : userSideIndex === 0
+        ? (frame?.homeScore ?? 0)
+        : (frame?.awayScore ?? 0),
+  );
+  const opponentScore = $derived(
+    finished
+      ? game.result[homeIsUser ? 'away' : 'home'].box.points
+      : userSideIndex === 0
+        ? (frame?.awayScore ?? 0)
+        : (frame?.homeScore ?? 0),
+  );
+  const leader = $derived(
+    userScore === opponentScore ? null : userScore > opponentScore ? 'local' : 'opponent',
+  );
+  const topUserPoints = $derived(Math.max(0, ...userBox.map((line) => line.points)));
+  const topOpponentPoints = $derived(Math.max(0, ...opponentBox.map((line) => line.points)));
+  const possession = $derived(
+    frame?.kind !== 'trip' || frame.side === null
+      ? null
+      : frame.side === userSideIndex
+        ? 'Your ball'
+        : 'Opponent ball',
+  );
+
+  const FEED_TAIL = 16;
+  const feed = $derived.by((): BroadcastFeedRow[] => {
     const rows: BroadcastFeedRow[] = [];
-    for (let index = cursor; index > 0 && rows.length < 10; index -= 1) {
-      const item = frames[index];
-      const previous = frames[index - 1];
+    for (let position = cursor; position > 0 && rows.length < FEED_TAIL; position -= 1) {
+      const item = frames[position];
+      const previous = frames[position - 1];
       if (!item || !previous || item.caption === null || item.side === null) continue;
-      const team = teams[item.side];
-      const local = team.teamId === userTeamId;
+      const local = item.side === userSideIndex;
       rows.push({
-        key: index,
+        key: position,
         period: item.period + 1,
         clockSeconds: item.clockSeconds,
         side: local ? 'local' : 'opponent',
         team: local ? 'You' : 'Opp',
-        tag: item.kind === 'substitution' ? 'SUB' : item.kind === 'trip' ? 'PLAY' : 'FT',
+        tag:
+          item.kind === 'substitution'
+            ? 'SUB'
+            : item.kind === 'technical'
+              ? 'TECH'
+              : item.side === 0
+                ? item.homeScore > previous.homeScore
+                  ? 'PTS'
+                  : 'PLAY'
+                : item.awayScore > previous.awayScore
+                  ? 'PTS'
+                  : 'PLAY',
         summary: item.caption,
         points:
           item.side === 0
@@ -138,14 +195,8 @@
     return rows;
   });
 
-  function step(direction: -1 | 1): void {
-    paused = true;
-    cursor = fullCourtPossessionCursor(frames, cursor, direction);
-  }
-
   const lineupReport = $derived.by(() => {
     if (!finished || game.tape === null) return null;
-    const userSide = game.result.home.teamId === userTeamId ? 'home' : 'away';
     try {
       const result = buildFullCourtGameReport({
         kind: 'played',
@@ -160,11 +211,8 @@
     }
   });
 
-  const userTeam = $derived(
-    game.result.home.teamId === userTeamId ? game.result.home : game.result.away,
-  );
-  const userSideIndex = $derived.by((): 0 | 1 => (game.result.home.teamId === userTeamId ? 0 : 1));
-  const rotation = $derived(fullCourtRotationSummary(userTeam, userSideIndex, game.tape));
+  const userTeam = $derived(game.result[userSide]);
+  const rotation = $derived(fullCourtRotationSummary(userTeam, userSideIndex as 0 | 1, game.tape));
   const bestLineup = $derived(fullCourtBestLineup(lineupReport?.lineupRows ?? []));
   const gameMoments = $derived(
     finished
@@ -177,20 +225,34 @@
       : [],
   );
 
+  // Cap Rush paces its Simcast to finish in about two and a half seconds; a
+  // Full Court tape is a few hundred frames, so step 1% of it per tick.
   onMount(() => {
     const timer = setInterval(() => {
-      if (!paused && !finished) cursor = Math.min(frames.length - 1, cursor + speed);
-    }, 240);
+      if (paused || finished) return;
+      const step = Math.max(1, Math.ceil(frames.length / 100));
+      cursor = Math.min(frames.length - 1, cursor + step);
+    }, 100);
     return () => clearInterval(timer);
   });
 
-  function playerNameOf(team: FullCourtGameResult['home'], playerId: string): string {
-    return team.players.find((player) => player.playerId === playerId)?.displayName ?? 'Player';
+  function step(direction: -1 | 1): void {
+    paused = true;
+    cursor = fullCourtPossessionCursor(frames, cursor, direction);
+  }
+
+  function seek(value: number): void {
+    if (value <= cursor) return;
+    paused = true;
+    cursor = Math.min(frames.length - 1, value);
   }
 
   function clockLabel(secondsRemaining: number): string {
-    const seconds = Math.ceil(secondsRemaining);
-    return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
+    return formatClock(Math.max(0, Math.floor(secondsRemaining)));
+  }
+
+  function playerNameOf(team: FullCourtGameResult['home'], playerId: string): string {
+    return team.players.find((player) => player.playerId === playerId)?.displayName ?? 'Player';
   }
 
   function namedUnitSeconds(team: FullCourtGameResult['home']): Map<string, number> {
@@ -214,56 +276,81 @@
       playerIds,
     );
   }
+
+  function pct(made: number, attempted: number): string {
+    return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
+  }
 </script>
 
-<Panel as="section" padding="sm" aria-label="Full Court game report">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <div>
-      <SectionHeading level={3} size="sm" title={frames.length > 0 ? 'Gamecast' : 'Game report'} />
-      {#if replayNote !== null}
-        <p class="mt-0.5 text-xs text-muted-foreground">{replayNote}</p>
-      {/if}
-    </div>
-    <Button tone="secondary" size="sm" onclick={onClose}>Close</Button>
-  </div>
+<section class="broadcast" aria-label="Full Court gamecast">
   <GamecastLiveLayout
-    class="broadcast mt-3"
-    label="Full Court Gamecast"
-    feed={frames.length > 0 ? visibleFeed : null}
+    label="Full Court gamecast"
+    progress={finished ? 1 : progress}
+    {feed}
     feedCountLabel={`${frame?.possession ?? 0} ${frame?.possession === 1 ? 'possession' : 'possessions'}`}
   >
     {#snippet scoreboard()}
       <GameScoreboard
         teams={[
-          {
-            key: 'away',
-            label: game.result.away.displayName,
-            score: finished ? game.result.away.box.points : (frame?.awayScore ?? 0),
-            winner: finished && game.result.winner === 'away',
-          },
-          {
-            key: 'home',
-            label: game.result.home.displayName,
-            score: finished ? game.result.home.box.points : (frame?.homeScore ?? 0),
-            winner: finished && game.result.winner === 'home',
-          },
+          { key: 'local', label: 'You', score: userScore },
+          { key: 'opponent', label: 'Opponent', score: opponentScore },
         ]}
+        label={`${label} score`}
+        class="bc-board"
       >
-        {#snippet status()}
-          <span class="ui-micro">
-            {#if finished}
-              Final
-            {:else if frame !== undefined}
-              {gamecastPeriodLabel(frame.period + 1)}
-              · {clockLabel(frame.clockSeconds)}
+        {#snippet team(entry)}
+          {@const team =
+            entry.key === 'local' ? userTeam : game.result[homeIsUser ? 'away' : 'home']}
+          <div
+            class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}
+            data-leading={entry.key === leader}
+          >
+            <span class="bc-team-label">{entry.key === 'local' ? 'You' : 'Opp'}</span>
+            <span class="simcast-team-name">{team.displayName}</span>
+            {#if entry.key === leader}
+              <span class="bc-leader">{finished ? 'Winner' : 'Leading'}</span>
+            {:else}
+              <span class="bc-leader invisible" aria-hidden="true">Leading</span>
             {/if}
-          </span>
+            {#key entry.score}<span class="bc-score">{entry.score}</span>{/key}
+          </div>
+        {/snippet}
+        {#snippet status()}
+          <div class="bc-center">
+            <span class="bc-live" data-tone={finished ? 'final' : 'live'}>
+              <span class="bc-live-dot" aria-hidden="true"></span>
+              {finished ? 'Final' : paused ? 'Paused' : 'Live'}
+            </span>
+            <span class="bc-clock">
+              {gamecastPeriodLabel((frame?.period ?? 0) + 1)}
+              &middot;
+              {clockLabel(frame?.clockSeconds ?? 720)}
+            </span>
+            {#if !finished}
+              <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
+            {/if}
+            <span class="bc-quarters" aria-hidden="true">
+              {#each [1, 2, 3, 4] as quarter (quarter)}
+                <span
+                  class="bc-quarter"
+                  class:done={quarter < (frame?.period ?? 0) + 1}
+                  class:now={quarter === (frame?.period ?? 0) + 1}
+                ></span>
+              {/each}
+            </span>
+          </div>
         {/snippet}
       </GameScoreboard>
     {/snippet}
 
     {#snippet content()}
-      {#if frames.length > 0}
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="min-w-0">
+          <p class="ui-label" data-tone="muted">{label}</p>
+          {#if note !== null}
+            <p class="mt-0.5 text-xs font-semibold">{note}</p>
+          {/if}
+        </div>
         <GamecastPlaybackControls
           {paused}
           complete={finished}
@@ -274,94 +361,95 @@
             paused = false;
           }}
         >
-          {#snippet leading()}
-            <Button size="sm" tone="secondary" disabled={cursor === 0} onclick={() => step(-1)}>
-              Previous possession
-            </Button>
-            <Button size="sm" tone="secondary" disabled={finished} onclick={() => step(1)}>
-              Next possession
-            </Button>
-          {/snippet}
           {#snippet trailing()}
-            <label class="flex items-center gap-2 text-xs text-muted-foreground">
-              Speed
-              <select
-                class="min-h-9 rounded-md border border-line-soft bg-surface-2 px-2"
-                bind:value={speed}
-              >
-                <option value={1}>1×</option>
-                <option value={4}>4×</option>
-                <option value={12}>12×</option>
-              </select>
-            </label>
+            <span class="font-mono text-[10px] text-muted-foreground uppercase">2.5s playback</span>
           {/snippet}
         </GamecastPlaybackControls>
-        <label class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+      </div>
+      {#if !finished}
+        <label class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
           <span class="shrink-0">Game timeline</span>
           <input
             class="ui-range w-full min-w-0"
             type="range"
             min="0"
-            max={Math.max(0, frames.length - 1)}
+            max={totalFrames}
             value={cursor}
-            style={`--ui-range-progress: ${String(frames.length > 1 ? (cursor / (frames.length - 1)) * 100 : 100)}%`}
+            style={`--ui-range-progress: ${String(progress * 100)}%`}
             aria-label="Game timeline"
-            oninput={(event) => {
-              paused = true;
-              cursor = event.currentTarget.valueAsNumber;
-            }}
+            oninput={(event) => seek(event.currentTarget.valueAsNumber)}
           />
         </label>
       {/if}
 
-      {#if frame !== undefined}
-        <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
-          {#each teams as team, index (team.teamId)}
-            {@const active = index === 0 ? frame.homeUnit : frame.awayUnit}
-            {@const unitName = unitNameFor(team, active)}
-            <section
-              class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2 sm:p-3"
-              aria-label={`${team.displayName} active five`}
-            >
-              <h4 class="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
-                <span>{team.displayName}</span>
-                <span class="text-xs font-normal text-muted-foreground"
-                  >{finished ? 'final five' : 'on court'}</span
-                >
-                {#if !finished && frame.kind === 'trip' && frame.side === index}
-                  <span class="ui-micro text-primary">On offense</span>
-                {/if}
-                {#if unitName !== null}
-                  <span class="text-xs font-normal text-accent">· {unitName}</span>
-                {/if}
-              </h4>
-              <ul class="mt-2 divide-y divide-line-soft">
-                {#each active as id (id)}
-                  {@const player = team.players.find((entry) => entry.playerId === id)}
-                  <li class="flex min-w-0 items-center gap-2 py-1.5">
-                    <div class="flex justify-center">
-                      <FullCourtPortrait
-                        player={{ playerId: id, displayName: player?.displayName ?? 'Player' }}
-                        {art}
-                        size="sm"
-                        eager
-                      />
-                    </div>
-                    <span
-                      class="min-w-0 text-xs font-semibold leading-tight sm:text-sm"
-                      title={player?.displayName ?? id}
-                    >
-                      {player?.displayName ?? 'Player'}
+      <div class="bc-panels mt-3">
+        {#each [{ box: userBox, side: 'local' as const, top: topUserPoints }, { box: opponentBox, side: 'opponent' as const, top: topOpponentPoints }] as side (side.side)}
+          <section
+            class="bc-panel"
+            aria-label={`${side.side === 'local' ? 'You' : 'Opponent'} player stats`}
+          >
+            <header class="bc-panel-head">
+              <span class="bc-panel-team" data-side={side.side}>
+                {side.side === 'local' ? 'You' : 'Opponent'}
+              </span>
+              <strong class="bc-panel-score"
+                >{side.side === 'local' ? userScore : opponentScore}</strong
+              >
+            </header>
+            <div class="bc-panel-cols" aria-hidden="true">
+              <span>Player</span><span>PTS</span><span>REB</span><span>AST</span><span>TO</span
+              ><span>FG%</span><span>3P%</span>
+            </div>
+            <ul class="bc-rows">
+              {#each side.box as row (row.playerId)}
+                {@const hot = row.points > 0 && row.points === side.top}
+                <li class="bc-row" class:hot>
+                  <span class="bc-ident">
+                    <FullCourtPortrait
+                      player={{ playerId: row.playerId, displayName: row.displayName }}
+                      {art}
+                      size="sm"
+                      eager
+                    />
+                    <span class="bc-ident-text">
+                      <span class="bc-name">{row.displayName}</span>
+                      <span class="bc-sub">
+                        {row.startedGame ? 'Starter' : 'Bench'}
+                        {#if hot}<span class="bc-hot">Top scorer</span>{/if}
+                      </span>
                     </span>
-                  </li>
-                {/each}
-              </ul>
-            </section>
-          {/each}
-        </div>
-      {/if}
+                  </span>
+                  <span class="bc-stat big" data-stat="pts">{row.points}</span>
+                  <span class="bc-stat" data-stat="reb">{row.rebounds}</span>
+                  <span class="bc-stat" data-stat="ast">{row.assists}</span>
+                  <span class="bc-stat" data-stat="tov">{row.turnovers}</span>
+                  <span class="bc-stat" data-stat="fg"
+                    >{pct(row.fieldGoalsMade, row.fieldGoalsAttempted)}</span
+                  >
+                  <span class="bc-stat" data-stat="tp"
+                    >{pct(row.threeMade, row.threeAttempted)}</span
+                  >
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      </div>
     {/snippet}
   </GamecastLiveLayout>
+
+  <div class="flex flex-wrap items-center gap-2">
+    {#if !finished}
+      <Button size="sm" tone="secondary" disabled={cursor === 0} onclick={() => step(-1)}>
+        Previous possession
+      </Button>
+      <Button size="sm" tone="secondary" onclick={() => step(1)}>Next possession</Button>
+    {/if}
+    <Button class="ml-auto" tone={finished ? 'primary' : 'secondary'} onclick={onclose}>
+      {finished ? 'Continue' : 'Skip and continue'}
+    </Button>
+  </div>
+
   {#if finished}
     {@const topShooter = userTeam.players.reduce<(typeof userTeam.players)[number] | undefined>(
       (leader, player) =>
@@ -370,78 +458,82 @@
     )}
     {@const unitSeconds = namedUnitSeconds(userTeam)}
     {@const firstSubstitution = rotation.firstSubstitution}
-    <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
-      <h3 class="font-semibold">How your team played</h3>
-      <p class="text-muted-foreground">
-        {userTeam.box.possessions} possessions · {userTeam.box.threes.attempted} of
-        {userTeam.box.fieldGoals.attempted} shots from three · {userTeam.box.assists} assists ·
-        {userTeam.box.turnovers} turnovers
-      </p>
-      <p class="text-muted-foreground">
-        {rotation.playersUsed} players used · {rotation.starterMinutes.toFixed(1)} starter minutes ·
-        {rotation.benchMinutes.toFixed(1)} bench minutes{#if rotation.disqualifications > 0}
-          · {rotation.disqualifications} foul out{rotation.disqualifications === 1 ? '' : 's'}{/if}
-      </p>
-      {#if rotation.foulTrouble.length > 0}
+    <Panel as="section" padding="sm" aria-label="How your team played">
+      <SectionHeading level={3} size="sm" title="How your team played" />
+      <div class="grid gap-1 text-sm">
         <p class="text-muted-foreground">
-          Foul trouble: {rotation.foulTrouble
-            .map(
-              (player) =>
-                `${player.displayName} (${String(player.fouls)} PF${player.foulsOut ? ', fouled out' : ''})`,
-            )
-            .join(' · ')}
+          {userTeam.box.possessions} possessions · {userTeam.box.threes.attempted} of
+          {userTeam.box.fieldGoals.attempted} shots from three · {userTeam.box.assists} assists ·
+          {userTeam.box.turnovers} turnovers
         </p>
-      {/if}
-      {#if topShooter !== undefined}
         <p class="text-muted-foreground">
-          {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
+          {rotation.playersUsed} players used · {rotation.starterMinutes.toFixed(1)} starter minutes ·
+          {rotation.benchMinutes.toFixed(1)} bench minutes{#if rotation.disqualifications > 0}
+            · {rotation.disqualifications} foul out{rotation.disqualifications === 1
+              ? ''
+              : 's'}{/if}
         </p>
-      {/if}
-      {#if unitSeconds.size > 0}
-        <ul class="mt-1 flex flex-wrap gap-2" aria-label="Lineup group minutes">
-          {#each unitSeconds as [name, seconds] (name)}
-            {@const planned = userTeam.units.find((unit) => unit.name === name)?.plannedMinutes}
-            <li class="rounded-md border border-line-soft px-2 py-1 text-xs">
-              {name} &middot; {(seconds / 60).toFixed(1)} min played
-              {#if planned !== undefined}
-                / {planned} planned{/if}
-            </li>
-          {/each}
-        </ul>
-      {/if}
-      {#if rotation.substitutions.length > 0}
-        <p class="text-muted-foreground">
-          {rotation.substitutions.length} substitution{rotation.substitutions.length === 1
-            ? ''
-            : 's'} · {rotation.reasonSummary}
-        </p>
-        {#if firstSubstitution !== null}
+        {#if rotation.foulTrouble.length > 0}
           <p class="text-muted-foreground">
-            First change: {playerNameOf(userTeam, firstSubstitution.inPlayerId)} in for
-            {playerNameOf(userTeam, firstSubstitution.outPlayerId)} ·
-            {gamecastPeriodLabel(firstSubstitution.period + 1)}
-            {clockLabel(firstSubstitution.clockSeconds)}
+            Foul trouble: {rotation.foulTrouble
+              .map(
+                (player) =>
+                  `${player.displayName} (${String(player.fouls)} PF${player.foulsOut ? ', fouled out' : ''})`,
+              )
+              .join(' · ')}
           </p>
         {/if}
-      {:else}
-        <p class="text-muted-foreground">No substitutions recorded.</p>
-      {/if}
-      {#if bestLineup !== null}
-        <p class="text-muted-foreground">
-          Best qualifying lineup: {bestLineup.players
-            .map((player) => player.displayName)
-            .join(' · ')} · {bestLineup.netRatingPer100 !== null && bestLineup.netRatingPer100 > 0
-            ? '+'
-            : ''}{bestLineup.netRatingPer100?.toFixed(1) ?? '—'} NET RTG over
-          {Math.round(bestLineup.pacePossessions)} possessions.
-        </p>
-      {/if}
-      <FullCourtGameMomentsStrip moments={gameMoments} {art} label="Game notable moments" />
-    </section>
+        {#if topShooter !== undefined}
+          <p class="text-muted-foreground">
+            {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
+          </p>
+        {/if}
+        {#if unitSeconds.size > 0}
+          <ul class="mt-1 flex flex-wrap gap-2" aria-label="Lineup group minutes">
+            {#each unitSeconds as [name, seconds] (name)}
+              {@const planned = userTeam.units.find((unit) => unit.name === name)?.plannedMinutes}
+              <li class="rounded-md border border-line-soft px-2 py-1 text-xs">
+                {name} &middot; {(seconds / 60).toFixed(1)} min played
+                {#if planned !== undefined}
+                  / {planned} planned{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if rotation.substitutions.length > 0}
+          <p class="text-muted-foreground">
+            {rotation.substitutions.length} substitution{rotation.substitutions.length === 1
+              ? ''
+              : 's'} · {rotation.reasonSummary}
+          </p>
+          {#if firstSubstitution !== null}
+            <p class="text-muted-foreground">
+              First change: {playerNameOf(userTeam, firstSubstitution.inPlayerId)} in for
+              {playerNameOf(userTeam, firstSubstitution.outPlayerId)} ·
+              {gamecastPeriodLabel(firstSubstitution.period + 1)}
+              {clockLabel(firstSubstitution.clockSeconds)}
+            </p>
+          {/if}
+        {:else}
+          <p class="text-muted-foreground">No substitutions recorded.</p>
+        {/if}
+        {#if bestLineup !== null}
+          <p class="text-muted-foreground">
+            Best qualifying lineup: {bestLineup.players
+              .map((player) => player.displayName)
+              .join(' · ')} · {bestLineup.netRatingPer100 !== null && bestLineup.netRatingPer100 > 0
+              ? '+'
+              : ''}{bestLineup.netRatingPer100?.toFixed(1) ?? '—'} NET RTG over
+            {Math.round(bestLineup.pacePossessions)} possessions.
+          </p>
+        {/if}
+        <FullCourtGameMomentsStrip moments={gameMoments} {art} label="Game notable moments" />
+      </div>
+    </Panel>
+
     {#if lineupReport !== null}
       <PlayerStatsSection
         surface="none"
-        class="mt-4"
         title="Lineup Lab"
         description={`${lineupReport.bench.points} bench points${lineupReport.teamBonusPoints > 0 ? ` · ${lineupReport.teamBonusPoints} team bonus points` : ''}. Asterisk marks lineups below ${lineupReport.sampleThreshold} possessions.`}
         ariaLabel="Lineup Lab"
@@ -473,12 +565,11 @@
         {/snippet}
       </PlayerStatsSection>
     {:else if game.tape !== null}
-      <p class="mt-4 text-xs text-muted-foreground">
-        Lineup details are unavailable for this game.
-      </p>
+      <p class="text-xs text-muted-foreground">Lineup details are unavailable for this game.</p>
     {/if}
+
     {#if game.injuries.length > 0}
-      <ul aria-label="Injuries" class="mt-3 space-y-1 text-xs text-muted-foreground">
+      <ul aria-label="Injuries" class="space-y-1 text-xs text-muted-foreground">
         {#each game.injuries as injury (`${injury.teamId}:${injury.playerId}`)}
           {@const player = teams
             .find((team) => team.teamId === injury.teamId)
@@ -494,11 +585,11 @@
         {/each}
       </ul>
     {/if}
-    {#each [game.result.away, game.result.home] as team (team.teamId)}
+
+    {#each [game.result[userSide], game.result[homeIsUser ? 'away' : 'home']] as team (team.teamId)}
       {@const isUserTeam = team.teamId === userTeamId}
       <PlayerStatsSection
         surface="none"
-        class="mt-4"
         title={`${team.displayName} box score`}
         description={`${team.box.points} PTS · ${team.players.filter((player) => player.minutes > 0).length} played`}
         ariaLabel={`${team.displayName} box score`}
@@ -540,7 +631,7 @@
       </PlayerStatsSection>
     {/each}
   {/if}
-</Panel>
+</section>
 
 {#if canScout && draft !== null && index !== null}
   <FullCourtPlayerScoutSheet
@@ -553,3 +644,18 @@
     }}
   />
 {/if}
+
+<style>
+  .simcast-team-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-muted-foreground);
+  }
+  .bc-feed-list,
+  .bc-feed-empty {
+    height: 236px;
+  }
+</style>
