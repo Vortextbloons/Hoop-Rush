@@ -164,6 +164,7 @@ describe('FullCourtSeasonView sections', () => {
     const body = renderView({ section: 'home' });
     expect(body).toContain('aria-label="Full Court game-day readiness"');
     expect(body).toContain('Game 1 of 82');
+    expect(body).toContain('Sim ahead');
     expect(body).toContain('Sim to next review');
   });
 
@@ -259,6 +260,10 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('+10.0');
     expect(body).toContain('>+10<');
     expect(body).toContain('Full Court player impact');
+    expect(body).toContain('MPG');
+    expect(body).toContain('+/- PER GAME');
+    expect(body).toContain('aria-haspopup="dialog"');
+    expect(body).toContain('View impact for Player E');
     expect(body).toContain('Actual Fives');
     expect(body).toContain('8.3 *');
     expect(body).toContain('Below 100 possessions');

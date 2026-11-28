@@ -575,6 +575,9 @@ export class FullCourtController {
       if (checkpoint === null || checkpoint.lockDigest !== season.lock.digest) {
         throw new Error('Training camp practice needs the saved season. Reload the run.');
       }
+      if (checkpoint.completedThroughSlot > 0) {
+        throw new Error('Training camp practice closes before the first regular-season game.');
+      }
       const camp = (currentDraft.reports ?? []).find((report) => report.kind === 'training-camp');
       if (camp === undefined) {
         throw new Error('Unlock training camp before running a scrimmage.');

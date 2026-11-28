@@ -28,6 +28,7 @@ import {
   buildFullCourtLeagueSchedule,
   type FullCourtLeagueGame,
 } from './league.ts';
+import { planFullCourtOpponent } from './opponent-planning.ts';
 export interface FullCourtRegularSeasonTeam extends FullCourtTeamGameInput {
   readonly anchorSeason: SeasonKey | null;
 }
@@ -109,6 +110,7 @@ export function buildFullCourtRegularSeason(input: {
     field: field.filter((team) => team.teamId !== assignment.franchiseId),
     catalog,
     runSeed,
+    variedStrength: draft.opponentVersion !== undefined,
   });
   const apron = fullCourtPayrollStatus(fullCourtPayrollDollars(draft.picks), draft.money);
   const userRoster = simulationRoster(chosen, apron);
@@ -146,7 +148,14 @@ export function buildFullCourtRegularSeason(input: {
     catalog: draft.catalog,
     profile,
     userTeamId: assignment.franchiseId,
-    teams,
+    teams:
+      draft.opponentVersion === undefined
+        ? teams
+        : teams.map((team) =>
+            team.anchorSeason === null
+              ? team
+              : planFullCourtOpponent(team, teams.slice(1), profile),
+          ),
     games,
   };
 }

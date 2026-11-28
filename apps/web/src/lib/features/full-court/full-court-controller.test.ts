@@ -920,7 +920,7 @@ describe('FullCourtController durable watched replay', () => {
     }
   });
 
-  test('persists the training camp purchase and reproduces the same practice report', async () => {
+  test('persists training camp and gives repeat scrimmages distinct, reproducible seeds', async () => {
     installTestEnvironment();
     const { first, second } = openTestDatabasePair('fc-controller-training-camp');
     const createWorker = (): FullCourtWorkerRunner => ({
@@ -952,15 +952,11 @@ describe('FullCourtController durable watched replay', () => {
       await controller.purchaseReport({ kind: 'training-camp' });
       const camp = controller.draft?.reports?.find((report) => report.kind === 'training-camp');
       if (camp === undefined) throw new Error('Expected a persisted training camp purchase');
-      expect(camp.priceDollars).toBe(10_000_000);
+      expect(camp.priceDollars).toBe(fullCourtReportPriceDollars('training-camp'));
       expect(controller.draft?.spending.filter((entry) => entry.kind === 'scouting')).toHaveLength(
         1,
       );
 
-      await controller.runPractice();
-      const report = controller.practice;
-      if (report === null) throw new Error('Expected a practice report');
-      expect(report.seed).toBe(fullCourtTrainingCampSeed(lock.season.runSeed, camp.reportId));
       const fixture = lock.season.games.find(
         (game) =>
           game.slot === 1 &&
@@ -968,6 +964,17 @@ describe('FullCourtController durable watched replay', () => {
             game.awayTeamId === lock.season.userTeamId),
       );
       if (fixture === undefined) throw new Error('Missing the opening fixture');
+      const opponentId =
+        fixture.homeTeamId === lock.season.userTeamId ? fixture.awayTeamId : fixture.homeTeamId;
+      const practiceSeed = (attempt: number) =>
+        fullCourtTrainingCampSeed(
+          lock.season.runSeed,
+          [camp.reportId, opponentId, attempt].join(':'),
+        );
+      await controller.runPractice(opponentId);
+      const report = controller.practice;
+      if (report === null) throw new Error('Expected a practice report');
+      expect(report.seed).toBe(practiceSeed(1));
       expect(report.seed).not.toBe(
         havocInstanceSeed(lock.season.runSeed, 'full-court-regular-game-v1', fixture.gameId),
       );
@@ -976,8 +983,8 @@ describe('FullCourtController durable watched replay', () => {
       expect(controller.latestGame).toBeNull();
       expect(controller.savedReplay).toBeNull();
 
-      await controller.runPractice();
-      expect(controller.practice).toEqual(report);
+      await controller.runPractice(opponentId);
+      expect(controller.practice?.seed).toBe(practiceSeed(2));
 
       controller.dispose();
       first.close();
@@ -996,7 +1003,7 @@ describe('FullCourtController durable watched replay', () => {
       ).toBe(true);
       expect(reloaded.draft?.spending.filter((entry) => entry.kind === 'scouting')).toHaveLength(1);
       expect(reloaded.practice).toBeNull();
-      await reloaded.runPractice();
+      await reloaded.runPractice(opponentId);
       expect(reloaded.practice).toEqual(report);
       reloaded.dispose();
     } finally {
@@ -1415,12 +1422,14 @@ test('opens a practice report bought by another tab and refuses a new one after 
       firstTab.draft?.reports?.some((report) => report.kind === 'training-camp') ?? false,
     ).toBe(false);
 
-    await firstTab.runPractice();
+    const opponent = lock.season.teams.find((team) => team.teamId !== lock.season.userTeamId);
+    if (opponent === undefined) throw new Error('Expected a training camp opponent');
+    await firstTab.runPractice(opponent.teamId);
     expect(firstTab.error).toBeNull();
     const camp = firstTab.draft?.reports?.find((report) => report.kind === 'training-camp');
     if (camp === undefined) throw new Error('Expected the durable training camp report');
     expect(firstTab.practice?.seed).toBe(
-      fullCourtTrainingCampSeed(lock.season.runSeed, camp.reportId),
+      fullCourtTrainingCampSeed(lock.season.runSeed, [camp.reportId, opponent.teamId, 1].join(':')),
     );
 
     await secondTab.advance(1);

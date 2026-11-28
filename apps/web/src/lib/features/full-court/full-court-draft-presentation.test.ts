@@ -5,14 +5,9 @@ import {
   FULL_COURT_MAX_ROSTER_SIZE,
   FULL_COURT_MIN_ROSTER_SIZE,
   commandIdSchema,
-  eraIdSchema,
-  franchiseIdSchema,
   fullCourtCreateDraftCommandSchema,
   fullCourtDraftStateSchema,
   idSchema,
-  playerIdSchema,
-  playersIndexSchema,
-  seasonKeySchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import {

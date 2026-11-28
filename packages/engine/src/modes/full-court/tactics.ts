@@ -354,14 +354,20 @@ function boundedHierarchyScale(value: number): number {
  * Layers tactical probability changes over an optional caller hook. The
  * millionth units match the shared effects contract.
  */
+export function fullCourtMakeAdjustment(defense: FullCourtTactics['defense']): number {
+  return defense === 'pressure' ? PRESSURE_MAKE_CONCESSION_MILLIONTHS : 0;
+}
+
+export function fullCourtTurnoverAdjustment({ offense, ballMovement }: FullCourtTactics): number {
+  return offense === 'ball-movement' || ballMovement ? BALL_MOVEMENT_TURNOVER_MILLIONTHS : 0;
+}
+
 export function fullCourtTacticsEffects(
   base: EffectsHook | undefined,
   tactics: readonly [FullCourtTactics, FullCourtTactics],
 ): EffectsHook | undefined {
-  const make = (defense: FullCourtTactics['defense']): number =>
-    defense === 'pressure' ? PRESSURE_MAKE_CONCESSION_MILLIONTHS : 0;
-  const turnover = ({ offense, ballMovement }: FullCourtTactics): number =>
-    offense === 'ball-movement' || ballMovement ? BALL_MOVEMENT_TURNOVER_MILLIONTHS : 0;
+  const make = fullCourtMakeAdjustment;
+  const turnover = fullCourtTurnoverAdjustment;
   const assist = ({ offense, ballMovement }: FullCourtTactics): number =>
     offense === 'ball-movement' || ballMovement ? BALL_MOVEMENT_ASSIST_MILLIONTHS : 0;
   const home = tactics[0];

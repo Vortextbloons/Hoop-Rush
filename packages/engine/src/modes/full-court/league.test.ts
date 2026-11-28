@@ -85,3 +85,39 @@ test('calendar preserves every Cap Rush fixture and gives each franchise determi
     expect(gaps.some((gap) => gap > 2)).toBe(true);
   }
 });
+
+test('the new field can draw both weak and strong historical leagues', () => {
+  const weak = buildCapRushTestCatalog({ overalls: [64, 64, 64] });
+  const strong = buildCapRushTestCatalog({ overalls: [89, 89, 89] });
+  const catalog = {
+    ...weak,
+    candidates: [
+      ...weak.candidates,
+      ...strong.candidates.map((player) => ({
+        ...player,
+        seasonKey: seasonKeySchema.parse('2005-06'),
+        playerVersionId: playerVersionId(
+          player.playerId,
+          player.franchiseId,
+          player.eraId,
+          '2005-06',
+        ),
+      })),
+    ],
+  };
+  const opponents = [{ teamId: 'lakers', displayName: 'Los Angeles Lakers' }];
+  const draws = new Set<string>();
+  for (let index = 0; index < 40; index++) {
+    const seed = seedSchema.parse(index.toString(16).padStart(16, '0'));
+    const draw = buildFullCourtHistoricalField({
+      catalog,
+      field: opponents,
+      runSeed: seed,
+      variedStrength: true,
+    });
+    const [opponent] = draw;
+    if (opponent === undefined) throw new Error('Expected a historical opponent');
+    draws.add(opponent.seasonKey);
+  }
+  expect(draws).toEqual(new Set(['1995-96', '2005-06']));
+});

@@ -3,8 +3,6 @@ import type {
   CapRushSourcePlayer,
   FullCourtDraftState,
   FullCourtMoneyConfig,
-  PlayersIndex,
-  PlayersIndexEntry,
   Position,
 } from '@hoop-rush/data-contracts';
 import { FULL_COURT_MAX_ROSTER_SIZE, FULL_COURT_MIN_ROSTER_SIZE } from '@hoop-rush/data-contracts';

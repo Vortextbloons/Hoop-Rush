@@ -22,15 +22,18 @@
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import { formatPositions } from '#lib/player-positions.js';
   import FullCourtBlueprintPicker from './FullCourtBlueprintPicker.svelte';
-  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtCourtLineup from './FullCourtCourtLineup.svelte';
+  import FullCourtHierarchyCards from './FullCourtHierarchyCards.svelte';
+  import FullCourtMinutesBoard from './FullCourtMinutesBoard.svelte';
+  import FullCourtRotationLadder from './FullCourtRotationLadder.svelte';
   import FullCourtRuleEditor from './FullCourtRuleEditor.svelte';
-  import TeamCourtPreview from './TeamCourtPreview.svelte';
+  import FullCourtUnitPlanner from './FullCourtUnitPlanner.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
   import {
     FULL_COURT_MAX_PLAYER_MINUTES,
     FULL_COURT_MAX_UNITS,
     FULL_COURT_MINUTE_TOTAL,
-    FULL_COURT_UNIT_NAME_MAX_LENGTH,
+    FULL_COURT_UNIT_MINUTE_BUDGET,
     activeRotationForBlueprint,
     applyFullCourtBlueprintToDraft,
     defaultFullCourtCoachingDraft,
@@ -40,7 +43,6 @@
     fullCourtCoachingPlan,
     fullCourtCoachingSignature,
     fullCourtTeamMinutes,
-    fullCourtUnitNameForLineup,
     newFullCourtClosingRule,
     newFullCourtFoulTroubleRule,
     nextFullCourtRuleId,
@@ -141,7 +143,6 @@
     untrack(() => fullCourtCoachingDraft(plan, defaultRotation, rosterIds)),
   );
   let savedSignature = $state(untrack(() => fullCourtCoachingSignature(plan)));
-  let focusedSlot = $state<number | null>(null);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
   let savedMessage = $state<string | null>(null);
@@ -157,7 +158,7 @@
       seededRoster = rosterKey;
       draft = fullCourtCoachingDraft(plan, defaultRotation, rosterIds);
       savedSignature = fullCourtCoachingSignature(plan);
-      focusedSlot = null;
+      lockedMinutes = [];
       saveError = null;
       savedMessage = null;
     });
@@ -239,6 +240,27 @@
           : 'Availability appears once the season starts.',
   );
   const minutesGap = $derived(FULL_COURT_MINUTE_TOTAL - displayedMinutes);
+  const lockedMinuteSet = $derived(new Set(lockedMinutes));
+  const hierarchyRolesSet = $derived(
+    [
+      draft.hierarchy.primaryPlayerId,
+      draft.hierarchy.secondaryPlayerId,
+      draft.hierarchy.floorGeneralPlayerId,
+    ].filter((playerId): playerId is string => playerId !== null).length,
+  );
+  const planPulse = $derived([
+    {
+      label: `${String(displayedMinutes)} / ${String(FULL_COURT_MINUTE_TOTAL)} min`,
+      tone:
+        displayedMinutes === FULL_COURT_MINUTE_TOTAL
+          ? ('positive' as const)
+          : displayedMinutes > FULL_COURT_MINUTE_TOTAL
+            ? ('negative' as const)
+            : ('accent' as const),
+    },
+    { label: `${String(hierarchyRolesSet)} roles`, tone: 'neutral' as const },
+    { label: `${String(draft.units.length)} units`, tone: 'neutral' as const },
+  ]);
   const planCheckHeadline = $derived(
     validation.valid
       ? 'Ready'
@@ -367,11 +389,25 @@
     markEdited();
   }
 
-  function setMinutes(playerId: string, raw: string): void {
-    const parsed = Number(raw);
-    draft.minuteTargets[playerId] = Number.isFinite(parsed) ? parsed : 0;
+  function setMinutes(playerId: string, minutes: number): void {
+    const next = Number.isFinite(minutes)
+      ? Math.max(0, Math.min(FULL_COURT_MAX_PLAYER_MINUTES, Math.round(minutes)))
+      : 0;
+    draft.minuteTargets[playerId] = next;
     lastMinutesEdit = playerId;
     markEdited();
+  }
+
+  function sitPlayer(playerId: string): void {
+    setMinutes(playerId, 0);
+    lockedMinutes = lockedMinutes.filter((id) => id !== playerId);
+    announcement = `${playerNames.get(playerId) ?? 'Player'} moved out of the rotation. Save changes to use it.`;
+  }
+
+  function toggleMinuteLock(playerId: string): void {
+    lockedMinutes = lockedMinuteSet.has(playerId)
+      ? lockedMinutes.filter((id) => id !== playerId)
+      : [...lockedMinutes, playerId];
   }
 
   function rebalanceMinutes(): void {
@@ -380,10 +416,22 @@
       rosterIds,
       defaultRotation.minuteTargets,
       lastMinutesEdit,
+      lockedMinuteSet,
     );
     lastMinutesEdit = null;
     markEdited();
     announcement = 'Rotation minutes rebalanced.';
+  }
+
+  function setUnitMinutes(index: number, minutes: number): void {
+    const unit = draft.units[index];
+    if (unit === undefined) return;
+    const next = Number.isFinite(minutes)
+      ? Math.max(0, Math.min(FULL_COURT_UNIT_MINUTE_BUDGET, Math.round(minutes)))
+      : 0;
+    if (next === 0) delete unit.plannedMinutes;
+    else unit.plannedMinutes = next;
+    markEdited();
   }
 
   function nextUnitName(): string {
@@ -465,6 +513,7 @@
   ] as const;
   let workspace = $state<(typeof WORKSPACES)[number]['id']>('plan');
   let lastMinutesEdit: string | null = null;
+  let lockedMinutes = $state<string[]>([]);
   let readHandler = $state('');
   const starterStrengths = $derived(
     scoutedRoster === null
@@ -513,7 +562,6 @@
   function cancel(): void {
     draft = fullCourtCoachingDraft(plan, defaultRotation, rosterIds);
     savedSignature = fullCourtCoachingSignature(plan);
-    focusedSlot = null;
     saveError = null;
     savedMessage = null;
     announcement = 'Changes discarded.';
@@ -524,7 +572,6 @@
     draft = defaultFullCourtCoachingDraft(defaultRotation, rosterIds);
     draft.interfaceLevel = level;
     savedSignature = fullCourtCoachingSignature(plan);
-    focusedSlot = null;
     saveError = null;
     savedMessage = null;
     announcement =
@@ -621,27 +668,6 @@
     {#if savedMessage !== null}
       <p class="mb-3 text-xs font-semibold text-positive" role="status">{savedMessage}</p>
     {/if}
-    {#snippet roleSelect(role: (typeof HIERARCHY_ROLES)[number])}
-      <label class="grid min-w-0 gap-1">
-        <span class="text-sm font-semibold">{role.label}</span>
-        <select
-          class={SELECT_CLASS}
-          aria-label={role.label}
-          value={draft.hierarchy[role.key] ?? ''}
-          disabled={locked}
-          onchange={(event) => setHierarchyRole(role.key, event.currentTarget.value)}
-        >
-          <option value="">Not set</option>
-          {#each roster as player (player.playerId)}
-            <option value={player.playerId}>
-              {player.displayName} · {formatPositions(player.positions)}
-            </option>
-          {/each}
-        </select>
-        <span class="text-xs text-muted-foreground">{role.hint}</span>
-      </label>
-    {/snippet}
-
     <header class="board-header">
       <div>
         <h3>Coaching Board</h3>
@@ -653,9 +679,16 @@
               : `Next game vs. ${opponent.displayName}`}
         </p>
       </div>
-      <Badge tone={validation.valid ? 'neutral' : 'negative'}>
-        {validation.valid ? availabilityHeadline : planCheckHeadline}
-      </Badge>
+      <div class="plan-pulse" aria-label="Plan summary">
+        {#if !readOnly}
+          {#each planPulse as pulse (pulse.label)}
+            <Badge tone={pulse.tone}>{pulse.label}</Badge>
+          {/each}
+        {/if}
+        <Badge tone={validation.valid ? 'positive' : 'negative'}>
+          {validation.valid ? 'Ready' : planCheckHeadline}
+        </Badge>
+      </div>
     </header>
     <nav class="workspace-nav" aria-label="Coaching workspace">
       {#each WORKSPACES as item (item.id)}
@@ -794,13 +827,20 @@
           </Panel>
         </div>
         {#if !readOnly}
-          <Panel as="section" padding="sm" aria-label="Scoring options">
-            <SectionHeading level={4} size="sm" title="Offensive roles" />
-            <div class="mt-3 grid gap-3 sm:grid-cols-3">
-              {@render roleSelect(HIERARCHY_ROLES[0])}
-              {@render roleSelect(HIERARCHY_ROLES[1])}
-              {@render roleSelect(HIERARCHY_ROLES[2])}
-            </div>
+          <Panel as="section" padding="sm" aria-label="Offensive roles">
+            <SectionHeading
+              level={4}
+              size="sm"
+              title="Scoring hierarchy"
+              description="Choose who the offense plays through, in order."
+            />
+            <FullCourtHierarchyCards
+              hierarchy={draft.hierarchy}
+              {roster}
+              {art}
+              {locked}
+              onChange={setHierarchyRole}
+            />
           </Panel>
         {/if}
         {#if !readOnly}
@@ -973,6 +1013,31 @@
             </div>
           {/if}
 
+          <div class="rotation-room">
+            <section class="rotation-room-column" aria-label="Starting five">
+              <div class="rotation-room-head">
+                <p class="ui-label">Starting five</p>
+                <p class="ui-micro">Tap a court slot to swap</p>
+              </div>
+              <FullCourtCourtLineup
+                starters={minutes.starters}
+                bench={minutes.bench}
+                {roster}
+                {art}
+                locked={locked || !editingRotation}
+                onSelectStarter={setStarter}
+              />
+            </section>
+
+            <section class="rotation-room-column" aria-label="Rotation share">
+              <div class="rotation-room-head">
+                <p class="ui-label">Rotation share</p>
+                <p class="ui-micro">0–48 minutes</p>
+              </div>
+              <FullCourtRotationLadder rows={rotationRows} {art} />
+            </section>
+          </div>
+
           <div class="mt-4 border-t border-line-soft pt-3" aria-label="Minutes" role="group">
             <SectionHeading level={4} size="sm" title="Minutes">
               {#snippet actions()}
@@ -983,6 +1048,7 @@
                     disabled={locked}
                     onclick={() => {
                       draft.minuteTargets = { ...defaultRotation.minuteTargets };
+                      lockedMinutes = [];
                       markEdited();
                       announcement = 'Staff minutes copied. Save changes to use them.';
                     }}
@@ -1001,162 +1067,24 @@
                 </Badge>
               {/snippet}
             </SectionHeading>
-            <p
-              class="mt-1 text-[11px] leading-snug {displayedMinutes === FULL_COURT_MINUTE_TOTAL
-                ? 'text-positive'
-                : 'text-muted-foreground'}"
-              aria-live="polite"
-            >
-              {minutesSummary()}
-            </p>
-            <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-3">
-              <div
-                class="h-full rounded-full transition-all {displayedMinutes ===
-                FULL_COURT_MINUTE_TOTAL
-                  ? 'bg-positive'
-                  : displayedMinutes > FULL_COURT_MINUTE_TOTAL
-                    ? 'bg-negative'
-                    : 'bg-primary'}"
-                style={`width: ${String(Math.min(100, Math.round((displayedMinutes / FULL_COURT_MINUTE_TOTAL) * 100)))}%`}
-              ></div>
-            </div>
-
-            <div class="mt-3 grid gap-1.5 md:grid-cols-2">
-              {#each minuteGroups as group (group.label)}
-                <div class="min-w-0">
-                  <div class="flex items-baseline justify-between gap-2 px-0.5">
-                    <p class="ui-label" data-tone="muted">{group.label}</p>
-                    <p class="ui-micro">{group.total} min</p>
-                  </div>
-                  <ul class="mt-1.5 flex flex-col gap-1.5">
-                    {#each group.rows as row (row.player.playerId)}
-                      <li
-                        class="flex min-w-0 items-center gap-2 rounded-lg border bg-surface-1 px-2.5 py-2 {row.starterSlot !==
-                          null && focusedSlot === row.starterSlot
-                          ? 'border-primary/50'
-                          : 'border-line-soft'}"
-                      >
-                        <FullCourtPortrait player={row.player} {art} size="md" />
-                        <div class="min-w-0 flex-1">
-                          {#if editingRotation && !readOnly && row.starterSlot !== null}
-                            {@const slot = row.starterSlot}
-                            <select
-                              class="min-h-8 w-full rounded-md border border-line-soft bg-surface-2 px-1.5 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={`Change Starter ${slot + 1}`}
-                              value={row.player.playerId}
-                              disabled={locked}
-                              onfocus={() => (focusedSlot = slot)}
-                              onchange={(event) => setStarter(slot, event.currentTarget.value)}
-                            >
-                              {#each roster as player (player.playerId)}
-                                <option value={player.playerId}>
-                                  {player.displayName} · {formatPositions(player.positions)}
-                                </option>
-                              {/each}
-                            </select>
-                          {:else}
-                            <span class="block truncate text-sm font-semibold">
-                              {row.player.displayName}
-                            </span>
-                          {/if}
-                          <span class="ui-micro flex flex-wrap items-center gap-x-1.5">
-                            <span>{roleLabel(row)}</span>
-                            <span aria-hidden="true">·</span>
-                            <span>{formatPositions(row.player.positions)}</span>
-                            {#if row.closer}
-                              <span class="text-accent">· Closer</span>
-                            {/if}
-                            {#if row.health !== null}
-                              <span
-                                class={row.health.tone === 'unavailable'
-                                  ? 'text-negative'
-                                  : row.health.tone === 'fatigued'
-                                    ? 'text-accent'
-                                    : ''}
-                              >
-                                · {row.health.label}
-                              </span>
-                            {/if}
-                            {#if row.player.overall != null}
-                              <span>· {row.player.overall} OVR</span>
-                            {/if}
-                          </span>
-                          <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span class="text-xs text-muted-foreground">Workload</span>
-                            <meter
-                              class="h-2 w-12 accent-primary"
-                              min="0"
-                              max="100"
-                              low="25"
-                              high="60"
-                              optimum="0"
-                              value={row.cumulativeLoad}
-                              aria-label={`Cumulative workload for ${row.player.displayName}`}
-                            ></meter>
-                            <span
-                              class="font-mono text-xs tabular-nums {row.cumulativeLoad >= 60
-                                ? 'text-negative'
-                                : row.cumulativeLoad >= 25
-                                  ? 'text-accent'
-                                  : 'text-muted-foreground'}">{row.cumulativeLoad}%</span
-                            >
-                          </div>
-                        </div>
-                        {#if editingRotation && !readOnly}
-                          <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                            <label class="grid justify-items-center gap-0.5">
-                              <span class="sr-only">Minutes for {row.player.displayName}</span>
-                              <input
-                                type="number"
-                                inputmode="numeric"
-                                min="0"
-                                max={FULL_COURT_MAX_PLAYER_MINUTES}
-                                step="1"
-                                class="min-h-10 w-16 rounded-lg border border-line-soft bg-surface-2 px-1.5 text-center font-mono text-sm tabular-nums text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                                value={row.minutes}
-                                disabled={locked}
-                                oninput={(event) =>
-                                  setMinutes(row.player.playerId, event.currentTarget.value)}
-                              />
-                              <span class="ui-micro" aria-hidden="true">min</span>
-                            </label>
-                            {#if row.starterSlot === null && !row.closer && row.minutes > 0}
-                              <Button
-                                type="button"
-                                tone="ghost"
-                                size="sm"
-                                disabled={locked}
-                                aria-label={`Sit ${row.player.displayName}`}
-                                onclick={() => setMinutes(row.player.playerId, '0')}
-                              >
-                                Sit
-                              </Button>
-                            {/if}
-                          </div>
-                        {:else}
-                          <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
-                            {row.minutes} <span class="ui-micro">min</span>
-                          </p>
-                        {/if}
-                      </li>
-                    {/each}
-                  </ul>
-                </div>
-              {/each}
-            </div>
+            {#if !editingRotation && !readOnly}
+              <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
+                The staff plan is active. Switch to <strong>My plan</strong> to edit starters, minutes,
+                and the closing five.
+              </p>
+            {/if}
+            <FullCourtMinutesBoard
+              groups={minuteGroups}
+              summary={minutesSummary()}
+              {displayedMinutes}
+              locked={locked || !editingRotation}
+              lockedIds={lockedMinutes}
+              {art}
+              onMinutes={setMinutes}
+              onToggleLock={toggleMinuteLock}
+              onSit={sitPlayer}
+            />
           </div>
-          <details class="mt-4 rounded-lg border border-line-soft bg-surface-1 p-3">
-            <summary class="cursor-pointer text-sm font-semibold">View on court</summary>
-            <div class="mt-3">
-              <TeamCourtPreview
-                starters={minutes.starters}
-                bench={minutes.bench}
-                {focusedSlot}
-                readOnly
-                {art}
-              />
-            </div>
-          </details>
 
           {#if editingRotation}
             <div class="mt-4 border-t border-line-soft pt-3">
@@ -1198,7 +1126,8 @@
             </div>
           {/if}
         </Panel>
-
+      </div>
+      <div class="workspace-content" hidden={workspace !== 'situations'}>
         {#if !readOnly}
           <Panel as="section" padding="sm" aria-label="Named units">
             <SectionHeading level={4} size="sm" title="Lineup groups">
@@ -1210,125 +1139,22 @@
               Plan up to 12 minutes across units at the start of the second quarter, in the order
               shown. Fatigue, availability, and substitution rules can shorten their time.
             </p>
-
-            {#if draft.units.length === 0}
-              <p
-                class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
-              >
-                No named units. Add a unit to save a five you can reuse in a closing rule or copy to
-                the closing five.
-              </p>
-            {:else}
-              {#if draft.units.some((unit) => (unit.plannedMinutes ?? 0) > 0)}
-                <div class="mt-3 grid gap-1">
-                  <p class="text-sm font-semibold">Second-quarter plan</p>
-                  <ol class="flex flex-wrap gap-2" aria-label="Second-quarter unit order">
-                    {#each draft.units as unit, index (index)}
-                      {#if (unit.plannedMinutes ?? 0) > 0}
-                        <li
-                          class="rounded-md border border-line-soft bg-surface-1 px-2 py-1 text-xs"
-                        >
-                          {unit.name || 'Unnamed unit'} &middot; {unit.plannedMinutes} min
-                        </li>
-                      {/if}
-                    {/each}
-                  </ol>
-                </div>
-              {/if}
-              <ul class="mt-3 grid gap-2">
-                {#each draft.units as unit, index (index)}
-                  <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
-                    <div class="flex flex-wrap items-end justify-between gap-2">
-                      <label class="w-28">
-                        <span class="ui-micro">Planned minutes</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="12"
-                          step="1"
-                          class={SELECT_CLASS}
-                          value={unit.plannedMinutes ?? 0}
-                          disabled={locked}
-                          onchange={(event) => {
-                            const minutes = event.currentTarget.valueAsNumber;
-                            if (Number.isInteger(minutes) && minutes > 0 && minutes <= 12)
-                              unit.plannedMinutes = minutes;
-                            else delete unit.plannedMinutes;
-                            markEdited();
-                          }}
-                        />
-                      </label>
-                      <label class="min-w-0 flex-1">
-                        <span class="ui-micro">Unit name</span>
-                        <input
-                          type="text"
-                          class="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                          maxlength={FULL_COURT_UNIT_NAME_MAX_LENGTH}
-                          value={unit.name}
-                          disabled={locked}
-                          oninput={(event) => renameUnit(index, event.currentTarget.value)}
-                        />
-                      </label>
-                      <div class="flex flex-wrap gap-1.5">
-                        <Button
-                          tone="secondary"
-                          type="button"
-                          disabled={locked}
-                          onclick={() => useUnitAsClosingFive(unit)}
-                        >
-                          Use as closing five
-                        </Button>
-                        <Button
-                          tone="ghost"
-                          type="button"
-                          disabled={locked}
-                          onclick={() => removeUnit(index)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                      {#each SLOTS as slot (slot)}
-                        <label class="min-w-0">
-                          <span class="ui-micro">Player {slot + 1}</span>
-                          <select
-                            class={SELECT_CLASS}
-                            value={unit.playerIds[slot] ?? ''}
-                            disabled={locked}
-                            onchange={(event) =>
-                              setUnitPlayer(index, slot, event.currentTarget.value)}
-                          >
-                            {#each roster as player (player.playerId)}
-                              <option value={player.playerId}>
-                                {player.displayName} · {formatPositions(player.positions)}
-                              </option>
-                            {/each}
-                          </select>
-                        </label>
-                      {/each}
-                    </div>
-                    {#if fullCourtUnitNameForLineup([unit], draft.closingFive ?? []) !== null}
-                      <p class="mt-2 text-[11px] font-semibold text-accent">Current closing five</p>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
             <div class="mt-3">
-              <Button
-                tone="secondary"
-                type="button"
-                disabled={locked || draft.units.length >= FULL_COURT_MAX_UNITS}
-                onclick={addUnit}
-              >
-                Add named unit
-              </Button>
+              <FullCourtUnitPlanner
+                units={draft.units}
+                {roster}
+                {art}
+                {locked}
+                onAdd={addUnit}
+                onRemove={removeUnit}
+                onRename={renameUnit}
+                onMinutes={setUnitMinutes}
+                onPlayer={setUnitPlayer}
+                onUseAsClosingFive={useUnitAsClosingFive}
+              />
             </div>
           </Panel>
         {/if}
-      </div>
-      <div class="workspace-content" hidden={workspace !== 'situations'}>
         {#if !readOnly}
           <Panel as="section" padding="sm" aria-label="Coaching rules">
             <SectionHeading level={4} size="sm" title="Automatic substitutions">

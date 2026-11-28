@@ -10,6 +10,7 @@ import { capRushSourcePlayerSchema } from './cap-rush-draft.ts';
 export const FULL_COURT_DRAFT_SCHEMA_VERSION = 1;
 export const FULL_COURT_MONEY_VERSION = 'full-court-money-v1';
 export const FULL_COURT_POOL_VERSION = 'full-court-pool-v1';
+export const FULL_COURT_OPPONENT_VERSION = 'full-court-opponents-v2';
 export const FULL_COURT_POOL_MIN_SIZE = 60;
 export const FULL_COURT_POOL_TARGET_SIZE = 75;
 export const FULL_COURT_POOL_MAX_SIZE = 90;
@@ -266,6 +267,7 @@ export const fullCourtDraftStateSchema = z
     variant: fullCourtVariantSchema,
     catalog: capRushCatalogSourceSchema,
     money: fullCourtMoneyConfigSchema,
+    opponentVersion: z.literal(FULL_COURT_OPPONENT_VERSION).optional(),
     pool: fullCourtDraftPoolSchema.optional(),
     offer: fullCourtRoundOfferSchema.optional(),
     stage: fullCourtDraftStageSchema,

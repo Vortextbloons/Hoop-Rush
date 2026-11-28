@@ -9,7 +9,14 @@
     type FullCourtTeamHealth,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import { ChevronDown, FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
+  import {
+    ArrowUpRight,
+    FastForward,
+    Play,
+    ShieldAlert,
+    SkipForward,
+    Trophy,
+  } from '@lucide/svelte';
   import {
     buildFullCourtAwards,
     buildFullCourtPlayerSeasonStats,
@@ -17,7 +24,8 @@
     fullCourtStandings,
     type FullCourtSeasonLock,
   } from '@hoop-rush/engine';
-  import { onMount, tick } from 'svelte';
+  import { Dialog } from 'bits-ui';
+  import { onMount } from 'svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
@@ -29,6 +37,7 @@
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
+  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
@@ -103,14 +112,7 @@
   let showAllLineups = $state(false);
   let impactView = $state<'players' | 'fives'>('players');
   let impactPlayerId = $state<string | null>(null);
-  let impactDetails = $state<HTMLDivElement>();
 
-  async function toggleImpactDetails(playerId: string): Promise<void> {
-    impactPlayerId = impactPlayerId === playerId ? null : playerId;
-    if (impactPlayerId === null) return;
-    await tick();
-    impactDetails?.scrollIntoView({ block: 'nearest' });
-  }
   let selectedTeamId = $state<string | null>(null);
 
   onMount(() => {
@@ -361,29 +363,25 @@
         </div>
 
         {#if controls.secondary.length > 0}
-          <div
-            class="flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
-            role="group"
-            aria-label="Batch simulation"
-          >
-            <span class="ui-micro shrink-0 px-2 text-muted-foreground">Skip</span>
-            {#each controls.secondary as action (action.label)}
-              <Button
-                size="sm"
-                tone="secondary"
-                class="flex-1 whitespace-nowrap"
-                disabled={busy}
-                onclick={() => runAction(action)}
-              >
-                {#if action.count >= 5}
-                  <FastForward size={13} aria-hidden="true" />
-                {:else}
-                  <SkipForward size={13} aria-hidden="true" />
-                {/if}
-                {action.label}
-              </Button>
-            {/each}
-          </div>
+          <Disclosure summary="Sim ahead" class="min-w-0 flex-1">
+            <div class="flex flex-wrap gap-1.5">
+              {#each controls.secondary as action (action.label)}
+                <Button
+                  size="sm"
+                  tone="secondary"
+                  disabled={busy}
+                  onclick={() => runAction(action)}
+                >
+                  {#if action.count >= 5}
+                    <FastForward size={13} aria-hidden="true" />
+                  {:else}
+                    <SkipForward size={13} aria-hidden="true" />
+                  {/if}
+                  {action.label}
+                </Button>
+              {/each}
+            </div>
+          </Disclosure>
         {/if}
       </div>
     {/if}
@@ -709,8 +707,16 @@
         <div class="ui-stats-scroll mt-3">
           <PlayerStatsTable
             columns={[
-              { key: 'minutes', label: 'MIN', value: (row) => row.on.minutes.toFixed(1) },
-              { key: 'margin', label: '+/-', value: (row) => signed(row.on.plusMinus) },
+              {
+                key: 'minutes',
+                label: 'MPG',
+                value: (row) => (row.on.minutes / row.games).toFixed(1),
+              },
+              {
+                key: 'margin',
+                label: '+/- PER GAME',
+                value: (row) => (row.on.plusMinus / row.games).toFixed(1),
+              },
               { key: 'on', label: 'ON NET', value: (row) => rateLabel(row.on.net) },
               { key: 'off', label: 'OFF NET', value: (row) => rateLabel(row.off.net) },
               { key: 'swing', label: 'ON/OFF', value: (row) => rateLabel(row.onOff) },
@@ -726,19 +732,13 @@
               <button
                 type="button"
                 class="flex min-h-10 items-center gap-2 text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-ring"
-                aria-expanded={impactPlayerId === row.player.playerId}
-                aria-controls={impactPlayerId === row.player.playerId
-                  ? 'player-impact-details'
-                  : undefined}
-                onclick={() => void toggleImpactDetails(row.player.playerId)}
+                aria-haspopup="dialog"
+                aria-label={`View impact for ${row.player.displayName}`}
+                onclick={() => (impactPlayerId = row.player.playerId)}
               >
                 <FullCourtPortrait player={row.player} {art} size="sm" />
                 {row.player.displayName}
-                <ChevronDown
-                  size={14}
-                  aria-hidden="true"
-                  class={impactPlayerId === row.player.playerId ? 'rotate-180' : ''}
-                />
+                <ArrowUpRight size={14} aria-hidden="true" class="text-muted-foreground" />
               </button>
             {/snippet}
             {#snippet cell(row, column)}
@@ -753,9 +753,10 @@
                 class:text-positive={column.key === 'swing' && (row.onOff ?? 0) > 0}
                 class:text-negative={column.key === 'swing' && (row.onOff ?? 0) < 0}
               >
-                {column.key === 'swing' && (row.onOff ?? 0) > 0 ? '+' : ''}{column.value(row)}{small
-                  ? ' *'
-                  : ''}
+                {(column.key === 'swing' && (row.onOff ?? 0) > 0) ||
+                (column.key === 'margin' && row.on.plusMinus > 0)
+                  ? '+'
+                  : ''}{column.value(row)}{small ? ' *' : ''}
               </span>
             {/snippet}
           </PlayerStatsTable>
@@ -780,70 +781,85 @@
                 Math.min(left.withPlayer.pacePossessions, left.withoutPlayer.pacePossessions),
             )
             .slice(0, 3)}
-          <div
-            class="mt-4 grid gap-3 rounded-lg border border-line-soft bg-surface-1 p-4"
-            id="player-impact-details"
-            bind:this={impactDetails}
-            aria-label={`${selected.player.displayName} impact details`}
+          <DialogShell
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) impactPlayerId = null;
+            }}
+            layout="center"
+            size="lg"
+            closeLabel="Close player impact"
+            headerClass="mb-4"
           >
-            <h3 class="font-semibold">
-              {selected.player.displayName}
-              <span class="text-sm font-normal text-muted-foreground"
-                >&middot; {selected.games} games</span
-              >
-            </h3>
-            <div class="grid gap-2 sm:grid-cols-2">
-              {#each [{ label: 'On court', sample: selected.on }, { label: 'Off court', sample: selected.off }] as { label, sample } (label)}
-                <div class="rounded-md bg-surface-2 p-3 text-sm">
-                  <p class="font-semibold">{label}</p>
-                  <p class="mt-1 text-muted-foreground">
-                    {possessionLabel(sample.possessions)} poss &middot; {sample.minutes.toFixed(1)} min
-                    {sample.sampleMet ? '' : ' *'}
-                  </p>
-                  <p class="mt-1 text-muted-foreground">
-                    Offense {sample.offense?.toFixed(1) ?? '?'} &middot; Defense {sample.defense?.toFixed(
-                      1,
-                    ) ?? '?'} per 100 poss
-                  </p>
+            {#snippet header()}
+              <div class="flex items-center gap-3">
+                <FullCourtPortrait player={selected.player} {art} size="md" />
+                <div>
+                  <Dialog.Title class="text-xl font-semibold"
+                    >{selected.player.displayName}</Dialog.Title
+                  >
+                  <Dialog.Description class="text-sm text-muted-foreground">
+                    Player impact &middot; {selected.games}
+                    {selected.games === 1 ? 'game' : 'games'}
+                  </Dialog.Description>
                 </div>
-              {/each}
-            </div>
-            <h4 class="text-sm font-semibold">Same four teammates</h4>
-            {#each comparisons as { withPlayer, withoutPlayer, teammates } (`${withPlayer.key}:${withoutPlayer.key}`)}
-              {@const replacement = withoutPlayer.players.find(
-                (player) => !teammates.includes(player.playerId),
-              )}
-              <div class="border-t border-line-soft pt-2 text-sm">
-                <p class="text-xs text-muted-foreground">
-                  {withPlayer.players
-                    .filter((player) => teammates.includes(player.playerId))
-                    .map((player) => player.displayName)
-                    .join(' ? ')}
-                </p>
-                <dl class="mt-1 grid gap-1 sm:grid-cols-2">
-                  {#each [{ player: selected.player, lineup: withPlayer }, { player: replacement, lineup: withoutPlayer }] as { player, lineup } (lineup.key)}
-                    <div>
-                      <dt class="font-semibold">{player?.displayName}</dt>
-                      <dd>
-                        {rateLabel(lineup.netRatingPer100)} net &middot; {possessionLabel(
-                          lineup.pacePossessions,
-                        )} poss{lineup.sampleMet ? '' : ' *'}
-                      </dd>
-                    </div>
-                  {/each}
-                </dl>
               </div>
-            {:else}
-              <p class="text-xs text-muted-foreground">
-                No recorded substitution shared the same four teammates.
-              </p>
-            {/each}
-            {#if comparisons.length > 0}
-              <p class="text-xs text-muted-foreground">
-                These groups may have faced different opponents and game situations.
-              </p>
-            {/if}
-          </div>
+            {/snippet}
+            <div class="grid gap-3">
+              <div class="grid gap-2 sm:grid-cols-2">
+                {#each [{ label: 'On court', sample: selected.on }, { label: 'Off court', sample: selected.off }] as { label, sample } (label)}
+                  <div class="rounded-md bg-surface-2 p-3 text-sm">
+                    <p class="font-semibold">{label}</p>
+                    <p class="mt-1 text-muted-foreground">
+                      {(sample.minutes / selected.games).toFixed(1)} min per game &middot;
+                      {possessionLabel(sample.possessions)} possessions total
+                      {sample.sampleMet ? '' : ' *'}
+                    </p>
+                    <p class="mt-1 text-muted-foreground">
+                      Offense {sample.offense?.toFixed(1) ?? '—'} &middot; Defense {sample.defense?.toFixed(
+                        1,
+                      ) ?? '—'} per 100 poss
+                    </p>
+                  </div>
+                {/each}
+              </div>
+              <h4 class="text-sm font-semibold">Same four teammates</h4>
+              {#each comparisons as { withPlayer, withoutPlayer, teammates } (`${withPlayer.key}:${withoutPlayer.key}`)}
+                {@const replacement = withoutPlayer.players.find(
+                  (player) => !teammates.includes(player.playerId),
+                )}
+                <div class="border-t border-line-soft pt-2 text-sm">
+                  <p class="text-xs text-muted-foreground">
+                    {withPlayer.players
+                      .filter((player) => teammates.includes(player.playerId))
+                      .map((player) => player.displayName)
+                      .join(' · ')}
+                  </p>
+                  <dl class="mt-1 grid gap-1 sm:grid-cols-2">
+                    {#each [{ player: selected.player, lineup: withPlayer }, { player: replacement, lineup: withoutPlayer }] as { player, lineup } (lineup.key)}
+                      <div>
+                        <dt class="font-semibold">{player?.displayName}</dt>
+                        <dd>
+                          {rateLabel(lineup.netRatingPer100)} net &middot; {possessionLabel(
+                            lineup.pacePossessions,
+                          )} poss{lineup.sampleMet ? '' : ' *'}
+                        </dd>
+                      </div>
+                    {/each}
+                  </dl>
+                </div>
+              {:else}
+                <p class="text-xs text-muted-foreground">
+                  No recorded substitution shared the same four teammates.
+                </p>
+              {/each}
+              {#if comparisons.length > 0}
+                <p class="text-xs text-muted-foreground">
+                  These groups may have faced different opponents and game situations.
+                </p>
+              {/if}
+            </div>
+          </DialogShell>
         {/if}
       {:else}
         <p class="mt-3 text-sm text-muted-foreground">

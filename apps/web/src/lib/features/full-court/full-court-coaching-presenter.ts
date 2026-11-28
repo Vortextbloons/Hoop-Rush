@@ -669,6 +669,7 @@ export function rebalanceFullCourtMinuteTargets(
   rosterIds: readonly string[],
   staffTargets: Readonly<Record<string, number>>,
   lastMinutesEdit: string | null,
+  lockedIds: ReadonlySet<string> = new Set(),
 ): Record<string, number> {
   const pinned = [...draft.startingFive, ...(draft.closingFive ?? [])];
   const targets = Object.fromEntries(
@@ -682,11 +683,13 @@ export function rebalanceFullCourtMinuteTargets(
   );
   let remaining =
     FULL_COURT_MINUTE_TOTAL - Object.values(targets).reduce((sum, value) => sum + value, 0);
-  const order = [...rosterIds].sort(
-    (left, right) =>
-      Number(left === lastMinutesEdit) - Number(right === lastMinutesEdit) ||
-      (staffTargets[right] ?? 0) - (staffTargets[left] ?? 0),
-  );
+  const order = [...rosterIds]
+    .filter((id) => !lockedIds.has(id))
+    .sort(
+      (left, right) =>
+        Number(left === lastMinutesEdit) - Number(right === lastMinutesEdit) ||
+        (staffTargets[right] ?? 0) - (staffTargets[left] ?? 0),
+    );
   const step = Math.sign(remaining);
   while (remaining !== 0) {
     let changed = false;

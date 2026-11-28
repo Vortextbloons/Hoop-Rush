@@ -103,13 +103,25 @@ export function expectedStealShare(stealAbility: number, profile: EraSimulationP
     ),
   );
 }
-export function projectExpectedLedger(input: {
+interface LedgerMatchup {
   team: SimulationTeam;
   prep: TeamPrep;
   opponent: SimulationTeam;
   opponentPrep: TeamPrep;
   profile: EraSimulationProfile;
-}): ExpectedLedgerResult {
+  adjustments?: readonly [LedgerAdjustments, LedgerAdjustments];
+}
+
+export function projectExpectedLedger(input: LedgerMatchup): ExpectedLedgerResult {
+  return computeExpectedLedger(input, false);
+}
+
+export function projectExpectedPoints(input: LedgerMatchup): readonly [number, number] {
+  const { offense, defense } = computeExpectedLedger(input, true);
+  return [offense.ledger.points, defense.ledger.points];
+}
+
+function computeExpectedLedger(input: LedgerMatchup, pointsOnly: boolean): ExpectedLedgerResult {
   const { team, prep, opponent, opponentPrep, profile } = input;
   const eraPoss = eraPossEstimatePerTrip(profile) ?? 1;
   const passingAnchorFactor = 0.5 + (profile.parameters.assistAnchorRating - 50) / 100;
@@ -121,6 +133,8 @@ export function projectExpectedLedger(input: {
     profile,
     eraPoss,
     passingAnchorFactor,
+    adjustments: input.adjustments?.[0],
+    pointsOnly,
   });
   const defense = computeSide({
     side: opponent,
@@ -130,6 +144,8 @@ export function projectExpectedLedger(input: {
     profile,
     eraPoss,
     passingAnchorFactor,
+    adjustments: input.adjustments?.[1],
+    pointsOnly,
   });
   const offenseSteals = defense.turnoverCauses.expectedSteals;
   const defenseSteals = offense.turnoverCauses.expectedSteals;
@@ -138,6 +154,11 @@ export function projectExpectedLedger(input: {
     defense: { ...defense, ledger: { ...defense.ledger, steals: defenseSteals } },
   };
 }
+interface LedgerAdjustments {
+  readonly make: number;
+  readonly turnover: number;
+}
+
 function computeSide(input: {
   side: SimulationTeam;
   opponent: SimulationTeam;
@@ -146,12 +167,21 @@ function computeSide(input: {
   profile: EraSimulationProfile;
   eraPoss: number;
   passingAnchorFactor: number;
+  adjustments: LedgerAdjustments | undefined;
+  pointsOnly: boolean;
 }): LedgerSide {
   const { side, opponent, prep, opponentPrep, profile, eraPoss, passingAnchorFactor } = input;
   const players = side.players;
   const initiatorShares = normalizedWeights(prep.initiatorWeights);
   const turnoverRates = players.map((player) =>
-    turnoverProbability(player, opponentPrep.pressure, eraPoss, profile),
+    turnoverProbability(
+      player,
+      opponentPrep.pressure,
+      eraPoss,
+      profile,
+      0,
+      input.adjustments?.turnover,
+    ),
   );
   const turnoverMass = initiatorShares.reduce(
     (sum, share, index) => sum + share * (turnoverRates[index] ?? 0),
@@ -366,6 +396,8 @@ function computeSide(input: {
       action,
       REGULATION_START_SECONDS,
       shotPrepAt(shotPrepByIndex, prep, shooter, shooterIndex),
+      0,
+      input.adjustments?.make,
     );
     const foulPKey = (shooterIndex * playerCount + defenderIndex) * zoneCount + zoneIndex;
     let foulP = foulPSeen[foulPKey] === 1 ? foulPFlat[foulPKey] : undefined;
@@ -443,6 +475,7 @@ function computeSide(input: {
     internal.defensiveReboundChances += liveFtMiss + deadFtMiss;
     internal.offensiveRebounds += liveFtMiss * rimOrebP;
     internal.defensiveRebounds += liveFtMiss * (1 - rimOrebP) + deadFtMiss;
+    if (input.pointsOnly) continue;
     const passedMass = passedMassByKey[keyIndex] ?? 0;
     if (passedMass > 0) {
       const totalPassed = passedMass;

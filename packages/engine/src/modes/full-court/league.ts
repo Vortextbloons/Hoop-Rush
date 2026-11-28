@@ -65,12 +65,14 @@ export function buildFullCourtHistoricalField(input: {
   readonly field: readonly CapRushLeagueField[];
   readonly catalog: SeasonDraftCatalog;
   readonly runSeed: Seed;
+  readonly variedStrength?: boolean;
 }): readonly FullCourtHistoricalTeam[] {
-  const { field, catalog, runSeed } = input;
+  const { field, catalog, runSeed, variedStrength } = input;
   const seasons = groupHistoricalRosters(catalog);
-  const target = historicalLeagueStrengthTarget(
-    createRng(havocInstanceSeed(runSeed, 'full-court-league-strength-v1')),
-  );
+  const strengthRng = createRng(havocInstanceSeed(runSeed, 'full-court-league-strength-v1'));
+  const target = variedStrength
+    ? 62 + strengthRng.next() * 30
+    : historicalLeagueStrengthTarget(strengthRng);
   return field.map((team) => {
     const years = seasons.get(team.teamId) ?? new Map<SeasonKey, readonly SeasonDraftCandidate[]>();
     const choices = [...years]
@@ -97,10 +99,16 @@ export function buildFullCourtHistoricalField(input: {
     if (choices.length === 0) {
       throw new Error(`Full Court has no historical rotation for ${team.teamId}`);
     }
-    const { seasonKey, players, starterVersionIds } = chooseHistoricalTeam(
-      choices,
-      createRng(havocInstanceSeed(runSeed, 'full-court-historical-field-v1', team.teamId)),
+    const rng = createRng(
+      havocInstanceSeed(runSeed, 'full-court-historical-field-v1', team.teamId),
     );
+    const nearest = Math.min(...choices.map((choice) => choice.distance));
+    const { seasonKey, players, starterVersionIds } = variedStrength
+      ? rng.weightedPick(
+          choices,
+          choices.map(({ distance }) => Math.exp(-(distance - nearest) / 4)),
+        )
+      : chooseHistoricalTeam(choices, rng);
     return { ...team, seasonKey, players, starterVersionIds };
   });
 }
