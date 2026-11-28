@@ -24,6 +24,7 @@
   import { onMount } from 'svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
+  import DialogShell from '#lib/components/DialogShell.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
@@ -44,6 +45,7 @@
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtPostseasonView from './FullCourtPostseasonView.svelte';
+  import FullCourtTeamDetail from './FullCourtTeamDetail.svelte';
   import {
     fullCourtFinalRecap,
     fullCourtGameDayReadiness,
@@ -111,6 +113,13 @@
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let selectedRound = $state<number | null>(null);
   let showAllLineups = $state(false);
+  let selectedTeamId = $state<string | null>(null);
+  const selectedTeam = $derived(
+    selectedTeamId === null ? null : (teamsById.get(selectedTeamId) ?? null),
+  );
+  const selectedTeamStanding = $derived(
+    selectedTeamId === null ? null : (standingsById.get(selectedTeamId) ?? null),
+  );
 
   onMount(() => {
     let mounted = true;
@@ -989,6 +998,7 @@
         rows={standings.west}
         {userTeamId}
         {manifest}
+        onTeamSelect={(teamId) => (selectedTeamId = teamId)}
       />
       <ConferenceStandingsTable
         conferenceLabel={CAP_RUSH_CONFERENCE_NAMES.east}
@@ -996,6 +1006,7 @@
         rows={standings.east}
         {userTeamId}
         {manifest}
+        onTeamSelect={(teamId) => (selectedTeamId = teamId)}
       />
     </div>
   </Panel>
@@ -1047,3 +1058,27 @@
     {@render latestResultPanel()}
   {/if}
 </div>
+
+<DialogShell
+  open={selectedTeam !== null}
+  onOpenChange={(open) => {
+    if (!open) selectedTeamId = null;
+  }}
+  size="xl"
+  layout="center"
+  headerClass="mb-4"
+>
+  {#snippet header()}
+    <p class="ui-label">Team detail</p>
+  {/snippet}
+  {#if selectedTeam !== null}
+    <FullCourtTeamDetail
+      team={selectedTeam}
+      standing={selectedTeamStanding}
+      {scores}
+      isUserTeam={selectedTeam.teamId === userTeamId}
+      {manifest}
+      {art}
+    />
+  {/if}
+</DialogShell>

@@ -509,7 +509,7 @@
   }
 </script>
 
-<div class="min-w-0 p-4 sm:p-5">
+<div class="coaching-view min-w-0 p-3 sm:p-5">
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
 
   <form
@@ -520,7 +520,7 @@
     novalidate
   >
     {#if !readOnly}
-      <div class="save-bar mb-3 rounded-lg border border-line-soft px-3 py-2">
+      <div class="save-bar mb-3 rounded-lg border border-line-soft px-3 py-2" class:dirty>
         <p class="save-state" aria-live="polite">
           {#if dirty}
             Unsaved changes
@@ -1309,8 +1309,18 @@
     text-transform: uppercase;
   }
   @media (max-width: 639px) {
+    .save-bar:not(.dirty) {
+      position: static;
+    }
     .save-state {
       flex-basis: 100%;
+    }
+    .coaching-view :global(.ui-segmented button),
+    summary {
+      min-height: 2.75rem;
+    }
+    summary {
+      align-content: center;
     }
   }
 </style>

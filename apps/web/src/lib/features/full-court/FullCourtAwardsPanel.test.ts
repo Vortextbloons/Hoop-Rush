@@ -111,8 +111,8 @@ describe('FullCourtAwardsPanel', () => {
     const body = render(FullCourtAwardsPanel, {
       props: { awards, rosterStats, userTeamId: 'usr' },
     }).body;
-    // Per-game is the default, so the note and the MIN header both read per game.
+    // Per-game is the default, so the note and the PTS header both read per game.
     expect(body).toContain('Per-game averages');
-    expect(body).toContain('MPG');
+    expect(body).toContain('PTS');
   });
 });

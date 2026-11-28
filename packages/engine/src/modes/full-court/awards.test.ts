@@ -347,7 +347,7 @@ describe('full-court awards and player stats', () => {
     const teams = [
       { teamId: 'team-a', displayName: 'Alpha', conference: 'east' as const, roster: [star] },
     ];
-    const standings: FullCourtStandings = { west: [], east: [] };
+    const standings: FullCourtStandings = { west: [], east: [], qualifiedTeamIds: [] };
     const awards = buildFullCourtAwards({
       teams,
       regularScores: [],
@@ -357,3 +357,5 @@ describe('full-court awards and player stats', () => {
     expect(awards.hasPlayerStats).toBe(false);
     expect(awards.mvp.winner).toBeNull();
     expect(awards.finalsMvp.winner).toBeNull();
+  });
+});

@@ -381,9 +381,8 @@
         caption="Lineup Lab"
         playerLabel="Lineup"
         stickyIdentity
-        tableClass="min-w-[36rem] text-xs"
-        statCellClass="px-2 py-1 text-right font-mono"
-        rowClass={() => 'border-b border-border/40'}
+        tableClass="min-w-[36rem] text-sm"
+        statCellClass="font-mono"
         columns={lineupColumns}
         rows={lineupReport.lineupRows}
         rowKey={(lineup) => lineup.key}
@@ -438,10 +437,8 @@
         ariaLabel={`${team.displayName} box score`}
         caption={`${team.displayName} box score`}
         stickyIdentity
-        tableClass="min-w-[54rem] text-xs"
-        statCellClass="px-2 py-1 text-right font-mono"
-        rowClass={() =>
-          isUserTeam ? 'border-b border-border/40 bg-primary/5' : 'border-b border-border/40'}
+        tableClass="min-w-[1080px] text-sm"
+        statCellClass="font-mono"
         totalsRow={totalsForTeam(team)}
         {columns}
         rows={team.players}

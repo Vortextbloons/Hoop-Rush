@@ -9,6 +9,7 @@ import {
 import {
   createFullCourtSeasonCheckpoint,
   fullCourtPlayoffView,
+  fullCourtStandings,
   type FullCourtSeasonLock,
 } from '@hoop-rush/engine';
 import { render } from 'svelte/server';
@@ -18,6 +19,7 @@ import type {
 } from './full-court-season-presenter';
 import { fullCourtTestPlayoffLock, fullCourtTestSeasonLock } from './full-court-test-support';
 import FullCourtSeasonView from './FullCourtSeasonView.svelte';
+import FullCourtTeamDetail from './FullCourtTeamDetail.svelte';
 
 const lock = fullCourtTestSeasonLock();
 const userTeamId = lock.season.userTeamId;
@@ -464,4 +466,34 @@ test('playoffs surfaces stored per-game opponent adjustments in the series list'
   });
   expect(body).toContain('Game 1 opponent adjustment: Protect paint');
   expect(body).toContain('Persistent inside scoring');
+});
+
+test('makes conference standings teams clickable and renders team detail stats', () => {
+  const leagueBody = renderView({ section: 'league' });
+  const opponent = lock.season.teams.find((team) => team.teamId !== userTeamId);
+  if (opponent === undefined) throw new Error('Expected an opponent team');
+
+  expect(leagueBody).toContain(`<button type="button"`);
+  expect(leagueBody).toContain(opponent.displayName);
+
+  const standings = fullCourtStandings(lock.season.teams, []);
+  const standing =
+    [...standings.west, ...standings.east].find((row) => row.teamId === opponent.teamId) ?? null;
+  const detailBody = render(FullCourtTeamDetail, {
+    props: {
+      team: opponent,
+      standing,
+      scores: [],
+      isUserTeam: false,
+    },
+  }).body;
+
+  expect(detailBody).toContain(opponent.displayName);
+  expect(detailBody).toContain('Roster &amp; season stats');
+  expect(detailBody).toContain('PPG');
+  expect(detailBody).toContain('OPP PPG');
+  expect(detailBody).toContain('ui-stats-table');
+  const firstPlayer = opponent.roster[0];
+  if (firstPlayer === undefined) throw new Error('Expected at least one player on opponent roster');
+  expect(detailBody).toContain(firstPlayer.displayName);
 });

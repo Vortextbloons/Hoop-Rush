@@ -203,6 +203,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <SegmentedControl
         label="War Room sections"
+        class="max-w-full flex-wrap max-sm:[&>button]:min-h-11"
         value={activeTab}
         onchange={(next) => (activeTab = next)}
         options={warRoomTabOptions}

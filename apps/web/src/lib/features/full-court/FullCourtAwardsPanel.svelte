@@ -72,7 +72,7 @@
     const rawStat = (total: number, games: number): string =>
       totals ? String(Math.round(total)) : games === 0 ? '0.0' : perGameText(total, games);
 
-    const core = seasonStatColumns<FullCourtPlayerSeasonRow>(
+    const columns = seasonStatColumns<FullCourtPlayerSeasonRow>(
       {
         games: (row) => row.games,
         points: (row) => stat(row.points, row.ppg, row.games),
@@ -101,27 +101,6 @@
       column.key === 'points' ? { ...column, cellClass: 'ui-stats-value-strong' } : column,
     );
 
-    const minutesColumn: PlayerStatColumn<FullCourtPlayerSeasonRow> = {
-      key: 'mpg',
-      label: totals ? 'MIN' : 'MPG',
-      value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
-    };
-    const foulsColumn: PlayerStatColumn<FullCourtPlayerSeasonRow> = {
-      key: 'fouls',
-      label: 'PF',
-      value: (row) => rawStat(row.fouls, row.games),
-    };
-
-    const gamesIndex = core.findIndex((column) => column.key === 'games');
-    const tovIndex = core.findIndex((column) => column.key === 'turnovers');
-    const withMinutes = [
-      ...core.slice(0, gamesIndex + 1),
-      minutesColumn,
-      ...core.slice(gamesIndex + 1, tovIndex + 1),
-      foulsColumn,
-      ...core.slice(tovIndex + 1),
-    ];
-
     if (statScope === 'leaders') {
       return [
         {
@@ -131,10 +110,10 @@
           value: (row) => franchiseAbbreviation(row.teamId),
           cellClass: 'text-muted-foreground',
         },
-        ...withMinutes,
+        ...columns,
       ];
     }
-    return withMinutes;
+    return columns;
   });
 
   const teamTotalsRow = $derived.by((): PlayerStatsTotals<FullCourtPlayerSeasonRow> | null => {
@@ -465,13 +444,9 @@
     rows={tableRows.length > 0 ? tableRows : null}
     columns={statColumns}
     totalsRow={teamTotalsRow}
-    tableClass="min-w-[1060px] text-xs"
-    statCellClass="px-2 py-1 text-right font-mono"
+    tableClass="min-w-[1080px] text-sm"
+    statCellClass="font-mono"
     rowKey={(row) => row.teamId + row.playerId}
-    rowClass={(row) =>
-      row.teamId === userTeamId
-        ? 'border-b border-border/40 bg-primary/5'
-        : 'border-b border-border/40'}
     caption={`${statValues === 'totals' ? 'Season totals' : 'Per-game season averages'} for ${
       statScope === 'team' ? 'your roster' : 'league leaders'
     }`}
@@ -493,7 +468,7 @@
       <span class="ui-stats-player">
         <FullCourtPortrait player={row} {art} size="sm" />
         <span class="ui-stats-player-text">
-          <span class="ui-stats-player-name {row.teamId === userTeamId ? 'text-primary' : ''}">
+          <span class="ui-stats-player-name">
             {row.displayName}
           </span>
           <span class="ui-stats-player-meta">
