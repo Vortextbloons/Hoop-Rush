@@ -3,15 +3,8 @@
     FullCourtDefensiveMatchupAssignment,
     FullCourtDraftState,
     FullCourtPracticeReport,
-    FullCourtReportTarget,
   } from '@hoop-rush/data-contracts';
   import {
-    fullCourtReportPriceDollars,
-    fullCourtReportScope,
-    fullCourtReportTargetKey,
-  } from '@hoop-rush/data-contracts';
-  import {
-    fullCourtAssessPurchase,
     fullCourtLeagueWeaknesses,
     fullCourtWarChestDollars,
     type FullCourtCatalogIndex,
@@ -19,10 +12,8 @@
     type FullCourtPlayoffOpponentPreview,
     type FullCourtRegularSeason,
   } from '@hoop-rush/engine';
-  import { Film } from '@lucide/svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
-  import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
@@ -35,10 +26,8 @@
   import type { FullCourtArt } from './full-court-art.ts';
   import type { FullCourtMatchupEditorContext } from './full-court-matchup-presenter.ts';
 
-  type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
   type WarRoomTab = 'all' | 'fit' | 'camp' | 'film' | 'matchups';
 
-  const FILM_PRICE = fullCourtReportPriceDollars('opponent-film');
   let activeTab = $state<WarRoomTab>('all');
   let showAllOpponents = $state(false);
 
@@ -85,11 +74,8 @@
     draft,
     index,
     season,
-    nextFilmTarget,
     playoffPreview = null,
     busy,
-    onPurchaseReport,
-    preseasonOpen = true,
     practiceOpen = false,
     practice = null,
     onRunPractice = () => undefined,
@@ -101,11 +87,8 @@
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
     season: FullCourtRegularSeason;
-    nextFilmTarget: Extract<FullCourtReportTarget, { kind: 'opponent-film' }> | null;
     playoffPreview?: FullCourtPlayoffOpponentPreview | null;
     busy: boolean;
-    onPurchaseReport: (target: FullCourtReportTarget) => void;
-    preseasonOpen?: boolean;
     practiceOpen?: boolean;
     practice?: FullCourtPracticeReport | null;
     onRunPractice?: (opponentTeamId?: string) => void;
@@ -115,7 +98,6 @@
     art?: FullCourtArt | null;
   } = $props();
 
-  const locked = $derived(draft.stage === 'complete');
   const fitOwned = $derived((draft.reports ?? []).some((report) => report.kind === 'lineup-fit'));
   const campOwned = $derived(
     (draft.reports ?? []).some((report) => report.kind === 'training-camp'),
@@ -169,32 +151,12 @@
     showAllOpponents ? allOpponentWeaknesses : allOpponentWeaknesses.slice(0, 8),
   );
 
-  function purchaseAffordance(assessment: PurchaseAssessment): string {
-    if (assessment.legal) {
-      return `${formatMillions(assessment.warChestAfterPurchase)} budget after the purchase.`;
-    }
-    if (assessment.reason === 'completion') {
-      return 'No legal roster finish remains after this purchase.';
-    }
-    if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
-    }
-    return 'Budget cannot cover this report.';
-  }
-
   function percentText(value: number): string {
     return `${Number.isInteger(value) ? String(value) : value.toFixed(1)}%`;
   }
 
   function minutesText(value: number): string {
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
-  }
-
-  function buyFilm(): void {
-    if (busy || !locked || !preseasonOpen || leagueFilmRecord !== null) return;
-    const assessment = fullCourtAssessPurchase({ index, state: draft, priceDollars: FILM_PRICE });
-    if (!assessment.legal) return;
-    onPurchaseReport({ kind: 'opponent-film' });
   }
 </script>
 
@@ -220,33 +182,21 @@
           size="sm"
           surface="tile"
           tone={fitOwned ? 'default' : 'muted'}
-          value={fitOwned
-            ? 'Owned'
-            : preseasonOpen
-              ? formatMillions(fullCourtReportPriceDollars('lineup-fit'))
-              : 'Closed'}
+          value={fitOwned ? 'Owned' : 'Not purchased'}
         />
         <StatTile
           label="Training Camp"
           size="sm"
           surface="tile"
           tone={campOwned ? 'default' : 'muted'}
-          value={campOwned
-            ? 'Booked'
-            : practiceOpen
-              ? formatMillions(fullCourtReportPriceDollars('training-camp'))
-              : 'Closed'}
+          value={campOwned ? 'Booked' : 'Not purchased'}
         />
         <StatTile
           label="Opponent Film"
           size="sm"
           surface="tile"
           tone={leagueFilmRecord !== null ? 'default' : 'muted'}
-          value={leagueFilmRecord !== null
-            ? 'Owned'
-            : preseasonOpen
-              ? formatMillions(FILM_PRICE)
-              : 'Closed'}
+          value={leagueFilmRecord !== null ? 'Owned' : 'Not purchased'}
         />
       </StatGrid>
     </div>
@@ -254,65 +204,25 @@
 
   <div class="grid gap-3 {activeTab === 'all' ? 'xl:grid-cols-2 xl:items-start' : ''}">
     <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'fit'}>
-      <FullCourtRosterFitPanel
-        {draft}
-        {index}
-        {busy}
-        {onPurchaseReport}
-        purchasable={preseasonOpen}
-        {art}
-      />
+      <FullCourtRosterFitPanel {draft} {art} />
     </div>
 
     <div class="space-y-3" hidden={activeTab !== 'all' && activeTab !== 'camp'}>
-      {#if practiceOpen || practice !== null}
-        <FullCourtTrainingCampPanel
-          {draft}
-          {index}
-          {busy}
-          campOpen={practiceOpen}
-          {practiceOpen}
-          {practice}
-          opponents={leagueOpponents}
-          {onPurchaseReport}
-          {onRunPractice}
-          {art}
-        />
-      {:else}
-        <details class="rounded-xl border border-line-soft bg-surface-1/60 px-4 py-2.5">
-          <summary
-            class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
-          >
-            Training Camp · Closed
-          </summary>
-          <div class="mt-2">
-            <FullCourtTrainingCampPanel
-              {draft}
-              {index}
-              {busy}
-              campOpen={false}
-              practiceOpen={false}
-              {practice}
-              opponents={leagueOpponents}
-              {onPurchaseReport}
-              {onRunPractice}
-              {art}
-            />
-          </div>
-        </details>
-      {/if}
+      <FullCourtTrainingCampPanel
+        {draft}
+        {busy}
+        {practiceOpen}
+        {practice}
+        opponents={leagueOpponents}
+        {onRunPractice}
+        {art}
+      />
     </div>
   </div>
 
   <div hidden={activeTab !== 'all' && activeTab !== 'film'}>
     <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
-      <SectionHeading
-        eyebrow="War Room"
-        title="League opponent film"
-        level={2}
-        size="md"
-        description="One-time upgrade scanning all league opponents to surface the biggest contenders and their weaknesses."
-      >
+      <SectionHeading eyebrow="War Room" title="League opponent film" level={2} size="md">
         {#snippet actions()}
           {#if leagueFilmRecord !== null}
             <div class="flex items-center gap-2">
@@ -372,9 +282,7 @@
           {/each}
         </div>
       {:else if !preseasonOpen}
-        <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-          League opponent film closed before game 1. Preseason purchases are no longer available.
-        </p>
+        <p class="mt-3 text-xs text-muted-foreground">Closed before game 1.</p>
       {:else}
         {@const filmPurchase = fullCourtAssessPurchase({
           index,

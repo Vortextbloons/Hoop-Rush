@@ -377,7 +377,7 @@ export function resolveFullCourtBlueprintHierarchy(options: {
       ref.kind === 'starter-slot' ? slots.starters[ref.slot] : slots.bench[ref.benchIndex];
     if (
       slotPlayer !== undefined &&
-      !usedPlayerIds.has(slotPlayer.playerId) &&
+      (role === 'floorGeneral' || !usedPlayerIds.has(slotPlayer.playerId)) &&
       isCompatibleForRole(slotPlayer, role, ref)
     ) {
       usedPlayerIds.add(slotPlayer.playerId);

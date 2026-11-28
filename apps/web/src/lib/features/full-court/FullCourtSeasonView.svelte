@@ -387,13 +387,14 @@
   {/if}
 
   <div
-    class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4"
+    class="mt-4 flex flex-col gap-2.5 border-t border-line-soft pt-4 lg:flex-row lg:items-center lg:gap-3"
     aria-busy={busy}
   >
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
       {#if controls.primary !== null}
         <Button
           tone="primary"
+          class="flex-1 whitespace-nowrap sm:flex-initial"
           disabled={busy}
           onclick={() => {
             if (controls.primary !== null) runAction(controls.primary);
@@ -407,25 +408,32 @@
           {controls.primary.label}
         </Button>
       {/if}
-      {#if onWatchNextGame !== undefined && controls.primary?.kind === 'sim' && matchup?.userSide && nextBracketGameHasUser}
-        <Button tone="secondary" disabled={busy || pendingForfeit} onclick={onWatchNextGame}>
-          Watch next game
-        </Button>
-      {/if}
       {#if onEditGamePlan !== undefined && section === 'home'}
-        <Button tone="secondary" disabled={busy} onclick={onEditGamePlan}>Edit game plan</Button>
+        <Button
+          size="sm"
+          tone="secondary"
+          class="flex-1 whitespace-nowrap sm:flex-initial"
+          disabled={busy}
+          onclick={onEditGamePlan}>Edit game plan</Button
+        >
       {/if}
     </div>
 
     {#if controls.secondary.length > 0}
       <div
-        class="flex flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
         role="group"
         aria-label="Batch simulation"
       >
-        <span class="ui-micro px-2 text-muted-foreground">Skip</span>
+        <span class="ui-micro shrink-0 px-2 text-muted-foreground">Skip</span>
         {#each controls.secondary as action (action.label)}
-          <Button size="sm" tone="secondary" disabled={busy} onclick={() => runAction(action)}>
+          <Button
+            size="sm"
+            tone="secondary"
+            class="flex-1 whitespace-nowrap"
+            disabled={busy}
+            onclick={() => runAction(action)}
+          >
             {#if action.count >= 5}
               <FastForward size={13} aria-hidden="true" />
             {:else}
@@ -438,17 +446,25 @@
     {/if}
   </div>
 
-  <p class="mt-2 text-[11px] text-muted-foreground" role="status">
-    {controls.status}
-  </p>
+  {#if controls.status}
+    <p class="mt-2 text-[11px] text-muted-foreground" role="status">
+      {controls.status}
+    </p>
+  {/if}
 
   {#if notice !== null && !busy}
-    <Alert class="mt-3" tone={notice.tone} title={notice.title}>
-      <p>{notice.message}</p>
-      {#snippet actions()}
-        <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
-      {/snippet}
-    </Alert>
+    {#if notice.stop.kind === 'injury'}
+      <Alert class="mt-3" tone={notice.tone} title={notice.title}>
+        <p>{notice.message}</p>
+        {#snippet actions()}
+          <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
+        {/snippet}
+      </Alert>
+    {:else}
+      <p class="mt-2 text-xs font-medium text-muted-foreground" role="status">
+        <span class="font-semibold text-foreground">{notice.title}</span> · {notice.message}
+      </p>
+    {/if}
   {/if}
 
   {#if pendingForfeit}
@@ -521,10 +537,6 @@
           </Badge>
         {/snippet}
       </SectionHeading>
-      <p class="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-        {recap.message}
-      </p>
-
       <div
         class="mt-4 flex items-center gap-4 rounded-xl border border-accent/50 bg-accent/10 p-4"
         role="status"
@@ -534,13 +546,6 @@
           <p class="ui-label text-accent">Champion</p>
           <p class="font-display text-2xl font-extrabold tracking-tight uppercase">
             {recap.championName}
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {#if recap.userChampion}
-              Your five took the title.
-            {:else}
-              Your run is over; the bracket finished without you.
-            {/if}
           </p>
         </div>
       </div>
@@ -811,19 +816,9 @@
         </Badge>
       {/snippet}
     </SectionHeading>
-    <p class="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-      {#if seasonStats.regular.playedGames === 0}
-        No played games yet. Scoring averages and lineup samples appear after your first result.
-      {:else}
-        Based on {seasonStats.regular.playedGames} played regular-season
-        {seasonStats.regular.playedGames === 1 ? 'game' : 'games'}{seasonStats.playoff.playedGames >
-        0
-          ? ` and ${seasonStats.playoff.playedGames} played playoff ${seasonStats.playoff.playedGames === 1 ? 'game' : 'games'}`
-          : ''}.
-      {/if}
-      Forfeits ({seasonStats.regular.forfeitGames + seasonStats.playoff.forfeitGames}) are excluded
-      from scoring, efficiency, and lineup samples.
-    </p>
+    {#if seasonStats.regular.playedGames === 0}
+      <p class="mt-2 text-xs text-muted-foreground">No played games yet.</p>
+    {/if}
     <StatGrid class="mt-4" columns={4} mobile={2}>
       <StatTile
         label="Points / game"
@@ -883,8 +878,7 @@
         ? seasonStats.lineups.rows
         : seasonStats.lineups.rows.slice(0, 8)}
       <p class="mt-2 text-xs text-muted-foreground">
-        5-man unit performance across played games. Units with fewer than
-        {seasonStats.lineups.sampleThreshold} possessions are marked with *.
+        * below {seasonStats.lineups.sampleThreshold} possessions.
       </p>
       <div class="ui-stats-scroll mt-3">
         <PlayerStatsTable
@@ -960,22 +954,8 @@
           </Button>
         </div>
       {/if}
-      {#if seasonStats.lineups.omitted.lineups > 0}
-        <p class="mt-2 text-xs text-muted-foreground">
-          {seasonStats.lineups.omitted.lineups} low-usage
-          {seasonStats.lineups.omitted.lineups === 1 ? 'lineup was' : 'lineups were'} omitted from the
-          table in {seasonStats.lineups.omitted.games}
-          {seasonStats.lineups.omitted.games === 1 ? 'game' : 'games'}; their minutes and points
-          remain in the coverage totals, not in a row.
-        </p>
-      {/if}
     {:else if seasonStats.lineups.gamesExpected > 0}
-      <Alert class="mt-3" tone="info" title="No lineup facts in this save">
-        <p>
-          This save has played games but no recorded lineup samples yet. Lineup detail is recorded
-          for newly simulated user games; bench totals above still use the saved compact results.
-        </p>
-      </Alert>
+      <Alert class="mt-3" tone="info" title="No lineup facts in this save"></Alert>
     {:else}
       <p class="mt-2 text-xs text-muted-foreground">Play a game to record the first actual five.</p>
     {/if}
@@ -1021,11 +1001,6 @@
         {/if}
       {/snippet}
     </SectionHeading>
-    <p class="mt-2 text-xs text-muted-foreground">
-      Seeds 1–{CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS} in each conference qualify. Ties break on wins, then
-      head-to-head record among tied teams, then conference record, point differential, points scored
-      and stable team id.
-    </p>
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <ConferenceStandingsTable
         conferenceLabel={CAP_RUSH_CONFERENCE_NAMES.west}
@@ -1082,11 +1057,6 @@
         level={2}
         size="md"
       />
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        {remaining}
-        {remaining === 1 ? 'regular-season game remains' : 'regular-season games remain'} before the top
-        eight in each conference are seeded.
-      </p>
     </Panel>
   {:else}
     {@render homePanel()}

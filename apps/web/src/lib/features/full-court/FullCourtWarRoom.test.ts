@@ -178,8 +178,7 @@ describe('FullCourtWarRoom', () => {
       preseasonOpen: false,
     });
 
-    expect(body).toContain('Roster fit closed before game 1.');
-    expect(body).toContain('League opponent film closed before game 1.');
+    expect(body).toContain('Closed before game 1.');
     expect(body).not.toContain('Buy roster fit');
     expect(body).not.toContain('Buy opponent film');
   });
@@ -211,7 +210,7 @@ describe('FullCourtWarRoom', () => {
     expect(open).toContain('aria-label="Full Court War Room training camp"');
     expect(open).toContain('Book training camp');
     expect(open).toContain('$5M');
-    expect(open).not.toContain('Training camp closed before game 1.');
+    expect(open).not.toContain('Closed before game 1.');
 
     const closed = renderWarRoom({
       draft,
@@ -220,7 +219,7 @@ describe('FullCourtWarRoom', () => {
       nextFilmTarget,
       practiceOpen: false,
     });
-    expect(closed).toContain('Training camp closed before game 1.');
+    expect(closed).toContain('Closed before game 1.');
     expect(closed).not.toContain('Book training camp');
   });
 

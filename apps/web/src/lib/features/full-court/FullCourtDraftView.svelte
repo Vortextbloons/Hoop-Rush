@@ -4,7 +4,7 @@
     CapRushSourcePlayer,
     FullCourtDraftState,
     FullCourtOfferCard,
-    FullCourtReportTarget,
+    FullCourtReportKind,
     Position,
   } from '@hoop-rush/data-contracts';
   import {
@@ -12,15 +12,10 @@
     FULL_COURT_MIN_ROSTER_SIZE,
     POSITIONS,
     franchiseAbbreviation,
-    fullCourtReportPriceDollars,
   } from '@hoop-rush/data-contracts';
-  import {
-    fullCourtAssessPurchase,
-    fullCourtSalaryDollarsOf,
-    type FullCourtCatalogIndex,
-  } from '@hoop-rush/engine';
+  import { fullCourtSalaryDollarsOf, type FullCourtCatalogIndex } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, ChevronDown, FileSearch, Lock, Users, X } from '@lucide/svelte';
+  import { Check, ChevronDown, Lock, Users, X } from '@lucide/svelte';
   import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
   import type { ProfileTab } from '#lib/components/PlayerProfileSheet.svelte';
@@ -73,7 +68,6 @@
     onPick,
     onRemove,
     onFinish,
-    onPurchaseReport,
     onAbandon,
   }: {
     draft: FullCourtDraftState;
@@ -82,7 +76,6 @@
     onPick: (versionId: string) => void;
     onRemove: (versionId: string) => void;
     onFinish: () => void;
-    onPurchaseReport?: (target: FullCourtReportTarget) => void;
     onAbandon?: () => void;
   } = $props();
 
@@ -196,13 +189,17 @@
    * One scouting report covers the whole draft. Owning it unlocks Show playstyle
    * on every card and in the inspector; the price is run-wide.
    */
-  const scoutingPrice = fullCourtReportPriceDollars('player-scouting');
-  const scoutingOwned = $derived(
-    (draft.reports ?? []).some((report) => report.kind === 'player-scouting'),
-  );
-  const scoutingAssessment = $derived(
-    fullCourtAssessPurchase({ index, state: draft, priceDollars: scoutingPrice }),
-  );
+  const PERK_LABELS: readonly { kind: FullCourtReportKind; label: string }[] = [
+    { kind: 'player-scouting', label: 'Scouting' },
+    { kind: 'lineup-fit', label: 'Roster fit' },
+    { kind: 'opponent-film', label: 'Opponent film' },
+    { kind: 'training-camp', label: 'Training camp' },
+  ];
+  const ownedPerks = $derived.by(() => {
+    const owned = new Set((draft.reports ?? []).map((report) => report.kind));
+    return PERK_LABELS.filter((perk) => owned.has(perk.kind));
+  });
+  const scoutingOwned = $derived(ownedPerks.some((perk) => perk.kind === 'player-scouting'));
   const selectedProfile = $derived.by(() => {
     if (profileVersionId === null) return null;
     const player = index.byVersionId.get(profileVersionId);
@@ -306,21 +303,6 @@
     profileTab = tab;
   }
 
-  function scoutingBlocker(): string | null {
-    if (scoutingAssessment.legal) return null;
-    if (scoutingAssessment.reason === 'completion') return 'No legal roster finish remains';
-    if (scoutingAssessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatMillions(scoutingAssessment.minimumCompletionDollars)} to finish`;
-    }
-    return 'Budget short';
-  }
-
-  function buyScoutingReport(): void {
-    if (onPurchaseReport === undefined || busy || scoutingOwned) return;
-    if (!scoutingAssessment.legal) return;
-    onPurchaseReport({ kind: 'player-scouting' });
-  }
-
   function rowActionLabel(row: FullCourtCatalogRow): string {
     if (row.onRoster) return 'Signed';
     if (row.playerRostered) return 'Rostered';
@@ -356,17 +338,15 @@
           Build your roster
         {/if}
       </h1>
-      <p class="mt-1.5 max-w-2xl text-sm text-muted-foreground">
-        {#if complete}
-          Roster locked. Review your payroll and remaining budget before tip-off.
-        {:else if roundOffer !== null}
-          Positionless 10-player draw sorted by overall. Sign 6 to 12 players under the
-          {formatMillions(draft.money.hardLimitDollars)} hard limit.
-        {:else}
-          Draft 6 to 12 players under the cap. Select any player to inspect playstyle, cap impact,
-          and scouting.
-        {/if}
-      </p>
+      {#if !complete}
+        <p class="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+          {#if roundOffer !== null}
+            Sign 6–12 players under the {formatMillions(draft.money.hardLimitDollars)} hard limit.
+          {:else}
+            Sign 6–12 under the cap.
+          {/if}
+        </p>
+      {/if}
     </div>
 
     <div class="w-full max-w-56">
@@ -403,174 +383,119 @@
   </header>
 
   <div class="mt-4 space-y-3">
-    <Panel as="section" class="px-4 py-2.5 sm:px-5 sm:py-3" aria-label="Draft payroll and budget">
-      <details>
-        <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold">
-          Payroll {formatMillions(summary.payrollDollars)} · Budget {formatMillions(
-            summary.warChestDollars,
-          )}
-        </summary>
-        <div class="pb-2 pt-2">
-          <div
-            class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
-          >
-            <div class="flex items-center justify-between gap-3 lg:block">
-              <div>
-                <p class="ui-label text-muted-foreground">Player payroll</p>
-                <p
-                  class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums {summary.status ===
-                  'illegal'
-                    ? 'text-negative'
-                    : ''}"
-                >
-                  {formatMillions(summary.payrollDollars)}
-                </p>
-              </div>
-              <span
-                class="inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.1em] uppercase lg:mt-1 {statusSummaryTone(
-                  summary.status,
-                )}">{capStatusLabel(summary.status)}</span
-              >
-            </div>
-
-            <div class="min-w-0">
-              <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
-                <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}
-                ></span>
-                <span
-                  class="absolute inset-y-0 bg-accent/70"
-                  style:left={`${capPct}%`}
-                  style:width={`${firstApronPct - capPct}%`}
-                ></span>
-                <span
-                  class="absolute inset-y-0 bg-primary/70"
-                  style:left={`${firstApronPct}%`}
-                  style:width={`${100 - firstApronPct}%`}
-                ></span>
-                {#if payrollPct > 0}
-                  <span
-                    class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
-                    style:left={`calc(${payrollPct}% - 1px)`}
-                  ></span>
-                {/if}
-              </div>
-              <div
-                class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
-              >
-                <span class="flex justify-between" style:width={`${capPct}%`}>
-                  <span>$0</span><span>{formatMillions(draft.money.capLineDollars)}</span>
-                </span>
-                <span
-                  class="invisible text-center sm:visible"
-                  style:width={`${firstApronPct - capPct}%`}
-                >
-                  {formatMillions(draft.money.firstApronDollars)}
-                </span>
-                <span class="text-right" style:width={`${100 - firstApronPct}%`}>
-                  {formatMillions(draft.money.hardLimitDollars)}
-                </span>
-              </div>
-            </div>
-
-            <StatGrid columns={3} mobile={3}>
-              <StatTile
-                label="Room"
-                size="sm"
-                surface="tile"
-                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-                tone={summary.payrollRoomDollars < 0 ? 'negative' : 'default'}
-                value={formatMillions(summary.payrollRoomDollars)}
-              />
-              <StatTile
-                label="Budget"
-                size="sm"
-                surface="tile"
-                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-                tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
-                value={formatMillions(summary.warChestDollars)}
-              />
-              <StatTile
-                label="Spent"
-                size="sm"
-                surface="tile"
-                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-                value={formatMillions(summary.spentDollars)}
-              />
-            </StatGrid>
-          </div>
-
-          <div
-            class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
-          >
-            <p class="text-[11px] font-bold">{depthLabel}</p>
-            <p class="ui-micro">
-              {FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players
-            </p>
-          </div>
-        </div>
-      </details>
-    </Panel>
-
-    {#if onPurchaseReport !== undefined && !complete}
-      <Panel
-        as="section"
-        padding="sm"
-        aria-label="Scouting report"
-        class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
+    <Panel as="section" class="px-4 py-3 sm:px-5 sm:py-3.5" aria-label="Draft payroll and budget">
+      <div
+        class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
       >
-        <div class="flex min-w-0 items-center gap-2.5">
+        <div class="flex items-center justify-between gap-3 lg:block">
+          <div>
+            <p class="ui-label text-muted-foreground">Player payroll</p>
+            <p
+              class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums {summary.status ===
+              'illegal'
+                ? 'text-negative'
+                : ''}"
+            >
+              {formatMillions(summary.payrollDollars)}
+            </p>
+          </div>
           <span
-            class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border {scoutingOwned
-              ? 'border-positive/40 bg-positive/10 text-positive'
-              : 'border-line-soft bg-surface-1 text-accent'}"
-            aria-hidden="true"
+            class="inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.1em] uppercase lg:mt-1 {statusSummaryTone(
+              summary.status,
+            )}">{capStatusLabel(summary.status)}</span
           >
-            {#if scoutingOwned}
-              <Check size={15} />
-            {:else}
-              <FileSearch size={15} />
+        </div>
+
+        <div class="min-w-0">
+          <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
+            <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}
+            ></span>
+            <span
+              class="absolute inset-y-0 bg-accent/70"
+              style:left={`${capPct}%`}
+              style:width={`${firstApronPct - capPct}%`}
+            ></span>
+            <span
+              class="absolute inset-y-0 bg-primary/70"
+              style:left={`${firstApronPct}%`}
+              style:width={`${100 - firstApronPct}%`}
+            ></span>
+            {#if payrollPct > 0}
+              <span
+                class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
+                style:left={`calc(${payrollPct}% - 1px)`}
+              ></span>
             {/if}
-          </span>
-          <div class="min-w-0">
-            <p class="font-display text-sm leading-tight font-extrabold uppercase">
-              {scoutingOwned ? 'Scouting report active' : 'Scouting report'}
-            </p>
-            <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              {#if scoutingOwned}
-                Usage, role, shot profile, and strengths for every player in this draft. Playstyle
-                is always free.
-              {:else}
-                One {formatMillions(scoutingPrice)} purchase reveals usage, role, and shot profile for
-                every player in this draft. Playstyle stays free either way.
-              {/if}
-            </p>
+          </div>
+          <div
+            class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
+          >
+            <span class="flex justify-between" style:width={`${capPct}%`}>
+              <span>$0</span><span>{formatMillions(draft.money.capLineDollars)}</span>
+            </span>
+            <span
+              class="invisible text-center sm:visible"
+              style:width={`${firstApronPct - capPct}%`}
+            >
+              {formatMillions(draft.money.firstApronDollars)}
+            </span>
+            <span class="text-right" style:width={`${100 - firstApronPct}%`}>
+              {formatMillions(draft.money.hardLimitDollars)}
+            </span>
           </div>
         </div>
-        {#if !scoutingOwned}
-          <div class="flex items-center gap-2">
-            {#if scoutingBlocker() !== null}
-              <span class="font-mono text-[10px] font-semibold text-negative"
-                >{scoutingBlocker()}</span
-              >
-            {/if}
-            <Button
-              size="sm"
-              tone={scoutingAssessment.legal ? 'secondary' : 'ghost'}
-              disabled={busy || !scoutingAssessment.legal}
-              aria-label={`Buy the ${formatMillions(scoutingPrice)} scouting report`}
-              onclick={buyScoutingReport}
-            >
-              <FileSearch size={13} aria-hidden="true" />
-              Buy · {formatMillions(scoutingPrice)}
-            </Button>
-          </div>
-        {/if}
-      </Panel>
-    {/if}
+
+        <StatGrid columns={3} mobile={3}>
+          <StatTile
+            label="Room"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            tone={summary.payrollRoomDollars < 0 ? 'negative' : 'default'}
+            value={formatMillions(summary.payrollRoomDollars)}
+          />
+          <StatTile
+            label="Budget"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
+            value={formatMillions(summary.warChestDollars)}
+          />
+          <StatTile
+            label="Spent"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            value={formatMillions(summary.spentDollars)}
+          />
+        </StatGrid>
+      </div>
+
+      <div
+        class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
+      >
+        <p class="text-[11px] font-bold">{depthLabel}</p>
+        <p class="ui-micro">
+          {FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players
+        </p>
+      </div>
+      <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <span class="ui-micro">
+          Run perks
+          {summary.perkSpendDollars > 0
+            ? `· ${formatMillions(summary.perkSpendDollars)} spent`
+            : '· none purchased'}
+        </span>
+        {#each ownedPerks as perk (perk.kind)}
+          <Badge tone="neutral">{perk.label}</Badge>
+        {/each}
+      </div>
+    </Panel>
 
     {#if roundOffer !== null && !complete}
       <section aria-label={`Round ${String(roundOffer.round + 1)} offer`}>
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {#each offerCards as { card, row } (card.player.playerVersionId)}
             {@const player = card.player}
             {@const team = teamFor(player)}
@@ -641,9 +566,7 @@
               <button
                 type="button"
                 disabled={!scoutingOwned}
-                title={scoutingOwned
-                  ? undefined
-                  : `Buy the ${formatMillions(scoutingPrice)} Scouting perk to unlock playstyle`}
+                title={scoutingOwned ? undefined : 'Scouting was not purchased at run setup'}
                 class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase transition-colors outline-none hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line-soft disabled:hover:text-muted-foreground sm:mx-2.5"
                 aria-expanded={scoutingOwned && expanded}
                 aria-controls={`${player.playerVersionId}-playstyle`}
@@ -732,7 +655,7 @@
                 </p>
               {/if}
 
-              {#if onPurchaseReport !== undefined && scoutingOwned}
+              {#if scoutingOwned}
                 <p
                   class="mx-2 mb-1.5 inline-flex items-center gap-1 font-mono text-[8px] font-bold text-positive uppercase sm:mx-2.5"
                 >
@@ -864,8 +787,8 @@
             </div>
           </Panel>
 
-          {#if onPurchaseReport !== undefined && (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
-            <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
+          {#if (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
+            <FullCourtRosterFitPanel {draft} {index} {busy} {art} />
           {/if}
         </div>
       </div>
@@ -1039,9 +962,7 @@
                 <button
                   type="button"
                   disabled={!scoutingOwned}
-                  title={scoutingOwned
-                    ? undefined
-                    : `Buy the ${formatMillions(scoutingPrice)} Scouting perk to unlock playstyle`}
+                  title={scoutingOwned ? undefined : 'Scouting was not purchased at run setup'}
                   class="flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2.5 font-mono text-[9px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-line-soft disabled:hover:text-muted-foreground"
                   aria-expanded={scoutingOwned && expanded}
                   aria-label={`${scoutingOwned && expanded ? 'Hide' : 'Show'} ${row.player.displayName} playstyle`}
@@ -1139,32 +1060,6 @@
                 >
                   {blocker}
                 </p>
-              {/if}
-
-              {#if onPurchaseReport !== undefined}
-                <div class="mt-2.5 border-t border-line-soft pt-2.5">
-                  {#if scoutingOwned}
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <Badge tone="positive">Scouting report</Badge>
-                        <p class="ui-micro mt-0.5">Unlocked for this draft</p>
-                      </div>
-                    </div>
-                  {:else}
-                    <div class="min-w-0">
-                      <p class="ui-micro">
-                        {#if scoutingBlocker() !== null}
-                          <span class="font-semibold text-negative">{scoutingBlocker()}</span>
-                        {:else}
-                          Scouting report {formatMillions(scoutingPrice)}
-                        {/if}
-                      </p>
-                      <p class="ui-micro mt-0.5 text-muted-foreground">
-                        One purchase reveals usage, role, and shot profile for every player.
-                      </p>
-                    </div>
-                  {/if}
-                </div>
               {/if}
 
               <div class="mt-3 flex items-center gap-2">
@@ -1315,8 +1210,8 @@
             </Panel>
           </aside>
 
-          {#if onPurchaseReport !== undefined && (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
-            <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
+          {#if (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
+            <FullCourtRosterFitPanel {draft} {index} {busy} {art} />
           {/if}
         </div>
       </div>

@@ -316,8 +316,11 @@ export function validateFullCourtCoachingDraft(
   if (hierarchyIds.some((playerId) => !rosterIdSet.has(playerId))) {
     errors.push('The scoring hierarchy includes a player outside your roster.');
   }
-  if (new Set(hierarchyIds).size !== hierarchyIds.length) {
-    errors.push('Each scoring role needs a different player.');
+  if (
+    draft.hierarchy.primaryPlayerId !== null &&
+    draft.hierarchy.primaryPlayerId === draft.hierarchy.secondaryPlayerId
+  ) {
+    errors.push('Choose different primary and second scoring options.');
   }
   if (draft.units.length > FULL_COURT_MAX_UNITS) {
     errors.push(`Use ${String(FULL_COURT_MAX_UNITS)} named units or fewer.`);

@@ -165,7 +165,6 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('aria-label="Full Court game-day readiness"');
     expect(body).toContain('Game 1 of 82');
     expect(body).toContain('Sim to next review');
-    expect(body).toContain('Rest choices apply only to this game');
   });
 
   test('home warns about short rosters and illegal rest plans', () => {
@@ -261,7 +260,7 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('+10.0');
     expect(body).toContain('>+10<');
     expect(body).toContain('Player A · Player B · Player C · Player D · Player E');
-    expect(body).toContain('100 possessions are marked with *');
+    expect(body).toContain('* below 100 possessions');
     expect(body).not.toContain('No lineup facts in this save');
     expect(body).not.toContain('aria-label="Full Court regular season"');
   });
@@ -281,7 +280,6 @@ describe('FullCourtSeasonView sections', () => {
         statsScore({ withLineups: false, forfeit: true }),
       ],
     });
-    expect(body).toContain('Forfeits (1) are excluded');
     expect(body).toContain('1 of 1 games with');
   });
 
@@ -408,20 +406,16 @@ test('shows opponent tactical adjustment in playoff preview only once series evi
     checkpoint: completed,
     playoff: adaptedView,
   });
-  expect(homeBody).toContain('aria-label="Playoff opponent adjustment"');
-  expect(homeBody).toContain('Pressure');
-  expect(homeBody).toContain('Persistent opportunity concentration');
-  expect(homeBody).toContain(
-    '28.5% lead-player opportunity share across 2 played games (threshold 26%).',
-  );
+  expect(homeBody).toContain('Your series is live');
+  expect(homeBody).not.toContain('aria-label="Playoff opponent adjustment"');
 
   const playoffsBody = renderView({
     section: 'playoffs',
     checkpoint: completed,
     playoff: adaptedView,
   });
-  expect(playoffsBody).toContain('aria-label="Playoff opponent adjustment"');
-  expect(playoffsBody).toContain('Pressure');
+  expect(playoffsBody).toContain('Your series is live');
+  expect(playoffsBody).not.toContain('aria-label="Playoff opponent adjustment"');
 });
 
 test('home renders typed simulation stop feedback', () => {
@@ -439,7 +433,7 @@ test('home renders typed simulation stop feedback', () => {
   expect(body).toContain('Dismiss');
 });
 
-test('playoffs surfaces stored per-game opponent adjustments in the series list', () => {
+test('playoffs renders series games cleanly without per-game adjustment badges', () => {
   const initial = bracketView();
   const adaptation = {
     defense: 'protect-paint' as const,
@@ -478,8 +472,8 @@ test('playoffs surfaces stored per-game opponent adjustments in the series list'
     checkpoint: completed,
     playoff: { ...initial, series: adaptedSeries },
   });
-  expect(body).toContain('Game 1 opponent adjustment: Protect paint');
-  expect(body).toContain('Persistent inside scoring');
+  expect(body).toContain('aria-label="Games in your playoff series"');
+  expect(body).not.toContain('Game 1 opponent adjustment');
 });
 
 test('makes conference standings teams clickable and renders team detail stats', () => {

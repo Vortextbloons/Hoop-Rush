@@ -410,11 +410,11 @@ describe('Full Court coaching validation', () => {
     draft.hierarchy.primaryPlayerId = 'p2';
     draft.hierarchy.secondaryPlayerId = 'p2';
     expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).errors).toContain(
-      'Each scoring role needs a different player.',
+      'Choose different primary and second scoring options.',
     );
 
     draft.hierarchy.secondaryPlayerId = 'p3';
-    draft.hierarchy.floorGeneralPlayerId = 'p1';
+    draft.hierarchy.floorGeneralPlayerId = 'p3';
     expect(validateFullCourtCoachingDraft(draft, ROSTER_IDS).valid).toBe(true);
   });
 

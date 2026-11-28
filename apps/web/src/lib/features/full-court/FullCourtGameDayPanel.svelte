@@ -89,9 +89,7 @@
   </div>
 
   {#if readiness.fixture === null}
-    <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
-      No upcoming fixture. Player availability updates when your next matchup is scheduled.
-    </p>
+    <p class="mt-2 text-xs text-muted-foreground">No upcoming fixture.</p>
   {:else}
     {#if readiness.availableCount < readiness.requiredPlayers || readiness.restConflict}
       {#each readiness.warnings as warning (warning)}
@@ -164,13 +162,6 @@
         </li>
       {/each}
     </ul>
-
-    {#if readiness.canRest}
-      <p class="mt-2 text-[11px] text-muted-foreground">
-        Rest choices apply only to this game and clear after it is played. Rested players recover
-        extra stamina.
-      </p>
-    {/if}
   {/if}
 </Panel>
 

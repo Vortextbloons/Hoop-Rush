@@ -100,12 +100,7 @@
 
 {#if view !== null}
   <Panel as="section" padding="md" aria-label={ariaLabel}>
-    <SectionHeading
-      title="Defensive matchups"
-      level={3}
-      size="sm"
-      description="Choose who guards whom against {view.opponentName}. Assignments apply to this game."
-    >
+    <SectionHeading title="Defensive matchups" level={3} size="sm">
       {#snippet actions()}
         <div class="flex flex-wrap items-center gap-1.5">
           <Badge tone="neutral">{view.fixture.label}</Badge>

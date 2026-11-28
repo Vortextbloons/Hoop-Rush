@@ -75,13 +75,11 @@ describe('FullCourtCoachingView', () => {
   test('shows tactics, automatic rotation, and the next-game note', () => {
     const body = renderView({ plan: FULL_COURT_DEFAULT_COACHING_PLAN });
 
-    expect(body).toContain('Set once. It applies from your next game.');
     expect(body).toContain('aria-label="Pace"');
     expect(body).toContain('aria-label="Shot emphasis"');
     expect(body).toContain('Move the ball');
     expect(body).toContain('aria-label="Defense"');
     expect(body).toContain('aria-label="Rotation source"');
-    expect(body).toContain('The staff sets the starters and minutes for every game.');
     expect(body).toContain('Discard');
     expect(body).toContain('Reset');
     expect(body).toContain('Game plan');
@@ -152,11 +150,11 @@ describe('FullCourtCoachingView', () => {
     expect(body).not.toContain('Unsaved changes');
   });
 
-  test('shows the roster before coaching controls on legacy plans', () => {
+  test('shows team tactics before the rotation editor on legacy plans', () => {
     const body = renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' } });
     expect(body).not.toContain('aria-label="Coaching interface"');
-    expect(body.indexOf('aria-label="Lineup and minutes"')).toBeLessThan(
-      body.indexOf('aria-label="Style"'),
+    expect(body.indexOf('aria-label="Style"')).toBeLessThan(
+      body.indexOf('aria-label="Lineup and minutes"'),
     );
     expect(body).toContain('aria-label="Sit Player 7"');
     expect(body).toContain('data-testid="full-court-rule-editor"');
@@ -273,8 +271,8 @@ describe('FullCourtCoachingView', () => {
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);
     expect(courtIndex).toBeGreaterThan(minutesIndex);
-    expect(tacticsIndex).toBeGreaterThan(minutesIndex);
-    expect(tacticsIndex).toBeGreaterThan(courtIndex);
+    expect(tacticsIndex).toBeLessThan(minutesIndex);
+    expect(tacticsIndex).toBeLessThan(courtIndex);
     expect(presetsIndex).toBeGreaterThan(tacticsIndex);
     expect(saveBarIndex).toBeGreaterThan(-1);
     expect(saveBarIndex).toBeLessThan(courtIndex);

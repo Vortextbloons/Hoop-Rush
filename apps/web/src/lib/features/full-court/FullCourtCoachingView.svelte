@@ -64,6 +64,7 @@
     onSaveBlueprint,
     onRemoveBlueprint,
     readOnly = false,
+    opponent = null,
     health = null,
     dayOffset = null,
     art = null,
@@ -82,6 +83,7 @@
     ) => Promise<FullCourtBlueprint>;
     onRemoveBlueprint?: (name: string) => Promise<void>;
     readOnly?: boolean;
+    opponent?: { displayName: string; roster: readonly SimulationPlayer[] } | null;
     health?: FullCourtTeamHealth | null;
     dayOffset?: number | null;
     art?: FullCourtArt | null;
@@ -206,6 +208,18 @@
         : labelFor(OFFENSE_OPTIONS, draft.tactics.offense)
     } · ${labelFor(DEFENSE_OPTIONS, draft.tactics.defense)}`,
   );
+  const opponentThreePointShare = $derived.by(() => {
+    let attempts = 0;
+    let threes = 0;
+    for (const player of opponent?.roster ?? []) {
+      const anchors = player.anchors;
+      if (!anchors || anchors.threePointAttemptRate == null) continue;
+      const weight = anchors.minutesPerGame;
+      attempts += weight;
+      threes += weight * anchors.threePointAttemptRate;
+    }
+    return attempts > 0 ? Math.round((100 * threes) / attempts) : null;
+  });
   const hasHealthData = $derived(rotationRows.some((row) => row.health !== null));
   const availabilityHeadline = $derived(
     unavailableRotation.length > 0
@@ -601,16 +615,30 @@
     {#if savedMessage !== null}
       <p class="mb-3 text-xs font-semibold text-positive" role="status">{savedMessage}</p>
     {/if}
+    {#snippet roleSelect(role: (typeof HIERARCHY_ROLES)[number])}
+      <label class="grid min-w-0 gap-1">
+        <span class="text-sm font-semibold">{role.label}</span>
+        <select
+          class={SELECT_CLASS}
+          aria-label={role.label}
+          value={draft.hierarchy[role.key] ?? ''}
+          disabled={locked}
+          onchange={(event) => setHierarchyRole(role.key, event.currentTarget.value)}
+        >
+          <option value="">Not set</option>
+          {#each roster as player (player.playerId)}
+            <option value={player.playerId}>
+              {player.displayName} · {formatPositions(player.positions)}
+            </option>
+          {/each}
+        </select>
+        <span class="text-xs text-muted-foreground">{role.hint}</span>
+      </label>
+    {/snippet}
+
     <fieldset class="m-0 min-w-0 border-0 p-0" disabled={locked}>
       <legend class="sr-only">Team</legend>
-      <SectionHeading
-        level={3}
-        size="sm"
-        title="Game plan"
-        description={readOnly
-          ? 'The plan used for this run.'
-          : 'Set once. It applies from your next game.'}
-      >
+      <SectionHeading level={3} size="sm" title="Game plan">
         {#snippet actions()}
           <Badge tone={dirty ? 'accent' : 'positive'}>
             {dirty ? 'Unsaved changes' : 'Saved'}
@@ -628,7 +656,9 @@
           <p class="ui-micro">Style</p>
           <p class="plan-glance-value">{styleSummary}</p>
           <p class="plan-glance-note">
-            {draft.tactics.ballMovement ? 'Ball movement on' : 'Standard passing'}
+            {draft.tactics.ballMovement || draft.tactics.offense === 'ball-movement'
+              ? 'Ball movement on'
+              : 'Standard passing'}
           </p>
         </div>
         <div>
@@ -643,6 +673,100 @@
           </p>
           <p class="plan-glance-note">{planCheckNote}</p>
         </div>
+      </div>
+
+      <div class="mt-3 grid gap-3">
+        <Panel as="section" padding="sm" aria-label="Style">
+          <SectionHeading level={4} size="sm" title="Team tactics" />
+          <div class="mt-3 grid gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Pace</span>
+              <SegmentedControl
+                label="Pace"
+                value={draft.tactics.pace}
+                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  draft.tactics.pace = value;
+                  markEdited();
+                }}
+              />
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Shot emphasis</span>
+              <SegmentedControl
+                label="Shot emphasis"
+                value={draft.tactics.offense === 'ball-movement'
+                  ? 'balanced'
+                  : draft.tactics.offense}
+                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  if (draft.tactics.offense === 'ball-movement') draft.tactics.ballMovement = true;
+                  draft.tactics.offense = value;
+                  markEdited();
+                }}
+              />
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label class="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  class="mt-1 accent-primary"
+                  disabled={locked}
+                  checked={draft.tactics.ballMovement === true ||
+                    draft.tactics.offense === 'ball-movement'}
+                  onchange={(event) => {
+                    if (draft.tactics.offense === 'ball-movement')
+                      draft.tactics.offense = 'balanced';
+                    if (event.currentTarget.checked) draft.tactics.ballMovement = true;
+                    else delete draft.tactics.ballMovement;
+                    markEdited();
+                  }}
+                />
+                <span>
+                  <span class="block text-sm font-semibold">Move the ball</span>
+                  <span class="text-xs text-muted-foreground"
+                    >More passing and assists, with more turnover risk.</span
+                  >
+                </span>
+              </label>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-semibold">Defense</span>
+              <SegmentedControl
+                label="Defense"
+                value={draft.tactics.defense}
+                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                onchange={(value) => {
+                  draft.tactics.defense = value;
+                  markEdited();
+                }}
+              />
+            </div>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">
+            {draft.tactics.defense === 'pressure'
+              ? 'Force more steals at the cost of energy and defensive rebounds.'
+              : draft.tactics.defense === 'protect-paint'
+                ? 'Give up more outside shots to protect the rim and secure rebounds.'
+                : 'Use each player’s usual defensive tendencies.'}
+          </p>
+          {#if !readOnly && opponent !== null && opponentThreePointShare !== null}
+            <p class="mt-1 text-xs text-muted-foreground">
+              {opponent.displayName} averaged a {opponentThreePointShare}% three-point shot share
+              across its players' historical seasons, weighted by minutes.
+            </p>
+          {/if}
+        </Panel>
+
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Scoring options">
+            <SectionHeading level={4} size="sm" title="Scoring options" />
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              {@render roleSelect(HIERARCHY_ROLES[0])}
+              {@render roleSelect(HIERARCHY_ROLES[1])}
+            </div>
+          </Panel>
+        {/if}
       </div>
 
       {#if !readOnly && editingRotation && minutesGap !== 0}
@@ -701,16 +825,6 @@
             {/snippet}
           </SectionHeading>
 
-          {#if !editingRotation}
-            <p
-              class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
-            >
-              {readOnly
-                ? 'The staff sets the starters and minutes for every game.'
-                : 'The staff sets the starters and minutes for every game. Choose My plan to lock in your own five and minute targets.'}
-            </p>
-          {/if}
-
           {#if starterStrengths.length > 0}
             <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Starting five strengths">
               {#each starterStrengths as strength (strength.code)}
@@ -722,12 +836,7 @@
           {/if}
 
           <div class="mt-4 border-t border-line-soft pt-3" aria-label="Minutes" role="group">
-            <SectionHeading
-              level={4}
-              size="sm"
-              title="Minutes"
-              description="Cumulative workload reflects repeated heavy minutes. Lighter minutes and rest help it come down."
-            >
+            <SectionHeading level={4} size="sm" title="Minutes">
               {#snippet actions()}
                 {#if !readOnly && editingRotation}
                   <Button
@@ -952,115 +1061,16 @@
           {/if}
         </Panel>
 
-        <Disclosure summary="Style" meta={styleSummary} aria-label="Style">
-          <div class="grid gap-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Pace</span>
-              <SegmentedControl
-                label="Pace"
-                value={draft.tactics.pace}
-                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.pace = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Shot emphasis</span>
-              <SegmentedControl
-                label="Shot emphasis"
-                value={draft.tactics.offense === 'ball-movement'
-                  ? 'balanced'
-                  : draft.tactics.offense}
-                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  if (draft.tactics.offense === 'ball-movement') draft.tactics.ballMovement = true;
-                  draft.tactics.offense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <label class="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  class="mt-1 accent-primary"
-                  disabled={locked}
-                  checked={draft.tactics.ballMovement === true ||
-                    draft.tactics.offense === 'ball-movement'}
-                  onchange={(event) => {
-                    if (draft.tactics.offense === 'ball-movement')
-                      draft.tactics.offense = 'balanced';
-                    if (event.currentTarget.checked) draft.tactics.ballMovement = true;
-                    else delete draft.tactics.ballMovement;
-                    markEdited();
-                  }}
-                />
-                <span>
-                  <span class="block text-sm font-semibold">Move the ball</span>
-                  <span class="text-xs text-muted-foreground"
-                    >More passing and assists, with more turnover risk.</span
-                  >
-                </span>
-              </label>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Defense</span>
-              <SegmentedControl
-                label="Defense"
-                value={draft.tactics.defense}
-                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.defense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-          </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            {draft.tactics.defense === 'pressure'
-              ? 'Force more steals at the cost of energy and defensive rebounds.'
-              : draft.tactics.defense === 'protect-paint'
-                ? 'Give up more outside shots to protect the rim and secure rebounds.'
-                : 'Use each player’s usual defensive tendencies.'}
-          </p>
-        </Disclosure>
-
         {#if !readOnly}
           <Disclosure
             summary="Advanced plan"
-            meta="Scoring roles, lineup groups, and automatic substitutions"
+            meta="Playmaking, lineup groups, and automatic substitutions"
           >
             <div class="grid gap-3">
               <Panel as="section" padding="sm" aria-label="Offensive roles">
-                <SectionHeading
-                  level={4}
-                  size="sm"
-                  title="Scoring roles"
-                  description="Choose who leads the offense and who creates for others."
-                />
-                <div class="mt-3 grid gap-3 md:grid-cols-3">
-                  {#each HIERARCHY_ROLES as role (role.key)}
-                    <label class="grid min-w-0 gap-1">
-                      <span class="text-sm font-semibold">{role.label}</span>
-                      <select
-                        class={SELECT_CLASS}
-                        aria-label={role.label}
-                        value={draft.hierarchy[role.key] ?? ''}
-                        disabled={locked}
-                        onchange={(event) => setHierarchyRole(role.key, event.currentTarget.value)}
-                      >
-                        <option value="">Not set</option>
-                        {#each roster as player (player.playerId)}
-                          <option value={player.playerId}>
-                            {player.displayName} · {formatPositions(player.positions)}
-                          </option>
-                        {/each}
-                      </select>
-                      <span class="text-xs text-muted-foreground">{role.hint}</span>
-                    </label>
-                  {/each}
+                <SectionHeading level={4} size="sm" title="Playmaking" />
+                <div class="mt-3">
+                  {@render roleSelect(HIERARCHY_ROLES[2])}
                 </div>
                 <div class="mt-4 grid gap-3 md:grid-cols-3">
                   <label class="grid gap-1">

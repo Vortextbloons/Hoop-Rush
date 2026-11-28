@@ -233,7 +233,7 @@ export function applyFullCourtHierarchyToPrep(
   if (hierarchy.secondaryPlayerId !== undefined) {
     roles.set(hierarchy.secondaryPlayerId, 'secondary');
   }
-  if (handler !== undefined) roles.set(handler, 'floor-general');
+  if (handler !== undefined && !roles.has(handler)) roles.set(handler, 'floor-general');
   if (primary !== undefined) roles.set(primary, 'primary');
   if (roles.size === 0 && hierarchy.passingReads === undefined) return prep;
 
@@ -251,7 +251,7 @@ export function applyFullCourtHierarchyToPrep(
     const role = roles.get(player.playerId);
     if (role === undefined) return IDENTITY_ROLE_SCALE;
     const scale = roleScaleFor(role, player, opponentDefense);
-    if (role !== 'primary' || player.playerId !== handler) return scale;
+    if (role === 'floor-general' || player.playerId !== handler) return scale;
     const creation = roleScaleFor('floor-general', player, opponentDefense);
     return { ...creation, finish: scale.finish };
   });

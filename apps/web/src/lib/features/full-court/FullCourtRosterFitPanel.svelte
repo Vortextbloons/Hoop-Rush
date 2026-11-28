@@ -1,24 +1,10 @@
 <script lang="ts">
-  import type { FullCourtDraftState, FullCourtReportTarget } from '@hoop-rush/data-contracts';
-  import {
-    fullCourtReportPriceDollars,
-    fullCourtReportScope,
-    fullCourtReportTargetKey,
-  } from '@hoop-rush/data-contracts';
-  import {
-    fullCourtAssessPurchase,
-    fullCourtLineupFitReport,
-    fullCourtPayrollDollars,
-    fullCourtWarChestDollars,
-    type FullCourtCatalogIndex,
-    type FullCourtLineupFinding,
-  } from '@hoop-rush/engine';
-  import { FileSearch } from '@lucide/svelte';
+  import type { FullCourtDraftState } from '@hoop-rush/data-contracts';
+  import { fullCourtReportTargetKey } from '@hoop-rush/data-contracts';
+  import { fullCourtLineupFitReport, type FullCourtLineupFinding } from '@hoop-rush/engine';
   import Badge from '#lib/components/ui/Badge.svelte';
-  import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
-  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import type { FullCourtArt } from './full-court-art.ts';
   import {
     LINEUP_FINDING_LABELS,
@@ -26,10 +12,7 @@
     scoutFieldValue,
   } from './full-court-scout-labels';
 
-  type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
-
-  const FIT_TARGET = { kind: 'lineup-fit' } as const satisfies FullCourtReportTarget;
-  const FIT_PRICE = fullCourtReportPriceDollars('lineup-fit');
+  const FIT_TARGET = { kind: 'lineup-fit' } as const;
 
   /** Only the roster-wide findings whose title alone leaves the threshold unclear. */
   const LINEUP_FINDING_READS: Partial<Record<keyof typeof LINEUP_FINDING_LABELS, string>> = {
@@ -42,19 +25,11 @@
 
   let {
     draft,
-    index,
-    busy,
-    onPurchaseReport,
-    purchasable = true,
     ariaLabel = 'Full Court War Room roster fit',
     eyebrow = 'War Room',
     art = null,
   }: {
     draft: FullCourtDraftState;
-    index: FullCourtCatalogIndex;
-    busy: boolean;
-    onPurchaseReport: (target: FullCourtReportTarget) => void;
-    purchasable?: boolean;
     ariaLabel?: string;
     eyebrow?: string;
     art?: FullCourtArt | null;
@@ -68,15 +43,6 @@
   const fitRecord = $derived(reportsByTarget.get(fullCourtReportTargetKey(FIT_TARGET)) ?? null);
   const roster = $derived(draft.picks.map((pick) => pick.player));
   const fitReport = $derived(fitRecord === null ? null : fullCourtLineupFitReport(roster));
-  const payrollDollars = $derived(fullCourtPayrollDollars(draft.picks));
-  const warChestCr = $derived(formatMillions(fullCourtWarChestDollars(draft)));
-  const locked = $derived(draft.stage === 'complete');
-  const fitAssessment = $derived(
-    fullCourtAssessPurchase({ index, state: draft, priceDollars: FIT_PRICE }),
-  );
-  const scopeLabel = $derived(
-    fullCourtReportScope('lineup-fit') === 'run' ? 'Lifetime of this run' : 'This game only',
-  );
   const groups = $derived.by(() => {
     if (fitReport === null) return [];
     return [
@@ -104,24 +70,6 @@
     if (others === 0) return `${field} · only qualifier`;
     const backup = finding.evidence[1];
     return `${field} · ${others} more${backup === undefined ? '' : `, led by ${backup.displayName}`}`;
-  }
-
-  function purchaseAffordance(assessment: PurchaseAssessment): string {
-    if (assessment.legal) {
-      return `${formatMillions(assessment.warChestAfterPurchase)} budget after the purchase.`;
-    }
-    if (assessment.reason === 'completion') {
-      return 'No legal roster finish remains after this purchase.';
-    }
-    if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
-    }
-    return 'Budget cannot cover this report.';
-  }
-
-  function buyFit(): void {
-    if (busy || !locked || !purchasable || fitRecord !== null || !fitAssessment.legal) return;
-    onPurchaseReport(FIT_TARGET);
   }
 </script>
 
@@ -153,30 +101,18 @@
 {/snippet}
 
 <Panel as="section" padding="md" class="border-line-strong bg-surface-1/90" aria-label={ariaLabel}>
-  <SectionHeading
-    {eyebrow}
-    title="Locked roster fit"
-    level={2}
-    size="md"
-    description="What this roster does well, and where it runs thin."
-  >
+  <SectionHeading {eyebrow} title="Locked roster fit" level={2} size="md">
     {#snippet actions()}
       {#if fitRecord !== null}
         <Badge tone="positive">Owned</Badge>
       {:else}
-        <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-          {formatMillions(FIT_PRICE)}
-        </span>
+        <Badge tone="neutral">Not purchased</Badge>
       {/if}
     {/snippet}
   </SectionHeading>
 
-  <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <p class="ui-micro">
-      {roster.length} players · {formatMillions(payrollDollars)} payroll · {warChestCr} budget
-    </p>
-    <p class="ui-micro">{scopeLabel}</p>
-    {#if fitReport !== null}
+  {#if fitReport !== null}
+    <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <span class="ml-auto flex items-baseline gap-2">
         <span class="ui-micro tabular-nums text-positive">
           {fitReport.strengths.length}
@@ -187,8 +123,8 @@
           {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
         </span>
       </span>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   {#if fitReport !== null}
     <div class="mt-3 flex flex-col gap-3">
@@ -222,25 +158,7 @@
     <p class="mt-3 text-xs text-muted-foreground">
       The roster fit report is unavailable for this roster.
     </p>
-  {:else if !purchasable}
-    <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-      Roster fit closed before game 1. Preseason purchases are no longer available.
-    </p>
   {:else}
-    <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
-      <Button
-        size="sm"
-        tone="primary"
-        disabled={busy || !locked || !fitAssessment.legal}
-        aria-label={`Buy roster fit for ${formatMillions(FIT_PRICE)}`}
-        onclick={buyFit}
-      >
-        <FileSearch size={14} aria-hidden="true" />
-        Buy roster fit
-      </Button>
-      <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-        {purchaseAffordance(fitAssessment)}
-      </p>
-    </div>
+    <p class="mt-3 text-xs text-muted-foreground">Not purchased at run setup.</p>
   {/if}
 </Panel>

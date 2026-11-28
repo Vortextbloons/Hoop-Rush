@@ -242,7 +242,10 @@ describe('Full Court coaching plan', () => {
           hierarchy: { primaryPlayerId: 'p1', floorGeneralPlayerId: 'p1' },
         }),
       ),
-    ).toBe(false);
+    ).toBe(true);
+    expect(
+      accepts(plan({ hierarchy: { secondaryPlayerId: 'p2', floorGeneralPlayerId: 'p2' } })),
+    ).toBe(true);
     expect(accepts(plan({ hierarchy: { primaryPlayerId: '' } }))).toBe(false);
   });
 
@@ -331,11 +334,11 @@ describe('Full Court blueprint schema', () => {
     expect(
       fullCourtBlueprintSchema.safeParse({
         schemaVersion: 1,
-        name: 'Duplicate Starter Slot',
+        name: 'Duplicate Scoring Slot',
         tactics: FULL_COURT_DEFAULT_TACTICS,
         hierarchy: {
           primary: { kind: 'starter-slot', slot: 0 },
-          floorGeneral: { kind: 'starter-slot', slot: 0 },
+          secondary: { kind: 'starter-slot', slot: 0 },
         },
       }).success,
     ).toBe(false);

@@ -358,6 +358,7 @@
               : null}
             {defaultRotation}
             plan={season.coaching}
+            opponent={matchupContext?.opponentTeam ?? null}
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
             health={health ?? null}
             dayOffset={nextUserFixture?.dayOffset ?? null}
@@ -444,8 +445,19 @@
           {art}
           onDismissNotice={() => current.clearNotice()}
           onAdvance={(count, acceptForfeit, options) => {
-            activeGamecast = null;
-            void current.advance(count, acceptForfeit, false, options);
+            if (count === 1) {
+              void (async () => {
+                const previous = current.latestGame;
+                activeGamecast = null;
+                await current.advance(1, acceptForfeit, true, options);
+                if (current.latestGame !== previous && current.latestGame?.tape != null) {
+                  activeGamecast = 'latest';
+                }
+              })();
+            } else {
+              activeGamecast = null;
+              void current.advance(count, acceptForfeit, false, options);
+            }
           }}
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
@@ -534,28 +546,10 @@
     {:else if current.busy}
       <p role="status" class="text-sm text-muted-foreground">Opening Full Court…</p>
     {:else if current.index !== null && draft == null}
-      <SectionHeading
-        title="Build your roster"
-        level={2}
-        size="md"
-        align="start"
-        description="Sign 6–12 historical players from a {formatMillions(
-          FULL_COURT_DEFAULT_MONEY.startingWarChestDollars,
-        )} budget ({formatMillions(FULL_COURT_DEFAULT_MONEY.capLineDollars)} cap, {formatMillions(
-          FULL_COURT_DEFAULT_MONEY.firstApronDollars,
-        )} first apron, {formatMillions(
-          FULL_COURT_DEFAULT_MONEY.hardLimitDollars,
-        )} hard limit), set your rotation, and face 29 historical teams."
-      />
+      <SectionHeading title="Build your roster" level={2} size="md" align="start" />
 
       <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
-        <SectionHeading
-          level={3}
-          size="sm"
-          align="start"
-          title="Pre-run perks"
-          description="Optional upgrades paid from the starting budget. Every perk lasts for the entire run."
-        >
+        <SectionHeading level={3} size="sm" align="start" title="Pre-run perks">
           {#snippet actions()}
             <Badge tone="neutral">{formatMillions(startingBudgetRemaining)} starting budget</Badge>
           {/snippet}

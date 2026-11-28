@@ -371,6 +371,47 @@
     </div>
   {/if}
   {#if finished}
+    {@const team = [game.result.home, game.result.away].find(
+      (entry) => entry.teamId === userTeamId,
+    )}
+    {#if team !== undefined}
+      {@const topShooter = team.players.reduce<(typeof team.players)[number] | undefined>(
+        (leader, player) =>
+          player.fieldGoals.attempted > (leader?.fieldGoals.attempted ?? 0) ? player : leader,
+        undefined,
+      )}
+      {@const units = new Set(
+        team.stints.map((stint) => unitNameFor(team, stint.playerIds)).filter(Boolean),
+      )}
+      {@const ruleSubstitutions = game.tape?.filter(
+        (event) =>
+          event.kind === 'substitution' &&
+          event.reason === 'coach-rule' &&
+          event.side === (team === game.result.home ? 0 : 1),
+      ).length}
+      <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
+        <h3 class="font-semibold">How your team played</h3>
+        <p class="text-muted-foreground">
+          {team.box.possessions} possessions · {team.box.threes.attempted} of
+          {team.box.fieldGoals.attempted} shots from three · {team.box.assists} assists ·
+          {team.box.turnovers} turnovers
+        </p>
+        {#if topShooter !== undefined}
+          <p class="text-muted-foreground">
+            {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
+          </p>
+        {/if}
+        {#if units.size > 0}
+          <p class="text-muted-foreground">Lineup groups used · {[...units].join(', ')}</p>
+        {/if}
+        {#if ruleSubstitutions !== undefined && ruleSubstitutions > 0}
+          <p class="text-muted-foreground">
+            Game situation rules made {ruleSubstitutions}
+            {ruleSubstitutions === 1 ? 'substitution' : 'substitutions'}.
+          </p>
+        {/if}
+      </section>
+    {/if}
     {#if lineupReport !== null}
       <PlayerStatsSection
         surface="none"

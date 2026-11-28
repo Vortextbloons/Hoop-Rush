@@ -1,48 +1,31 @@
 <script lang="ts">
-  import type {
-    FullCourtDraftState,
-    FullCourtPracticeReport,
-    FullCourtReportTarget,
-  } from '@hoop-rush/data-contracts';
-  import {
-    fullCourtReportPriceDollars,
-    fullCourtReportScope,
-    fullCourtReportTargetKey,
-  } from '@hoop-rush/data-contracts';
-  import { fullCourtAssessPurchase, type FullCourtCatalogIndex } from '@hoop-rush/engine';
-  import { ClipboardList, Play, Shuffle } from '@lucide/svelte';
+  import type { FullCourtDraftState, FullCourtPracticeReport } from '@hoop-rush/data-contracts';
+  import { fullCourtReportTargetKey } from '@hoop-rush/data-contracts';
+  import { Play, Shuffle } from '@lucide/svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
-  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
 
-  const CAMP_TARGET = { kind: 'training-camp' } as const satisfies FullCourtReportTarget;
-  const CAMP_PRICE = fullCourtReportPriceDollars('training-camp');
+  const CAMP_TARGET = { kind: 'training-camp' } as const;
 
   let {
     draft,
-    index,
     busy,
-    campOpen,
     practiceOpen,
     practice,
     opponents = [],
-    onPurchaseReport,
     onRunPractice,
     ariaLabel = 'Full Court War Room training camp',
     art = null,
   }: {
     draft: FullCourtDraftState;
-    index: FullCourtCatalogIndex;
     busy: boolean;
-    campOpen: boolean;
     practiceOpen: boolean;
     practice: FullCourtPracticeReport | null;
     opponents?: readonly { readonly teamId: string; readonly displayName: string }[];
-    onPurchaseReport: (target: FullCourtReportTarget) => void;
     onRunPractice: (opponentTeamId?: string) => void;
     ariaLabel?: string;
     art?: FullCourtArt | null;
@@ -55,13 +38,6 @@
       (report) => fullCourtReportTargetKey(report.target) === fullCourtReportTargetKey(CAMP_TARGET),
     ) ?? null,
   );
-  const locked = $derived(draft.stage === 'complete');
-  const campAssessment = $derived(
-    fullCourtAssessPurchase({ index, state: draft, priceDollars: CAMP_PRICE }),
-  );
-  const scopeLabel = $derived(
-    fullCourtReportScope('training-camp') === 'run' ? 'Before game 1' : 'This game only',
-  );
 
   function minutesText(value: number): string {
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -70,11 +46,6 @@
   function percentText(value: number): string {
     const percent = value * 100;
     return `${Number.isInteger(percent) ? String(percent) : percent.toFixed(1)}%`;
-  }
-
-  function buyCamp(): void {
-    if (busy || !locked || !campOpen || campRecord !== null || !campAssessment.legal) return;
-    onPurchaseReport(CAMP_TARGET);
   }
 
   function runPractice(): void {
@@ -90,65 +61,22 @@
 </script>
 
 <Panel as="section" padding="md" aria-label={ariaLabel}>
-  <SectionHeading
-    eyebrow="Preseason"
-    title="Training Camp"
-    level={2}
-    size="md"
-    description="A paid practice report. It estimates rotations, fatigue, and bench usage from one scrimmage and never changes ratings."
-  >
+  <SectionHeading eyebrow="Preseason" title="Training Camp" level={2} size="md">
     {#snippet actions()}
       {#if campRecord !== null}
         <Badge tone="positive">Booked</Badge>
       {:else}
-        <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-          {formatMillions(CAMP_PRICE)}
-        </span>
+        <Badge tone="neutral">Not purchased</Badge>
       {/if}
     {/snippet}
   </SectionHeading>
 
-  <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <p class="font-mono text-[10px] text-muted-foreground uppercase">
-      {scopeLabel} · separate practice seed
-    </p>
-    <p class="font-mono text-[9px] text-muted-foreground uppercase">
-      No fixture, health, record, achievement, or Gamecast entry
-    </p>
-  </div>
+  <p class="mt-2 font-mono text-[10px] text-muted-foreground uppercase">
+    Before game 1 · sandbox scrimmage
+  </p>
 
-  {#if !locked}
-    <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-      Confirm the roster before booking training camp.
-    </p>
-  {:else if campRecord === null}
-    {#if campOpen}
-      <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
-        <Button
-          size="sm"
-          tone="primary"
-          disabled={busy || !campAssessment.legal}
-          aria-label={`Book training camp for ${formatMillions(CAMP_PRICE)}`}
-          onclick={buyCamp}
-        >
-          <ClipboardList size={14} aria-hidden="true" />
-          Book training camp
-        </Button>
-        <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-          {#if campAssessment.legal}
-            {formatMillions(campAssessment.warChestAfterPurchase)} budget after booking.
-          {:else if campAssessment.minimumCompletionDollars !== null}
-            Needs {formatMillions(campAssessment.minimumCompletionDollars)} for the cheapest legal finish.
-          {:else}
-            Budget cannot cover training camp.
-          {/if}
-        </p>
-      </div>
-    {:else}
-      <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-        Training camp closed before game 1. The practice report is no longer available.
-      </p>
-    {/if}
+  {#if campRecord === null}
+    <p class="mt-3 text-xs text-muted-foreground">Not purchased at run setup.</p>
   {:else}
     <div class="mt-3 border-t border-line-soft pt-3">
       {#if practiceOpen}
@@ -179,20 +107,9 @@
             <Shuffle size={14} aria-hidden="true" />
             Pull random
           </Button>
-          <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            Free sandbox scrimmage against any league opponent. Tweak rotation or tactics and test
-            again.
-          </p>
         </div>
-      {:else if campOpen}
-        <p class="text-xs leading-relaxed text-muted-foreground">
-          Camp is booked. Practice opens after the roster is finalized and before game 1.
-        </p>
       {:else}
-        <p class="text-xs leading-relaxed text-muted-foreground">
-          Practice is closed once the regular season starts. The camp sample never enters the season
-          record.
-        </p>
+        <p class="text-xs text-muted-foreground">Closed before game 1.</p>
       {/if}
 
       {#if practice !== null}

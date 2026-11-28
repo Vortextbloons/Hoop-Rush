@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type { FullCourtTactics, ShotZone, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type {
+  FullCourtOffensiveHierarchy,
+  FullCourtTactics,
+  ShotZone,
+  SimulationPlayer,
+} from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../../domain/zones.ts';
 import type { EffectsHook } from '../../game/effects.ts';
 import { createEngineContext } from '../../sim/kernel.ts';
@@ -487,6 +492,28 @@ describe('full court tactics API', () => {
     expect(finishingWeightOf(general, homeRoster, 1, 0)).toBeLessThan(
       finishingWeightOf(basePrep, homeRoster, 1, 0),
     );
+  });
+
+  it("keeps a second scorer's finishing weight when also assigned floor general", () => {
+    const playerId = homeRoster[0]?.playerId;
+    const applyHierarchy = (hierarchy: FullCourtOffensiveHierarchy) =>
+      applyFullCourtTacticsToPrep(
+        basePrep,
+        homeRoster,
+        tacticsProfile,
+        BALANCED,
+        'balanced',
+        hierarchy,
+      );
+    const scorer = applyHierarchy({ secondaryPlayerId: playerId });
+    const general = applyHierarchy({ floorGeneralPlayerId: playerId });
+    const both = applyHierarchy({ secondaryPlayerId: playerId, floorGeneralPlayerId: playerId });
+
+    expect(finishingWeightOf(both, homeRoster, 1, 0)).toBe(
+      finishingWeightOf(scorer, homeRoster, 1, 0),
+    );
+    expect(initiatorWeightOf(both, homeRoster, 0)).toBe(initiatorWeightOf(general, homeRoster, 0));
+    expect(passProbabilityOf(both, homeRoster, 0)).toBe(passProbabilityOf(general, homeRoster, 0));
   });
 
   it('bounds the hierarchy shift and tempers it against a paint-packing matchup', () => {

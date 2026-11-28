@@ -139,6 +139,22 @@ describe('Full Court portable blueprint scoring roles', () => {
     expect(JSON.stringify(hierarchy)).not.toContain('p1');
   });
 
+  it('round-trips a scoring option who also runs the offense', () => {
+    const roster = rosterOfSize(10);
+    const assignedRoles = { primaryPlayerId: 'p1', floorGeneralPlayerId: 'p1' };
+    const hierarchy = buildFullCourtBlueprintHierarchy({ hierarchy: assignedRoles, roster });
+    const blueprint = fullCourtBlueprintSchema.parse({
+      schemaVersion: 1,
+      name: 'Scoring playmaker',
+      tactics: FULL_COURT_DEFAULT_TACTICS,
+      hierarchy,
+    });
+
+    expect(resolveFullCourtBlueprintHierarchy({ blueprint, roster }).hierarchy).toEqual(
+      assignedRoles,
+    );
+  });
+
   it('works cleanly when custom minutes are absent (automatic rotation)', () => {
     const roster = rosterOfSize(8);
     const primaryStarter = roster[2];

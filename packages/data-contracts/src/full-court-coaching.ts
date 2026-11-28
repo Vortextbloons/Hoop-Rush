@@ -110,7 +110,7 @@ export const fullCourtBlueprintHierarchySchema = z
       const ref = hierarchy[key];
       if (ref === undefined) continue;
       assignedCount += 1;
-      if (ref.kind === 'role-fit') continue;
+      if (key === 'floorGeneral' || ref.kind === 'role-fit') continue;
       const slotKey =
         ref.kind === 'starter-slot'
           ? `starter:${String(ref.slot)}`
@@ -395,7 +395,7 @@ export const fullCourtInterfaceLevelSchema = z.enum(FULL_COURT_INTERFACE_LEVELS)
 export type FullCourtInterfaceLevel = z.infer<typeof fullCourtInterfaceLevelSchema>;
 
 /**
- * Offensive hierarchy for the user plan. Roles are optional and distinct; when
+ * Offensive hierarchy for the user plan. Scoring options are optional and distinct; when
  * absent the prepared lineup is untouched. `floorGeneralPlayerId` is the
  * supporting creator, not a third scorer.
  */
@@ -417,22 +417,15 @@ export const fullCourtOffensiveHierarchySchema = z
       .optional(),
   })
   .superRefine((hierarchy, context) => {
-    const assignments: Array<[keyof typeof hierarchy, string | undefined]> = [
-      ['primaryPlayerId', hierarchy.primaryPlayerId],
-      ['secondaryPlayerId', hierarchy.secondaryPlayerId],
-      ['floorGeneralPlayerId', hierarchy.floorGeneralPlayerId],
-    ];
-    const seen = new Set<string>();
-    for (const [field, playerId] of assignments) {
-      if (playerId === undefined) continue;
-      if (seen.has(playerId)) {
-        context.addIssue({
-          code: 'custom',
-          path: [field],
-          message: 'each offensive role needs a different player',
-        });
-      }
-      seen.add(playerId);
+    if (
+      hierarchy.primaryPlayerId !== undefined &&
+      hierarchy.primaryPlayerId === hierarchy.secondaryPlayerId
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['secondaryPlayerId'],
+        message: 'choose different primary and second scoring options',
+      });
     }
     for (const [handler, targets] of Object.entries(hierarchy.passingReads ?? {})) {
       if (targets.includes(handler) || new Set(targets).size !== targets.length) {
@@ -461,7 +454,13 @@ export const fullCourtOffensiveHierarchySchema = z
       }
       units.add(key);
     }
-    if (seen.size === 0 && !Object.keys(hierarchy.passingReads ?? {}).length && !units.size) {
+    if (
+      hierarchy.primaryPlayerId === undefined &&
+      hierarchy.secondaryPlayerId === undefined &&
+      hierarchy.floorGeneralPlayerId === undefined &&
+      !Object.keys(hierarchy.passingReads ?? {}).length &&
+      !units.size
+    ) {
       context.addIssue({
         code: 'custom',
         path: [],

@@ -284,7 +284,7 @@ export function fullCourtPlayoffStatus(
   if (champion === userTeamId) {
     return {
       headline: 'Full Court champions',
-      message: 'The bracket is complete. Your season ends with the trophy.',
+      message: '',
     };
   }
   const userRound =
@@ -296,41 +296,41 @@ export function fullCourtPlayoffStatus(
     if (playoff.userOutcome.status === 'not-qualified') {
       return {
         headline: `${championName} take the title`,
-        message: 'The bracket is complete. You finished outside the top eight.',
+        message: '',
       };
     }
     if (playoff.userOutcome.status === 'eliminated') {
       return {
         headline: `${championName} take the title`,
-        message: `The bracket is complete. Your run ended in the ${userRound ?? 'playoffs'}.`,
+        message: '',
       };
     }
     return {
       headline: `${championName} take the title`,
-      message: 'The bracket is complete.',
+      message: '',
     };
   }
   if (playoff.userOutcome.status === 'not-qualified') {
     return {
       headline: 'The bracket moves on without you',
-      message: 'You finished outside the top eight. The remaining series are finishing.',
+      message: '',
     };
   }
   if (playoff.userOutcome.status === 'eliminated') {
     return {
       headline: `Out in the ${userRound ?? 'playoffs'}`,
-      message: 'Your run is over. Finish the bracket to crown a champion.',
+      message: '',
     };
   }
   if (playoff.userOutcome.status === 'champion') {
     return {
       headline: 'Full Court champions',
-      message: 'The title is yours.',
+      message: '',
     };
   }
   return {
     headline: 'The postseason is live',
-    message: 'One game at a time. Your locked lineup carries into every round.',
+    message: '',
   };
 }
 
@@ -750,10 +750,7 @@ export function fullCourtHomeControls(input: {
   const withStatus = (controls: Omit<FullCourtHomeControls, 'status'>, status: string) =>
     busy ? { ...controls, status: 'Simulation in progress…' } : { ...controls, status };
   if (pendingForfeit) {
-    return withStatus(
-      { primary: null, secondary: [] },
-      'The next game cannot continue until the forfeit is accepted.',
-    );
+    return withStatus({ primary: null, secondary: [] }, '');
   }
   if (restConflict) {
     return withStatus(
@@ -763,7 +760,7 @@ export function fullCourtHomeControls(input: {
   }
   if (playoff !== null) {
     if (playoff.championTeamId !== null || playoff.nextGame === null) {
-      return withStatus({ primary: null, secondary: [] }, 'The bracket and champion are saved.');
+      return withStatus({ primary: null, secondary: [] }, '');
     }
     const userAlive = playoff.userOutcome.status === 'pending';
     return withStatus(
@@ -775,9 +772,7 @@ export function fullCourtHomeControls(input: {
             : sim('Sim rest of bracket', (CAP_RUSH_PLAYOFF_TEAMS - 1) * CAP_RUSH_SERIES_GAMES),
         ],
       },
-      userAlive
-        ? 'Play game-by-game or sim the full series; AI bracket games advance automatically.'
-        : 'Your run is over. Sim the remaining bracket to crown a champion.',
+      '',
     );
   }
   if (regularComplete) {
@@ -790,7 +785,7 @@ export function fullCourtHomeControls(input: {
         },
         secondary: [],
       },
-      'The 82-game regular season is complete. Seed the bracket.',
+      '',
     );
   }
   const reviewSlot = fullCourtNextReviewSlot(played);
@@ -822,7 +817,7 @@ export function fullCourtHomeControls(input: {
       primary: sim('Play next game', 1, interrupted),
       secondary,
     },
-    'Sim one game, to the next review, or through the regular season. Batches pause at a review or an actionable injury.',
+    '',
   );
 }
 

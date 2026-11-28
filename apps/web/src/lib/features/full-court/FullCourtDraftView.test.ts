@@ -165,7 +165,6 @@ describe('FullCourtDraftView', () => {
 
     expect(body).toContain('Locked');
     expect(body).toContain('Draft complete');
-    expect(body).toContain('Every salary is fixed for the run.');
     expect(body).toContain('Locked');
   });
 

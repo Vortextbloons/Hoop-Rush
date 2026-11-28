@@ -5,26 +5,48 @@ import type {
   FullCourtOfferCard,
   FullCourtRoundOffer,
 } from '@hoop-rush/data-contracts';
-import {
-  CAP_RUSH_OFFER_RECIPE,
-  fullCourtRoundOfferSchema,
-  havocInstanceSeed,
-} from '@hoop-rush/data-contracts';
-import { createRng } from '../../sim/rng.ts';
-import { compareStrings } from '../../domain/math.ts';
+import { fullCourtRoundOfferSchema, havocInstanceSeed } from '@hoop-rush/data-contracts';
+import { createRng, shuffle } from '../../sim/rng.ts';
 import { fullCourtSalaryDollarsOf, type FullCourtCatalogIndex } from './draft-catalog.ts';
 import { fullCourtAssessPick } from './draft-economy.ts';
 
 const OFFER_SEED_PURPOSE = 'full-court-offer-v1';
 const MAX_OFFER_ATTEMPTS = 64;
+const ELITE_SLOT_CHANCE = 0.25;
+const STAR_SLOT_CHANCE = 0.45;
 
-function compareOfferCards(left: CapRushSourcePlayer, right: CapRushSourcePlayer): number {
-  return (
-    right.originalOverall - left.originalOverall ||
-    compareStrings(left.displayName, right.displayName) ||
-    compareStrings(left.seasonKey, right.seasonKey) ||
-    compareStrings(left.playerVersionId, right.playerVersionId)
-  );
+interface OfferBucketRule {
+  readonly bucket: CapRushBucket;
+  readonly minOverall: number;
+  readonly maxOverall: number;
+}
+
+const BUCKET_RULES: Readonly<Record<CapRushBucket, OfferBucketRule>> = {
+  elite: { bucket: 'elite', minOverall: 95, maxOverall: 99 },
+  star: { bucket: 'star', minOverall: 90, maxOverall: 99 },
+  strong: { bucket: 'strong', minOverall: 80, maxOverall: 89 },
+  rotation: { bucket: 'rotation', minOverall: 75, maxOverall: 79 },
+  budget: { bucket: 'budget', minOverall: 60, maxOverall: 74 },
+  wildcard: { bucket: 'wildcard', minOverall: 40, maxOverall: 99 },
+};
+
+function roundBucketRecipe(seed: string): readonly OfferBucketRule[] {
+  const rng = createRng(seed);
+  const topSlot1: CapRushBucket =
+    rng.next() < ELITE_SLOT_CHANCE ? 'elite' : rng.next() < 0.5 ? 'strong' : 'rotation';
+  const topSlot2: CapRushBucket =
+    rng.next() < STAR_SLOT_CHANCE ? 'star' : rng.next() < 0.5 ? 'strong' : 'rotation';
+  const buckets: readonly CapRushBucket[] = [
+    topSlot1,
+    topSlot2,
+    'strong',
+    'strong',
+    'rotation',
+    'budget',
+    'budget',
+    'wildcard',
+  ];
+  return buckets.map((bucket) => BUCKET_RULES[bucket]);
 }
 
 function drawBucketPlayer(input: {
@@ -53,9 +75,8 @@ function drawBucketPlayer(input: {
 }
 
 /**
- * Draws a positionless 10-card offer for the current Full Court round using Cap Rush's
- * overall-tier recipe (`elite`, `star`, `strong`, `rotation`, `budget`, `wildcard`),
- * sorted by overall descending.
+ * Draws a positionless 8-card offer for the current Full Court round with varied
+ * per-round star odds and shuffled card order (like Cap Rush).
  */
 export function drawFullCourtRoundOffer(input: {
   readonly index: FullCourtCatalogIndex;
@@ -74,36 +95,49 @@ export function drawFullCourtRoundOffer(input: {
   for (let attempt = 0; attempt < MAX_OFFER_ATTEMPTS; attempt += 1) {
     const attemptExcluded = new Set(excluded);
     const drawn: { bucket: CapRushBucket; player: CapRushSourcePlayer }[] = [];
+    const recipe = roundBucketRecipe(
+      havocInstanceSeed(
+        input.state.runSeed,
+        OFFER_SEED_PURPOSE,
+        `r${String(input.round)}-a${String(attempt)}-recipe`,
+      ),
+    );
 
-    for (const rule of CAP_RUSH_OFFER_RECIPE) {
-      for (let slot = 0; slot < rule.count; slot += 1) {
-        const seed = havocInstanceSeed(
-          input.state.runSeed,
-          OFFER_SEED_PURPOSE,
-          `r${String(input.round)}-a${String(attempt)}-${rule.bucket}-${String(slot)}`,
-        );
-        const player = drawBucketPlayer({
-          candidates,
-          minOverall: rule.minOverall,
-          maxOverall: rule.maxOverall,
-          excludedPlayerIds: attemptExcluded,
-          seed,
-        });
-        if (player === null) break;
-        attemptExcluded.add(player.playerId);
-        drawn.push({ bucket: rule.bucket, player });
-      }
+    for (const [slot, rule] of recipe.entries()) {
+      const seed = havocInstanceSeed(
+        input.state.runSeed,
+        OFFER_SEED_PURPOSE,
+        `r${String(input.round)}-a${String(attempt)}-${rule.bucket}-${String(slot)}`,
+      );
+      const player = drawBucketPlayer({
+        candidates,
+        minOverall: rule.minOverall,
+        maxOverall: rule.maxOverall,
+        excludedPlayerIds: attemptExcluded,
+        seed,
+      });
+      if (player === null) break;
+      attemptExcluded.add(player.playerId);
+      drawn.push({ bucket: rule.bucket, player });
     }
 
     if (drawn.length === 0) return undefined;
-    const cards = [...drawn]
-      .sort((left, right) => compareOfferCards(left.player, right.player))
-      .map((entry, cardIndex): FullCourtOfferCard => ({
-        cardIndex,
-        bucket: entry.bucket,
-        player: entry.player,
-        salaryDollars: fullCourtSalaryDollarsOf(entry.player),
-      }));
+    const shuffled = shuffle(
+      drawn,
+      createRng(
+        havocInstanceSeed(
+          input.state.runSeed,
+          OFFER_SEED_PURPOSE,
+          `r${String(input.round)}-a${String(attempt)}-shuffle`,
+        ),
+      ),
+    );
+    const cards = shuffled.map((entry, cardIndex): FullCourtOfferCard => ({
+      cardIndex,
+      bucket: entry.bucket,
+      player: entry.player,
+      salaryDollars: fullCourtSalaryDollarsOf(entry.player),
+    }));
 
     fallbackCards ??= cards;
     const hasLegalPick = cards.some(

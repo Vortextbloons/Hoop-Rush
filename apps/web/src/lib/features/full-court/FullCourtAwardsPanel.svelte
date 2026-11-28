@@ -264,9 +264,6 @@
     title={awards.regularComplete ? 'Season Awards' : 'Awards Race'}
     level={2}
     size="md"
-    description={awards.regularComplete
-      ? 'Final regular-season and postseason honors across all 30 franchises.'
-      : 'Live MVP, Defensive Player of the Year, and Sixth Man standings.'}
   >
     {#snippet actions()}
       <div class="flex flex-wrap items-center gap-1.5">
@@ -289,9 +286,7 @@
   </SectionHeading>
 
   {#if !awards.hasPlayerStats}
-    <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-      Simulate at least one game to populate player averages, league leaders, and award races.
-    </p>
+    <p class="mt-3 text-xs text-muted-foreground">Play a game to populate award races.</p>
   {:else}
     <div class="award-board mt-4">
       {#each awardCards as award (award.id)}

@@ -128,7 +128,7 @@ describe('full court home controls', () => {
     });
     expect(controls.primary).toBeNull();
     expect(controls.secondary).toEqual([]);
-    expect(controls.status).toBe('The next game cannot continue until the forfeit is accepted.');
+    expect(controls.status).toBe('');
   });
 
   test('offers playoff seeding once all 82 games are played', () => {
@@ -157,9 +157,7 @@ describe('full court home controls', () => {
       label: 'Sim series',
       ignoreOpponentAdjustment: true,
     });
-    expect(controls.status).toBe(
-      'Play game-by-game or sim the full series; AI bracket games advance automatically.',
-    );
+    expect(controls.status).toBe('');
   });
 
   test('offers a remaining-bracket batch after the user is eliminated', () => {
@@ -175,7 +173,7 @@ describe('full court home controls', () => {
     expect(controls.secondary[0]).toMatchObject({
       label: 'Sim rest of bracket',
     });
-    expect(controls.status).toContain('Your run is over');
+    expect(controls.status).toBe('');
   });
 
   test('stops offering sim actions once a champion exists', () => {

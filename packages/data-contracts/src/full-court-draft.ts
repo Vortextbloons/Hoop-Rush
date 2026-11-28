@@ -61,7 +61,8 @@ export const FULL_COURT_DEFAULT_MONEY: FullCourtMoneyConfig = fullCourtMoneyConf
   capLineDollars: FULL_COURT_CAP_LINE_DOLLARS,
   firstApronDollars: FULL_COURT_FIRST_APRON_DOLLARS,
   hardLimitDollars: FULL_COURT_HARD_LIMIT_DOLLARS,
-  startingWarChestDollars: 180_000_000,
+  // The War Chest must reach the second apron so a draft can build into it.
+  startingWarChestDollars: FULL_COURT_HARD_LIMIT_DOLLARS,
 });
 
 /**

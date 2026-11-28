@@ -40,6 +40,7 @@ export interface FullCourtDraftSummary {
   readonly payrollRoomDollars: number;
   readonly status: CapRushPayrollStatus;
   readonly spentDollars: number;
+  readonly perkSpendDollars: number;
   readonly warChestDollars: number;
   readonly canPick: boolean;
   readonly canFinish: boolean;
@@ -54,6 +55,9 @@ export function fullCourtDraftSummary(
   const rosterCount = draft.picks.length;
   const payrollDollars = fullCourtPayrollDollars(draft.picks);
   const warChestDollars = fullCourtWarChestDollars(draft);
+  const perkSpendDollars = draft.spending
+    .filter((entry) => entry.kind === 'scouting')
+    .reduce((total, entry) => total + entry.dollars, 0);
   const depthForecast = fullCourtDepthForecast({ index, state: draft });
   return {
     rosterCount,
@@ -63,6 +67,7 @@ export function fullCourtDraftSummary(
     payrollRoomDollars: draft.money.hardLimitDollars - payrollDollars,
     status: fullCourtPayrollStatus(payrollDollars, draft.money),
     spentDollars: draft.money.startingWarChestDollars - warChestDollars,
+    perkSpendDollars,
     warChestDollars,
     canPick: draft.stage === 'drafting' && rosterCount < FULL_COURT_MAX_ROSTER_SIZE,
     canFinish: draft.stage === 'drafting' && rosterCount >= FULL_COURT_MIN_ROSTER_SIZE,
@@ -292,7 +297,7 @@ export function fullCourtLockCopy(
     return {
       stamp: 'Locked',
       headline: 'Draft complete',
-      detail: `${String(summary.rosterCount)} players on ${formatMillions(summary.payrollDollars)} payroll, ${formatMillions(summary.warChestDollars)} budget left. Every salary is fixed for the run.`,
+      detail: `${String(summary.rosterCount)} players · ${formatMillions(summary.payrollDollars)} payroll · ${formatMillions(summary.warChestDollars)} budget left.`,
     };
   }
   if (!summary.canFinish) {
@@ -307,7 +312,7 @@ export function fullCourtLockCopy(
   return {
     stamp: null,
     headline: filled ? 'Roster is full' : 'Lock the roster',
-    detail: `${String(summary.rosterCount)} players, ${formatMillions(summary.payrollDollars)} payroll, ${formatMillions(summary.warChestDollars)} budget left. ${filled ? 'Lock to freeze every salary.' : 'Unused places are skipped and every salary freezes.'}`,
+    detail: `${String(summary.rosterCount)} players · ${formatMillions(summary.payrollDollars)} payroll · ${formatMillions(summary.warChestDollars)} budget left.`,
   };
 }
 

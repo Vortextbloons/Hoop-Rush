@@ -27,7 +27,6 @@
   import {
     fullCourtHomeControls,
     fullCourtPlayoffAdaptationRead,
-    fullCourtPlayoffStatus,
     fullCourtSeriesGames,
     fullCourtUserSeries,
     type FullCourtAdvanceOptions,
@@ -155,9 +154,6 @@
     }
     return { wins, losses };
   });
-  const status = $derived(
-    playoff === null ? null : fullCourtPlayoffStatus(playoff, userTeamId, teamName),
-  );
   const playoffRounds = $derived(
     playoff === null
       ? 0
@@ -233,25 +229,6 @@
     if (round === 1) return 'The first round is live';
     return `${capRushConferenceRoundName(round)} is live`;
   });
-
-  const message = $derived.by(() => {
-    if (playoff === null) {
-      return regularComplete
-        ? 'The regular season is complete. Seed the top eight in each conference and play the bracket.'
-        : `${String(remaining)} ${remaining === 1 ? 'regular-season game remains' : 'regular-season games remain'} before the top eight in each conference are seeded.`;
-    }
-    if (championId !== null) return status?.message ?? '';
-    if (playoff.userOutcome.status === 'not-qualified') {
-      return `You finished ${userRow === null ? 'outside the top eight' : `${String(userRow.seed)} in the ${userRow.conference} conference at ${recordLabel(userRow.wins, userRow.losses)}`}. The bracket finishes without you — sim it to crown a champion.`;
-    }
-    if (playoff.userOutcome.status === 'eliminated') {
-      return `The ${capRushConferenceRoundName(playoff.userOutcome.round ?? 1)} ended your run. The rest of the bracket is finishing without you.`;
-    }
-    if (!userSeriesActive) {
-      return 'Your series is decided. The rest of the round must finish before the next round opens.';
-    }
-    return 'One game at a time. Your locked lineup, rotation and health carry into every round.';
-  });
 </script>
 
 <section class="postseason flex flex-col gap-3" aria-label="Full Court postseason">
@@ -259,7 +236,6 @@
     <div class="min-w-0">
       <p class="ui-label">Full Court · Postseason</p>
       <h1 class="postseason-title">{headline}</h1>
-      <p class="postseason-message">{message}</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       {#if userRow !== null}
@@ -365,7 +341,9 @@
         {/each}
       {/if}
     </div>
-    <p class="mt-2 text-[11px] text-muted-foreground" role="status">{controls.status}</p>
+    {#if controls.status}
+      <p class="mt-2 text-[11px] text-muted-foreground" role="status">{controls.status}</p>
+    {/if}
 
     {#if pendingForfeit}
       <Alert class="mt-3" tone="warning" title="Confirm the forfeit">
@@ -381,12 +359,18 @@
         {/snippet}
       </Alert>
     {:else if notice !== null && !busy}
-      <Alert class="mt-3" tone={notice.tone} title={notice.title}>
-        <p>{notice.message}</p>
-        {#snippet actions()}
-          <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
-        {/snippet}
-      </Alert>
+      {#if notice.stop.kind === 'injury'}
+        <Alert class="mt-3" tone={notice.tone} title={notice.title}>
+          <p>{notice.message}</p>
+          {#snippet actions()}
+            <Button size="sm" tone="secondary" onclick={() => onDismissNotice?.()}>Dismiss</Button>
+          {/snippet}
+        </Alert>
+      {:else}
+        <p class="mt-2 text-xs font-medium text-muted-foreground" role="status">
+          <span class="font-semibold text-foreground">{notice.title}</span> · {notice.message}
+        </p>
+      {/if}
     {/if}
   </Panel>
 
@@ -440,11 +424,6 @@
             </div>
             <div class="shrink-0 text-center">
               <PlayoffSeriesWins {wins} {won} />
-              <div class="mt-1 flex justify-center gap-1" aria-hidden="true">
-                {#each [0, 1, 2, 3] as pip (pip)}
-                  <span class="pip" data-filled={pip < wins}></span>
-                {/each}
-              </div>
             </div>
           </div>
           {#if index === 0}
@@ -455,19 +434,6 @@
           {/if}
         {/each}
       </div>
-
-      {#if userSeriesActive && userPlayoffAdjustment !== null}
-        <div class="adjustment" aria-label="Playoff opponent adjustment">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="ui-label text-muted-foreground">Opponent adjustment</p>
-            <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
-          </div>
-          <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
-          <p class="mt-0.5 text-[11px] text-muted-foreground">
-            {userPlayoffAdjustment.detailLabel}
-          </p>
-        </div>
-      {/if}
 
       {#if userSeriesGames.length > 0}
         <ol class="mt-4 flex flex-col gap-1.5" aria-label="Games in your playoff series">
@@ -483,29 +449,12 @@
                   >{game.userPoints}–{game.opponentPoints}</span
                 >
               {/snippet}
-              {#if game.opponentAdaptation !== null}
-                {@const adjustment = fullCourtPlayoffAdaptationRead(game.opponentAdaptation)}
-                <span
-                  class="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[8px] font-bold text-accent uppercase"
-                  title={`${adjustment.reasonLabel}: ${adjustment.detailLabel}`}
-                  aria-label={`Game ${String(game.gameOrdinal)} opponent adjustment: ${adjustment.settingLabel}`}
-                  >{adjustment.settingLabel}</span
-                >
-              {/if}
               {#if game.forfeit}
                 <span class="font-mono text-[8px] text-muted-foreground uppercase">Forfeit</span>
               {/if}
             </PlayoffGameRow>
           {/each}
         </ol>
-      {/if}
-
-      {#if latestSeriesGame !== null && opponentId !== null && championId === null}
-        <p class="mt-3 text-[11px] text-muted-foreground">
-          Latest: Game {latestSeriesGame.gameOrdinal}
-          {latestSeriesGame.userHome ? 'at home' : 'on the road'} against {teamName(opponentId)}.
-          Series {userSeriesWins}–{opponentWins}.
-        </p>
       {/if}
     </section>
   {:else if playoff !== null && championId === null}
@@ -514,11 +463,6 @@
         {playoff.userOutcome.status === 'not-qualified'
           ? 'Not in the bracket'
           : 'The bracket moves on'}
-      </p>
-      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-        {playoff.userOutcome.status === 'not-qualified'
-          ? 'No series for your five this season. Sim the remaining rounds to crown a champion.'
-          : 'Your run is over. Sim the remaining rounds to crown a champion.'}
       </p>
     </Panel>
   {/if}
@@ -572,14 +516,6 @@
     text-transform: uppercase;
   }
 
-  .postseason-message {
-    margin: 0.45rem 0 0;
-    max-width: 52ch;
-    color: var(--color-muted-foreground);
-    font-size: 0.8125rem;
-    line-height: 1.6;
-  }
-
   .postseason-champion-name {
     margin: 0.15rem 0 0;
     font-family: var(--font-display);
@@ -607,14 +543,6 @@
     border-color: var(--color-line-soft);
     background: var(--color-surface-2);
     color: var(--color-muted-foreground);
-  }
-
-  .adjustment {
-    margin-top: 0.75rem;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.75rem;
-    background: var(--color-surface-1);
   }
 
   .series-panel {
@@ -648,16 +576,5 @@
   .series-side-user {
     border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
     background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface-1));
-  }
-
-  .pip {
-    width: 0.4rem;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--color-surface-3);
-  }
-
-  .pip[data-filled='true'] {
-    background: var(--color-accent);
   }
 </style>
