@@ -1,0 +1,63 @@
+﻿bun : $ svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+At C:\Users\isaac\AppData\Local\Temp\ps-script-fc911670-384c-45e8-9ce8-b9e1590126f5.ps1:643 char:70
++ ... \DevProjects\Web Apps\Hoop Rush\apps\web"; bun run check 2>&1 | Out-F ...
++                                                ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ($ svelte-kit sy..../tsconfig.json:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Loading svelte-check in workspace: c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web
+Getting Svelte diagnostics...
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\..\..\packages\engine\src\sim\possession-wasm.ts:284:24
+Error: Expected 7 arguments, but got 6. 
+        const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
+        const values = shotComponents(player, profile, zone, action, prep.spacing, anchor);
+        for (let component = 0; component < 7; component += 1) {
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\..\..\packages\engine\src\sim\possession-wasm.ts:308:28
+Error: Expected 4 arguments, but got 3. 
+        const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
+        const components = blockComponents(player, zone, action);
+        blockValue[index] = components[0];
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\..\..\packages\engine\src\sim\possession-wasm.ts:322:13
+Error: Expected 7 arguments, but got 6. 
+          assistData.push(
+            assistBase(profile, passingAnchorFactor, initiator, action, zone, shooter),
+          );
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\src\lib\features\full-court\FullCourtTeamDetail.svelte:205:15
+Error: Object literal may only specify known properties, and '"minWidth"' does not exist in type '{ columns?: 1 | 2 | 3 | 4 | 5 | undefined; mobile?: 1 | 2 | 3 | undefined; gap?: "md" | "sm" | undefined; children: Snippet<[]>; } & HTMLAttributes<HTMLDListElement>'. (ts)
+  {#if standing !== null}
+    <StatGrid minWidth="7.5rem">
+      <StatTile
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\src\lib\features\full-court\FullCourtSeasonView.svelte:118:39
+Error: Block-scoped variable 'teamsById' used before its declaration. (ts)
+  const selectedTeam = $derived(
+    selectedTeamId === null ? null : (teamsById.get(selectedTeamId) ?? null),
+  );
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\src\lib\features\full-court\FullCourtSeasonView.svelte:118:39
+Error: Variable 'teamsById' is used before being assigned. (ts)
+  const selectedTeam = $derived(
+    selectedTeamId === null ? null : (teamsById.get(selectedTeamId) ?? null),
+  );
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\src\lib\features\full-court\FullCourtSeasonView.svelte:121:39
+Error: Cannot find name 'standingsById'. Did you mean 'standings'? (ts)
+  const selectedTeamStanding = $derived(
+    selectedTeamId === null ? null : (standingsById.get(selectedTeamId) ?? null),
+  );
+
+c:\Users\isaac\Desktop\DevProjects\Web Apps\Hoop Rush\apps\web\src\lib\features\full-court\full-court-worker-runner.ts:266:7
+Error: Type 'FullCourtGameHealthOutcome' is not assignable to type 'ResolvedGame'.
+  Type '{ readonly kind: "rest-conflict"; readonly sides: readonly Side[]; }' is not assignable to type 'ResolvedGame'.
+    Type '{ readonly kind: "rest-conflict"; readonly sides: readonly Side[]; }' is missing the following properties from type '{ readonly kind: "forfeit"; readonly sides: readonly Side[]; readonly winner: Side | null; readonly health: Readonly<Record<Side, { version: "full-court-health-v1"; teamId: string; throughDay: number; players: Record<...>; }>>; }': winner, health 
+      scores,
+      userGame: userOutcome.userGame,
+    };
+
+====================================
+svelte-check found 8 errors and 0 warnings in 4 files
+error: script "check" exited with code 1

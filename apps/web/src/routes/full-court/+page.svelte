@@ -433,7 +433,6 @@
         {/if}
       {:else if section === 'home' && runComplete}
         <section aria-label="Final review" class="space-y-4">
-          <SectionHeading title="Final review" />
           {#if review === null}
             <p role="status" class="text-sm text-muted-foreground">Loading season summary</p>
           {:else}
@@ -451,7 +450,25 @@
                   meta={entry.playoffLabel}
                   tone={entry.playoffStatus === 'champion' ? 'champion' : 'default'}
                 />
-                <FullCourtRunSummary {entry} showHeadline={false} />
+                <Panel as="section" padding="md" aria-label="Open the final report">
+                  <SectionHeading
+                    eyebrow="Season complete"
+                    title="Your final report"
+                    level={2}
+                    size="sm"
+                    description="Season results, roster detail, league stats and awards, and the full playoff bracket open on their own tabbed page."
+                  />
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <ActionLink
+                      href={resolve('/full-court/report/[runId]', { runId: entry.runId })}
+                    >
+                      Open final report
+                    </ActionLink>
+                    <ActionLink href={resolve('/full-court/history')} tone="secondary">
+                      Run history
+                    </ActionLink>
+                  </div>
+                </Panel>
               {:else}
                 <Alert tone="warning" title="Season summary unavailable">
                   You can still review the standings, stats, awards, and playoff bracket.
@@ -459,19 +476,6 @@
               {/if}
             {/await}
           {/if}
-          <div class="flex flex-wrap gap-2">
-            <Button tone="secondary" onclick={() => selectSection('playoffs')}
-              >Playoff bracket</Button
-            >
-            <Button tone="secondary" onclick={() => selectSection('league')}>Final standings</Button
-            >
-            <Button tone="secondary" onclick={() => selectSection('stats')}
-              >Stats &amp; awards</Button
-            >
-            <ActionLink href={resolve('/full-court/history')} tone="secondary"
-              >Run history</ActionLink
-            >
-          </div>
         </section>
       {:else if section !== 'team'}
         <FullCourtSeasonView

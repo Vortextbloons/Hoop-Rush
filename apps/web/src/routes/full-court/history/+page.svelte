@@ -76,7 +76,17 @@
     {:else}
       <ul class="flex flex-col gap-4">
         {#each entries as entry (entry.runId)}
-          <li><FullCourtRunSummary {entry} /></li>
+          <li class="space-y-2">
+            <FullCourtRunSummary {entry} />
+            <div class="flex flex-wrap gap-2 px-1">
+              <ActionLink
+                href={resolve('/full-court/report/[runId]', { runId: entry.runId })}
+                size="sm"
+              >
+                Open final report
+              </ActionLink>
+            </div>
+          </li>
         {/each}
       </ul>
     {/if}
