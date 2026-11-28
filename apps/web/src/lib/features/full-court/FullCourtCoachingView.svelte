@@ -17,7 +17,6 @@
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
-  import Disclosure from '#lib/components/ui/Disclosure.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
@@ -35,6 +34,8 @@
     activeRotationForBlueprint,
     applyFullCourtBlueprintToDraft,
     defaultFullCourtCoachingDraft,
+    historicalThreePointShare,
+    rebalanceFullCourtMinuteTargets,
     fullCourtCoachingDraft,
     fullCourtCoachingPlan,
     fullCourtCoachingSignature,
@@ -65,6 +66,7 @@
     onRemoveBlueprint,
     readOnly = false,
     opponent = null,
+    leagueThreePointShare = null,
     health = null,
     dayOffset = null,
     art = null,
@@ -83,6 +85,7 @@
     ) => Promise<FullCourtBlueprint>;
     onRemoveBlueprint?: (name: string) => Promise<void>;
     readOnly?: boolean;
+    leagueThreePointShare?: number | null;
     opponent?: { displayName: string; roster: readonly SimulationPlayer[] } | null;
     health?: FullCourtTeamHealth | null;
     dayOffset?: number | null;
@@ -123,7 +126,7 @@
     {
       key: 'floorGeneralPlayerId',
       label: 'Floor general',
-      hint: 'Starts more possessions and passes more instead of shooting more.',
+      hint: 'Starts more possessions and looks to pass. Can also be a scoring option.',
     },
   ] as const satisfies readonly {
     key: keyof FullCourtOffensiveHierarchyDraft;
@@ -208,18 +211,14 @@
         : labelFor(OFFENSE_OPTIONS, draft.tactics.offense)
     } · ${labelFor(DEFENSE_OPTIONS, draft.tactics.defense)}`,
   );
-  const opponentThreePointShare = $derived.by(() => {
-    let attempts = 0;
-    let threes = 0;
-    for (const player of opponent?.roster ?? []) {
-      const anchors = player.anchors;
-      if (!anchors || anchors.threePointAttemptRate == null) continue;
-      const weight = anchors.minutesPerGame;
-      attempts += weight;
-      threes += weight * anchors.threePointAttemptRate;
-    }
-    return attempts > 0 ? Math.round((100 * threes) / attempts) : null;
-  });
+  const opponentThreePointShare = $derived(
+    opponent === null ? null : historicalThreePointShare(opponent.roster),
+  );
+  const opponentThreePointRead = $derived(
+    opponentThreePointShare === null || leagueThreePointShare === null
+      ? null
+      : Math.round(opponentThreePointShare) - Math.round(leagueThreePointShare),
+  );
   const hasHealthData = $derived(rotationRows.some((row) => row.health !== null));
   const availabilityHeadline = $derived(
     unavailableRotation.length > 0
@@ -239,25 +238,12 @@
           ? 'Rotation cleared to play.'
           : 'Availability appears once the season starts.',
   );
-  const availabilityTone = $derived(
-    unavailableRotation.length > 0
-      ? 'text-negative'
-      : fatiguedRotation.length > 0
-        ? 'text-accent'
-        : hasHealthData
-          ? 'text-positive'
-          : 'text-muted-foreground',
-  );
   const minutesGap = $derived(FULL_COURT_MINUTE_TOTAL - displayedMinutes);
   const planCheckHeadline = $derived(
     validation.valid
       ? 'Ready'
       : `${String(validation.errors.length)} ${validation.errors.length === 1 ? 'issue' : 'issues'}`,
   );
-  const planCheckNote = $derived(
-    validation.valid ? 'No blocking problems.' : (validation.errors[0] ?? 'Review the plan.'),
-  );
-
   function labelFor<T extends string>(
     options: readonly { value: T; label: string }[],
     value: T,
@@ -384,7 +370,20 @@
   function setMinutes(playerId: string, raw: string): void {
     const parsed = Number(raw);
     draft.minuteTargets[playerId] = Number.isFinite(parsed) ? parsed : 0;
+    lastMinutesEdit = playerId;
     markEdited();
+  }
+
+  function rebalanceMinutes(): void {
+    draft.minuteTargets = rebalanceFullCourtMinuteTargets(
+      draft,
+      rosterIds,
+      defaultRotation.minuteTargets,
+      lastMinutesEdit,
+    );
+    lastMinutesEdit = null;
+    markEdited();
+    announcement = 'Rotation minutes rebalanced.';
   }
 
   function nextUnitName(): string {
@@ -459,6 +458,13 @@
     markEdited();
   }
 
+  const WORKSPACES = [
+    { id: 'plan', label: 'Game Plan' },
+    { id: 'rotation', label: 'Rotation' },
+    { id: 'situations', label: 'Game Situations' },
+  ] as const;
+  let workspace = $state<(typeof WORKSPACES)[number]['id']>('plan');
+  let lastMinutesEdit: string | null = null;
   let readHandler = $state('');
   const starterStrengths = $derived(
     scoutedRoster === null
@@ -636,163 +642,35 @@
       </label>
     {/snippet}
 
-    <fieldset class="m-0 min-w-0 border-0 p-0" disabled={locked}>
-      <legend class="sr-only">Team</legend>
-      <SectionHeading level={3} size="sm" title="Game plan">
-        {#snippet actions()}
-          <Badge tone={dirty ? 'accent' : 'positive'}>
-            {dirty ? 'Unsaved changes' : 'Saved'}
-          </Badge>
-        {/snippet}
-      </SectionHeading>
-
-      <div class="plan-glance mt-3">
-        <div>
-          <p class="ui-micro">Rotation</p>
-          <p class="plan-glance-value">{editingRotation ? 'My plan' : 'Staff plan'}</p>
-          <p class="plan-glance-note">{playersUsed} players · {displayedMinutes} min</p>
-        </div>
-        <div>
-          <p class="ui-micro">Style</p>
-          <p class="plan-glance-value">{styleSummary}</p>
-          <p class="plan-glance-note">
-            {draft.tactics.ballMovement || draft.tactics.offense === 'ball-movement'
-              ? 'Ball movement on'
-              : 'Standard passing'}
-          </p>
-        </div>
-        <div>
-          <p class="ui-micro">Availability</p>
-          <p class="plan-glance-value {availabilityTone}">{availabilityHeadline}</p>
-          <p class="plan-glance-note">{availabilityNote}</p>
-        </div>
-        <div>
-          <p class="ui-micro">Plan check</p>
-          <p class="plan-glance-value {validation.valid ? 'text-positive' : 'text-negative'}">
-            {planCheckHeadline}
-          </p>
-          <p class="plan-glance-note">{planCheckNote}</p>
-        </div>
+    <header class="board-header">
+      <div>
+        <h3>Coaching Board</h3>
+        <p>
+          {readOnly
+            ? 'The plan used for this run.'
+            : opponent === null
+              ? 'Season game plan'
+              : `Next game vs. ${opponent.displayName}`}
+        </p>
       </div>
-
-      <div class="mt-3 grid gap-3">
-        <Panel as="section" padding="sm" aria-label="Style">
-          <SectionHeading level={4} size="sm" title="Team tactics" />
-          <div class="mt-3 grid gap-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Pace</span>
-              <SegmentedControl
-                label="Pace"
-                value={draft.tactics.pace}
-                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.pace = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Shot emphasis</span>
-              <SegmentedControl
-                label="Shot emphasis"
-                value={draft.tactics.offense === 'ball-movement'
-                  ? 'balanced'
-                  : draft.tactics.offense}
-                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  if (draft.tactics.offense === 'ball-movement') draft.tactics.ballMovement = true;
-                  draft.tactics.offense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <label class="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  class="mt-1 accent-primary"
-                  disabled={locked}
-                  checked={draft.tactics.ballMovement === true ||
-                    draft.tactics.offense === 'ball-movement'}
-                  onchange={(event) => {
-                    if (draft.tactics.offense === 'ball-movement')
-                      draft.tactics.offense = 'balanced';
-                    if (event.currentTarget.checked) draft.tactics.ballMovement = true;
-                    else delete draft.tactics.ballMovement;
-                    markEdited();
-                  }}
-                />
-                <span>
-                  <span class="block text-sm font-semibold">Move the ball</span>
-                  <span class="text-xs text-muted-foreground"
-                    >More passing and assists, with more turnover risk.</span
-                  >
-                </span>
-              </label>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Defense</span>
-              <SegmentedControl
-                label="Defense"
-                value={draft.tactics.defense}
-                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.defense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-          </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            {draft.tactics.defense === 'pressure'
-              ? 'Force more steals at the cost of energy and defensive rebounds.'
-              : draft.tactics.defense === 'protect-paint'
-                ? 'Give up more outside shots to protect the rim and secure rebounds.'
-                : 'Use each player’s usual defensive tendencies.'}
-          </p>
-          {#if !readOnly && opponent !== null && opponentThreePointShare !== null}
-            <p class="mt-1 text-xs text-muted-foreground">
-              {opponent.displayName} averaged a {opponentThreePointShare}% three-point shot share
-              across its players' historical seasons, weighted by minutes.
-            </p>
-          {/if}
-        </Panel>
-
-        {#if !readOnly}
-          <Panel as="section" padding="sm" aria-label="Scoring options">
-            <SectionHeading level={4} size="sm" title="Scoring options" />
-            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-              {@render roleSelect(HIERARCHY_ROLES[0])}
-              {@render roleSelect(HIERARCHY_ROLES[1])}
-            </div>
-          </Panel>
-        {/if}
-      </div>
-
-      {#if !readOnly && editingRotation && minutesGap !== 0}
-        <div
-          class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2"
+      <Badge tone={validation.valid ? 'neutral' : 'negative'}>
+        {validation.valid ? availabilityHeadline : planCheckHeadline}
+      </Badge>
+    </header>
+    <nav class="workspace-nav" aria-label="Coaching workspace">
+      {#each WORKSPACES as item (item.id)}
+        <button
+          type="button"
+          aria-current={workspace === item.id ? 'true' : undefined}
+          onclick={() => (workspace = item.id)}
         >
-          <p class="text-xs font-semibold text-accent">
-            {minutesGap > 0
-              ? `Add ${String(minutesGap)} more ${minutesGap === 1 ? 'minute' : 'minutes'} to reach ${String(FULL_COURT_MINUTE_TOTAL)}.`
-              : `Remove ${String(Math.abs(minutesGap))} ${Math.abs(minutesGap) === 1 ? 'minute' : 'minutes'} to reach ${String(FULL_COURT_MINUTE_TOTAL)}.`}
-          </p>
-          <Button
-            size="sm"
-            tone="secondary"
-            disabled={locked}
-            onclick={() => {
-              draft.minuteTargets = { ...defaultRotation.minuteTargets };
-              markEdited();
-              announcement = 'Staff minutes copied. Save changes to use them.';
-            }}
-          >
-            Autofill minutes
-          </Button>
-        </div>
-      {/if}
+          {item.label}
+        </button>
+      {/each}
+    </nav>
 
+    <fieldset class="m-0 min-w-0 border-0 p-0" disabled={locked}>
+      <legend class="sr-only">Coaching plan</legend>
       {#if !validation.valid}
         <div
           class="mt-3 rounded-lg border border-negative/40 bg-negative/10 px-3 py-2"
@@ -806,7 +684,224 @@
         </div>
       {/if}
 
-      <div class="mt-3 grid gap-3">
+      <div class="workspace-content" hidden={workspace !== 'plan'}>
+        <div class="plan-grid" class:read-only={readOnly}>
+          {#if !readOnly}
+            <Panel as="section" padding="sm" aria-label="Strategy presets">
+              <FullCourtBlueprintPicker
+                tactics={draft.tactics}
+                {roster}
+                rotation={blueprintRotation}
+                hierarchy={draft.hierarchy}
+                disabled={locked}
+                onApplyTactics={applyStrategyTactics}
+                onApplyBlueprint={applyStrategyBlueprint}
+                {onListBlueprints}
+                {onSaveBlueprint}
+                {onRemoveBlueprint}
+              />
+            </Panel>
+          {/if}
+          <Panel as="section" padding="sm" aria-label="Style">
+            <SectionHeading level={4} size="sm" title="Team tactics" description={styleSummary} />
+            <div class="mt-3 grid gap-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Pace</span>
+                <SegmentedControl
+                  label="Pace"
+                  value={draft.tactics.pace}
+                  options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    draft.tactics.pace = value;
+                    markEdited();
+                  }}
+                />
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Shot emphasis</span>
+                <SegmentedControl
+                  label="Shot emphasis"
+                  value={draft.tactics.offense === 'ball-movement'
+                    ? 'balanced'
+                    : draft.tactics.offense}
+                  options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    if (draft.tactics.offense === 'ball-movement')
+                      draft.tactics.ballMovement = true;
+                    draft.tactics.offense = value;
+                    markEdited();
+                  }}
+                />
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <label class="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    class="mt-1 accent-primary"
+                    disabled={locked}
+                    checked={draft.tactics.ballMovement === true ||
+                      draft.tactics.offense === 'ball-movement'}
+                    onchange={(event) => {
+                      if (draft.tactics.offense === 'ball-movement')
+                        draft.tactics.offense = 'balanced';
+                      if (event.currentTarget.checked) draft.tactics.ballMovement = true;
+                      else delete draft.tactics.ballMovement;
+                      markEdited();
+                    }}
+                  />
+                  <span>
+                    <span class="block text-sm font-semibold">Move the ball</span>
+                    <span class="text-xs text-muted-foreground"
+                      >More passing and assists, with more turnover risk.</span
+                    >
+                  </span>
+                </label>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Defense</span>
+                <SegmentedControl
+                  label="Defense"
+                  value={draft.tactics.defense}
+                  options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    draft.tactics.defense = value;
+                    markEdited();
+                  }}
+                />
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-muted-foreground">
+              {draft.tactics.defense === 'pressure'
+                ? 'Force more steals at the cost of energy and defensive rebounds.'
+                : draft.tactics.defense === 'protect-paint'
+                  ? 'Give up more outside shots to protect the rim and secure rebounds.'
+                  : 'Use each player’s usual defensive tendencies.'}
+            </p>
+            {#if !readOnly && opponent !== null && opponentThreePointShare !== null}
+              <p class="mt-1 text-xs text-muted-foreground">
+                {opponent.displayName} &middot; {Math.round(opponentThreePointShare)}% historical
+                three-point share
+                {#if opponentThreePointRead !== null}
+                  {#if opponentThreePointRead === 0}
+                    &middot; matches the league average
+                  {:else}
+                    &middot; {Math.abs(opponentThreePointRead)} pts
+                    {opponentThreePointRead > 0 ? 'above' : 'below'} the league average
+                  {/if}
+                {/if}
+              </p>
+            {/if}
+          </Panel>
+        </div>
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Scoring options">
+            <SectionHeading level={4} size="sm" title="Offensive roles" />
+            <div class="mt-3 grid gap-3 sm:grid-cols-3">
+              {@render roleSelect(HIERARCHY_ROLES[0])}
+              {@render roleSelect(HIERARCHY_ROLES[1])}
+              {@render roleSelect(HIERARCHY_ROLES[2])}
+            </div>
+          </Panel>
+        {/if}
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Offensive roles">
+            <SectionHeading level={4} size="sm" title="Playmaking" />
+            <div class="mt-4 grid gap-3 md:grid-cols-3">
+              <label class="grid gap-1">
+                <span class="text-sm font-semibold">Ball handler</span>
+                <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
+                  <option value="">Choose a player</option>
+                  {#each roster as player (player.playerId)}
+                    <option value={player.playerId}>{player.displayName}</option>
+                  {/each}
+                </select>
+              </label>
+              {#each [0, 1] as slot (slot)}
+                <label class="grid gap-1">
+                  <span class="text-sm font-semibold"
+                    >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
+                  >
+                  <select
+                    class={SELECT_CLASS}
+                    disabled={locked || readHandler === '' || (slot === 1 && reads.length === 0)}
+                    value={reads[slot] ?? ''}
+                    onchange={(event) => setRead(slot, event.currentTarget.value)}
+                  >
+                    <option value="">Use player tendencies</option>
+                    {#each roster as player (player.playerId)}
+                      {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
+                        <option value={player.playerId}>{player.displayName}</option>
+                      {/if}
+                    {/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+            <p class="mt-2 text-xs text-muted-foreground">
+              The top target gets the strongest preference. Players still follow their tendencies.
+            </p>
+            {#each draft.units as unit, index (index)}
+              <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
+                <legend class="text-sm font-semibold">{unit.name}</legend>
+                {#if scoutedRoster !== null}
+                  {@const strengths = fullCourtLineupFitReport(
+                    scoutedRoster.filter((player) => unit.playerIds.includes(player.playerId)),
+                  ).strengths}
+                  {#if strengths.length}
+                    <p class="text-xs text-muted-foreground md:col-span-2">
+                      {strengths.map((strength) => LINEUP_FINDING_LABELS[strength.code]).join(', ')}
+                    </p>
+                  {/if}
+                {/if}
+                {#each ['floorGeneralPlayerId', 'primaryPlayerId'] as role (role)}
+                  {@const key =
+                    role === 'primaryPlayerId' ? 'primaryPlayerId' : 'floorGeneralPlayerId'}
+                  <label class="grid gap-1">
+                    <span class="text-xs"
+                      >{key === 'primaryPlayerId' ? 'Scoring priority' : 'Initiator'}</span
+                    >
+                    <select
+                      class={SELECT_CLASS}
+                      disabled={locked}
+                      value={unitRoles(unit)?.[key] ?? ''}
+                      onchange={(event) => setUnitRole(unit, key, event.currentTarget.value)}
+                    >
+                      <option value="">Use team role</option>
+                      {#each unit.playerIds as id (id)}
+                        <option value={id}>{playerNames.get(id)}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {/each}
+              </fieldset>
+            {/each}
+            <div class="mt-4 rounded-lg border border-line-soft bg-surface-1 px-3 py-2.5"></div>
+          </Panel>
+        {/if}
+      </div>
+      <div class="workspace-content" hidden={workspace !== 'rotation'}>
+        {#if !readOnly && editingRotation && minutesGap !== 0}
+          <div
+            class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2"
+          >
+            <p class="text-xs font-semibold text-accent">
+              {minutesGap > 0
+                ? `Add ${String(minutesGap)} more ${minutesGap === 1 ? 'minute' : 'minutes'} to reach ${String(FULL_COURT_MINUTE_TOTAL)}.`
+                : `Remove ${String(Math.abs(minutesGap))} ${Math.abs(minutesGap) === 1 ? 'minute' : 'minutes'} to reach ${String(FULL_COURT_MINUTE_TOTAL)}.`}
+            </p>
+            <Button
+              size="sm"
+              tone="secondary"
+              disabled={locked}
+              onclick={() => {
+                rebalanceMinutes();
+              }}
+            >
+              Rebalance minutes
+            </Button>
+          </div>
+        {/if}
+
         <Panel as="section" padding="sm" aria-label="Lineup and minutes">
           <SectionHeading level={4} size="sm" title="Lineup and minutes">
             {#snippet actions()}
@@ -825,6 +920,49 @@
             {/snippet}
           </SectionHeading>
 
+          <div class="rotation-brief">
+            <div>
+              <strong>{playersUsed} players</strong>
+              <span>{displayedMinutes} planned minutes</span>
+            </div>
+            <div>
+              <strong
+                >{rotationRows.filter((row) => row.minutes >= 40).length} heavy-minute players</strong
+              >
+              <span>40 or more planned minutes</span>
+            </div>
+            <div>
+              <strong>{availabilityHeadline}</strong>
+              <span>{availabilityNote}</span>
+            </div>
+          </div>
+
+          {#if !readOnly}
+            <label class="flex items-start gap-2">
+              <input
+                type="checkbox"
+                class="mt-0.5 size-4 shrink-0 accent-primary"
+                checked={draft.staggerStars}
+                disabled={locked}
+                onchange={(event) => {
+                  draft.staggerStars = event.currentTarget.checked;
+                  markEdited();
+                }}
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-semibold">Stagger stars</span>
+                <span class="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  Keep at least one primary or secondary option on the floor when available.
+                  Foul-outs, injuries, exhaustion, and explicit rules still take priority.
+                </span>
+                {#if !hasStaggerScorers}
+                  <span class="mt-1 block text-[11px] font-semibold text-accent">
+                    Assign a primary or secondary option to use this preference.
+                  </span>
+                {/if}
+              </span>
+            </label>
+          {/if}
           {#if starterStrengths.length > 0}
             <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Starting five strengths">
               {#each starterStrengths as strength (strength.code)}
@@ -1062,264 +1200,162 @@
         </Panel>
 
         {#if !readOnly}
-          <Disclosure
-            summary="Advanced plan"
-            meta="Playmaking, lineup groups, and automatic substitutions"
-          >
-            <div class="grid gap-3">
-              <Panel as="section" padding="sm" aria-label="Offensive roles">
-                <SectionHeading level={4} size="sm" title="Playmaking" />
-                <div class="mt-3">
-                  {@render roleSelect(HIERARCHY_ROLES[2])}
-                </div>
-                <div class="mt-4 grid gap-3 md:grid-cols-3">
-                  <label class="grid gap-1">
-                    <span class="text-sm font-semibold">Ball handler</span>
-                    <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
-                      <option value="">Choose a player</option>
-                      {#each roster as player (player.playerId)}
-                        <option value={player.playerId}>{player.displayName}</option>
-                      {/each}
-                    </select>
-                  </label>
-                  {#each [0, 1] as slot (slot)}
-                    <label class="grid gap-1">
-                      <span class="text-sm font-semibold"
-                        >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
-                      >
-                      <select
-                        class={SELECT_CLASS}
-                        disabled={locked ||
-                          readHandler === '' ||
-                          (slot === 1 && reads.length === 0)}
-                        value={reads[slot] ?? ''}
-                        onchange={(event) => setRead(slot, event.currentTarget.value)}
-                      >
-                        <option value="">Use player tendencies</option>
-                        {#each roster as player (player.playerId)}
-                          {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
-                            <option value={player.playerId}>{player.displayName}</option>
-                          {/if}
-                        {/each}
-                      </select>
-                    </label>
-                  {/each}
-                </div>
-                <p class="mt-2 text-xs text-muted-foreground">
-                  The top target gets the strongest preference. Players still follow their
-                  tendencies.
-                </p>
-                {#each draft.units as unit, index (index)}
-                  <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
-                    <legend class="text-sm font-semibold">{unit.name}</legend>
-                    {#if scoutedRoster !== null}
-                      {@const strengths = fullCourtLineupFitReport(
-                        scoutedRoster.filter((player) => unit.playerIds.includes(player.playerId)),
-                      ).strengths}
-                      {#if strengths.length}
-                        <p class="text-xs text-muted-foreground md:col-span-2">
-                          {strengths
-                            .map((strength) => LINEUP_FINDING_LABELS[strength.code])
-                            .join(', ')}
-                        </p>
-                      {/if}
-                    {/if}
-                    {#each ['floorGeneralPlayerId', 'primaryPlayerId'] as role (role)}
-                      {@const key =
-                        role === 'primaryPlayerId' ? 'primaryPlayerId' : 'floorGeneralPlayerId'}
-                      <label class="grid gap-1">
-                        <span class="text-xs"
-                          >{key === 'primaryPlayerId' ? 'Scoring priority' : 'Initiator'}</span
-                        >
-                        <select
-                          class={SELECT_CLASS}
-                          disabled={locked}
-                          value={unitRoles(unit)?.[key] ?? ''}
-                          onchange={(event) => setUnitRole(unit, key, event.currentTarget.value)}
-                        >
-                          <option value="">Use team role</option>
-                          {#each unit.playerIds as id (id)}
-                            <option value={id}>{playerNames.get(id)}</option>
-                          {/each}
-                        </select>
-                      </label>
-                    {/each}
-                  </fieldset>
-                {/each}
-                <div class="mt-4 rounded-lg border border-line-soft bg-surface-1 px-3 py-2.5">
-                  <label class="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      class="mt-0.5 size-4 shrink-0 accent-primary"
-                      checked={draft.staggerStars}
-                      disabled={locked}
-                      onchange={(event) => {
-                        draft.staggerStars = event.currentTarget.checked;
-                        markEdited();
-                      }}
-                    />
-                    <span class="min-w-0">
-                      <span class="block text-sm font-semibold">Stagger stars</span>
-                      <span class="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                        Keep at least one primary or secondary option on the floor when available.
-                        Foul-outs, injuries, exhaustion, and explicit rules still take priority.
-                      </span>
-                      {#if !hasStaggerScorers}
-                        <span class="mt-1 block text-[11px] font-semibold text-accent">
-                          Assign a primary or secondary option to use this preference.
-                        </span>
-                      {/if}
-                    </span>
-                  </label>
-                </div>
-              </Panel>
+          <Panel as="section" padding="sm" aria-label="Named units">
+            <SectionHeading level={4} size="sm" title="Lineup groups">
+              {#snippet actions()}
+                <Badge tone="neutral">{draft.units.length} / {FULL_COURT_MAX_UNITS}</Badge>
+              {/snippet}
+            </SectionHeading>
+            <p class="mt-2 text-xs text-muted-foreground">
+              Plan up to 12 minutes across units at the start of the second quarter, in the order
+              shown. Fatigue, availability, and substitution rules can shorten their time.
+            </p>
 
-              {#if !readOnly}
-                <Panel as="section" padding="sm" aria-label="Named units">
-                  <SectionHeading level={4} size="sm" title="Lineup groups">
-                    {#snippet actions()}
-                      <Badge tone="neutral">{draft.units.length} / {FULL_COURT_MAX_UNITS}</Badge>
-                    {/snippet}
-                  </SectionHeading>
-                  <p class="mt-2 text-xs text-muted-foreground">
-                    Plan up to 12 minutes across units at the start of the second quarter, in the
-                    order shown. Fatigue, availability, and substitution rules can shorten their
-                    time.
-                  </p>
-
-                  {#if draft.units.length === 0}
-                    <p
-                      class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
-                    >
-                      No named units. Add a unit to save a five you can reuse in a closing rule or
-                      copy to the closing five.
-                    </p>
-                  {:else}
-                    <ul class="mt-3 grid gap-2">
-                      {#each draft.units as unit, index (index)}
-                        <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
-                          <div class="flex flex-wrap items-end justify-between gap-2">
-                            <label class="w-28">
-                              <span class="ui-micro">Planned minutes</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="12"
-                                step="1"
-                                class={SELECT_CLASS}
-                                value={unit.plannedMinutes ?? 0}
-                                disabled={locked}
-                                onchange={(event) => {
-                                  const minutes = event.currentTarget.valueAsNumber;
-                                  if (Number.isInteger(minutes) && minutes > 0 && minutes <= 12)
-                                    unit.plannedMinutes = minutes;
-                                  else delete unit.plannedMinutes;
-                                  markEdited();
-                                }}
-                              />
-                            </label>
-                            <label class="min-w-0 flex-1">
-                              <span class="ui-micro">Unit name</span>
-                              <input
-                                type="text"
-                                class="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                                maxlength={FULL_COURT_UNIT_NAME_MAX_LENGTH}
-                                value={unit.name}
-                                disabled={locked}
-                                oninput={(event) => renameUnit(index, event.currentTarget.value)}
-                              />
-                            </label>
-                            <div class="flex flex-wrap gap-1.5">
-                              <Button
-                                tone="secondary"
-                                type="button"
-                                disabled={locked}
-                                onclick={() => useUnitAsClosingFive(unit)}
-                              >
-                                Use as closing five
-                              </Button>
-                              <Button
-                                tone="ghost"
-                                type="button"
-                                disabled={locked}
-                                onclick={() => removeUnit(index)}
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                          <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                            {#each SLOTS as slot (slot)}
-                              <label class="min-w-0">
-                                <span class="ui-micro">Player {slot + 1}</span>
-                                <select
-                                  class={SELECT_CLASS}
-                                  value={unit.playerIds[slot] ?? ''}
-                                  disabled={locked}
-                                  onchange={(event) =>
-                                    setUnitPlayer(index, slot, event.currentTarget.value)}
-                                >
-                                  {#each roster as player (player.playerId)}
-                                    <option value={player.playerId}>
-                                      {player.displayName} · {formatPositions(player.positions)}
-                                    </option>
-                                  {/each}
-                                </select>
-                              </label>
-                            {/each}
-                          </div>
-                          {#if fullCourtUnitNameForLineup([unit], draft.closingFive ?? []) !== null}
-                            <p class="mt-2 text-[11px] font-semibold text-accent">
-                              Current closing five
-                            </p>
-                          {/if}
+            {#if draft.units.length === 0}
+              <p
+                class="mt-3 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+              >
+                No named units. Add a unit to save a five you can reuse in a closing rule or copy to
+                the closing five.
+              </p>
+            {:else}
+              {#if draft.units.some((unit) => (unit.plannedMinutes ?? 0) > 0)}
+                <div class="mt-3 grid gap-1">
+                  <p class="text-sm font-semibold">Second-quarter plan</p>
+                  <ol class="flex flex-wrap gap-2" aria-label="Second-quarter unit order">
+                    {#each draft.units as unit, index (index)}
+                      {#if (unit.plannedMinutes ?? 0) > 0}
+                        <li
+                          class="rounded-md border border-line-soft bg-surface-1 px-2 py-1 text-xs"
+                        >
+                          {unit.name || 'Unnamed unit'} &middot; {unit.plannedMinutes} min
                         </li>
+                      {/if}
+                    {/each}
+                  </ol>
+                </div>
+              {/if}
+              <ul class="mt-3 grid gap-2">
+                {#each draft.units as unit, index (index)}
+                  <li class="rounded-lg border border-line-soft bg-surface-1 px-3 py-3">
+                    <div class="flex flex-wrap items-end justify-between gap-2">
+                      <label class="w-28">
+                        <span class="ui-micro">Planned minutes</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="12"
+                          step="1"
+                          class={SELECT_CLASS}
+                          value={unit.plannedMinutes ?? 0}
+                          disabled={locked}
+                          onchange={(event) => {
+                            const minutes = event.currentTarget.valueAsNumber;
+                            if (Number.isInteger(minutes) && minutes > 0 && minutes <= 12)
+                              unit.plannedMinutes = minutes;
+                            else delete unit.plannedMinutes;
+                            markEdited();
+                          }}
+                        />
+                      </label>
+                      <label class="min-w-0 flex-1">
+                        <span class="ui-micro">Unit name</span>
+                        <input
+                          type="text"
+                          class="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-line-soft bg-surface-2 px-2.5 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          maxlength={FULL_COURT_UNIT_NAME_MAX_LENGTH}
+                          value={unit.name}
+                          disabled={locked}
+                          oninput={(event) => renameUnit(index, event.currentTarget.value)}
+                        />
+                      </label>
+                      <div class="flex flex-wrap gap-1.5">
+                        <Button
+                          tone="secondary"
+                          type="button"
+                          disabled={locked}
+                          onclick={() => useUnitAsClosingFive(unit)}
+                        >
+                          Use as closing five
+                        </Button>
+                        <Button
+                          tone="ghost"
+                          type="button"
+                          disabled={locked}
+                          onclick={() => removeUnit(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                      {#each SLOTS as slot (slot)}
+                        <label class="min-w-0">
+                          <span class="ui-micro">Player {slot + 1}</span>
+                          <select
+                            class={SELECT_CLASS}
+                            value={unit.playerIds[slot] ?? ''}
+                            disabled={locked}
+                            onchange={(event) =>
+                              setUnitPlayer(index, slot, event.currentTarget.value)}
+                          >
+                            {#each roster as player (player.playerId)}
+                              <option value={player.playerId}>
+                                {player.displayName} · {formatPositions(player.positions)}
+                              </option>
+                            {/each}
+                          </select>
+                        </label>
                       {/each}
-                    </ul>
-                  {/if}
-                  <div class="mt-3">
-                    <Button
-                      tone="secondary"
-                      type="button"
-                      disabled={locked || draft.units.length >= FULL_COURT_MAX_UNITS}
-                      onclick={addUnit}
-                    >
-                      Add named unit
-                    </Button>
-                  </div>
-                </Panel>
-              {/if}
-
-              {#if !readOnly}
-                <Panel as="section" padding="sm" aria-label="Coaching rules">
-                  <SectionHeading level={4} size="sm" title="Automatic substitutions">
-                    {#snippet actions()}
-                      <Badge tone="neutral">{draft.rules.length} configured</Badge>
-                    {/snippet}
-                  </SectionHeading>
-                  <p class="mt-2 text-xs text-muted-foreground">
-                    Rules run in priority order and respond to the score, clock, or foul trouble.
-                  </p>
-
-                  <div class="mt-3">
-                    <FullCourtRuleEditor
-                      rules={draft.rules}
-                      {roster}
-                      units={draft.units}
-                      {locked}
-                      onAdd={addRule}
-                      onUpdate={updateRule}
-                      onRemove={removeRule}
-                      onMove={moveRule}
-                    />
-                  </div>
-                </Panel>
-              {/if}
+                    </div>
+                    {#if fullCourtUnitNameForLineup([unit], draft.closingFive ?? []) !== null}
+                      <p class="mt-2 text-[11px] font-semibold text-accent">Current closing five</p>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            <div class="mt-3">
+              <Button
+                tone="secondary"
+                type="button"
+                disabled={locked || draft.units.length >= FULL_COURT_MAX_UNITS}
+                onclick={addUnit}
+              >
+                Add named unit
+              </Button>
             </div>
-          </Disclosure>
+          </Panel>
+        {/if}
+      </div>
+      <div class="workspace-content" hidden={workspace !== 'situations'}>
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Coaching rules">
+            <SectionHeading level={4} size="sm" title="Automatic substitutions">
+              {#snippet actions()}
+                <Badge tone="neutral">{draft.rules.length} configured</Badge>
+              {/snippet}
+            </SectionHeading>
+            <p class="mt-2 text-xs text-muted-foreground">
+              Rules run in priority order and respond to the score, clock, or foul trouble.
+            </p>
+
+            <div class="mt-3">
+              <FullCourtRuleEditor
+                rules={draft.rules}
+                {roster}
+                units={draft.units}
+                {locked}
+                onAdd={addRule}
+                onUpdate={updateRule}
+                onRemove={removeRule}
+                onMove={moveRule}
+              />
+            </div>
+          </Panel>
         {/if}
         {#if readOnly}
-          <Panel as="section" padding="sm" aria-label="Game plan summary">
+          <Panel as="section" padding="sm" aria-label="Saved situations and roles">
             <SectionHeading level={4} size="sm" title="Game plan" />
             <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               {#each HIERARCHY_ROLES as role (role.key)}
@@ -1371,22 +1407,6 @@
             </details>
           </Panel>
         {/if}
-        {#if !readOnly}
-          <Panel as="section" padding="sm" aria-label="Strategy presets">
-            <FullCourtBlueprintPicker
-              tactics={draft.tactics}
-              {roster}
-              rotation={blueprintRotation}
-              hierarchy={draft.hierarchy}
-              disabled={locked}
-              onApplyTactics={applyStrategyTactics}
-              onApplyBlueprint={applyStrategyBlueprint}
-              {onListBlueprints}
-              {onSaveBlueprint}
-              {onRemoveBlueprint}
-            />
-          </Panel>
-        {/if}
       </div>
     </fieldset>
   </form>
@@ -1412,37 +1432,78 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .plan-glance {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-  }
-  .plan-glance > div {
-    min-width: 0;
-    padding: 0.65rem 0.8rem;
+  .board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
     border: 1px solid var(--color-line-soft);
+    border-inline-start: 3px solid var(--color-accent);
     border-radius: 0.75rem;
     background: var(--color-surface-1);
   }
-  .plan-glance-value {
-    margin: 0.15rem 0 0;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 800;
-    line-height: 1.1;
-    text-transform: uppercase;
-    overflow-wrap: anywhere;
+  .board-header h3 {
+    font: 800 clamp(1.5rem, 4vw, 2.25rem) / 1 var(--font-display);
   }
-  .plan-glance-note {
-    margin: 0.2rem 0 0;
+  .board-header p {
+    margin-top: 0.4rem;
+    font-size: 0.875rem;
     color: var(--color-muted-foreground);
-    font-size: 0.65rem;
-    line-height: 1.35;
   }
-  @media (min-width: 900px) {
-    .plan-glance {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+  .workspace-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0.75rem 0 0;
+    border-bottom: 1px solid var(--color-line-soft);
+  }
+  .workspace-nav button {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.375rem;
+    border-bottom: 2px solid transparent;
+    color: var(--color-muted-foreground);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .workspace-nav button:hover,
+  .workspace-nav button[aria-current='true'] {
+    color: var(--color-foreground);
+  }
+  .workspace-nav button[aria-current='true'] {
+    border-bottom-color: var(--color-accent);
+  }
+  .workspace-content:not([hidden]) {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .plan-grid {
+    display: grid;
+    align-items: start;
+    gap: 0.75rem;
+  }
+  @media (min-width: 960px) {
+    .plan-grid:not(.read-only) {
+      grid-template-columns: minmax(15rem, 2fr) minmax(0, 3fr);
     }
+  }
+  .rotation-brief {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 0.5rem;
+    margin-block: 0.75rem;
+  }
+  .rotation-brief div {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.65rem 0.75rem;
+    border-inline-start: 2px solid var(--color-line-soft);
+    background: var(--color-surface-1);
+  }
+  .rotation-brief span {
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
   }
   @media (max-width: 639px) {
     .save-bar:not(.dirty) {

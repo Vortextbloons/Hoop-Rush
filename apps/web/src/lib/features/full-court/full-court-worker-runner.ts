@@ -128,34 +128,7 @@ class BrowserFullCourtWorkerRunner implements FullCourtWorkerRunner {
     ) {
       return this.simulateSlotParallel(lock, checkpoint, options);
     }
-    const runId = lock.season.runId;
-    const includeLock = !this.seasonIsHydrated(runId, lock.digest);
-    const request: FullCourtWorkerSlotRequestInput = {
-      schemaVersion: FULL_COURT_WORKER_WIRE_SCHEMA_VERSION,
-      type: 'full-court-simulate-slot',
-      requestId: this.nextRequestId(),
-      runId,
-      lockDigest: lock.digest,
-      ...(includeLock ? { lock } : {}),
-      checkpoint,
-      options,
-    };
-    const generation = this.generation;
-    return this.runJob<FullCourtSeasonSlotOutcome>(request, (message) =>
-      message.type === 'full-court-slot-result' ? message.outcome : null,
-    ).then(
-      (outcome) => {
-        if (this.generation === generation) {
-          this.hydratedSeason = { runId, digest: lock.digest };
-          if (this.hydratedPlayoffs?.runId !== runId) this.hydratedPlayoffs = null;
-        }
-        return outcome;
-      },
-      (error: unknown) => {
-        if (this.generation === generation) this.clearHydration();
-        throw error;
-      },
-    );
+    return this.runSingleSlot(lock, checkpoint, options);
   }
 
   private async simulateSlotParallel(

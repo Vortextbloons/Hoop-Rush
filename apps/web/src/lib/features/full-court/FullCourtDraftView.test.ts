@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { FullCourtDraftState, FullCourtReportTarget } from '@hoop-rush/data-contracts';
+import type { FullCourtDraftState } from '@hoop-rush/data-contracts';
 import {
   commandIdSchema,
   fullCourtCreateDraftCommandSchema,
@@ -38,11 +38,7 @@ function setup(): { index: FullCourtCatalogIndex; state: FullCourtDraftState } {
   return { index, state };
 }
 
-function renderView(
-  state: FullCourtDraftState,
-  index: FullCourtCatalogIndex,
-  onPurchaseReport?: (target: FullCourtReportTarget) => void,
-): string {
+function renderView(state: FullCourtDraftState, index: FullCourtCatalogIndex): string {
   return render(FullCourtDraftView, {
     props: {
       draft: state,
@@ -51,33 +47,8 @@ function renderView(
       onPick: () => undefined,
       onRemove: () => undefined,
       onFinish: () => undefined,
-      ...(onPurchaseReport === undefined ? {} : { onPurchaseReport }),
     },
   }).body;
-}
-
-function completedState(
-  index: FullCourtCatalogIndex,
-  seed: FullCourtDraftState,
-): FullCourtDraftState {
-  const players = fullCourtEligibleCandidates(index, seed).slice(0, FULL_COURT_MIN_ROSTER_SIZE);
-  const picks = players.map((player, pickOrdinal) => ({
-    pickOrdinal,
-    player,
-    salaryDollars: fullCourtSalaryDollarsOf(player),
-  }));
-  return fullCourtDraftStateSchema.parse({
-    ...seed,
-    stage: 'complete',
-    picks,
-    spending: picks.map((pick, ordinal) => ({
-      entryId: `fcs-${String(ordinal).padStart(32, '0')}`,
-      kind: 'salary',
-      dollars: pick.salaryDollars,
-      commandId: commandIdSchema.parse(`cmd-locked-${String(ordinal)}`),
-      playerVersionId: pick.player.playerVersionId,
-    })),
-  });
 }
 
 function scoutingReportState(
@@ -97,38 +68,31 @@ function scoutingReportState(
   ).state;
 }
 
-function lowWarChestSetup(): { index: FullCourtCatalogIndex; state: FullCourtDraftState } {
-  const catalog = buildCapRushTestCatalog({ overalls: [40, 41, 42] });
-  const source = capRushTestCatalogSource(catalog);
-  const index = fullCourtDraftIndexOf(catalog, source);
-  const state = createFullCourtDraftState(
-    fullCourtCreateDraftCommandSchema.parse({
-      command: 'create-full-court-draft',
-      commandId: commandIdSchema.parse('cmd-low-chest'),
-      runId: idSchema.parse('run-low-chest'),
-      runSeed: seedSchema.parse('abc123def4567891'),
-      variant: 'standard',
-      catalog: source,
+test('counts a dual-position pick at both positions', () => {
+  const { index, state } = setup();
+  const players = fullCourtEligibleCandidates(index, state).slice(0, FULL_COURT_MIN_ROSTER_SIZE);
+  const picks = players.map((player, pickOrdinal) => ({
+    pickOrdinal,
+    player: {
+      ...player,
+      positions: pickOrdinal === 0 ? (['PG', 'SG'] as const) : (['C'] as const),
+    },
+    salaryDollars: fullCourtSalaryDollarsOf(player),
+  }));
+  const body = renderView(
+    fullCourtDraftStateSchema.parse({
+      ...state,
+      picks,
+      spending: picks.map((pick, ordinal) => ({
+        entryId: `fcs-${String(ordinal).padStart(32, '0')}`,
+        kind: 'salary',
+        dollars: pick.salaryDollars,
+        commandId: commandIdSchema.parse(`cmd-pick-${String(ordinal)}`),
+        playerVersionId: pick.player.playerVersionId,
+      })),
     }),
     index,
   );
-  return {
-    index,
-    state: fullCourtDraftStateSchema.parse({
-      ...state,
-      money: { ...state.money, startingWarChestDollars: 8_000_000 },
-    }),
-  };
-}
-
-test('counts a dual-position pick at both positions', () => {
-  const { index, state } = setup();
-  const complete = completedState(index, state);
-  const picks = complete.picks.map((pick, i) => ({
-    ...pick,
-    player: { ...pick.player, positions: i === 0 ? (['PG', 'SG'] as const) : (['C'] as const) },
-  }));
-  const body = renderView(fullCourtDraftStateSchema.parse({ ...complete, picks }), index);
   const coverage = body.split('aria-label="Roster position coverage"')[1]?.split('</dl>')[0];
   expect(coverage).toMatch(/>PG<\/dt>\s*<dd class="[^"]*tabular-nums">1<\/dd>/);
   expect(coverage).toMatch(/>SG<\/dt>\s*<dd class="[^"]*tabular-nums">1<\/dd>/);
@@ -159,23 +123,14 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Lock the roster');
   });
 
-  test('seals a locked roster with a confirmation stamp and the frozen payroll', () => {
-    const { state, index } = setup();
-    const body = renderView(completedState(index, state), index);
-
-    expect(body).toContain('Locked');
-    expect(body).toContain('Draft complete');
-    expect(body).toContain('Locked');
-  });
-
   test('gates Show playstyle behind the scouting perk on every card', () => {
     const { state, index } = setup();
-    const body = renderView(state, index, () => undefined);
+    const body = renderView(state, index);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
     expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
-    expect(body).toContain(`disabled="" title="Buy the $5M Scouting perk to unlock playstyle"`);
+    expect(body).toContain('Scouting was not purchased at run setup');
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
 
@@ -189,29 +144,29 @@ describe('FullCourtDraftView', () => {
 
   test('gates Show playstyle in the selected player panel until scouting is owned', () => {
     const { state, index } = setup();
-    const body = renderView(
-      { ...state, offer: undefined, pool: undefined },
-      index,
-      () => undefined,
-    );
+    const body = renderView({ ...state, offer: undefined, pool: undefined }, index);
 
     expect(body).toContain('Show playstyle');
-    expect(body).toContain('disabled="" title="Buy the $5M Scouting perk to unlock playstyle"');
+    expect(body).toContain('Scouting was not purchased at run setup');
   });
 
-  test('offers one $5M scouting report instead of per-player scouting', () => {
+  test('shows the perks purchased before the draft and what they cost', () => {
     const { state, index } = setup();
-    const body = renderView(state, index, () => undefined);
+    const none = renderView(state, index);
+    expect(none).toContain('Run perks');
+    expect(none).toContain('none purchased');
 
-    expect(body).toContain('Scouting report');
-    expect(body).toContain('Buy · $5M');
-    expect(body).toContain('aria-label="Buy the $5M scouting report"');
-    expect(body).not.toContain('Scout $2M');
+    const body = renderView(scoutingReportState(index, state), index);
+    expect(body).toContain('Run perks');
+    expect(body).toContain('$5M spent');
+    expect(body).toContain('Scouting');
+    expect(body).not.toContain('Buy · $5M');
+    expect(body).not.toContain('aria-label="Buy the $5M scouting report"');
   });
 
-  test('unlocks the paid read and Show playstyle across the draft after the report is bought', () => {
+  test('unlocks the paid read and Show playstyle across the draft after the setup purchase', () => {
     const { state, index } = setup();
-    const body = renderView(scoutingReportState(index, state), index, () => undefined);
+    const body = renderView(scoutingReportState(index, state), index);
     const firstPlayer = state.offer?.cards[0]?.player;
     if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
@@ -219,15 +174,7 @@ describe('FullCourtDraftView', () => {
     expect(body).not.toContain('aria-label="Buy the $5M scouting report"');
     expect(body).not.toContain('Scout $2M');
     expect(body).toContain(`aria-label="Show ${firstPlayer.displayName} playstyle"`);
-    expect(body).not.toContain('Buy the $5M Scouting perk to unlock playstyle');
-  });
-
-  test('disables the scouting report when the budget cannot cover the cheapest legal finish', () => {
-    const { state, index } = lowWarChestSetup();
-    const body = renderView(state, index, () => undefined);
-
-    expect(body).toContain('Scouting report');
-    expect(body).toContain('disabled=""');
+    expect(body).not.toContain('Scouting was not purchased at run setup');
   });
 });
 

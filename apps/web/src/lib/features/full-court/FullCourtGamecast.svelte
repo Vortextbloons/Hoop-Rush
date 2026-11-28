@@ -214,6 +214,17 @@
     return `${String(Math.floor(seconds / 60))}:${String(seconds % 60).padStart(2, '0')}`;
   }
 
+  function namedUnitSeconds(team: FullCourtGameResult['home']): Map<string, number> {
+    const secondsByUnit = new Map(
+      team.units.filter((unit) => unit.plannedMinutes).map((unit) => [unit.name, 0]),
+    );
+    for (const stint of team.stints) {
+      const name = unitNameFor(team, stint.playerIds);
+      if (name !== null) secondsByUnit.set(name, (secondsByUnit.get(name) ?? 0) + stint.seconds);
+    }
+    return secondsByUnit;
+  }
+
   function unitNameFor(
     team: FullCourtGameResult['home'],
     playerIds: readonly string[],
@@ -380,15 +391,15 @@
           player.fieldGoals.attempted > (leader?.fieldGoals.attempted ?? 0) ? player : leader,
         undefined,
       )}
-      {@const units = new Set(
-        team.stints.map((stint) => unitNameFor(team, stint.playerIds)).filter(Boolean),
-      )}
-      {@const ruleSubstitutions = game.tape?.filter(
-        (event) =>
-          event.kind === 'substitution' &&
-          event.reason === 'coach-rule' &&
-          event.side === (team === game.result.home ? 0 : 1),
-      ).length}
+      {@const unitSeconds = namedUnitSeconds(team)}
+      {@const ruleSubstitutions =
+        game.tape?.filter(
+          (event) =>
+            event.kind === 'substitution' &&
+            event.reason === 'coach-rule' &&
+            event.side === (team === game.result.home ? 0 : 1),
+        ) ?? []}
+      {@const firstRuleSubstitution = ruleSubstitutions[0]}
       <section class="mt-4 grid gap-1 text-sm" aria-label="How your team played">
         <h3 class="font-semibold">How your team played</h3>
         <p class="text-muted-foreground">
@@ -401,13 +412,25 @@
             {topShooter.displayName} led the team with {topShooter.fieldGoals.attempted} shot attempts.
           </p>
         {/if}
-        {#if units.size > 0}
-          <p class="text-muted-foreground">Lineup groups used · {[...units].join(', ')}</p>
+        {#if unitSeconds.size > 0}
+          <ul class="mt-1 flex flex-wrap gap-2" aria-label="Lineup group minutes">
+            {#each unitSeconds as [name, seconds] (name)}
+              {@const planned = team.units.find((unit) => unit.name === name)?.plannedMinutes}
+              <li class="rounded-md border border-line-soft px-2 py-1 text-xs">
+                {name} &middot; {(seconds / 60).toFixed(1)} min played
+                {#if planned !== undefined}
+                  / {planned} planned{/if}
+              </li>
+            {/each}
+          </ul>
         {/if}
-        {#if ruleSubstitutions !== undefined && ruleSubstitutions > 0}
+        {#if firstRuleSubstitution?.kind === 'substitution'}
           <p class="text-muted-foreground">
-            Game situation rules made {ruleSubstitutions}
-            {ruleSubstitutions === 1 ? 'substitution' : 'substitutions'}.
+            First situational substitution at {Math.floor(
+              firstRuleSubstitution.clockSeconds / 60,
+            )}:{String(Math.floor(firstRuleSubstitution.clockSeconds % 60)).padStart(2, '0')} in period
+            {firstRuleSubstitution.period}.
+            {ruleSubstitutions.length} total.
           </p>
         {/if}
       </section>

@@ -28,8 +28,6 @@ import {
   FULL_COURT_CATALOG_PAGE_SIZE,
   fullCourtCatalogPage,
   fullCourtDraftSummary,
-  fullCourtFaceIndex,
-  fullCourtFaceKey,
   fullCourtLockCopy,
   fullCourtPickReasonLabel,
   fullCourtProfileReferences,
@@ -273,31 +271,6 @@ describe('full court draft presentation', () => {
   it('labels the Full Court variant', () => {
     const { state } = setup();
     expect(fullCourtVariantLabel(state)).toBe('Full Court Standard');
-  });
-
-  it('indexes faces by the player season tuple', () => {
-    const player = {
-      playerId: playerIdSchema.parse('p-face'),
-      franchiseId: franchiseIdSchema.parse('lakers'),
-      eraId: eraIdSchema.parse('1990s'),
-      seasonKey: seasonKeySchema.parse('1995-96'),
-      firstName: 'Face',
-      lastName: 'Test',
-      displayName: 'Face Test',
-      playerExternalId: '1234',
-      positionsPlayable: ['PG'],
-      overall: 80,
-      offense: 80,
-      defense: 80,
-      selectionScore: 10,
-    };
-    const index = playersIndexSchema.parse({
-      schemaVersion: 4,
-      dataVersion: 'test',
-      players: [player],
-    });
-    const faces = fullCourtFaceIndex(index);
-    expect(faces.get(fullCourtFaceKey(player))?.playerId).toBe(player.playerId);
   });
 
   it('sorts by overall or salary and filters to signable players when requested', () => {

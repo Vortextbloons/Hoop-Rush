@@ -4,7 +4,11 @@ import FullCourtReportSummary from './FullCourtReportSummary.svelte';
 import FullCourtReportRoster from './FullCourtReportRoster.svelte';
 import type { FullCourtHistoryEntryView } from './full-court-history-presentation.ts';
 import type { FullCourtReportData } from './full-court-report-data.ts';
-import type { FullCourtPlayerSeasonRow, FullCourtStandingsRow } from '@hoop-rush/engine';
+import type {
+  FullCourtAwardsBoard,
+  FullCourtPlayerSeasonRow,
+  FullCourtStandingsRow,
+} from '@hoop-rush/engine';
 
 function row(overrides: Partial<FullCourtPlayerSeasonRow> = {}): FullCourtPlayerSeasonRow {
   return {
@@ -45,7 +49,7 @@ function row(overrides: Partial<FullCourtPlayerSeasonRow> = {}): FullCourtPlayer
     fta: 433,
     gameScorePg: 17.2,
     ...overrides,
-  } as FullCourtPlayerSeasonRow;
+  };
 }
 
 const entry = {
@@ -135,16 +139,49 @@ const data = {
   bracket: null,
 } as unknown as FullCourtReportData;
 
+const awards = {
+  hasPlayerStats: true,
+  regularComplete: true,
+  mvp: {
+    winner: { player: row(), score: 1, summary: '24.5 PPG · 6.1 RPG · 5.2 APG' },
+  },
+  finalsMvp: {
+    winner: {
+      player: row({
+        playerId: 'p-3',
+        displayName: 'Finals Star',
+        games: 6,
+        ppg: 31.4,
+        rpg: 9.2,
+        apg: 6.1,
+      }),
+      score: 1,
+      summary: '31.4 PPG · 9.2 RPG · 6.1 APG in Finals',
+    },
+  },
+} as unknown as FullCourtAwardsBoard;
+
 describe('FullCourtReport tabs', () => {
   test('summary shows record, economy, strategy, and bench facts', () => {
     const body = render(FullCourtReportSummary, {
-      props: { entry, rosterStats: data.playerRows, userRow },
+      props: { entry, rosterStats: data.playerRows, userRow, awards },
     }).body;
     expect(body).toContain('67–15');
     expect(body).toContain('$205.3M');
     expect(body).toContain('Fast pace');
     expect(body).toContain('Best bench game');
     expect(body).toContain('#1 seed');
+  });
+
+  test('summary surfaces the league and Finals MVPs', () => {
+    const body = render(FullCourtReportSummary, {
+      props: { entry, rosterStats: data.playerRows, userRow, awards },
+    }).body;
+    expect(body).toContain('League MVP');
+    expect(body).toContain('Finals MVP');
+    expect(body).toContain('Alex Star');
+    expect(body).toContain('Finals Star');
+    expect(body).toContain('6 Finals games');
   });
 
   test('roster shows every signed player with role and per-game stats', () => {

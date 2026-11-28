@@ -17,6 +17,7 @@ import {
   fullCourtCoachingPlan,
   fullCourtCoachingSignature,
   fullCourtPlayerHealthView,
+  rebalanceFullCourtMinuteTargets,
   fullCourtTeamMinutes,
   fullCourtUnitNameForLineup,
   validateFullCourtCoachingDraft,
@@ -50,6 +51,29 @@ function customDraft(): FullCourtCoachingDraft {
   draft.rotationMode = 'custom';
   return draft;
 }
+
+test('rebalances excess minutes while preserving the last edit and a closing reserve', () => {
+  const draft = customDraft();
+  draft.minuteTargets.p1 = 48;
+  draft.minuteTargets.p8 = 1;
+  draft.closingFive = ['p1', 'p2', 'p3', 'p4', 'p8'];
+  draft.minuteTargets.p3 = 48;
+  draft.minuteTargets.p4 = 48;
+
+  const targets = rebalanceFullCourtMinuteTargets(
+    draft,
+    ROSTER_IDS,
+    DEFAULT_ROTATION.minuteTargets,
+    'p1',
+  );
+
+  expect(targets.p1).toBe(48);
+  expect(targets.p8).toBe(1);
+  expect(Object.values(targets).reduce((sum, minutes) => sum + minutes, 0)).toBe(240);
+  expect(
+    validateFullCourtCoachingDraft({ ...draft, minuteTargets: targets }, ROSTER_IDS).valid,
+  ).toBe(true);
+});
 
 describe('Full Court coaching draft', () => {
   test('seeds an automatic plan with the default rotation values for later editing', () => {

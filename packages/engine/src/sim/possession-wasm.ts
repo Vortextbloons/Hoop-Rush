@@ -281,7 +281,15 @@ function buildCachedTeamTables(
     for (const [actionIndex, action] of ACTION_TYPES.entries()) {
       for (const [zoneIndex, zone] of SHOT_ZONES.entries()) {
         const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
-        const values = shotComponents(player, profile, zone, action, prep.spacing, anchor);
+        const values = shotComponents(
+          player,
+          profile,
+          zone,
+          action,
+          prep.spacing,
+          anchor,
+          undefined,
+        );
         for (let component = 0; component < 7; component += 1) {
           const array = shotArrays[component];
           if (array !== undefined) array[index] = values[component] ?? 0;
@@ -305,7 +313,7 @@ function buildCachedTeamTables(
     for (const [actionIndex, action] of ACTION_TYPES.entries()) {
       for (const [zoneIndex, zone] of SHOT_ZONES.entries()) {
         const index = (playerIndex * 7 + actionIndex) * 5 + zoneIndex;
-        const components = blockComponents(player, zone, action);
+        const components = blockComponents(player, zone, action, undefined);
         blockValue[index] = components[0];
         blockMax[index] = components[1];
       }
@@ -319,7 +327,7 @@ function buildCachedTeamTables(
       for (const action of ACTION_TYPES) {
         for (const zone of SHOT_ZONES) {
           assistData.push(
-            assistBase(profile, passingAnchorFactor, initiator, action, zone, shooter),
+            assistBase(profile, passingAnchorFactor, initiator, action, zone, shooter, undefined),
           );
         }
       }

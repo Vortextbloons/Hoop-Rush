@@ -651,3 +651,55 @@ export function applyFullCourtBlueprintToDraft(
     },
   };
 }
+
+export function historicalThreePointShare(roster: readonly SimulationPlayer[]): number | null {
+  let minutes = 0;
+  let weightedShare = 0;
+  for (const player of roster) {
+    const anchors = player.anchors;
+    if (anchors?.threePointAttemptRate == null) continue;
+    minutes += anchors.minutesPerGame;
+    weightedShare += anchors.minutesPerGame * anchors.threePointAttemptRate;
+  }
+  return minutes > 0 ? (100 * weightedShare) / minutes : null;
+}
+
+export function rebalanceFullCourtMinuteTargets(
+  draft: FullCourtCoachingDraft,
+  rosterIds: readonly string[],
+  staffTargets: Readonly<Record<string, number>>,
+  lastMinutesEdit: string | null,
+): Record<string, number> {
+  const pinned = [...draft.startingFive, ...(draft.closingFive ?? [])];
+  const targets = Object.fromEntries(
+    rosterIds.map((id) => [
+      id,
+      Math.max(
+        pinned.includes(id) ? 1 : 0,
+        Math.min(FULL_COURT_MAX_PLAYER_MINUTES, Math.round(draft.minuteTargets[id] ?? 0)),
+      ),
+    ]),
+  );
+  let remaining =
+    FULL_COURT_MINUTE_TOTAL - Object.values(targets).reduce((sum, value) => sum + value, 0);
+  const order = [...rosterIds].sort(
+    (left, right) =>
+      Number(left === lastMinutesEdit) - Number(right === lastMinutesEdit) ||
+      (staffTargets[right] ?? 0) - (staffTargets[left] ?? 0),
+  );
+  const step = Math.sign(remaining);
+  while (remaining !== 0) {
+    let changed = false;
+    for (const id of order) {
+      if (remaining === 0) break;
+      const next = (targets[id] ?? 0) + step;
+      if (next < (pinned.includes(id) ? 1 : 0) || next > FULL_COURT_MAX_PLAYER_MINUTES) continue;
+      if (id === lastMinutesEdit && changed) continue;
+      targets[id] = next;
+      remaining -= step;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return targets;
+}

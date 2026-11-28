@@ -17,11 +17,13 @@ import {
 export {
   advanceFullCourtSeasonSlot,
   startFullCourtSeason,
+  type FullCourtSeasonAdvanceResult,
   type FullCourtSeasonRepository,
 } from './season.ts';
 export {
   advanceFullCourtPlayoffs,
   startFullCourtPlayoffs,
+  type FullCourtPlayoffAdvanceResult,
   type FullCourtPlayoffRepository,
 } from './playoffs.ts';
 export {

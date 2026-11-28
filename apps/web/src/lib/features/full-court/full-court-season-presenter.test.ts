@@ -9,15 +9,12 @@ import {
 import {
   createFullCourtSeasonCheckpoint,
   fullCourtPlayoffView,
-  fullCourtUserNextPlayoffMatchup,
   type FullCourtPlayoffSeries,
 } from '@hoop-rush/engine';
 import {
   FULL_COURT_REVIEW_SLOTS,
-  fullCourtFinalRecap,
   fullCourtGameDayReadiness,
   fullCourtHomeControls,
-  fullCourtNextMatchup,
   fullCourtNextReviewSlot,
   fullCourtNextUserFixture,
   fullCourtPlayoffAdjustmentChanged,
@@ -192,52 +189,21 @@ describe('full court home controls', () => {
 
 describe('full court matchup', () => {
   test('reads the next regular-season fixture from the locked schedule', () => {
-    const matchup = fullCourtNextMatchup(lock, opened, null, teamNameOf);
+    const matchup = fullCourtNextUserFixture(lock, opened, null);
     const fixture = userFixtureOf(1);
     expect(matchup).not.toBeNull();
     expect(matchup?.phase).toBe('regular');
     expect(matchup?.label).toBe('Game 1 of 82');
-    expect([matchup?.home.teamId, matchup?.away.teamId]).toEqual([
+    expect([matchup?.homeTeamId, matchup?.awayTeamId]).toEqual([
       fixture?.homeTeamId,
       fixture?.awayTeamId,
     ]);
     expect(matchup?.userSide).toBe(fixture?.homeTeamId === userTeamId ? 'home' : 'away');
-    expect(matchup?.series).toBeNull();
-  });
-
-  test('reads the next user playoff game even when AI-only games come first', () => {
-    const playoffs = fullCourtTestPlayoffLock(lock);
-    const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
-    const next = fullCourtUserNextPlayoffMatchup({
-      userTeamId,
-      runSeed: lock.season.runSeed,
-      series: view.series,
-    });
-    expect(next).not.toBeNull();
-    expect(view.nextGame?.userSide).toBeNull();
-
-    const matchup = fullCourtNextMatchup(
-      lock,
-      { ...opened, completedThroughSlot: 82 },
-      view,
-      teamNameOf,
-    );
-    expect(matchup).toMatchObject({
-      phase: 'playoff',
-      label: `Game ${String(next?.gameOrdinal)} · First round`,
-      userSide: next?.userSide,
-    });
-    expect(matchup?.home.seed).toBe(next?.homeSeed);
-    expect(matchup?.away.seed).toBe(next?.awaySeed);
-    expect([matchup?.home.teamId, matchup?.away.teamId]).toEqual([
-      next?.homeTeamId,
-      next?.awayTeamId,
-    ]);
   });
 
   test('shows nothing to play once the regular season is complete', () => {
     expect(
-      fullCourtNextMatchup(lock, { ...opened, completedThroughSlot: 82 }, null, teamNameOf),
+      fullCourtNextUserFixture(lock, { ...opened, completedThroughSlot: 82 }, null),
     ).toBeNull();
   });
 });
@@ -404,102 +370,6 @@ describe('full court game-day readiness', () => {
       gameId: `fcp-${String(userSeries.round)}-${String(userSeries.seriesSlot)}-1`,
       userSide: userSeries.highTeamId === userTeamId ? 'home' : 'away',
       dayOffset: Math.max(...lock.season.games.map((game) => game.dayOffset)) + 3,
-    });
-  });
-});
-
-describe('full court final recap', () => {
-  test('returns nothing until a champion is crowned', () => {
-    expect(fullCourtFinalRecap(lock, null, teamNameOf)).toBeNull();
-    const playoffs = fullCourtTestPlayoffLock(lock);
-    const view = fullCourtPlayoffView(playoffs.lock, playoffs.checkpoint);
-    expect(view.championTeamId).toBeNull();
-    expect(fullCourtFinalRecap(lock, view, teamNameOf)).toBeNull();
-  });
-
-  test('summarises the user path and the champion once the bracket resolves', () => {
-    const opponentId = lock.season.teams.find((team) => team.teamId !== userTeamId)?.teamId ?? '';
-    const series: FullCourtPlayoffSeries = {
-      seriesId: 'crs-1-0',
-      round: 1,
-      seriesSlot: 0,
-      highSeed: 1,
-      lowSeed: 8,
-      highTeamId: userTeamId,
-      lowTeamId: opponentId,
-      games: Array.from({ length: 4 }, (_, index) => ({
-        gameId: `fcp-1-0-${String(index + 1)}`,
-        dayOffset: 180 + index,
-        homeTeamId: userTeamId,
-        awayTeamId: opponentId,
-        winnerTeamId: opponentId,
-        outcome: { kind: 'played' as const, homePoints: 90, awayPoints: 100 },
-      })),
-    };
-    const recap = fullCourtFinalRecap(
-      lock,
-      {
-        series: [series],
-        championTeamId: opponentId,
-        userOutcome: { status: 'eliminated', round: 1 },
-        nextGame: null,
-      },
-      teamNameOf,
-    );
-    expect(recap).toMatchObject({
-      championTeamId: opponentId,
-      championName: teamNameOf(opponentId),
-      userChampion: false,
-      seriesWon: 0,
-      seriesPlayed: 1,
-      gameWins: 0,
-      gameLosses: 4,
-    });
-    expect(recap?.series[0]).toMatchObject({
-      roundLabel: 'First round',
-      opponentId,
-      won: false,
-      userWins: 0,
-      opponentWins: 4,
-    });
-  });
-
-  test('reports a title run across every round the user played', () => {
-    const opponentId = lock.season.teams.find((team) => team.teamId !== userTeamId)?.teamId ?? '';
-    const rounds = [1, 2, 3, 4].map((round): FullCourtPlayoffSeries => ({
-      seriesId: `crs-${String(round)}-0`,
-      round,
-      seriesSlot: 0,
-      highSeed: 1,
-      lowSeed: 8,
-      highTeamId: userTeamId,
-      lowTeamId: opponentId,
-      games: Array.from({ length: 4 }, (_, index) => ({
-        gameId: `fcp-${String(round)}-0-${String(index + 1)}`,
-        dayOffset: 180 + round * 10 + index,
-        homeTeamId: userTeamId,
-        awayTeamId: opponentId,
-        winnerTeamId: userTeamId,
-        outcome: { kind: 'played' as const, homePoints: 100, awayPoints: 90 },
-      })),
-    }));
-    const recap = fullCourtFinalRecap(
-      lock,
-      {
-        series: rounds,
-        championTeamId: userTeamId,
-        userOutcome: { status: 'champion', round: 4 },
-        nextGame: null,
-      },
-      teamNameOf,
-    );
-    expect(recap).toMatchObject({
-      userChampion: true,
-      seriesWon: 4,
-      seriesPlayed: 4,
-      gameWins: 16,
-      gameLosses: 0,
-      headline: 'Full Court champions',
     });
   });
 });

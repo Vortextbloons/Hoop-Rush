@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
-  import { getManifest, getPlayersIndex } from '#lib/data.js';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import {
+    playerFaces,
+    resolvePlayerFace,
+    type PlayerFaceIndex,
+  } from '#lib/assets/player-face-lookup.js';
+  import { getManifest } from '#lib/data.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { initialsOf } from '#lib/branding.js';
@@ -24,17 +29,15 @@
     compact?: boolean;
   } = $props();
   let manifest = $state.raw<HoopRushManifest | null>(null);
-  let index = $state.raw<PlayersIndex | null>(null);
+  let faceIndex = $state.raw<PlayerFaceIndex | null>(null);
   const player = $derived(
-    index?.players.find(
-      (entry) =>
-        (playerId ? entry.playerId === playerId : entry.displayName === displayName) &&
-        (!franchiseId || entry.franchiseId === franchiseId) &&
-        (!seasonKey || entry.seasonKey === seasonKey),
-    ) ??
-      index?.players.find((entry) =>
-        playerId ? entry.playerId === playerId : entry.displayName === displayName,
-      ),
+    faceIndex
+      ? resolvePlayerFace(
+          faceIndex,
+          { playerId, playerVersionId, displayName, franchiseId, seasonKey },
+          { fallbackToDisplayName: true },
+        )
+      : null,
   );
   const team = $derived(
     manifest?.modernFranchiseSlots.find(
@@ -43,10 +46,10 @@
   );
   onMount(() => {
     let mounted = true;
-    void Promise.allSettled([getManifest(), getPlayersIndex()]).then(([branding, players]) => {
+    void Promise.allSettled([getManifest(), playerFaces.load()]).then(([branding, players]) => {
       if (!mounted) return;
       if (branding.status === 'fulfilled') manifest = branding.value;
-      if (players.status === 'fulfilled') index = players.value;
+      if (players.status === 'fulfilled') faceIndex = players.value;
     });
     return () => {
       mounted = false;

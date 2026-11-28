@@ -177,6 +177,21 @@
             </div>
           </div>
 
+          <p class="mt-1 text-sm text-muted-foreground">
+            {#if rule.kind === 'closing-lineup'}
+              Final {Math.floor(rule.secondsRemainingMax / 60)}:{String(
+                rule.secondsRemainingMax % 60,
+              ).padStart(2, '0')} with the score within {rule.scoreMarginMax} points &rarr; {fullCourtUnitNameForLineup(
+                units,
+                rule.lineup,
+              ) ?? 'Selected five'}
+            {:else}
+              {roster.find((player) => player.playerId === rule.playerId)?.displayName ?? 'Player'}
+              reaches {rule.foulLimit} fouls &rarr;
+              {roster.find((player) => player.playerId === rule.replacementPlayerId)?.displayName ??
+                'Staff-selected substitute'}
+            {/if}
+          </p>
           {#if rule.kind === 'closing-lineup'}
             <div class="mt-3 grid gap-2 sm:grid-cols-2">
               <label class="min-w-0">

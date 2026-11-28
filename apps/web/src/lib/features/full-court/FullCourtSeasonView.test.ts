@@ -225,13 +225,13 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).not.toContain('aria-label="Full Court season progress"');
   });
 
-  test('home replaces sim actions with the terminal recap after a champion', () => {
+  test('playoffs keeps the completed bracket available after a champion', () => {
     const body = renderView({
-      section: 'home',
+      section: 'playoffs',
       checkpoint: completed,
       playoff: { ...bracketView(), championTeamId: userTeamId, nextGame: null },
     });
-    expect(body).toContain('aria-label="Full Court final recap"');
+    expect(body).toContain('aria-label="Full Court playoff bracket"');
     expect(body).toContain('Full Court champions');
     expect(body).not.toContain('Play next game');
     expect(body).not.toContain('Start playoffs');
@@ -244,10 +244,9 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('West Full Court standings');
     expect(body).toContain('East Full Court standings');
     expect(body).not.toContain('Game 1 of 82');
-    expect(body).not.toContain('aria-label="Full Court final recap"');
   });
 
-  test('stats shows scoring averages and withholds lineup ranks below the sample floor', () => {
+  test('stats opens player impact with small samples flagged', () => {
     const body = renderView({ section: 'stats', scores: [statsScore({ withLineups: true })] });
     expect(body).toContain('aria-label="Full Court season stats"');
     expect(body).toContain('aria-label="Full Court lineup lab"');
@@ -259,8 +258,10 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('90.0');
     expect(body).toContain('+10.0');
     expect(body).toContain('>+10<');
-    expect(body).toContain('Player A · Player B · Player C · Player D · Player E');
-    expect(body).toContain('* below 100 possessions');
+    expect(body).toContain('Full Court player impact');
+    expect(body).toContain('Actual Fives');
+    expect(body).toContain('8.3 *');
+    expect(body).toContain('Below 100 possessions');
     expect(body).not.toContain('No lineup facts in this save');
     expect(body).not.toContain('aria-label="Full Court regular season"');
   });
@@ -268,7 +269,7 @@ describe('FullCourtSeasonView sections', () => {
   test('stats keeps legacy saves honest when no lineup facts were recorded', () => {
     const body = renderView({ section: 'stats', scores: [statsScore({ withLineups: false })] });
     expect(body).toContain('0 of 1 games with');
-    expect(body).toContain('No lineup facts in this save');
+    expect(body).toContain('Player impact needs a played game with complete lineup data.');
     expect(body).toContain('Points / game');
   });
 

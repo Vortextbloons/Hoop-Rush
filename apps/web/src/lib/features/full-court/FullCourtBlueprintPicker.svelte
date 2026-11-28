@@ -238,7 +238,7 @@
     libraryMessage = null;
   }
 
-  function applySelected(): void {
+  function applySelected(includeRoles: boolean): void {
     if (disabled || libraryBusy) return;
     if (selectedHistorical !== null) {
       onApplyTactics({ ...selectedHistorical.tactics }, selectedHistorical.name);
@@ -248,7 +248,7 @@
       return;
     }
     if (selectedBlueprint !== null) {
-      if (onApplyBlueprint !== undefined && selectedPreview !== null) {
+      if (includeRoles && onApplyBlueprint !== undefined && selectedPreview !== null) {
         onApplyBlueprint(selectedBlueprint, selectedPreview);
       } else {
         onApplyTactics({ ...selectedBlueprint.tactics }, selectedBlueprint.name);
@@ -371,7 +371,7 @@
       {/if}
     </select>
 
-    <div class="flex shrink-0 items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <Button
         type="button"
         tone="secondary"
@@ -379,10 +379,21 @@
         disabled={disabled ||
           libraryBusy ||
           (selectedHistorical === null && selectedBlueprint === null)}
-        onclick={applySelected}
+        onclick={() => applySelected(false)}
       >
-        Apply
+        Apply style
       </Button>
+      {#if selectedBlueprint?.hierarchy !== undefined && onApplyBlueprint !== undefined}
+        <Button
+          type="button"
+          tone="secondary"
+          size="sm"
+          disabled={disabled || libraryBusy || selectedPreview === null}
+          onclick={() => applySelected(true)}
+        >
+          Apply style and roles
+        </Button>
+      {/if}
       {#if selectedBlueprint !== null && onRemoveBlueprint !== undefined}
         <Button
           type="button"

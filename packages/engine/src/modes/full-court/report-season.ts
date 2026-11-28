@@ -189,6 +189,24 @@ export interface FullCourtSeasonLineupOmitted {
   readonly pointsAgainst: number;
 }
 
+export interface FullCourtPlayerImpactSample {
+  readonly minutes: number;
+  readonly possessions: number;
+  readonly plusMinus: number;
+  readonly offense: number | null;
+  readonly defense: number | null;
+  readonly net: number | null;
+  readonly sampleMet: boolean;
+}
+
+export interface FullCourtPlayerImpactRow {
+  readonly player: FullCourtReportedPlayer;
+  readonly games: number;
+  readonly on: FullCourtPlayerImpactSample;
+  readonly off: FullCourtPlayerImpactSample;
+  readonly onOff: number | null;
+}
+
 export interface FullCourtSeasonLineupSummary {
   readonly sampleThreshold: number;
   /** Played user games in the supplied regular season and playoff record. */
@@ -197,6 +215,8 @@ export interface FullCourtSeasonLineupSummary {
   readonly gamesRecorded: number;
   readonly coverageComplete: boolean;
   readonly rows: readonly FullCourtSeasonLineupRow[];
+  readonly impact: readonly FullCourtPlayerImpactRow[];
+  readonly impactGames: number;
   readonly omitted: FullCourtSeasonLineupOmitted;
 }
 
@@ -751,6 +771,48 @@ interface LineupAccumulator {
   pointsAgainst: number;
 }
 
+type ImpactTotals = Pick<
+  LineupAccumulator,
+  'seconds' | 'offensivePossessions' | 'defensivePossessions' | 'pointsFor' | 'pointsAgainst'
+>;
+
+function impactTotals(): ImpactTotals {
+  return {
+    seconds: 0,
+    offensivePossessions: 0,
+    defensivePossessions: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+  };
+}
+
+function addImpactTotals(target: ImpactTotals, source: ImpactTotals): void {
+  target.seconds += source.seconds;
+  target.offensivePossessions += source.offensivePossessions;
+  target.defensivePossessions += source.defensivePossessions;
+  target.pointsFor += source.pointsFor;
+  target.pointsAgainst += source.pointsAgainst;
+}
+
+function impactSample(totals: ImpactTotals, sampleThreshold: number): FullCourtPlayerImpactSample {
+  const offense =
+    totals.offensivePossessions > 0 ? (totals.pointsFor * 100) / totals.offensivePossessions : null;
+  const defense =
+    totals.defensivePossessions > 0
+      ? (totals.pointsAgainst * 100) / totals.defensivePossessions
+      : null;
+  const possessions = (totals.offensivePossessions + totals.defensivePossessions) / 2;
+  return {
+    minutes: totals.seconds / 60,
+    possessions,
+    plusMinus: totals.pointsFor - totals.pointsAgainst,
+    offense,
+    defense,
+    net: offense === null || defense === null ? null : offense - defense,
+    sampleMet: possessions >= sampleThreshold && offense !== null && defense !== null,
+  };
+}
+
 function lineupSummaryOf(
   games: readonly CompletedGameScore[],
   sampleThreshold: number,
@@ -765,6 +827,16 @@ function lineupSummaryOf(
     pointsFor: 0,
     pointsAgainst: 0,
   };
+  const impactByPlayer = new Map<
+    string,
+    {
+      player: FullCourtReportedPlayer;
+      games: number;
+      on: ImpactTotals;
+      off: ImpactTotals;
+    }
+  >();
+  let impactGames = 0;
   let gamesRecorded = 0;
   let gamesExpected = 0;
   for (const game of games) {
@@ -779,6 +851,25 @@ function lineupSummaryOf(
       );
     }
     gamesRecorded += 1;
+    if (lineups.omitted.lineups === 0 && lineups.lineups.length > 0) {
+      impactGames += 1;
+      const participants = new Map(
+        lineups.lineups.flatMap((fact) =>
+          fact.players.map((player) => [player.playerId, player] as const),
+        ),
+      );
+      for (const player of participants.values()) {
+        let entry = impactByPlayer.get(player.playerId);
+        if (entry === undefined) {
+          entry = { player, games: 0, on: impactTotals(), off: impactTotals() };
+          impactByPlayer.set(player.playerId, entry);
+        }
+        entry.games += 1;
+        for (const fact of lineups.lineups) {
+          addImpactTotals(fact.playerIds.includes(player.playerId) ? entry.on : entry.off, fact);
+        }
+      }
+    }
     for (const fact of lineups.lineups) {
       const key = fullCourtLineupKey(fact.playerIds);
       let accumulator = accumulators.get(key);
@@ -871,6 +962,24 @@ function lineupSummaryOf(
     gamesRecorded,
     coverageComplete: gamesRecorded === gamesExpected,
     rows: rows.map((row) => ({ ...row, rank: rankByKey.get(row.key) ?? null })),
+    impactGames,
+    impact: [...impactByPlayer.values()]
+      .sort(
+        (left, right) =>
+          right.on.seconds - left.on.seconds ||
+          left.player.playerId.localeCompare(right.player.playerId),
+      )
+      .map(({ player, games, on: onTotals, off: offTotals }) => {
+        const on = impactSample(onTotals, sampleThreshold);
+        const off = impactSample(offTotals, sampleThreshold);
+        return {
+          player,
+          games,
+          on,
+          off,
+          onOff: on.net === null || off.net === null ? null : on.net - off.net,
+        };
+      }),
     omitted,
   };
 }

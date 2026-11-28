@@ -1220,6 +1220,75 @@ describe('FullCourtController durable watched replay', () => {
   });
 });
 
+test('publishes the committed slot when clearing the pinned game plan fails', async () => {
+  installTestEnvironment();
+  const { first } = openTestDatabasePair('fc-controller-plan-clear-failure');
+  const base = repositoriesFor(first);
+  const planRepository = base.fullCourtNextGamePlanRepository;
+  const clearFailure = new Error('next-game plan clear failed');
+  const failingPlanRepository = new Proxy(planRepository, {
+    get(target, property, receiver) {
+      if (property === 'clear') {
+        return async (runId: string, gameId?: string) => {
+          if (gameId !== undefined) throw clearFailure;
+          await target.clear(runId, gameId);
+        };
+      }
+      return Reflect.get(target, property, receiver) as unknown;
+    },
+  });
+  const repositories: Persistence = {
+    ...base,
+    fullCourtNextGamePlanRepository: failingPlanRepository,
+  };
+  const createWorker = (): FullCourtWorkerRunner => ({
+    simulateSlot: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtSeasonSlot(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulateGame: (lock, checkpoint, options) =>
+      Promise.resolve(
+        simulateFullCourtPlayoffGame(lock, checkpoint, createEngineContext(), options),
+      ),
+    simulatePractice: (lock, input) =>
+      Promise.resolve(simulateFullCourtTrainingCamp(lock.season, input, createEngineContext())),
+    dispose: () => {},
+  });
+
+  try {
+    const { assets, lock } = await seedCompletedDraft(first);
+    const controller = new FullCourtController({
+      loadAssets: () => Promise.resolve(assets),
+      loadHealthProfiles: () => Promise.resolve(null),
+      repositories,
+      createWorker,
+    });
+    await controller.load();
+    const userTeam = lock.season.teams.find((team) => team.teamId === lock.season.userTeamId);
+    const restingPlayer = userTeam?.roster.at(-1);
+    if (restingPlayer === undefined) throw new Error('Missing test bench player');
+    controller.setRestingPlayers([restingPlayer.playerId]);
+    expect(controller.restingForGameId).not.toBeNull();
+
+    await controller.advance(1, false, true);
+
+    expect(controller.error).toBe(clearFailure.message);
+    expect(controller.season?.checkpoint.completedThroughSlot).toBe(1);
+    expect(controller.latestGame).not.toBeNull();
+    expect(controller.savedReplay?.identity.slot).toBe(1);
+    const durable = await base.fullCourtSeasonRepository.load(lock.season.runId);
+    expect(durable?.completedThroughSlot).toBe(1);
+
+    // A stale durable plan does not block the next committed slot.
+    await controller.advance(1, false, false);
+    expect(controller.error).toBeNull();
+    expect(controller.season?.checkpoint.completedThroughSlot).toBe(2);
+    controller.dispose();
+  } finally {
+    first.close();
+  }
+});
+
 test('keeps a stale tab from paying for training camp after another tab commits the opener', async () => {
   installTestEnvironment();
   const { first, second } = openTestDatabasePair('fc-purchase-stale-tab');

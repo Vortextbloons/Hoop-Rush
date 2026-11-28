@@ -5,7 +5,11 @@ import type {
   FullCourtVariant,
 } from '@hoop-rush/data-contracts';
 import type { FullCourtCompletedGameFacts } from './report.ts';
-import { buildFullCourtSeasonSummary, type FullCourtSeriesFacts } from './report-season.ts';
+import {
+  buildFullCourtSeasonStats,
+  buildFullCourtSeasonSummary,
+  type FullCourtSeriesFacts,
+} from './report-season.ts';
 
 const USER = 'user';
 
@@ -413,4 +417,67 @@ describe('Full Court season completion summary', () => {
     });
     expect(result.achievements).toEqual([]);
   });
+});
+
+it('uses complete games and compares a player only with their own bench minutes', () => {
+  const fact = (playerId: string, pointsFor: number, pointsAgainst: number) => {
+    const playerIds = ['a', 'b', 'c', 'd', playerId];
+    return {
+      playerIds,
+      players: playerIds.map((id) => ({ playerId: id, displayName: id })),
+      seconds: 1440,
+      offensivePossessions: 50,
+      defensivePossessions: 40,
+      pointsFor,
+      pointsAgainst,
+    };
+  };
+  const played = (slot: number, lineups: ReturnType<typeof fact>[], omittedCount = 0) =>
+    regularScore({
+      slot,
+      userHome: true,
+      outcome: {
+        kind: 'played',
+        homePoints: 100,
+        awayPoints: 90,
+        lineups: {
+          version: 1,
+          side: 'home',
+          sampleThreshold: 100,
+          lineups,
+          omitted: {
+            lineups: omittedCount,
+            seconds: omittedCount * 1440,
+            offensivePossessions: omittedCount * 50,
+            defensivePossessions: omittedCount * 40,
+            pointsFor: omittedCount * 50,
+            pointsAgainst: omittedCount * 45,
+          },
+        },
+      },
+    });
+  const stats = buildFullCourtSeasonStats({
+    userTeamId: USER,
+    regularScores: [
+      played(1, [fact('e', 60, 40), fact('f', 40, 50)]),
+      played(2, [fact('f', 55, 40), fact('g', 45, 50)]),
+      played(3, [fact('e', 50, 45)], 1),
+    ],
+  });
+  expect(stats.lineups.impactGames).toBe(2);
+  expect(stats.lineups.impact.find((row) => row.player.playerId === 'e')).toMatchObject({
+    games: 1,
+    on: {
+      minutes: 24,
+      possessions: 45,
+      plusMinus: 20,
+      offense: 120,
+      defense: 100,
+      net: 20,
+      sampleMet: false,
+    },
+    off: { minutes: 24, possessions: 45, plusMinus: -10, offense: 80, defense: 125, net: -45 },
+    onOff: 65,
+  });
+  expect(stats.lineups.impact.find((row) => row.player.playerId === 'a')?.onOff).toBeNull();
 });

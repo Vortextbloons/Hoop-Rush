@@ -31,6 +31,13 @@ interface FullCourtSeasonDependencies {
   ) => FullCourtSeasonSlotOutcome | Promise<FullCourtSeasonSlotOutcome>;
 }
 
+type SimulatedSlotOutcome = Extract<FullCourtSeasonSlotOutcome, { kind: 'simulated' }>;
+
+export type FullCourtSeasonAdvanceResult =
+  | Exclude<FullCourtSeasonSlotOutcome, { kind: 'simulated' }>
+  | { readonly kind: 'stale'; readonly completedThroughSlot: number }
+  | (SimulatedSlotOutcome & { readonly watchedReplay: FullCourtWatchedReplay | null });
+
 function requireMatchingLock(
   checkpoint: FullCourtSeasonCheckpoint,
   lock: FullCourtSeasonLock,
@@ -64,9 +71,7 @@ export async function advanceFullCourtSeasonSlot(
     readonly options?: FullCourtSeasonSlotOptions;
   },
   dependencies: FullCourtSeasonDependencies,
-): Promise<
-  FullCourtSeasonSlotOutcome | { readonly kind: 'stale'; readonly completedThroughSlot: number }
-> {
+): Promise<FullCourtSeasonAdvanceResult> {
   const { lock } = input;
   const { repository, simulateSlot } = dependencies;
   const runId = lock.season.runId;
@@ -129,5 +134,5 @@ export async function advanceFullCourtSeasonSlot(
     outcome.scores,
     watchedReplay === undefined ? undefined : { watchedReplay },
   );
-  return outcome;
+  return { ...outcome, watchedReplay: watchedReplay ?? null };
 }

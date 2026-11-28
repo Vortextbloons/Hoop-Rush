@@ -79,12 +79,6 @@ export async function loadFullCourtReport(runId: string): Promise<FullCourtRepor
     teams: seasonLock.season.teams,
     scores: regularScores,
   });
-  const awards = buildFullCourtAwards({
-    teams: seasonLock.season.teams,
-    regularScores,
-    standings,
-    completedSlots: checkpoint.completedThroughSlot,
-  });
 
   let bracket: ReturnType<typeof fullCourtPlayoffView> | null = null;
   if (playoffCheckpoint !== null) {
@@ -97,6 +91,17 @@ export async function loadFullCourtReport(runId: string): Promise<FullCourtRepor
       bracket = null;
     }
   }
+
+  // The Finals MVP is derived from the championship series, so the bracket has to
+  // be rebuilt before the awards board or the report seals an award that was won.
+  const awards = buildFullCourtAwards({
+    teams: seasonLock.season.teams,
+    regularScores,
+    standings,
+    completedSlots: checkpoint.completedThroughSlot,
+    playoffGames: bracket === null ? [] : bracket.series.flatMap((series) => series.games),
+    championTeamId: bracket?.championTeamId ?? null,
+  });
 
   return {
     record,

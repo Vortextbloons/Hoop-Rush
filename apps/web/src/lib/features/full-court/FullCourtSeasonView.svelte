@@ -3,25 +3,21 @@
   import {
     CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
     CAP_RUSH_CONFERENCE_NAMES,
-    CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
-    CAP_RUSH_SERIES_WINS,
-    capRushSeriesWinner,
-    capRushSeriesWins,
+    franchiseAbbreviation,
     type FullCourtSeasonCheckpoint,
     type FullCourtSeasonScore,
     type FullCourtTeamHealth,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import { FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
+  import { ChevronDown, FastForward, Play, ShieldAlert, SkipForward, Trophy } from '@lucide/svelte';
   import {
     buildFullCourtAwards,
     buildFullCourtPlayerSeasonStats,
     buildFullCourtSeasonStats,
     fullCourtStandings,
-    fullCourtUserNextPlayoffMatchup,
     type FullCourtSeasonLock,
   } from '@hoop-rush/engine';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import ConferenceStandingsTable from '#lib/components/basketball/ConferenceStandingsTable.svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
@@ -35,7 +31,6 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
-  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { ScheduleCell } from '#lib/components/ui/types.js';
@@ -47,20 +42,13 @@
   import FullCourtPostseasonView from './FullCourtPostseasonView.svelte';
   import FullCourtTeamDetail from './FullCourtTeamDetail.svelte';
   import {
-    fullCourtFinalRecap,
     fullCourtGameDayReadiness,
     fullCourtHomeControls,
-    fullCourtNextMatchup,
     fullCourtNextUserFixture,
-    fullCourtPlayoffAdaptationRead,
-    fullCourtPlayoffRounds,
     fullCourtResultOf,
-    fullCourtSeriesGames,
     fullCourtUserSchedule,
-    fullCourtUserSeries,
     type FullCourtAdvanceOptions,
     type FullCourtHomeAction,
-    type FullCourtMatchupSide,
     type FullCourtPlayoffView,
     type FullCourtSeasonSection,
     type FullCourtSimulationNotice,
@@ -75,7 +63,6 @@
     busy,
     onAdvance,
     onStartPlayoffs,
-    onWatchNextGame,
     health = null,
     restingPlayerIds = [],
     onRestingChange,
@@ -97,7 +84,6 @@
     busy: boolean;
     onAdvance: (count: number, acceptForfeit?: boolean, options?: FullCourtAdvanceOptions) => void;
     onStartPlayoffs: () => void;
-    onWatchNextGame?: () => void;
     health?: FullCourtTeamHealth | null;
     restingPlayerIds?: readonly string[];
     onRestingChange?: (playerIds: readonly string[]) => void;
@@ -114,8 +100,17 @@
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
-  let selectedRound = $state<number | null>(null);
   let showAllLineups = $state(false);
+  let impactView = $state<'players' | 'fives'>('players');
+  let impactPlayerId = $state<string | null>(null);
+  let impactDetails = $state<HTMLDivElement>();
+
+  async function toggleImpactDetails(playerId: string): Promise<void> {
+    impactPlayerId = impactPlayerId === playerId ? null : playerId;
+    if (impactPlayerId === null) return;
+    await tick();
+    impactDetails?.scrollIntoView({ block: 'nearest' });
+  }
   let selectedTeamId = $state<string | null>(null);
 
   onMount(() => {
@@ -221,49 +216,6 @@
   const latestCell = $derived(schedule.findLast((cell) => cell.result !== null) ?? null);
   const latestResult = $derived(latestCell?.result ?? null);
 
-  const bracketRounds = $derived(playoff === null ? [] : fullCourtPlayoffRounds(playoff.series));
-  const userSeries = $derived(
-    playoff === null ? null : fullCourtUserSeries(playoff.series, userTeamId),
-  );
-  const userSeriesGames = $derived(
-    userSeries === null ? [] : fullCourtSeriesGames(userSeries, userTeamId),
-  );
-  const userSeriesWinner = $derived(userSeries === null ? null : capRushSeriesWinner(userSeries));
-  const userSeriesActive = $derived(userSeries !== null && userSeriesWinner === null);
-  const userSeriesOpponentId = $derived(
-    userSeries === null
-      ? null
-      : userSeries.highTeamId === userTeamId
-        ? userSeries.lowTeamId
-        : userSeries.highTeamId,
-  );
-  const championId = $derived(playoff?.championTeamId ?? null);
-  const latestRound = $derived.by(() => {
-    const populated = bracketRounds.filter((round) => round.series.length > 0);
-    return populated.length === 0 ? 1 : Math.max(...populated.map((round) => round.round));
-  });
-
-  const matchup = $derived(fullCourtNextMatchup(lock, checkpoint, playoff, teamName));
-  const nextBracketGameHasUser = $derived(playoff === null || playoff.nextGame?.userSide !== null);
-  const userPlayoffPreview = $derived(
-    playoff === null
-      ? null
-      : fullCourtUserNextPlayoffMatchup({
-          userTeamId,
-          runSeed: lock.season.runSeed,
-          series: playoff.series,
-        }),
-  );
-  const nextUserGame = $derived(
-    userPlayoffPreview === null
-      ? null
-      : { gameOrdinal: userPlayoffPreview.gameOrdinal, userSide: userPlayoffPreview.userSide },
-  );
-  const userPlayoffAdjustment = $derived(
-    userPlayoffPreview?.adaptation == null
-      ? null
-      : fullCourtPlayoffAdaptationRead(userPlayoffPreview.adaptation),
-  );
   /** The postseason screen owns every bracket action and every postseason view. */
   const playoffMode = $derived(playoff !== null || regularComplete);
   const controls = $derived(
@@ -276,7 +228,6 @@
       restConflict: gameDayReadiness.restConflict,
     }),
   );
-  const recap = $derived(fullCourtFinalRecap(lock, playoff, teamName));
   const playoffGamesList = $derived(
     playoff === null ? [] : playoff.series.flatMap((entry) => entry.games),
   );
@@ -302,7 +253,6 @@
           scores,
         }).filter((row) => row.games > 0),
   );
-  const latestPlayoffGame = $derived(userSeriesGames.at(-1) ?? null);
 
   function teamName(teamId: string): string {
     return teamsById.get(teamId)?.displayName ?? teamId;
@@ -338,11 +288,11 @@
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
   }
 
-  function sideMeta(side: FullCourtMatchupSide): string {
-    const row = rowByTeam.get(side.teamId);
-    const seed = side.seed ?? row?.seed ?? null;
+  function sideMeta(teamId: string): string {
+    const row = rowByTeam.get(teamId);
+    const seed = row?.seed ?? null;
     const record = row === undefined ? null : recordLabel(row.wins, row.losses);
-    return [side.abbreviation, seed === null ? null : `Seed ${String(seed)}`, record]
+    return [franchiseAbbreviation(teamId), seed === null ? null : `Seed ${String(seed)}`, record]
       .filter((part): part is string => part !== null)
       .join(' · ');
   }
@@ -368,80 +318,73 @@
     if (busy) return;
     onAdvance(1, true);
   }
-
-  function startPlayoffs(): void {
-    if (busy || pendingForfeit) return;
-    onStartPlayoffs();
-  }
 </script>
 
 {#snippet simControlsBar()}
-  {#if simulating}
-    <SimulationStatus
-      class="mt-4"
-      label="Season simulation progress"
-      progress={simProgress}
-      stopping={stopRequested}
-      onStop={onStopAfterGame}
-    />
-  {/if}
-
-  <div
-    class="mt-4 flex flex-col gap-2.5 border-t border-line-soft pt-4 lg:flex-row lg:items-center lg:gap-3"
-    aria-busy={busy}
-  >
-    <div class="flex shrink-0 flex-wrap items-center gap-2">
-      {#if controls.primary !== null}
-        <Button
-          tone="primary"
-          class="flex-1 whitespace-nowrap sm:flex-initial"
-          disabled={busy}
-          onclick={() => {
-            if (controls.primary !== null) runAction(controls.primary);
-          }}
-        >
-          {#if controls.primary.kind === 'start-playoffs'}
-            <Trophy size={15} aria-hidden="true" />
-          {:else}
-            <Play size={15} aria-hidden="true" />
+  <div class="mt-4 border-t border-line-soft pt-4" aria-busy={busy}>
+    {#if simulating}
+      <SimulationStatus
+        label="Season simulation progress"
+        progress={simProgress}
+        stopping={stopRequested}
+        onStop={onStopAfterGame}
+      />
+    {:else}
+      <div class="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-3">
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          {#if controls.primary !== null}
+            <Button
+              tone="primary"
+              class="flex-1 whitespace-nowrap sm:flex-initial"
+              disabled={busy}
+              onclick={() => {
+                if (controls.primary !== null) runAction(controls.primary);
+              }}
+            >
+              {#if controls.primary.kind === 'start-playoffs'}
+                <Trophy size={15} aria-hidden="true" />
+              {:else}
+                <Play size={15} aria-hidden="true" />
+              {/if}
+              {controls.primary.label}
+            </Button>
           {/if}
-          {controls.primary.label}
-        </Button>
-      {/if}
-      {#if onEditGamePlan !== undefined && section === 'home'}
-        <Button
-          size="sm"
-          tone="secondary"
-          class="flex-1 whitespace-nowrap sm:flex-initial"
-          disabled={busy}
-          onclick={onEditGamePlan}>Edit game plan</Button
-        >
-      {/if}
-    </div>
+          {#if onEditGamePlan !== undefined && section === 'home'}
+            <Button
+              size="sm"
+              tone="secondary"
+              class="flex-1 whitespace-nowrap sm:flex-initial"
+              disabled={busy}
+              onclick={onEditGamePlan}>Edit game plan</Button
+            >
+          {/if}
+        </div>
 
-    {#if controls.secondary.length > 0}
-      <div
-        class="flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
-        role="group"
-        aria-label="Batch simulation"
-      >
-        <span class="ui-micro shrink-0 px-2 text-muted-foreground">Skip</span>
-        {#each controls.secondary as action (action.label)}
-          <Button
-            size="sm"
-            tone="secondary"
-            class="flex-1 whitespace-nowrap"
-            disabled={busy}
-            onclick={() => runAction(action)}
+        {#if controls.secondary.length > 0}
+          <div
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-xl border border-line-soft bg-surface-1 p-1"
+            role="group"
+            aria-label="Batch simulation"
           >
-            {#if action.count >= 5}
-              <FastForward size={13} aria-hidden="true" />
-            {:else}
-              <SkipForward size={13} aria-hidden="true" />
-            {/if}
-            {action.label}
-          </Button>
-        {/each}
+            <span class="ui-micro shrink-0 px-2 text-muted-foreground">Skip</span>
+            {#each controls.secondary as action (action.label)}
+              <Button
+                size="sm"
+                tone="secondary"
+                class="flex-1 whitespace-nowrap"
+                disabled={busy}
+                onclick={() => runAction(action)}
+              >
+                {#if action.count >= 5}
+                  <FastForward size={13} aria-hidden="true" />
+                {:else}
+                  <SkipForward size={13} aria-hidden="true" />
+                {/if}
+                {action.label}
+              </Button>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -493,9 +436,9 @@
   </span>
 {/snippet}
 
-{#snippet matchupSide(side: FullCourtMatchupSide, role: 'Home' | 'Away' | null)}
-  {@const identity = identityOf(side.teamId)}
-  {@const isUser = side.teamId === userTeamId}
+{#snippet matchupSide(teamId: string, role: 'Home' | 'Away')}
+  {@const identity = identityOf(teamId)}
+  {@const isUser = teamId === userTeamId}
   <div
     class="flex min-w-0 flex-col gap-1 rounded-lg border p-2 sm:gap-2 sm:p-3 {isUser
       ? 'border-primary/50 bg-primary/5'
@@ -513,103 +456,47 @@
       {/if}
       <p
         class="font-display min-w-0 basis-full break-words text-sm leading-tight font-extrabold uppercase sm:flex-1 sm:text-lg"
-        title={side.name}
+        title={teamName(teamId)}
       >
-        {side.name}
+        {teamName(teamId)}
       </p>
       {#if isUser}
         <span class="shrink-0 font-mono text-[9px] font-bold text-primary uppercase">You</span>
       {/if}
     </div>
     <p class="font-mono text-[10px] text-muted-foreground uppercase">
-      {role === null ? '' : `${role} · `}{sideMeta(side)}
+      {role} · {sideMeta(teamId)}
     </p>
   </div>
 {/snippet}
 
-{#snippet recapPanel()}
-  {#if recap !== null}
-    <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Full Court final recap">
-      <SectionHeading eyebrow="Final" title={recap.headline} level={2} size="md">
-        {#snippet actions()}
-          <Badge tone={recap.userChampion ? 'positive' : 'neutral'}>
-            {recap.userChampion ? 'Your title' : 'Season complete'}
-          </Badge>
-        {/snippet}
-      </SectionHeading>
-      <div
-        class="mt-4 flex items-center gap-4 rounded-xl border border-accent/50 bg-accent/10 p-4"
-        role="status"
-      >
-        <Trophy size={32} class="shrink-0 text-accent" aria-hidden="true" />
-        <div class="min-w-0">
-          <p class="ui-label text-accent">Champion</p>
-          <p class="font-display text-2xl font-extrabold tracking-tight uppercase">
-            {recap.championName}
-          </p>
-        </div>
-      </div>
-
-      <StatGrid class="mt-4" columns={3} mobile={3}>
-        <StatTile
-          label="Series won"
-          size="md"
-          surface="tile"
-          value={`${recap.seriesWon} / ${recap.seriesPlayed}`}
-        />
-        <StatTile
-          label="Playoff games"
-          size="md"
-          surface="tile"
-          value={`${recap.gameWins}–${recap.gameLosses}`}
-        />
-        <StatTile
-          label="Final record"
-          size="md"
-          surface="tile"
-          value={recordLabel(userRow?.wins ?? 0, userRow?.losses ?? 0)}
-        />
-      </StatGrid>
-
-      {#if recap.series.length > 0}
-        <ol class="mt-4 flex flex-col gap-1.5" aria-label="Your playoff series results">
-          {#each recap.series as entry (entry.round)}
-            <li
-              class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line-soft bg-surface-1 px-3 py-2"
-            >
-              <span class="font-mono text-[9px] font-bold text-muted-foreground uppercase"
-                >{entry.roundLabel}</span
-              >
-              <span class="min-w-0 flex-1 truncate text-[11px] font-semibold"
-                >{entry.opponentName}</span
-              >
-              <span class="font-display text-lg font-extrabold tabular-nums"
-                >{entry.userWins}–{entry.opponentWins}</span
-              >
-              <span
-                class="rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold uppercase {entry.won
-                  ? 'border-positive/40 bg-positive/10 text-positive'
-                  : 'border-negative/40 bg-negative/10 text-negative'}"
-                >{entry.won ? 'Won' : 'Lost'}</span
-              >
-            </li>
-          {/each}
-        </ol>
-      {:else}
-        <p class="mt-4 text-xs text-muted-foreground">You did not reach the bracket this season.</p>
-      {/if}
-    </Panel>
-  {/if}
-{/snippet}
-
 {#snippet homePanel()}
   <Panel as="section" padding="md" aria-label="Full Court season progress">
-    <div class="flex flex-wrap items-start justify-between gap-4">
+    <StatGrid columns={3} mobile={3} gap="md">
+      <StatTile label="Remaining" size="md" surface="tile" value={remaining} />
+      <StatTile
+        label="Playoff seed"
+        size="md"
+        surface="tile"
+        tone={userRow?.qualified === true ? 'accent' : 'muted'}
+        value={userRow === null ? '—' : `#${String(userRow.seed)}`}
+      />
+      <StatTile
+        label="Point diff"
+        size="md"
+        surface="tile"
+        tone={(userRow?.pointDifferential ?? 0) > 0
+          ? 'primary'
+          : (userRow?.pointDifferential ?? 0) < 0
+            ? 'negative'
+            : 'muted'}
+        value={signed(userRow?.pointDifferential ?? 0)}
+      />
+    </StatGrid>
+
+    <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="ui-label">
-          Full Court ·
-          {playoff === null ? 'Regular season' : 'Postseason'}
-        </p>
+        <p class="ui-label">Full Court · Regular season</p>
         <div class="mt-2 flex items-center gap-3">
           {#if userIdentity !== null && manifest !== null}
             <TeamLogo
@@ -639,84 +526,33 @@
       </div>
     </div>
 
-    {#if matchup !== null}
+    {#if nextUserFixture !== null}
       <div class="mt-4 rounded-xl border border-primary/30 bg-surface-2/50 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="ui-label" data-tone="muted">{matchup.label}</p>
-          {#if matchup.series !== null}
-            <Badge tone="accent">
-              Series {matchup.series.userWins}–{matchup.series.opponentWins}
-            </Badge>
-          {:else}
-            <Badge tone={matchup.phase === 'playoff' ? 'accent' : 'neutral'}>
-              {matchup.phase === 'playoff' ? 'Postseason' : 'Next game'}
-            </Badge>
-          {/if}
+          <p class="ui-label" data-tone="muted">{nextUserFixture.label}</p>
+          <Badge tone="neutral">Next game</Badge>
         </div>
         <div
           class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1.5 sm:gap-2"
         >
-          {@render matchupSide(matchup.home, matchup.phase === 'playoff' ? null : 'Home')}
+          {@render matchupSide(nextUserFixture.homeTeamId, 'Home')}
           <span
             class="self-center text-center font-mono text-[10px] text-muted-foreground uppercase"
             >vs</span
           >
-          {@render matchupSide(matchup.away, matchup.phase === 'playoff' ? null : 'Away')}
+          {@render matchupSide(nextUserFixture.awayTeamId, 'Away')}
         </div>
         {@render simControlsBar()}
-        {#if matchup.userSide !== null && matchup.series === null}
-          <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">
-            Your five {matchup.userSide === 'home' ? 'host this game' : 'travel for this game'}
-          </p>
-        {/if}
-        {#if matchup.phase === 'playoff' && matchup.userSide !== null && userPlayoffAdjustment !== null}
-          <div
-            class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Playoff opponent adjustment"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="ui-label text-muted-foreground">Opponent adjustment</p>
-              <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
-            </div>
-            <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">
-              {userPlayoffAdjustment.detailLabel}
-            </p>
-          </div>
-        {/if}
+        <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">
+          Your five {nextUserFixture.userSide === 'home'
+            ? 'host this game'
+            : 'travel for this game'}
+        </p>
       </div>
-    {:else if playoff !== null && championId === null}
-      <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
-        No game is ready for your five. The rest of the bracket is finishing.
-      </p>
-      {@render simControlsBar()}
     {:else}
       {@render simControlsBar()}
     {/if}
 
-    <div class="mt-4">
-      <StatGrid columns={3} mobile={3} gap="md">
-        <StatTile label="Remaining" size="md" surface="tile" value={remaining} />
-        <StatTile
-          label="Playoff seed"
-          size="md"
-          surface="tile"
-          tone={userRow?.qualified === true ? 'accent' : 'muted'}
-          value={userRow === null ? '—' : `#${String(userRow.seed)}`}
-        />
-        <StatTile
-          label="Point diff"
-          size="md"
-          surface="tile"
-          tone={(userRow?.pointDifferential ?? 0) > 0
-            ? 'primary'
-            : (userRow?.pointDifferential ?? 0) < 0
-              ? 'negative'
-              : 'muted'}
-          value={signed(userRow?.pointDifferential ?? 0)}
-        />
-      </StatGrid>
-    </div>
     <details class="mt-4 rounded-lg border border-line-soft px-3">
       <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold"
         >Game day readiness</summary
@@ -733,45 +569,11 @@
 {/snippet}
 
 {#snippet latestResultPanel()}
-  {#if playoff !== null && latestPlayoffGame !== null && userSeriesOpponentId !== null}
+  {#if latestCell !== null && latestResult !== null}
     <Panel as="section" padding="sm" aria-label="Latest Full Court result">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <p class="ui-label" data-tone="muted">
-          Latest playoff result · Game {latestPlayoffGame.gameOrdinal}
-        </p>
-        <Badge tone={latestPlayoffGame.won ? 'positive' : 'negative'}>
-          {latestPlayoffGame.doubleForfeit
-            ? 'Double forfeit'
-            : latestPlayoffGame.won
-              ? 'Win'
-              : 'Loss'}
-        </Badge>
-      </div>
-      <GameScoreboard
-        teams={[
-          {
-            key: 'you',
-            label: userTeamName,
-            score: latestPlayoffGame.userPoints ?? '—',
-            winner: latestPlayoffGame.doubleForfeit ? false : latestPlayoffGame.won,
-          },
-          {
-            key: 'opponent',
-            label: teamName(userSeriesOpponentId),
-            score: latestPlayoffGame.opponentPoints ?? '—',
-            winner: latestPlayoffGame.doubleForfeit ? false : !latestPlayoffGame.won,
-          },
-        ]}
-        status={latestStatus}
-        label={`Playoff Game ${String(latestPlayoffGame.gameOrdinal)} result`}
-        class="mt-2"
-      />
-    </Panel>
-  {:else if latestCell !== null && latestResult !== null}
-    <Panel as="section" padding="sm" aria-label="Latest Full Court result">
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <p class="ui-label" data-tone="muted">
-          {playoff === null ? 'Latest result' : 'Latest regular-season result'} · Game {latestCell.slot}
+          Latest result · Game {latestCell.slot}
         </p>
         <Badge tone={latestResult.won ? 'positive' : 'negative'}>
           {latestResult.doubleForfeit ? 'Double forfeit' : latestResult.won ? 'Win' : 'Loss'}
@@ -868,96 +670,275 @@
   {/if}
 
   <Panel as="section" padding="md" aria-label="Full Court lineup lab">
-    <SectionHeading eyebrow="Lineup Lab" title="Actual fives" level={2} size="md">
+    <SectionHeading
+      title={impactView === 'players' ? 'Player Impact' : 'Actual fives'}
+      level={2}
+      size="md"
+    >
       {#snippet actions()}
-        <Badge tone="neutral">Sample floor {seasonStats.lineups.sampleThreshold} poss</Badge>
-      {/snippet}
-    </SectionHeading>
-    {#if seasonStats.lineups.rows.length > 0}
-      {@const visibleLineups = showAllLineups
-        ? seasonStats.lineups.rows
-        : seasonStats.lineups.rows.slice(0, 8)}
-      <p class="mt-2 text-xs text-muted-foreground">
-        * below {seasonStats.lineups.sampleThreshold} possessions.
-      </p>
-      <div class="ui-stats-scroll mt-3">
-        <PlayerStatsTable
-          columns={[
-            { key: 'games', label: 'GP', value: (lineup) => lineup.games },
-            { key: 'minutes', label: 'MIN', value: (lineup) => lineup.minutes.toFixed(1) },
-            { key: 'pointsFor', label: 'PF', value: (lineup) => lineup.pointsFor },
-            { key: 'pointsAgainst', label: 'PA', value: (lineup) => lineup.pointsAgainst },
-            {
-              key: 'poss',
-              label: 'POSS',
-              value: (lineup) => possessionLabel(lineup.pacePossessions),
-            },
-            {
-              key: 'netRating',
-              label: 'NET RTG',
-              value: (lineup) =>
-                `${rateLabel(lineup.netRatingPer100)}${lineup.sampleMet ? '' : ' *'}`,
-            },
-            { key: 'rank', label: 'RK', value: (lineup) => lineup.rank ?? '—' },
-          ] satisfies PlayerStatColumn<(typeof visibleLineups)[number]>[]}
-          rows={visibleLineups}
-          rowKey={(lineup) => lineup.key}
-          caption="Full Court season lineups"
-          playerLabel="Lineup"
-          stickyIdentity
-          playerCellClass="ui-stats-player-cell"
-          playerHeadCellClass="ui-stats-player-cell"
-        >
-          {#snippet identity(lineup)}
-            <div class="flex items-center gap-2">
-              <div class="flex shrink-0 -space-x-2">
-                {#each lineup.players as player (player.playerId)}
-                  <div class="rounded-full ring-2 ring-surface-1">
-                    <FullCourtPortrait {player} {art} size="sm" />
-                  </div>
-                {/each}
-              </div>
-              <span class="min-w-0 text-xs font-semibold">
-                {lineup.players.map((player) => player.displayName).join(' · ')}
-              </span>
-            </div>
-          {/snippet}
-          {#snippet cell(lineup, column)}
-            {#if column.key === 'netRating'}
-              <span
-                class="font-bold {lineup.netRatingPer100 === null
-                  ? ''
-                  : lineup.netRatingPer100 > 0
-                    ? 'text-positive'
-                    : lineup.netRatingPer100 < 0
-                      ? 'text-negative'
-                      : ''}"
-              >
-                {column.value(lineup)}
-              </span>
-            {:else if column.key === 'rank'}
-              <span title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}>
-                {column.value(lineup)}
-              </span>
-            {:else}
-              {column.value(lineup)}
-            {/if}
-          {/snippet}
-        </PlayerStatsTable>
-      </div>
-      {#if seasonStats.lineups.rows.length > 8}
-        <div class="mt-3">
-          <Button size="sm" tone="secondary" onclick={() => (showAllLineups = !showAllLineups)}>
-            {showAllLineups
-              ? 'Show top 8 lineups'
-              : `Show all ${String(seasonStats.lineups.rows.length)} lineups`}
+        <div class="flex flex-wrap gap-1" role="group" aria-label="Lineup analysis">
+          <Button
+            size="sm"
+            tone={impactView === 'players' ? 'secondary' : 'ghost'}
+            aria-pressed={impactView === 'players'}
+            onclick={() => (impactView = 'players')}
+          >
+            Player Impact
+          </Button>
+          <Button
+            size="sm"
+            tone={impactView === 'fives' ? 'secondary' : 'ghost'}
+            aria-pressed={impactView === 'fives'}
+            onclick={() => (impactView = 'fives')}
+          >
+            Actual Fives
           </Button>
         </div>
+      {/snippet}
+    </SectionHeading>
+    {#if impactView === 'players'}
+      {@const selected = seasonStats.lineups.impact.find(
+        (row) => row.player.playerId === impactPlayerId,
+      )}
+      {#if seasonStats.lineups.impact.length > 0}
+        <p class="mt-2 text-xs text-muted-foreground">
+          {seasonStats.lineups.impactGames} of {seasonStats.lineups.gamesExpected} played games with complete
+          lineup data. Net ratings are per 100 possessions. Off-court minutes come from games the player
+          appeared in. * Below {seasonStats.lineups.sampleThreshold} possessions.
+        </p>
+        <div class="ui-stats-scroll mt-3">
+          <PlayerStatsTable
+            columns={[
+              { key: 'minutes', label: 'MIN', value: (row) => row.on.minutes.toFixed(1) },
+              { key: 'margin', label: '+/-', value: (row) => signed(row.on.plusMinus) },
+              { key: 'on', label: 'ON NET', value: (row) => rateLabel(row.on.net) },
+              { key: 'off', label: 'OFF NET', value: (row) => rateLabel(row.off.net) },
+              { key: 'swing', label: 'ON/OFF', value: (row) => rateLabel(row.onOff) },
+            ] satisfies PlayerStatColumn<(typeof seasonStats.lineups.impact)[number]>[]}
+            rows={seasonStats.lineups.impact}
+            rowKey={(row) => row.player.playerId}
+            caption="Full Court player impact"
+            stickyIdentity
+            playerCellClass="ui-stats-player-cell"
+            playerHeadCellClass="ui-stats-player-cell"
+          >
+            {#snippet identity(row)}
+              <button
+                type="button"
+                class="flex min-h-10 items-center gap-2 text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-ring"
+                aria-expanded={impactPlayerId === row.player.playerId}
+                aria-controls={impactPlayerId === row.player.playerId
+                  ? 'player-impact-details'
+                  : undefined}
+                onclick={() => void toggleImpactDetails(row.player.playerId)}
+              >
+                <FullCourtPortrait player={row.player} {art} size="sm" />
+                {row.player.displayName}
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  class={impactPlayerId === row.player.playerId ? 'rotate-180' : ''}
+                />
+              </button>
+            {/snippet}
+            {#snippet cell(row, column)}
+              {@const small =
+                (column.key === 'on' && row.on.net !== null && !row.on.sampleMet) ||
+                (column.key === 'off' && row.off.net !== null && !row.off.sampleMet) ||
+                (column.key === 'swing' &&
+                  row.onOff !== null &&
+                  (!row.on.sampleMet || !row.off.sampleMet))}
+              <span
+                class:font-bold={column.key === 'swing'}
+                class:text-positive={column.key === 'swing' && (row.onOff ?? 0) > 0}
+                class:text-negative={column.key === 'swing' && (row.onOff ?? 0) < 0}
+              >
+                {column.key === 'swing' && (row.onOff ?? 0) > 0 ? '+' : ''}{column.value(row)}{small
+                  ? ' *'
+                  : ''}
+              </span>
+            {/snippet}
+          </PlayerStatsTable>
+        </div>
+        {#if selected !== undefined}
+          {@const alternatives = seasonStats.lineups.rows.filter(
+            (row) => !row.playerIds.includes(selected.player.playerId),
+          )}
+          {@const comparisons = seasonStats.lineups.rows
+            .filter((row) => row.playerIds.includes(selected.player.playerId))
+            .flatMap((withPlayer) => {
+              const teammates = withPlayer.playerIds.filter(
+                (id) => id !== selected.player.playerId,
+              );
+              return alternatives
+                .filter((row) => teammates.every((id) => row.playerIds.includes(id)))
+                .map((withoutPlayer) => ({ withPlayer, withoutPlayer, teammates }));
+            })
+            .sort(
+              (left, right) =>
+                Math.min(right.withPlayer.pacePossessions, right.withoutPlayer.pacePossessions) -
+                Math.min(left.withPlayer.pacePossessions, left.withoutPlayer.pacePossessions),
+            )
+            .slice(0, 3)}
+          <div
+            class="mt-4 grid gap-3 rounded-lg border border-line-soft bg-surface-1 p-4"
+            id="player-impact-details"
+            bind:this={impactDetails}
+            aria-label={`${selected.player.displayName} impact details`}
+          >
+            <h3 class="font-semibold">
+              {selected.player.displayName}
+              <span class="text-sm font-normal text-muted-foreground"
+                >&middot; {selected.games} games</span
+              >
+            </h3>
+            <div class="grid gap-2 sm:grid-cols-2">
+              {#each [{ label: 'On court', sample: selected.on }, { label: 'Off court', sample: selected.off }] as { label, sample } (label)}
+                <div class="rounded-md bg-surface-2 p-3 text-sm">
+                  <p class="font-semibold">{label}</p>
+                  <p class="mt-1 text-muted-foreground">
+                    {possessionLabel(sample.possessions)} poss &middot; {sample.minutes.toFixed(1)} min
+                    {sample.sampleMet ? '' : ' *'}
+                  </p>
+                  <p class="mt-1 text-muted-foreground">
+                    Offense {sample.offense?.toFixed(1) ?? '?'} &middot; Defense {sample.defense?.toFixed(
+                      1,
+                    ) ?? '?'} per 100 poss
+                  </p>
+                </div>
+              {/each}
+            </div>
+            <h4 class="text-sm font-semibold">Same four teammates</h4>
+            {#each comparisons as { withPlayer, withoutPlayer, teammates } (`${withPlayer.key}:${withoutPlayer.key}`)}
+              {@const replacement = withoutPlayer.players.find(
+                (player) => !teammates.includes(player.playerId),
+              )}
+              <div class="border-t border-line-soft pt-2 text-sm">
+                <p class="text-xs text-muted-foreground">
+                  {withPlayer.players
+                    .filter((player) => teammates.includes(player.playerId))
+                    .map((player) => player.displayName)
+                    .join(' ? ')}
+                </p>
+                <dl class="mt-1 grid gap-1 sm:grid-cols-2">
+                  {#each [{ player: selected.player, lineup: withPlayer }, { player: replacement, lineup: withoutPlayer }] as { player, lineup } (lineup.key)}
+                    <div>
+                      <dt class="font-semibold">{player?.displayName}</dt>
+                      <dd>
+                        {rateLabel(lineup.netRatingPer100)} net &middot; {possessionLabel(
+                          lineup.pacePossessions,
+                        )} poss{lineup.sampleMet ? '' : ' *'}
+                      </dd>
+                    </div>
+                  {/each}
+                </dl>
+              </div>
+            {:else}
+              <p class="text-xs text-muted-foreground">
+                No recorded substitution shared the same four teammates.
+              </p>
+            {/each}
+            {#if comparisons.length > 0}
+              <p class="text-xs text-muted-foreground">
+                These groups may have faced different opponents and game situations.
+              </p>
+            {/if}
+          </div>
+        {/if}
+      {:else}
+        <p class="mt-3 text-sm text-muted-foreground">
+          Player impact needs a played game with complete lineup data.
+        </p>
       {/if}
-    {:else if seasonStats.lineups.gamesExpected > 0}
-      <Alert class="mt-3" tone="info" title="No lineup facts in this save"></Alert>
     {:else}
-      <p class="mt-2 text-xs text-muted-foreground">Play a game to record the first actual five.</p>
+      {#if seasonStats.lineups.rows.length > 0}
+        {@const visibleLineups = showAllLineups
+          ? seasonStats.lineups.rows
+          : seasonStats.lineups.rows.slice(0, 8)}
+        <p class="mt-2 text-xs text-muted-foreground">
+          * below {seasonStats.lineups.sampleThreshold} possessions.
+        </p>
+        <div class="ui-stats-scroll mt-3">
+          <PlayerStatsTable
+            columns={[
+              { key: 'games', label: 'GP', value: (lineup) => lineup.games },
+              { key: 'minutes', label: 'MIN', value: (lineup) => lineup.minutes.toFixed(1) },
+              { key: 'pointsFor', label: 'PF', value: (lineup) => lineup.pointsFor },
+              { key: 'pointsAgainst', label: 'PA', value: (lineup) => lineup.pointsAgainst },
+              {
+                key: 'poss',
+                label: 'POSS',
+                value: (lineup) => possessionLabel(lineup.pacePossessions),
+              },
+              {
+                key: 'netRating',
+                label: 'NET RTG',
+                value: (lineup) =>
+                  `${rateLabel(lineup.netRatingPer100)}${lineup.sampleMet ? '' : ' *'}`,
+              },
+              { key: 'rank', label: 'RK', value: (lineup) => lineup.rank ?? '—' },
+            ] satisfies PlayerStatColumn<(typeof visibleLineups)[number]>[]}
+            rows={visibleLineups}
+            rowKey={(lineup) => lineup.key}
+            caption="Full Court season lineups"
+            playerLabel="Lineup"
+            stickyIdentity
+            playerCellClass="ui-stats-player-cell"
+            playerHeadCellClass="ui-stats-player-cell"
+          >
+            {#snippet identity(lineup)}
+              <div class="flex items-center gap-2">
+                <div class="flex shrink-0 -space-x-2">
+                  {#each lineup.players as player (player.playerId)}
+                    <div class="rounded-full ring-2 ring-surface-1">
+                      <FullCourtPortrait {player} {art} size="sm" />
+                    </div>
+                  {/each}
+                </div>
+                <span class="min-w-0 text-xs font-semibold">
+                  {lineup.players.map((player) => player.displayName).join(' · ')}
+                </span>
+              </div>
+            {/snippet}
+            {#snippet cell(lineup, column)}
+              {#if column.key === 'netRating'}
+                <span
+                  class="font-bold {lineup.netRatingPer100 === null
+                    ? ''
+                    : lineup.netRatingPer100 > 0
+                      ? 'text-positive'
+                      : lineup.netRatingPer100 < 0
+                        ? 'text-negative'
+                        : ''}"
+                >
+                  {column.value(lineup)}
+                </span>
+              {:else if column.key === 'rank'}
+                <span title={lineup.sampleMet ? 'Net-rating rank' : 'Below the sample floor'}>
+                  {column.value(lineup)}
+                </span>
+              {:else}
+                {column.value(lineup)}
+              {/if}
+            {/snippet}
+          </PlayerStatsTable>
+        </div>
+        {#if seasonStats.lineups.rows.length > 8}
+          <div class="mt-3">
+            <Button size="sm" tone="secondary" onclick={() => (showAllLineups = !showAllLineups)}>
+              {showAllLineups
+                ? 'Show top 8 lineups'
+                : `Show all ${String(seasonStats.lineups.rows.length)} lineups`}
+            </Button>
+          </div>
+        {/if}
+      {:else if seasonStats.lineups.gamesExpected > 0}
+        <Alert class="mt-3" tone="info" title="No lineup facts in this save"></Alert>
+      {:else}
+        <p class="mt-2 text-xs text-muted-foreground">
+          Play a game to record the first actual five.
+        </p>
+      {/if}
     {/if}
   </Panel>
 {/snippet}
@@ -1028,27 +1009,23 @@
   {:else if section === 'stats'}
     {@render statsPanel()}
   {:else if playoffMode}
-    {#if recap !== null}
-      {@render recapPanel()}
-    {:else}
-      <FullCourtPostseasonView
-        {lock}
-        {checkpoint}
-        {playoff}
-        {standings}
-        {pendingForfeit}
-        {busy}
-        {simulating}
-        {simProgress}
-        {stopRequested}
-        {notice}
-        {onDismissNotice}
-        {onAdvance}
-        {onStartPlayoffs}
-        {onStopAfterGame}
-        {art}
-      />
-    {/if}
+    <FullCourtPostseasonView
+      {lock}
+      {checkpoint}
+      {playoff}
+      {standings}
+      {pendingForfeit}
+      {busy}
+      {simulating}
+      {simProgress}
+      {stopRequested}
+      {notice}
+      {onDismissNotice}
+      {onAdvance}
+      {onStartPlayoffs}
+      {onStopAfterGame}
+      {art}
+    />
   {:else if section === 'playoffs'}
     <Panel as="section" padding="md" aria-label="Full Court postseason">
       <SectionHeading

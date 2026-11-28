@@ -36,24 +36,29 @@ test('advanceFullCourtSeasonSlot commits watchedReplay only when record=true and
   };
 
   // Summary sim (record: false) passes no watchedReplay.
-  await advanceFullCourtSeasonSlot(
+  const summary = await advanceFullCourtSeasonSlot(
     { lock, expectedThroughSlot: 0, options: { record: false } },
     {
       repository,
       simulateSlot: (l, c, o) => simulateFullCourtSeasonSlot(l, c, createEngineContext(), o),
     },
   );
+  expect(summary.kind).toBe('simulated');
+  if (summary.kind !== 'simulated') throw new Error('Expected simulated slot');
+  expect(summary.watchedReplay).toBeNull();
   expect(commitSlot).toHaveBeenCalledTimes(1);
   expect(commitSlot.mock.calls[0]?.[2]).toBeUndefined();
 
   // Watched sim (record: true) builds and passes a verified watchedReplay.
-  await advanceFullCourtSeasonSlot(
+  const watched = await advanceFullCourtSeasonSlot(
     { lock, expectedThroughSlot: 1, options: { record: true } },
     {
       repository,
       simulateSlot: (l, c, o) => simulateFullCourtSeasonSlot(l, c, createEngineContext(), o),
     },
   );
+  expect(watched.kind).toBe('simulated');
+  if (watched.kind !== 'simulated') throw new Error('Expected simulated slot');
   expect(commitSlot).toHaveBeenCalledTimes(2);
   const replay = commitSlot.mock.calls[1]?.[2]?.watchedReplay;
   expect(replay).toBeDefined();
@@ -64,9 +69,11 @@ test('advanceFullCourtSeasonSlot commits watchedReplay only when record=true and
     userTeamId: lock.season.userTeamId,
   });
   expect(replay?.tape.length).toBeGreaterThan(0);
+  // The returned replay is the authoritative one committed to storage.
+  expect(watched.watchedReplay).toBe(replay ?? null);
 
   // Forfeit user game (even if record: true) does not pass watchedReplay.
-  await advanceFullCourtSeasonSlot(
+  const forfeit = await advanceFullCourtSeasonSlot(
     { lock, expectedThroughSlot: 2, options: { record: true } },
     {
       repository,
@@ -87,6 +94,9 @@ test('advanceFullCourtSeasonSlot commits watchedReplay only when record=true and
       },
     },
   );
+  expect(forfeit.kind).toBe('simulated');
+  if (forfeit.kind !== 'simulated') throw new Error('Expected simulated slot');
+  expect(forfeit.watchedReplay).toBeNull();
   expect(commitSlot).toHaveBeenCalledTimes(3);
   expect(commitSlot.mock.calls[2]?.[2]).toBeUndefined();
 });
@@ -108,30 +118,36 @@ test('advanceFullCourtPlayoffs commits watchedReplay only for watched played use
   // Opening West series games have userSide === null -> never passes watchedReplay even with record=true.
   let expectedGames = 0;
   while (fullCourtPlayoffView(lock, stored).nextGame?.userSide === null) {
-    await advanceFullCourtPlayoffs(
+    const outcome = await advanceFullCourtPlayoffs(
       { lock, expectedGames, options: { record: true } },
       {
         repository,
         simulateGame: (l, c, o) => simulateFullCourtPlayoffGame(l, c, createEngineContext(), o),
       },
     );
+    expect(outcome.kind).toBe('simulated');
+    if (outcome.kind !== 'simulated') throw new Error('Expected simulated game');
+    expect(outcome.watchedReplay).toBeNull();
     expectedGames += 1;
     expect(commitGame.mock.calls[expectedGames - 1]?.[1]).toBeUndefined();
   }
   expect(expectedGames).toBeGreaterThan(0);
 
   // User game watched -> passes watchedReplay.
-  await advanceFullCourtPlayoffs(
+  const watched = await advanceFullCourtPlayoffs(
     { lock, expectedGames, options: { record: true } },
     {
       repository,
       simulateGame: (l, c, o) => simulateFullCourtPlayoffGame(l, c, createEngineContext(), o),
     },
   );
+  expect(watched.kind).toBe('simulated');
+  if (watched.kind !== 'simulated') throw new Error('Expected simulated game');
   expect(commitGame).toHaveBeenCalledTimes(expectedGames + 1);
   const firstReplay = commitGame.mock.calls[expectedGames]?.[1]?.watchedReplay;
   expect(firstReplay?.identity.phase).toBe('playoff');
   expect(firstReplay?.identity.lockDigest).toBe(lock.digest);
+  expect(watched.watchedReplay).toBe(firstReplay ?? null);
 });
 
 test('builds a playoff watched replay from a recorded user game', () => {

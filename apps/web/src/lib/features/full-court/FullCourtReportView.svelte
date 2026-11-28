@@ -137,7 +137,7 @@
     class="report-panel"
   >
     {#if activeTab === 'summary'}
-      <FullCourtReportSummary {entry} {rosterStats} {userRow} />
+      <FullCourtReportSummary {entry} {rosterStats} {userRow} awards={data.awards} {art} />
     {:else if activeTab === 'roster'}
       <FullCourtReportRoster {entry} {data} {art} />
     {:else if activeTab === 'stats'}

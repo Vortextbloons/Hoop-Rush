@@ -28,7 +28,6 @@
     art = null,
     money,
     busy,
-    complete,
     selected,
     onSelect,
     onPick,
@@ -39,7 +38,6 @@
     art?: FullCourtArt | null;
     money: FullCourtMoneyConfig;
     busy: boolean;
-    complete: boolean;
     selected: boolean;
     onSelect: () => void;
     onPick: () => void;
@@ -48,7 +46,7 @@
   const player = $derived(row.player);
   const team = $derived(art === null ? null : art.teamFor(player.franchiseId));
   const abbreviation = $derived(team?.abbreviation ?? franchiseAbbreviation(player.franchiseId));
-  const signable = $derived(row.assessment.legal && !row.onRoster && !complete);
+  const signable = $derived(row.assessment.legal && !row.onRoster);
   const actionLabel = $derived(row.onRoster ? 'Signed' : row.playerRostered ? 'Rostered' : 'Sign');
   const blocker = $derived(fullCourtPickReasonLabel(row.assessment, money));
 

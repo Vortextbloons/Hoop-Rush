@@ -749,12 +749,10 @@ export function runFullCourtGame(
     }
 
     let secondsRemaining = period < 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
-    let periodStart = true;
     while (secondsRemaining > 0) {
       state.secondsRemaining = secondsRemaining;
       const homeUnit = tape !== null ? home.activePlayerIds() : null;
       const awayUnit = tape !== null ? away.activePlayerIds() : null;
-      periodStart = false;
       const trip = resolveTrip(ctx, offense);
       if (!trip.ended && trip.secondsElapsed === 0 && state.secondsRemaining > 0) {
         if (state.secondsRemaining >= ENGINE_CONSTANTS.minimumStartSeconds) {
@@ -769,7 +767,6 @@ export function runFullCourtGame(
       secondsRemaining = state.secondsRemaining;
       globalSeconds += secondsElapsed;
       chargeTime(runtimes, secondsElapsed, effects);
-      const keepOffense = false;
       const foulCharges = refreshFouls(runtimes, ctx);
 
       if (tape !== null && homeUnit !== null && awayUnit !== null) {
@@ -788,7 +785,7 @@ export function runFullCourtGame(
         });
       }
 
-      if (trip.ended && !keepOffense) offense = (1 - offense) as SideIndex;
+      if (trip.ended) offense = (1 - offense) as SideIndex;
       // Forced disqualification exits apply at once; tactical changes wait for a
       // legal dead ball so live play never gains a fresh defender for free.
       const legalWindow = secondsRemaining > 0 && ctx.possessionStart === 'deadBall';
@@ -1034,15 +1031,7 @@ function resolveSubstitutions(
       if (!request.legalWindow && decision.reason !== 'foul-out') break;
       // Close the stint before the swap so minutes, points, and possessions belong
       // to the five that was actually on the floor.
-      applySwap(
-        runtime,
-        recorder,
-        request.globalSeconds,
-        decision.slot,
-        decision.inIndex,
-        decision.outIndex,
-        decision.reason,
-      );
+      applySwap(runtime, recorder, request.globalSeconds, decision.slot, decision.inIndex);
       tape?.push({
         kind: 'substitution',
         period: request.period,
@@ -1062,8 +1051,6 @@ function applySwap(
   globalSeconds: number,
   slot: number,
   inIndex: number,
-  outIndex: number,
-  reason: FullCourtSubstitutionReason,
 ): void {
   runtime.closeStint(globalSeconds, recorder);
   runtime.stintSeconds[inIndex] = 0;

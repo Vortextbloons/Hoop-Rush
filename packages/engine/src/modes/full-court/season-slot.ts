@@ -181,7 +181,7 @@ export type FullCourtUserSlotOutcome =
       readonly userGameId: string;
       readonly userScore: FullCourtSeasonScore;
       readonly healthByTeam: FullCourtSeasonCheckpoint['healthByTeam'];
-      readonly userGame: FullCourtGameHealthOutcome;
+      readonly userGame: ResolvedGame;
     };
 
 function validatedSlotContext(

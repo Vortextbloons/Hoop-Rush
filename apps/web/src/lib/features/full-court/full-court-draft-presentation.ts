@@ -77,6 +77,7 @@ export function fullCourtDraftSummary(
 }
 
 export function fullCourtVariantLabel(draft: FullCourtDraftState): string {
+  void draft;
   return 'Full Court Standard';
 }
 
@@ -328,21 +329,4 @@ export function fullCourtProfileReferences(index: FullCourtCatalogIndex): Player
   const references = buildPlayerProfileReferences(capRushProfileSamples(index.catalog.candidates));
   profileReferencesCache.set(index, references);
   return references;
-}
-
-export function fullCourtFaceKey(
-  player: Pick<CapRushSourcePlayer, 'playerId' | 'franchiseId' | 'eraId' | 'seasonKey'>,
-): string {
-  return `${player.playerId}\u0000${player.franchiseId}\u0000${player.eraId}\u0000${player.seasonKey}`;
-}
-
-export function fullCourtFaceIndex(
-  playersIndex: PlayersIndex,
-): ReadonlyMap<string, PlayersIndexEntry> {
-  const faces = new Map<string, PlayersIndexEntry>();
-  for (const entry of playersIndex.players) {
-    const key = fullCourtFaceKey(entry);
-    if (!faces.has(key)) faces.set(key, entry);
-  }
-  return faces;
 }

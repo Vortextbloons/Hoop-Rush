@@ -1,12 +1,9 @@
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
-  CAP_RUSH_PLAYOFF_ROUNDS,
   CAP_RUSH_PLAYOFF_TEAMS,
   CAP_RUSH_SERIES_GAMES,
   capRushConferenceRoundName,
   capRushPlayoffSeriesId,
-  capRushSeriesWinner,
-  capRushSeriesWins,
   franchiseAbbreviation,
   type FullCourtPlayoffAdaptation,
   type FullCourtSeasonCheckpoint,
@@ -59,38 +56,6 @@ export interface FullCourtSeriesGameView extends FullCourtResultView {
   readonly adjustmentResponse: string | null;
 }
 
-export interface FullCourtBracketRound {
-  readonly round: number;
-  readonly label: string;
-  readonly series: readonly FullCourtPlayoffSeries[];
-}
-
-export interface FullCourtPostseasonStatus {
-  readonly headline: string;
-  readonly message: string;
-}
-
-export interface FullCourtMatchupSide {
-  readonly teamId: string;
-  readonly name: string;
-  readonly abbreviation: string;
-  readonly seed: number | null;
-}
-
-export interface FullCourtMatchupSeries {
-  readonly userWins: number;
-  readonly opponentWins: number;
-}
-
-export interface FullCourtMatchupView {
-  readonly phase: 'regular' | 'playoff';
-  readonly label: string;
-  readonly home: FullCourtMatchupSide;
-  readonly away: FullCourtMatchupSide;
-  readonly userSide: 'home' | 'away' | null;
-  readonly series: FullCourtMatchupSeries | null;
-}
-
 export type FullCourtHomeActionKind = 'sim' | 'start-playoffs';
 
 /** Optional interruptions for a regular-season or playoff batch. */
@@ -113,29 +78,6 @@ export interface FullCourtHomeControls {
   readonly primary: FullCourtHomeAction | null;
   readonly secondary: readonly FullCourtHomeAction[];
   readonly status: string;
-}
-
-export interface FullCourtSeriesRecapView {
-  readonly round: number;
-  readonly roundLabel: string;
-  readonly opponentId: string;
-  readonly opponentName: string;
-  readonly won: boolean;
-  readonly userWins: number;
-  readonly opponentWins: number;
-}
-
-export interface FullCourtFinalRecap {
-  readonly championTeamId: string;
-  readonly championName: string;
-  readonly userChampion: boolean;
-  readonly seriesWon: number;
-  readonly seriesPlayed: number;
-  readonly gameWins: number;
-  readonly gameLosses: number;
-  readonly headline: string;
-  readonly message: string;
-  readonly series: readonly FullCourtSeriesRecapView[];
 }
 
 type ScoreWithOutcome = Pick<FullCourtSeasonScore, 'homeTeamId' | 'awayTeamId' | 'outcome'>;
@@ -215,21 +157,6 @@ export function fullCourtUserSchedule(
   });
 }
 
-export function fullCourtPlayoffRounds(
-  series: readonly FullCourtPlayoffSeries[],
-): FullCourtBracketRound[] {
-  return Array.from({ length: CAP_RUSH_PLAYOFF_ROUNDS }, (_, index) => {
-    const round = index + 1;
-    return {
-      round,
-      label: capRushConferenceRoundName(round),
-      series: series
-        .filter((entry) => entry.round === round)
-        .sort((left, right) => left.seriesSlot - right.seriesSlot),
-    };
-  });
-}
-
 export function fullCourtUserSeries(
   series: readonly FullCourtPlayoffSeries[],
   userTeamId: string,
@@ -273,143 +200,6 @@ export function fullCourtSeriesGames(
       adjustmentResponse,
     };
   });
-}
-
-export function fullCourtPlayoffStatus(
-  playoff: FullCourtPlayoffView,
-  userTeamId: string,
-  teamNameOf: (teamId: string) => string,
-): FullCourtPostseasonStatus {
-  const champion = playoff.championTeamId;
-  if (champion === userTeamId) {
-    return {
-      headline: 'Full Court champions',
-      message: '',
-    };
-  }
-  const userRound =
-    playoff.userOutcome.round === null
-      ? null
-      : capRushConferenceRoundName(playoff.userOutcome.round).toLowerCase();
-  if (champion !== null) {
-    const championName = teamNameOf(champion);
-    if (playoff.userOutcome.status === 'not-qualified') {
-      return {
-        headline: `${championName} take the title`,
-        message: '',
-      };
-    }
-    if (playoff.userOutcome.status === 'eliminated') {
-      return {
-        headline: `${championName} take the title`,
-        message: '',
-      };
-    }
-    return {
-      headline: `${championName} take the title`,
-      message: '',
-    };
-  }
-  if (playoff.userOutcome.status === 'not-qualified') {
-    return {
-      headline: 'The bracket moves on without you',
-      message: '',
-    };
-  }
-  if (playoff.userOutcome.status === 'eliminated') {
-    return {
-      headline: `Out in the ${userRound ?? 'playoffs'}`,
-      message: '',
-    };
-  }
-  if (playoff.userOutcome.status === 'champion') {
-    return {
-      headline: 'Full Court champions',
-      message: '',
-    };
-  }
-  return {
-    headline: 'The postseason is live',
-    message: '',
-  };
-}
-
-function sideOf(
-  teamId: string,
-  teamNameOf: (teamId: string) => string,
-  seed: number | null,
-): FullCourtMatchupSide {
-  return {
-    teamId,
-    name: teamNameOf(teamId),
-    abbreviation: franchiseAbbreviation(teamId),
-    seed,
-  };
-}
-
-/**
- * Next matchup for the home card. It reads the same locked schedule and bracket
- * the engine plays from, so the card never advertises a game the season cannot
- * advance to.
- */
-export function fullCourtNextMatchup(
-  lock: FullCourtSeasonLock,
-  checkpoint: FullCourtSeasonCheckpoint,
-  playoff: FullCourtPlayoffView | null,
-  teamNameOf: (teamId: string) => string,
-): FullCourtMatchupView | null {
-  const { userTeamId, games } = lock.season;
-  if (playoff !== null) {
-    const preview = fullCourtUserNextPlayoffMatchup({
-      userTeamId,
-      runSeed: lock.season.runSeed,
-      series: playoff.series,
-    });
-    if (preview !== null) {
-      return {
-        phase: 'playoff',
-        label: `Game ${String(preview.gameOrdinal)} · ${capRushConferenceRoundName(preview.round)}`,
-        home: sideOf(preview.homeTeamId, teamNameOf, preview.homeSeed),
-        away: sideOf(preview.awayTeamId, teamNameOf, preview.awaySeed),
-        userSide: preview.userSide,
-        series: null,
-      };
-    }
-    const series = fullCourtUserSeries(playoff.series, userTeamId);
-    if (series === null) return null;
-    const opponentId = series.highTeamId === userTeamId ? series.lowTeamId : series.highTeamId;
-    const userWins = capRushSeriesWins(series, userTeamId);
-    const opponentWins = capRushSeriesWins(series, opponentId);
-    const decided = capRushSeriesWinner(series) !== null;
-    return {
-      phase: 'playoff',
-      label: decided
-        ? `${capRushConferenceRoundName(series.round)} · Series decided`
-        : `${capRushConferenceRoundName(series.round)} · Your series`,
-      home: sideOf(series.highTeamId, teamNameOf, series.highSeed),
-      away: sideOf(series.lowTeamId, teamNameOf, series.lowSeed),
-      userSide: series.highTeamId === userTeamId ? 'home' : 'away',
-      series: { userWins, opponentWins },
-    };
-  }
-  const slot = Math.min(checkpoint.completedThroughSlot + 1, CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
-  if (checkpoint.completedThroughSlot >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) return null;
-  const fixture = games.find(
-    (game) =>
-      game.slot === slot && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
-  );
-  if (fixture === undefined) return null;
-  const homeId = fixture.homeTeamId;
-  const awayId = fixture.awayTeamId;
-  const userHome = homeId === userTeamId;
-  return {
-    phase: 'regular',
-    label: `Game ${String(slot)} of ${String(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM)}`,
-    home: sideOf(homeId, teamNameOf, null),
-    away: sideOf(awayId, teamNameOf, null),
-    userSide: userHome ? 'home' : 'away',
-    series: null,
-  };
 }
 
 export interface FullCourtUserFixture {
@@ -821,48 +611,6 @@ export function fullCourtHomeControls(input: {
   );
 }
 
-/** Season-ending recap once a champion exists; the only terminal state in Full Court. */
-export function fullCourtFinalRecap(
-  lock: FullCourtSeasonLock,
-  playoff: FullCourtPlayoffView | null,
-  teamNameOf: (teamId: string) => string,
-): FullCourtFinalRecap | null {
-  if (playoff === null || playoff.championTeamId === null) return null;
-  const { userTeamId } = lock.season;
-  const championTeamId = playoff.championTeamId;
-  const status = fullCourtPlayoffStatus(playoff, userTeamId, teamNameOf);
-  const userSeries = playoff.series.filter(
-    (entry) => entry.highTeamId === userTeamId || entry.lowTeamId === userTeamId,
-  );
-  const series: FullCourtSeriesRecapView[] = userSeries.map((entry) => {
-    const opponentId = entry.highTeamId === userTeamId ? entry.lowTeamId : entry.highTeamId;
-    const winner = capRushSeriesWinner(entry);
-    return {
-      round: entry.round,
-      roundLabel: capRushConferenceRoundName(entry.round),
-      opponentId,
-      opponentName: teamNameOf(opponentId),
-      won: winner === userTeamId,
-      userWins: capRushSeriesWins(entry, userTeamId),
-      opponentWins: capRushSeriesWins(entry, opponentId),
-    };
-  });
-  const gameWins = series.reduce((total, entry) => total + entry.userWins, 0);
-  const gameLosses = series.reduce((total, entry) => total + entry.opponentWins, 0);
-  return {
-    championTeamId,
-    championName: teamNameOf(championTeamId),
-    userChampion: championTeamId === userTeamId,
-    seriesWon: series.filter((entry) => entry.won).length,
-    seriesPlayed: series.length,
-    gameWins,
-    gameLosses,
-    headline: status.headline,
-    message: status.message,
-    series,
-  };
-}
-
 export interface FullCourtPlayoffAdaptationRead {
   readonly settingLabel: string;
   readonly reasonLabel: string;
@@ -1041,14 +789,4 @@ export function fullCourtSimulationNotice(
             : `Saved after ${gamesLabel(stop.bracketGames)} of the bracket.`,
       };
   }
-}
-
-const PLAYOFF_GAME_ID_PATTERN = /^fcp-([1-4])-([0-7])-([1-7])$/;
-
-export function fullCourtPlayoffFixtureLabel(gameId: string): string | null {
-  const match = PLAYOFF_GAME_ID_PATTERN.exec(gameId);
-  if (match === null) return null;
-  const round = Number(match[1]);
-  const ordinal = Number(match[3]);
-  return `Game ${String(ordinal)} · ${capRushConferenceRoundName(round)}`;
 }

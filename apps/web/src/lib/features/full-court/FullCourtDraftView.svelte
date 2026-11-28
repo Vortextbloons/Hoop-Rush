@@ -138,7 +138,6 @@
   );
   let rosterDetails = $state<HTMLDetailsElement>();
   const rosterPicks = $derived([...draft.picks].reverse());
-  const complete = $derived(draft.stage === 'complete');
   const pageCount = $derived(
     Math.max(1, Math.ceil(catalogPage.total / FULL_COURT_CATALOG_PAGE_SIZE)),
   );
@@ -161,7 +160,6 @@
     return `${String(catalogPage.total)} ${filtered ? 'matching' : 'available'} ${noun}`;
   });
   const depthLabel = $derived.by(() => {
-    if (complete) return 'Roster confirmed for the run.';
     if (summary.rosterCount >= FULL_COURT_MAX_ROSTER_SIZE) {
       return 'Twelve players. Lock the roster.';
     }
@@ -323,30 +321,26 @@
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div class="min-w-0">
       <p class="ui-label">
-        {fullCourtVariantLabel(draft)} · {roundOffer !== null && !complete
+        {fullCourtVariantLabel(draft)} · {roundOffer !== null
           ? `Round ${String(roundOffer.round + 1)}`
           : 'Draft night'}
       </p>
       <h1
         class="font-display mt-2 text-3xl leading-[0.95] font-extrabold tracking-tight uppercase sm:text-4xl"
       >
-        {#if complete}
-          Your roster is locked.
-        {:else if roundOffer !== null}
+        {#if roundOffer !== null}
           Pick your next player.
         {:else}
           Build your roster
         {/if}
       </h1>
-      {#if !complete}
-        <p class="mt-1.5 max-w-2xl text-sm text-muted-foreground">
-          {#if roundOffer !== null}
-            Sign 6–12 players under the {formatMillions(draft.money.hardLimitDollars)} hard limit.
-          {:else}
-            Sign 6–12 under the cap.
-          {/if}
-        </p>
-      {/if}
+      <p class="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+        {#if roundOffer !== null}
+          Sign 6–12 players under the {formatMillions(draft.money.hardLimitDollars)} hard limit.
+        {:else}
+          Sign 6–12 up to the second apron.
+        {/if}
+      </p>
     </div>
 
     <div class="w-full max-w-56">
@@ -493,13 +487,13 @@
       </div>
     </Panel>
 
-    {#if roundOffer !== null && !complete}
+    {#if roundOffer !== null}
       <section aria-label={`Round ${String(roundOffer.round + 1)} offer`}>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {#each offerCards as { card, row } (card.player.playerVersionId)}
             {@const player = card.player}
             {@const team = teamFor(player)}
-            {@const signable = row.assessment.legal && !row.onRoster && !complete}
+            {@const signable = row.assessment.legal && !row.onRoster}
             {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
             {@const impact = fullCourtSigningImpact(row, draft.money)}
             {@const expanded = Boolean(expandedCardIds[player.playerVersionId])}
@@ -696,7 +690,7 @@
               </p>
             </div>
 
-            <details bind:this={rosterDetails} open={complete}>
+            <details bind:this={rosterDetails}>
               <summary class="cursor-pointer px-3 py-3 text-sm font-semibold"
                 >View signed players</summary
               >
@@ -788,7 +782,7 @@
           </Panel>
 
           {#if (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
-            <FullCourtRosterFitPanel {draft} {index} {busy} {art} />
+            <FullCourtRosterFitPanel {draft} {art} />
           {/if}
         </div>
       </div>
@@ -861,7 +855,6 @@
                       {art}
                       money={draft.money}
                       {busy}
-                      {complete}
                       selected={isInspected}
                       onSelect={() => selectPlayer(row.player.playerVersionId)}
                       onPick={() => onPick(row.player.playerVersionId)}
@@ -917,7 +910,7 @@
               {@const team = teamFor(row.player)}
               {@const impact = fullCourtSigningImpact(row, draft.money)}
               {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
-              {@const signable = row.assessment.legal && !row.onRoster && !complete}
+              {@const signable = row.assessment.legal && !row.onRoster}
               {@const expanded = Boolean(expandedCardIds[row.player.playerVersionId])}
 
               <div class="flex items-start gap-2.5">
@@ -1063,7 +1056,7 @@
               {/if}
 
               <div class="mt-3 flex items-center gap-2">
-                {#if row.onRoster && !complete}
+                {#if row.onRoster}
                   <Button
                     tone="secondary"
                     class="flex-1"
@@ -1112,7 +1105,7 @@
                 </p>
               </div>
 
-              <details bind:this={rosterDetails} open={complete}>
+              <details bind:this={rosterDetails}>
                 <summary class="cursor-pointer px-3 py-3 text-sm font-semibold"
                   >View signed players</summary
                 >
@@ -1166,16 +1159,14 @@
                             {formatMillions(pick.salaryDollars)}
                           </p>
                         </div>
-                        {#if !complete}
-                          <IconButton
-                            label={`Remove ${pick.player.displayName} from the roster`}
-                            size="sm"
-                            disabled={busy}
-                            onclick={() => onRemove(pick.player.playerVersionId)}
-                          >
-                            <X size={14} aria-hidden="true" />
-                          </IconButton>
-                        {/if}
+                        <IconButton
+                          label={`Remove ${pick.player.displayName} from the roster`}
+                          size="sm"
+                          disabled={busy}
+                          onclick={() => onRemove(pick.player.playerVersionId)}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </IconButton>
                       </li>
                     {/each}
                   </ul>
@@ -1194,24 +1185,22 @@
                     {/if}
                   </div>
                   <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{lock.detail}</p>
-                  {#if !complete}
-                    <Button
-                      tone="primary"
-                      class="mt-2.5 w-full"
-                      disabled={busy || !summary.canFinish}
-                      onclick={onFinish}
-                    >
-                      <Lock size={15} aria-hidden="true" />
-                      Lock the roster
-                    </Button>
-                  {/if}
+                  <Button
+                    tone="primary"
+                    class="mt-2.5 w-full"
+                    disabled={busy || !summary.canFinish}
+                    onclick={onFinish}
+                  >
+                    <Lock size={15} aria-hidden="true" />
+                    Lock the roster
+                  </Button>
                 </div>
               </div>
             </Panel>
           </aside>
 
           {#if (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
-            <FullCourtRosterFitPanel {draft} {index} {busy} {art} />
+            <FullCourtRosterFitPanel {draft} {art} />
           {/if}
         </div>
       </div>
@@ -1241,14 +1230,10 @@
       <div class="min-w-0 flex-1">
         <p class="font-display truncate text-xs font-extrabold uppercase">{lock.headline}</p>
       </div>
-      {#if complete}
-        <Badge tone="positive"><Check size={13} aria-hidden="true" /> Locked</Badge>
-      {:else}
-        <Button size="sm" tone="primary" disabled={busy || !summary.canFinish} onclick={onFinish}>
-          <Lock size={14} aria-hidden="true" />
-          Lock
-        </Button>
-      {/if}
+      <Button size="sm" tone="primary" disabled={busy || !summary.canFinish} onclick={onFinish}>
+        <Lock size={14} aria-hidden="true" />
+        Lock
+      </Button>
     </div>
   </div>
 </PageShell>

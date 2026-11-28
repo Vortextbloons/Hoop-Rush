@@ -214,7 +214,7 @@
   </div>
 
   {#if standing !== null}
-    <StatGrid minWidth="7.5rem">
+    <StatGrid>
       <StatTile
         label="Record"
         size="md"

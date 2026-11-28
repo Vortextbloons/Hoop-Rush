@@ -21,6 +21,7 @@
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import FullCourtAbandonRun from '#lib/features/full-court/FullCourtAbandonRun.svelte';
+  import { historicalThreePointShare } from '#lib/features/full-court/full-court-coaching-presenter.js';
   import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtFinalReview from '#lib/features/full-court/FullCourtFinalReview.svelte';
@@ -107,15 +108,6 @@
     confirmNewDraft = false;
   }
 
-  async function watchNextGame(instance: FullCourtController): Promise<void> {
-    const previous = instance.latestGame;
-    activeGamecast = null;
-    await instance.advance(1, false, true);
-    if (instance.latestGame !== previous && instance.latestGame?.tape != null) {
-      activeGamecast = 'latest';
-    }
-  }
-
   async function abandonRun(instance: FullCourtController): Promise<void> {
     await instance.abandonRun();
     if (instance.draft === null) {
@@ -198,6 +190,15 @@
       forGameId: current.defensiveMatchupsForGameId,
       forOpponentId: current.defensiveMatchupsOpponentId,
     };
+  });
+  const leagueThreePointShare = $derived.by(() => {
+    const shares = (season?.lock.season.teams ?? [])
+      .filter((team) => team.teamId !== userTeam?.teamId)
+      .map((team) => historicalThreePointShare(team.roster))
+      .filter((share): share is number => share !== null);
+    return shares.length === 0
+      ? null
+      : shares.reduce((sum, share) => sum + share, 0) / shares.length;
   });
   const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
   const savedReplay = $derived(current?.savedReplay ?? null);
@@ -359,6 +360,7 @@
             {defaultRotation}
             plan={season.coaching}
             opponent={matchupContext?.opponentTeam ?? null}
+            {leagueThreePointShare}
             readOnly={playoff !== null && playoff.userOutcome.status !== 'pending'}
             health={health ?? null}
             dayOffset={nextUserFixture?.dayOffset ?? null}
@@ -385,19 +387,15 @@
         {#if draft && current.index}
           <FullCourtWarRoom
             {draft}
-            index={current.index}
             season={season.lock.season}
-            nextFilmTarget={current.nextFilmTarget()}
             {playoffPreview}
             busy={current.busy}
-            preseasonOpen={season.checkpoint.completedThroughSlot === 0}
             practiceOpen={playoff === null && season.checkpoint.completedThroughSlot === 0}
             practice={current.practice}
             {matchupContext}
             {art}
             onMatchupsChange={(assignments) => current.setDefensiveMatchups(assignments)}
             onResetMatchups={() => current.clearDefensiveMatchups()}
-            onPurchaseReport={(target) => void current.purchaseReport(target)}
             onRunPractice={(opponentTeamId) => void current.runPractice(opponentTeamId)}
           />
         {/if}
@@ -461,7 +459,6 @@
           }}
           onRestingChange={(playerIds) => current.setRestingPlayers(playerIds)}
           onStartPlayoffs={() => void current.startPlayoffs()}
-          onWatchNextGame={() => void watchNextGame(current)}
           onEditGamePlan={() => selectSection('team')}
         />
       {/if}
@@ -536,7 +533,6 @@
         busy={current.busy}
         onPick={(versionId) => void current.editDraft('pick-full-court-player', versionId)}
         onRemove={(versionId) => void current.editDraft('remove-full-court-player', versionId)}
-        onPurchaseReport={(target) => void current.purchaseReport(target)}
         onAbandon={() => void abandonRun(current)}
         onFinish={() => {
           selectSection('home');
@@ -549,7 +545,13 @@
       <SectionHeading title="Build your roster" level={2} size="md" align="start" />
 
       <Panel as="section" padding="md" class="mt-4" aria-label="Pre-run perks">
-        <SectionHeading level={3} size="sm" align="start" title="Pre-run perks">
+        <SectionHeading
+          level={3}
+          size="sm"
+          align="start"
+          title="Pre-run perks"
+          description="Optional upgrades paid from the starting budget. Every perk lasts the entire run and can only be chosen now."
+        >
           {#snippet actions()}
             <Badge tone="neutral">{formatMillions(startingBudgetRemaining)} starting budget</Badge>
           {/snippet}
@@ -589,8 +591,8 @@
         >
           <p class="font-mono text-[10px] text-muted-foreground uppercase">
             {selectedPerks.length === 0
-              ? 'no perks'
-              : `${String(selectedPerks.length)} perk${selectedPerks.length === 1 ? '' : 's'}`}
+              ? 'No perks'
+              : `${String(selectedPerks.length)} perk${selectedPerks.length === 1 ? '' : 's'} · ${formatMillions(selectedPerkCost)} spent`}
             · {formatMillions(startingBudgetRemaining)} budget
           </p>
           <Button tone="primary" loading={current.busy} onclick={() => startRun(current)}>

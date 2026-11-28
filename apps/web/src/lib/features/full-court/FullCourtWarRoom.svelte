@@ -7,13 +7,13 @@
   import {
     fullCourtLeagueWeaknesses,
     fullCourtWarChestDollars,
-    type FullCourtCatalogIndex,
     type FullCourtOpponentWeaknessCode,
     type FullCourtPlayoffOpponentPreview,
     type FullCourtRegularSeason,
   } from '@hoop-rush/engine';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
@@ -72,7 +72,6 @@
 
   let {
     draft,
-    index,
     season,
     playoffPreview = null,
     busy,
@@ -85,7 +84,6 @@
     art = null,
   }: {
     draft: FullCourtDraftState;
-    index: FullCourtCatalogIndex;
     season: FullCourtRegularSeason;
     playoffPreview?: FullCourtPlayoffOpponentPreview | null;
     busy: boolean;
@@ -238,9 +236,7 @@
               <Badge tone="positive">Owned</Badge>
             </div>
           {:else}
-            <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-              {formatMillions(FILM_PRICE)}
-            </span>
+            <Badge tone="neutral">Not purchased</Badge>
           {/if}
         {/snippet}
       </SectionHeading>
@@ -281,29 +277,8 @@
             </div>
           {/each}
         </div>
-      {:else if !preseasonOpen}
-        <p class="mt-3 text-xs text-muted-foreground">Closed before game 1.</p>
       {:else}
-        {@const filmPurchase = fullCourtAssessPurchase({
-          index,
-          state: draft,
-          priceDollars: FILM_PRICE,
-        })}
-        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
-          <Button
-            size="sm"
-            tone="primary"
-            disabled={busy || !locked || !filmPurchase.legal}
-            aria-label={`Buy opponent film for ${formatMillions(FILM_PRICE)}`}
-            onclick={buyFilm}
-          >
-            <Film size={14} aria-hidden="true" />
-            Buy opponent film
-          </Button>
-          <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            {purchaseAffordance(filmPurchase)}
-          </p>
-        </div>
+        <p class="mt-3 text-xs text-muted-foreground">Not purchased at run setup.</p>
       {/if}
     </Panel>
   </div>

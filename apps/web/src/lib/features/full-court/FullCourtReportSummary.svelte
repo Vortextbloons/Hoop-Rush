@@ -1,21 +1,30 @@
 <script lang="ts">
-  import type { FullCourtPlayerSeasonRow } from '@hoop-rush/engine';
-  import type { FullCourtStandingsRow } from '@hoop-rush/engine';
+  import type {
+    FullCourtAwardsBoard,
+    FullCourtPlayerSeasonRow,
+    FullCourtStandingsRow,
+  } from '@hoop-rush/engine';
   import { Dices, Gauge, Shield, TrendingUp, Users } from '@lucide/svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { FullCourtHistoryEntryView } from './full-court-history-presentation.ts';
+  import type { FullCourtArt } from './full-court-art.ts';
+  import FullCourtReportHardware from './FullCourtReportHardware.svelte';
 
   let {
     entry,
     rosterStats,
     userRow,
+    awards,
+    art = null,
   }: {
     entry: FullCourtHistoryEntryView;
     rosterStats: readonly FullCourtPlayerSeasonRow[];
     userRow: FullCourtStandingsRow | null;
+    awards: FullCourtAwardsBoard;
+    art?: FullCourtArt | null;
   } = $props();
 
   const leader = $derived(
@@ -28,6 +37,8 @@
     wins + losses === 0 ? 0 : Math.round((wins / (wins + losses)) * 1000) / 10,
   );
 </script>
+
+<FullCourtReportHardware {awards} {art} />
 
 <Panel as="section" padding="md" aria-label="Season results">
   <SectionHeading

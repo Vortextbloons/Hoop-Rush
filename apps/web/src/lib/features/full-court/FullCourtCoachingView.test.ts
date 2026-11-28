@@ -82,10 +82,10 @@ describe('FullCourtCoachingView', () => {
     expect(body).toContain('aria-label="Rotation source"');
     expect(body).toContain('Discard');
     expect(body).toContain('Reset');
-    expect(body).toContain('Game plan');
-    expect(body).toContain('Plan check');
-    expect(body).toContain('Availability');
-    expect(body).toContain('Ready');
+    expect(body).toContain('Coaching Board');
+    expect(body).toContain('aria-label="Coaching workspace"');
+    expect(body).toContain('No health flags');
+    expect(body).toContain('Game Situations');
     expect(body).toContain('type="submit"');
     expect(body).toContain('Starter 1');
     expect(body).toContain('240 / 240 min');
@@ -252,7 +252,7 @@ describe('FullCourtCoachingView', () => {
     expect(body).toContain('Move down');
   });
 
-  test('renders historical strategy presets inside the Tactics panel without a nested form', () => {
+  test('renders strategy presets above the tactics controls in the shared form', () => {
     const body = renderView({ plan: FULL_COURT_DEFAULT_COACHING_PLAN });
 
     expect(body.split('<form').length - 1).toBe(1);
@@ -273,7 +273,7 @@ describe('FullCourtCoachingView', () => {
     expect(courtIndex).toBeGreaterThan(minutesIndex);
     expect(tacticsIndex).toBeLessThan(minutesIndex);
     expect(tacticsIndex).toBeLessThan(courtIndex);
-    expect(presetsIndex).toBeGreaterThan(tacticsIndex);
+    expect(presetsIndex).toBeLessThan(tacticsIndex);
     expect(saveBarIndex).toBeGreaterThan(-1);
     expect(saveBarIndex).toBeLessThan(courtIndex);
   });

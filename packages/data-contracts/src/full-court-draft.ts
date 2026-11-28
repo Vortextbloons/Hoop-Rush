@@ -130,6 +130,7 @@ export function fullCourtReportPriceDollars(kind: FullCourtReportKind): number {
 
 /** All Full Court run perks last for the entire run. */
 export function fullCourtReportScope(_kind: FullCourtReportKind): 'run' | 'game' {
+  void _kind;
   return 'run';
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { playerVersionId, playersIndexSchema } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
-import { fullCourtArtIndex, fullCourtArtOf } from './full-court-art';
+import { playerFaceIndex } from '#lib/assets/player-face-lookup.js';
+import { fullCourtArtOf } from './full-court-art';
 
 function entry(overrides: Record<string, unknown>) {
   return {
@@ -40,7 +41,7 @@ const playersIndex = playersIndexSchema.parse({
   ],
 });
 
-const art = fullCourtArtOf(fullCourtArtIndex(buildManifest(), playersIndex));
+const art = fullCourtArtOf(buildManifest(), playerFaceIndex(playersIndex));
 const firstVersion = playerVersionId('p1', 'lakers', '1990s', '1990-91');
 const secondVersion = playerVersionId('p1', 'celtics', '2000s', '2001-02');
 

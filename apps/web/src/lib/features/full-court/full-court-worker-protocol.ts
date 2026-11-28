@@ -153,23 +153,18 @@ export const fullCourtWorkerPlayoffPayloadSchema = z.object({
 export type FullCourtWorkerPlayoffPayload = z.infer<typeof fullCourtWorkerPlayoffPayloadSchema>;
 export type FullCourtWorkerSeasonLock = z.infer<typeof fullCourtSeasonLockSchema>;
 
-const fullCourtSeasonSlotOptionsSchema = z.object({
-  rotation: fullCourtRotationPlanInputSchema.optional(),
-  tactics: fullCourtTacticsSchema.optional(),
-  rules: fullCourtCoachingRulesSchema.optional(),
-  hierarchy: fullCourtOffensiveHierarchySchema.optional(),
-  defensiveMatchups: fullCourtDefensiveMatchupsSchema.optional(),
-  restingPlayerIds: z.array(z.string().min(1).max(64)).max(12).optional(),
-  acceptForfeit: z.boolean().optional(),
-  record: z.boolean().optional(),
-});
-
 const fullCourtTrainingCampOptionsSchema = z.object({
   rotation: fullCourtRotationPlanInputSchema.optional(),
   tactics: fullCourtTacticsSchema.optional(),
   rules: fullCourtCoachingRulesSchema.optional(),
   hierarchy: fullCourtOffensiveHierarchySchema.optional(),
   defensiveMatchups: fullCourtDefensiveMatchupsSchema.optional(),
+});
+
+const fullCourtSeasonSlotOptionsSchema = fullCourtTrainingCampOptionsSchema.extend({
+  restingPlayerIds: z.array(z.string().min(1).max(64)).max(12).optional(),
+  acceptForfeit: z.boolean().optional(),
+  record: z.boolean().optional(),
 });
 
 const fullCourtPlayoffFixtureSchema = capRushPlayoffGamePlanSchema.extend({

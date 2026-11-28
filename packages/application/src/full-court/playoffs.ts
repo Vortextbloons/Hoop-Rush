@@ -20,6 +20,13 @@ export interface FullCourtPlayoffRepository {
   ): Promise<void>;
 }
 
+type SimulatedPlayoffOutcome = Extract<FullCourtPlayoffGameOutcome, { kind: 'simulated' }>;
+
+export type FullCourtPlayoffAdvanceResult =
+  | Exclude<FullCourtPlayoffGameOutcome, { kind: 'simulated' }>
+  | { readonly kind: 'stale'; readonly committedGames: number }
+  | (SimulatedPlayoffOutcome & { readonly watchedReplay: FullCourtWatchedReplay | null });
+
 export async function startFullCourtPlayoffs(
   season: FullCourtSeasonLock,
   dependencies: {
@@ -54,9 +61,7 @@ export async function advanceFullCourtPlayoffs(
       options: FullCourtSeasonSlotOptions,
     ) => FullCourtPlayoffGameOutcome | Promise<FullCourtPlayoffGameOutcome>;
   },
-): Promise<
-  FullCourtPlayoffGameOutcome | { readonly kind: 'stale'; readonly committedGames: number }
-> {
+): Promise<FullCourtPlayoffAdvanceResult> {
   const { lock } = input;
   const checkpoint = await dependencies.repository.load(lock.seasonLock.season.runId);
   if (checkpoint === null) throw new Error('Start Full Court playoffs before simulating a game');
@@ -90,5 +95,5 @@ export async function advanceFullCourtPlayoffs(
     outcome.checkpoint,
     watchedReplay === undefined ? undefined : { watchedReplay },
   );
-  return outcome;
+  return { ...outcome, watchedReplay: watchedReplay ?? null };
 }

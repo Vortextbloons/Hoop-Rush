@@ -2,7 +2,6 @@ import {
   advanceFullCourtPlayoffs,
   advanceFullCourtSeasonSlot,
   archiveFullCourtRun,
-  buildFullCourtWatchedReplay,
   fullCourtRotationInputForPlan,
   saveFullCourtBlueprint,
   saveFullCourtCoaching,
@@ -90,6 +89,9 @@ type PlayoffState = Awaited<ReturnType<typeof startFullCourtPlayoffs>>;
 type PlayedGame = Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
 type RegularSimulatedOutcome = Extract<FullCourtSeasonSlotOutcome, { kind: 'simulated' }>;
 type FullCourtWorker = ReturnType<typeof createFullCourtWorkerRunner>;
+type SimulationHandoffOutcome =
+  | { readonly kind: 'decision'; readonly reason: 'rest-conflict' | 'confirm-forfeit' }
+  | { readonly kind: 'stale' };
 
 /** Pinned rest and matchup choices captured for the next user fixture. */
 interface PinnedGamePlan {
@@ -483,8 +485,11 @@ export class FullCourtController {
     if (gameId === null) return;
     if (plan.restGameId === gameId) this.#clearRest();
     if (plan.matchupGameId === gameId) this.#clearDefensiveMatchups();
-    if (plan.restGameId === gameId || plan.matchupGameId === gameId) {
+    if (plan.restGameId !== gameId && plan.matchupGameId !== gameId) return;
+    try {
       await this.#repositories.fullCourtNextGamePlanRepository.clear(runId, gameId);
+    } catch (error) {
+      if (!this.#isDisposed()) this.error ??= errorMessageOf(error);
     }
   }
 
@@ -770,6 +775,26 @@ export class FullCourtController {
     };
   }
 
+  #publishCommittedUserGame(
+    game: PlayedGame | null,
+    watchedReplay: FullCourtWatchedReplay | null,
+  ): void {
+    this.practice = null;
+    this.latestGame = game;
+    if (watchedReplay !== null) this.savedReplay = watchedReplay;
+  }
+
+  async #handleSimulationHandoff(outcome: SimulationHandoffOutcome, runId: string): Promise<null> {
+    if (outcome.kind === 'decision') {
+      this.pendingForfeit = outcome.reason === 'confirm-forfeit';
+      if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
+      return null;
+    }
+    await this.#openRun(runId);
+    this.error = 'This run advanced in another tab. The latest results are loaded.';
+    return null;
+  }
+
   #regularInjuryStop(
     outcome: RegularSimulatedOutcome,
     lock: FullCourtSeasonLock,
@@ -843,53 +868,24 @@ export class FullCourtController {
         { repository, simulateSlot: (...args) => worker.simulateSlot(...args) },
       );
       if (this.#isDisposed()) return null;
-      if (outcome.kind === 'decision') {
-        this.pendingForfeit = outcome.reason === 'confirm-forfeit';
-        if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
-        return null;
-      }
-      if (outcome.kind === 'stale') {
-        await this.#openRun(lock.season.runId);
-        this.error = 'This run advanced in another tab. The latest results are loaded.';
-        return null;
+      if (outcome.kind === 'decision' || outcome.kind === 'stale') {
+        return this.#handleSimulationHandoff(outcome, lock.season.runId);
       }
       if (outcome.kind === 'season-complete') return null;
 
       acceptNextForfeit = false;
       played += 1;
       this.simProgress = { completed: played, total: Math.max(total, played) };
-      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
-      this.practice = null;
-      this.latestGame = outcome.userGame.kind === 'played' ? outcome.userGame : null;
-      if (
-        slotOptions.record &&
-        outcome.userGame.kind === 'played' &&
-        outcome.userGame.tape !== null
-      ) {
-        const playedFixture = lock.season.games.find(
-          (game) =>
-            game.slot === outcome.checkpoint.completedThroughSlot &&
-            (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
-        );
-        if (playedFixture !== undefined) {
-          this.savedReplay = buildFullCourtWatchedReplay({
-            phase: 'regular',
-            runId: lock.season.runId,
-            seasonLockDigest: lock.digest,
-            lockDigest: lock.digest,
-            gameId: playedFixture.gameId,
-            slot: playedFixture.slot,
-            dayOffset: playedFixture.dayOffset,
-            userTeamId,
-            game: outcome.userGame,
-          });
-        }
-      }
+      this.#publishCommittedUserGame(
+        outcome.userGame.kind === 'played' ? outcome.userGame : null,
+        outcome.watchedReplay,
+      );
       this.season = {
         ...season,
         checkpoint: outcome.checkpoint,
         scores: [...season.scores, ...outcome.scores],
       };
+      await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
       const completed = outcome.checkpoint.completedThroughSlot;
       if (completed >= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
         if (input.options.stopAtReview === true) return { kind: 'review', slot: completed };
@@ -990,15 +986,8 @@ export class FullCourtController {
         { repository, simulateGame: (...args) => worker.simulateGame(...args) },
       );
       if (this.#isDisposed()) return null;
-      if (outcome.kind === 'decision') {
-        this.pendingForfeit = outcome.reason === 'confirm-forfeit';
-        if (!this.pendingForfeit) this.error = 'The current lineup cannot play this game.';
-        return null;
-      }
-      if (outcome.kind === 'stale') {
-        await this.#openRun(lock.season.runId);
-        this.error = 'This run advanced in another tab. The latest results are loaded.';
-        return null;
+      if (outcome.kind === 'decision' || outcome.kind === 'stale') {
+        return this.#handleSimulationHandoff(outcome, lock.season.runId);
       }
       if (outcome.kind === 'playoffs-complete') {
         return {
@@ -1030,27 +1019,11 @@ export class FullCourtController {
       this.simProgress = { completed: userGames, total: Math.max(total, userGames) };
       acceptNextForfeit = false;
       this.#controlReturnedForSeriesId = null;
+      this.#publishCommittedUserGame(
+        outcome.game.kind === 'played' ? outcome.game : null,
+        outcome.watchedReplay,
+      );
       await this.#clearCommittedGamePlan(lock.season.runId, userGameId, pinned);
-      this.practice = null;
-      this.latestGame = outcome.game.kind === 'played' ? outcome.game : null;
-      if (
-        slotOptions.record &&
-        fixture.userSide !== null &&
-        outcome.game.kind === 'played' &&
-        outcome.game.tape !== null
-      ) {
-        this.savedReplay = buildFullCourtWatchedReplay({
-          phase: 'playoff',
-          runId: lock.season.runId,
-          seasonLockDigest: lock.digest,
-          lockDigest: playoffs.lock.digest,
-          gameId: fixture.gameId,
-          slot: null,
-          dayOffset: fixture.dayOffset,
-          userTeamId,
-          game: outcome.game,
-        });
-      }
       if (nextView.nextGame === null) {
         await this.#archiveCompletedRun(playoffs.lock, outcome.checkpoint);
         return {
