@@ -440,7 +440,14 @@ export {
   fullCourtLineupFitReport,
   fullCourtScoutPlayer,
 } from './modes/full-court/scouting.ts';
-export { fullCourtFilmReport, type FullCourtFilmPlayer } from './modes/full-court/opponent-film.ts';
+export {
+  fullCourtFilmReport,
+  fullCourtLeagueWeaknesses,
+  type FullCourtFilmPlayer,
+  type FullCourtLeagueOpponentInput,
+  type FullCourtOpponentWeaknessCode,
+  type FullCourtOpponentWeaknessSummary,
+} from './modes/full-court/opponent-film.ts';
 export {
   buildFullCourtGameLineups,
   buildFullCourtGameReport,

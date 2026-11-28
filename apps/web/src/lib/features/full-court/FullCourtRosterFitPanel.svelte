@@ -18,7 +18,7 @@
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
-  import { formatWarChestCr } from './full-court-draft-presentation.js';
+  import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
 
   type PurchaseAssessment = ReturnType<typeof fullCourtAssessPurchase>;
@@ -51,6 +51,7 @@
     onPurchaseReport,
     ariaLabel = 'Full Court War Room roster fit',
     eyebrow = 'War Room',
+    art = null,
   }: {
     draft: FullCourtDraftState;
     index: FullCourtCatalogIndex;
@@ -58,6 +59,7 @@
     onPurchaseReport: (target: FullCourtReportTarget) => void;
     ariaLabel?: string;
     eyebrow?: string;
+    art?: FullCourtArt | null;
   } = $props();
 
   const reportsByTarget = $derived(
@@ -69,7 +71,7 @@
   const roster = $derived(draft.picks.map((pick) => pick.player));
   const fitReport = $derived(fitRecord === null ? null : fullCourtLineupFitReport(roster));
   const payrollDollars = $derived(fullCourtPayrollDollars(draft.picks));
-  const warChestCr = $derived(formatWarChestCr(fullCourtWarChestDollars(draft)));
+  const warChestCr = $derived(formatMillions(fullCourtWarChestDollars(draft)));
   const locked = $derived(draft.stage === 'complete');
   const fitAssessment = $derived(
     fullCourtAssessPurchase({ index, state: draft, priceDollars: FIT_PRICE }),
@@ -78,17 +80,38 @@
     fullCourtReportScope('lineup-fit') === 'run' ? 'Lifetime of this run' : 'This game only',
   );
 
+  const rosterById = $derived(
+    new Map<string, (typeof roster)[number]>(
+      roster.map((player) => [player.playerId as string, player]),
+    ),
+  );
+  const rosterByName = $derived(
+    new Map<string, (typeof roster)[number]>(roster.map((player) => [player.displayName, player])),
+  );
+
+  function playerForEvidence(entry: { playerId?: string; displayName: string }) {
+    const matched =
+      (entry.playerId === undefined ? undefined : rosterById.get(entry.playerId)) ??
+      rosterByName.get(entry.displayName);
+    return (
+      matched ?? {
+        ...(entry.playerId === undefined ? {} : { playerId: entry.playerId }),
+        displayName: entry.displayName,
+      }
+    );
+  }
+
   function purchaseAffordance(assessment: PurchaseAssessment): string {
     if (assessment.legal) {
-      return `${formatWarChestCr(assessment.warChestAfterPurchase)} War Chest after the purchase.`;
+      return `${formatMillions(assessment.warChestAfterPurchase)} budget after the purchase.`;
     }
     if (assessment.reason === 'completion') {
       return 'No legal roster finish remains after this purchase.';
     }
     if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatWarChestCr(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
+      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
     }
-    return 'The War Chest cannot cover this report.';
+    return 'Budget cannot cover this report.';
   }
 
   function buyFit(): void {
@@ -97,20 +120,20 @@
   }
 </script>
 
-<Panel as="section" padding="md" aria-label={ariaLabel}>
+<Panel as="section" padding="md" class="border-line-strong bg-surface-1/90" aria-label={ariaLabel}>
   <SectionHeading
     {eyebrow}
     title="Locked roster fit"
     level={2}
     size="md"
-    description="A paid read of the locked roster's catalog traits. No projection or result is added."
+    description="Team strengths, spacing, and defensive gaps."
   >
     {#snippet actions()}
       {#if fitRecord !== null}
         <Badge tone="positive">Owned</Badge>
       {:else}
         <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-          {formatWarChestCr(FIT_PRICE)}
+          {formatMillions(FIT_PRICE)}
         </span>
       {/if}
     {/snippet}
@@ -125,28 +148,38 @@
   </div>
 
   {#if fitReport !== null}
-    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+    <div class="mt-4 grid items-start gap-3 sm:grid-cols-2">
       <section
-        class="rounded-xl border border-line-soft bg-surface-1 p-3"
+        class="rounded-xl border border-positive/30 bg-positive/5 p-3.5"
         aria-label="Roster strengths"
       >
-        <p class="ui-label text-muted-foreground">Strengths</p>
+        <div class="flex items-center justify-between gap-2">
+          <p class="ui-label text-positive">Strengths</p>
+          <span class="font-mono text-[9px] font-bold text-positive/80 uppercase">
+            {fitReport.strengths.length}
+            {fitReport.strengths.length === 1 ? 'trait' : 'traits'}
+          </span>
+        </div>
         {#if fitReport.strengths.length === 0}
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-2 text-xs text-muted-foreground">
             No strength cleared the evidence thresholds.
           </p>
         {:else}
-          <ul class="mt-1.5 flex flex-col gap-2">
+          <ul class="mt-2.5 flex flex-col gap-2.5">
             {#each fitReport.strengths as finding (finding.code)}
-              <li>
-                <p class="text-[11px] font-bold">{LINEUP_FINDING_LABELS[finding.code]}</p>
+              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2.5">
+                <p class="text-xs font-bold text-foreground">
+                  {LINEUP_FINDING_LABELS[finding.code]}
+                </p>
                 {#if finding.evidence.length > 0}
-                  <div class="mt-1">
+                  <div class="mt-1.5">
                     <FullCourtScoutEvidence
+                      {art}
                       items={finding.evidence.map((entry) => ({
                         name: entry.displayName,
                         field: entry.field,
                         value: entry.value,
+                        player: playerForEvidence(entry),
                       }))}
                     />
                   </div>
@@ -157,24 +190,35 @@
         {/if}
       </section>
 
-      <section class="rounded-xl border border-line-soft bg-surface-1 p-3" aria-label="Roster gaps">
-        <p class="ui-label text-muted-foreground">Gaps</p>
+      <section
+        class="rounded-xl border border-negative/30 bg-negative/5 p-3.5"
+        aria-label="Roster gaps"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <p class="ui-label text-negative">Gaps</p>
+          <span class="font-mono text-[9px] font-bold text-negative/80 uppercase">
+            {fitReport.gaps.length}
+            {fitReport.gaps.length === 1 ? 'gap' : 'gaps'}
+          </span>
+        </div>
         {#if fitReport.gaps.length === 0}
-          <p class="mt-1 text-[11px] text-muted-foreground">
-            No gap cleared the evidence thresholds.
-          </p>
+          <p class="mt-2 text-xs text-muted-foreground">No gap cleared the evidence thresholds.</p>
         {:else}
-          <ul class="mt-1.5 flex flex-col gap-2">
+          <ul class="mt-2.5 flex flex-col gap-2.5">
             {#each fitReport.gaps as finding (finding.code)}
-              <li>
-                <p class="text-[11px] font-bold">{LINEUP_FINDING_LABELS[finding.code]}</p>
+              <li class="rounded-lg border border-line-soft/70 bg-surface-1/80 p-2.5">
+                <p class="text-xs font-bold text-foreground">
+                  {LINEUP_FINDING_LABELS[finding.code]}
+                </p>
                 {#if finding.evidence.length > 0}
-                  <div class="mt-1">
+                  <div class="mt-1.5">
                     <FullCourtScoutEvidence
+                      {art}
                       items={finding.evidence.map((entry) => ({
                         name: entry.displayName,
                         field: entry.field,
                         value: entry.value,
+                        player: playerForEvidence(entry),
                       }))}
                     />
                   </div>
@@ -195,7 +239,7 @@
         size="sm"
         tone="primary"
         disabled={busy || !locked || !fitAssessment.legal}
-        aria-label={`Buy roster fit for ${formatWarChestCr(FIT_PRICE)}`}
+        aria-label={`Buy roster fit for ${formatMillions(FIT_PRICE)}`}
         onclick={buyFit}
       >
         <FileSearch size={14} aria-hidden="true" />

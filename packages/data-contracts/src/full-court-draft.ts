@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { commandIdSchema, idSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
+import {
+  CAP_RUSH_CAP_LINE_DOLLARS,
+  CAP_RUSH_FIRST_APRON_DOLLARS,
+  CAP_RUSH_HARD_LIMIT_DOLLARS,
+  CAP_RUSH_OFFER_SIZE,
+  capRushBucketSchema,
+  capRushCatalogSourceSchema,
+} from './cap-rush-versions.ts';
 import { capRushSourcePlayerSchema } from './cap-rush-draft.ts';
 import {
   fullCourtFinalizeRouletteCommandSchema,
@@ -59,10 +66,10 @@ export type FullCourtMoneyConfig = z.infer<typeof fullCourtMoneyConfigSchema>;
 // purchase room.
 export const FULL_COURT_DEFAULT_MONEY: FullCourtMoneyConfig = fullCourtMoneyConfigSchema.parse({
   moneyVersion: FULL_COURT_MONEY_VERSION,
-  capLineDollars: 250_000_000,
-  firstApronDollars: 300_000_000,
-  hardLimitDollars: 440_000_000,
-  startingWarChestDollars: 450_000_000,
+  capLineDollars: CAP_RUSH_CAP_LINE_DOLLARS,
+  firstApronDollars: CAP_RUSH_FIRST_APRON_DOLLARS,
+  hardLimitDollars: CAP_RUSH_HARD_LIMIT_DOLLARS,
+  startingWarChestDollars: 200_000_000,
 });
 
 /**
@@ -121,17 +128,16 @@ export const FULL_COURT_REPORT_PRICES_DOLLARS = {
   'player-scouting': 2_000_000,
   'lineup-fit': 5_000_000,
   'opponent-film': 3_000_000,
-  // Provisional: the original Full Court phase 4 spec priced preseason training at 10 CR.
-  'training-camp': 10_000_000,
+  'training-camp': 15_000_000,
 } as const satisfies Record<FullCourtReportKind, number>;
 
 export function fullCourtReportPriceDollars(kind: FullCourtReportKind): number {
   return FULL_COURT_REPORT_PRICES_DOLLARS[kind];
 }
 
-/** Player scouting, lineup fit, and training camp last for the run; film lasts through its fixture. */
-export function fullCourtReportScope(kind: FullCourtReportKind): 'run' | 'game' {
-  return kind === 'opponent-film' ? 'game' : 'run';
+/** All Full Court run perks last for the entire run. */
+export function fullCourtReportScope(_kind: FullCourtReportKind): 'run' | 'game' {
+  return 'run';
 }
 
 export const FULL_COURT_MAX_REPORTS = 32;
@@ -146,8 +152,8 @@ export const fullCourtReportTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('lineup-fit') }),
   z.object({
     kind: z.literal('opponent-film'),
-    gameId: fullCourtGameReferenceSchema,
-    opponentTeamId: fullCourtGameReferenceSchema,
+    gameId: fullCourtGameReferenceSchema.optional(),
+    opponentTeamId: fullCourtGameReferenceSchema.optional(),
   }),
   z.object({ kind: z.literal('training-camp') }),
 ]);
@@ -161,7 +167,9 @@ export function fullCourtReportTargetKey(target: FullCourtReportTarget): string 
     case 'lineup-fit':
       return 'lineup-fit';
     case 'opponent-film':
-      return `opponent-film:${target.opponentTeamId}:${target.gameId}`;
+      return target.opponentTeamId !== undefined && target.gameId !== undefined
+        ? `opponent-film:${target.opponentTeamId}:${target.gameId}`
+        : 'opponent-film';
     case 'training-camp':
       return 'training-camp';
   }
@@ -235,6 +243,28 @@ export const fullCourtDraftPoolSchema = z
   });
 export type FullCourtDraftPool = z.infer<typeof fullCourtDraftPoolSchema>;
 
+export const fullCourtOfferCardSchema = z.object({
+  cardIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(CAP_RUSH_OFFER_SIZE - 1),
+  bucket: capRushBucketSchema,
+  player: capRushSourcePlayerSchema,
+  salaryDollars: z.number().int().nonnegative(),
+});
+export type FullCourtOfferCard = z.infer<typeof fullCourtOfferCardSchema>;
+
+export const fullCourtRoundOfferSchema = z.object({
+  round: z
+    .number()
+    .int()
+    .min(0)
+    .max(FULL_COURT_MAX_ROSTER_SIZE - 1),
+  cards: z.array(fullCourtOfferCardSchema).min(1).max(CAP_RUSH_OFFER_SIZE),
+});
+export type FullCourtRoundOffer = z.infer<typeof fullCourtRoundOfferSchema>;
+
 export const fullCourtDraftStateSchema = z
   .object({
     schemaVersion: z.literal(FULL_COURT_DRAFT_SCHEMA_VERSION),
@@ -245,6 +275,7 @@ export const fullCourtDraftStateSchema = z
     catalog: capRushCatalogSourceSchema,
     money: fullCourtMoneyConfigSchema,
     pool: fullCourtDraftPoolSchema.optional(),
+    offer: fullCourtRoundOfferSchema.optional(),
     stage: fullCourtDraftStageSchema,
     picks: z.array(fullCourtDraftPickSchema).max(FULL_COURT_MAX_ROSTER_SIZE),
     spending: z.array(fullCourtSpendingEntrySchema).max(64),
@@ -444,29 +475,6 @@ export const fullCourtDraftStateSchema = z
         code: 'custom',
         message: 'a confirmed roster requires at least six players',
       });
-    }
-
-    if (state.pool !== undefined) {
-      const poolVersions = new Set<string>(state.pool.playerVersionIds);
-      for (const pick of state.picks) {
-        if (!poolVersions.has(pick.player.playerVersionId)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `pick ${pick.player.playerVersionId} is outside the draft pool`,
-          });
-        }
-      }
-      for (const report of state.reports ?? []) {
-        if (
-          report.target.kind === 'player-scouting' &&
-          !poolVersions.has(report.target.playerVersionId)
-        ) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `scouting report ${report.target.playerVersionId} is outside the draft pool`,
-          });
-        }
-      }
     }
   });
 export type FullCourtDraftState = z.infer<typeof fullCourtDraftStateSchema>;

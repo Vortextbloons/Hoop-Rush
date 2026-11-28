@@ -2,7 +2,7 @@
   import { fullCourtReportScope } from '@hoop-rush/data-contracts';
   import { fullCourtScoutPlayer } from '@hoop-rush/engine';
   import Badge from '#lib/components/ui/Badge.svelte';
-  import { formatWarChestCr } from './full-court-draft-presentation.js';
+  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import FullCourtScoutEvidence from './FullCourtScoutEvidence.svelte';
 
   const ROLE_LABELS = {
@@ -68,7 +68,7 @@
   </span>
   {#if priceDollars !== null}
     <span class="ml-auto font-mono text-[9px] text-muted-foreground tabular-nums">
-      Paid {formatWarChestCr(priceDollars)}
+      Paid {formatMillions(priceDollars)}
     </span>
   {/if}
 </div>

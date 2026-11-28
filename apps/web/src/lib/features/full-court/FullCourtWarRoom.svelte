@@ -13,17 +13,20 @@
   import {
     fullCourtAssessPurchase,
     fullCourtFilmReport,
+    fullCourtLeagueWeaknesses,
     type FullCourtCatalogIndex,
     type FullCourtFilmPlayer,
+    type FullCourtOpponentWeaknessCode,
     type FullCourtPlayoffOpponentPreview,
     type FullCourtRegularSeason,
   } from '@hoop-rush/engine';
   import { Film } from '@lucide/svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
-  import { formatWarChestCr } from './full-court-draft-presentation.js';
+  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import {
     fullCourtPlayoffAdaptationRead,
     fullCourtPlayoffFixtureLabel,
@@ -76,6 +79,18 @@
     heavy: 'Heavy',
   } as const;
 
+  const WEAKNESS_LABELS: Readonly<Record<FullCourtOpponentWeaknessCode, string>> = {
+    'no-spacing': 'No spacing',
+    'thin-spacing': 'Thin spacing',
+    'no-rim-protection': 'No rim protection',
+    'no-perimeter-stopper': 'No perimeter stopper',
+    'weak-defensive-glass': 'Weak defensive glass',
+    'turnover-prone': 'Turnover prone',
+    'foul-prone': 'Foul prone',
+    'thin-depth': 'Thin depth',
+    'no-primary-creator': 'No primary creator',
+  };
+
   let {
     draft,
     index,
@@ -101,7 +116,7 @@
     onPurchaseReport: (target: FullCourtReportTarget) => void;
     practiceOpen?: boolean;
     practice?: FullCourtPracticeReport | null;
-    onRunPractice?: () => void;
+    onRunPractice?: (opponentTeamId?: string) => void;
     matchupContext?: FullCourtMatchupEditorContext | null;
     onMatchupsChange?: (assignments: readonly FullCourtDefensiveMatchupAssignment[]) => void;
     onResetMatchups?: () => void;
@@ -114,6 +129,39 @@
     ),
   );
   const locked = $derived(draft.stage === 'complete');
+  const leagueFilmRecord = $derived(
+    (draft.reports ?? []).find((report) => report.kind === 'opponent-film') ?? null,
+  );
+  const leagueOpponents = $derived(
+    season.teams
+      .filter((team) => team.teamId !== season.userTeamId)
+      .map((team) => ({ teamId: team.teamId, displayName: team.displayName })),
+  );
+  const topOpponentWeaknesses = $derived.by(() => {
+    if (leagueFilmRecord === null) return [];
+    const opponents = season.teams
+      .filter((team) => team.teamId !== season.userTeamId)
+      .map((team) => ({
+        teamId: team.teamId,
+        displayName: team.displayName,
+        seasonKey: team.anchorSeason ?? 'Historical',
+        players: team.roster.map((player) => ({
+          overall:
+            player.overall ??
+            Math.round(
+              (player.ratings.insideScoring +
+                player.ratings.threePoint +
+                player.ratings.perimeterDefense +
+                player.ratings.interiorDefense) /
+                4,
+            ),
+          minutes: player.anchors?.minutesPerGame ?? 12,
+          ratings: player.ratings,
+          tendencies: player.tendencies,
+        })),
+      }));
+    return fullCourtLeagueWeaknesses(opponents).slice(0, 8);
+  });
 
   const filmFixture = $derived(
     nextFilmTarget === null
@@ -121,7 +169,9 @@
       : (season.games.find((game) => game.gameId === nextFilmTarget.gameId) ?? null),
   );
   const filmPlayoffLabel = $derived(
-    nextFilmTarget === null ? null : fullCourtPlayoffFixtureLabel(nextFilmTarget.gameId),
+    nextFilmTarget?.gameId === undefined
+      ? null
+      : fullCourtPlayoffFixtureLabel(nextFilmTarget.gameId),
   );
   const matchingPlayoffAdjustment = $derived.by(() => {
     if (
@@ -224,15 +274,15 @@
 
   function purchaseAffordance(assessment: PurchaseAssessment): string {
     if (assessment.legal) {
-      return `${formatWarChestCr(assessment.warChestAfterPurchase)} War Chest after the purchase.`;
+      return `${formatMillions(assessment.warChestAfterPurchase)} budget after the purchase.`;
     }
     if (assessment.reason === 'completion') {
       return 'No legal roster finish remains after this purchase.';
     }
     if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatWarChestCr(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
+      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} for the cheapest legal finish.`;
     }
-    return 'The War Chest cannot cover this report.';
+    return 'Budget cannot cover this report.';
   }
 
   function percentText(value: number): string {
@@ -244,14 +294,15 @@
   }
 
   function buyFilm(): void {
-    if (busy || !locked || nextFilmTarget === null || filmRecord !== null) return;
-    if (filmAssessment === null || !filmAssessment.legal) return;
-    onPurchaseReport(nextFilmTarget);
+    if (busy || !locked || leagueFilmRecord !== null) return;
+    const assessment = fullCourtAssessPurchase({ index, state: draft, priceDollars: FILM_PRICE });
+    if (!assessment.legal) return;
+    onPurchaseReport({ kind: 'opponent-film' });
   }
 </script>
 
 <div class="flex flex-col gap-3">
-  <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} />
+  <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
 
   {#if practiceOpen || practice !== null}
     <FullCourtTrainingCampPanel
@@ -261,6 +312,7 @@
       campOpen={practiceOpen}
       {practiceOpen}
       {practice}
+      opponents={leagueOpponents}
       {onPurchaseReport}
       {onRunPractice}
       {art}
@@ -270,7 +322,7 @@
       <summary
         class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
       >
-        Preseason Training Camp · Closed
+        Training Camp · Closed
       </summary>
       <div class="mt-2">
         <FullCourtTrainingCampPanel
@@ -280,6 +332,7 @@
           campOpen={false}
           practiceOpen={false}
           {practice}
+          opponents={leagueOpponents}
           {onPurchaseReport}
           {onRunPractice}
           {art}
@@ -291,225 +344,79 @@
   <Panel as="section" padding="md" aria-label="Full Court War Room opponent film">
     <SectionHeading
       eyebrow="War Room"
-      title="Next-game opponent film"
+      title="League opponent film"
       level={2}
       size="md"
-      description="Historical rotation input, never a played result."
+      description="One-time upgrade scanning all league opponents to surface the biggest contenders and their weaknesses."
     >
       {#snippet actions()}
-        {#if filmRecord !== null}
+        {#if leagueFilmRecord !== null}
           <Badge tone="positive">Owned</Badge>
-        {:else if nextFilmTarget !== null}
+        {:else}
           <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-            {formatWarChestCr(FILM_PRICE)}
+            {formatMillions(FILM_PRICE)}
           </span>
         {/if}
       {/snippet}
     </SectionHeading>
 
-    {#if nextFilmTarget === null}
-      <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-        No next opponent is set. Film becomes available when your next game is on the schedule.
-      </p>
-    {:else if opponentTeam === null}
-      <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-        The next opponent is not available in this season.
-      </p>
-    {:else}
-      <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p class="text-sm font-bold">{opponentTeam.displayName}</p>
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
-          {#if filmFixture !== null}Game {filmFixture.slot} ·
-          {:else if filmPlayoffLabel !== null}{filmPlayoffLabel} ·
-          {/if}
-          {opponentTeam.anchorSeason ?? 'Season unavailable'}
-        </p>
-        <p class="font-mono text-[10px] text-muted-foreground uppercase">
-          {opponentTeam.roster.length} players
-        </p>
-        <p class="font-mono text-[9px] text-muted-foreground uppercase">
-          {scopeLabel('opponent-film')}
-        </p>
-      </div>
-
-      {#if matchingPlayoffAdjustment !== null}
-        <section
-          class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
-          aria-label="Playoff opponent tactical adjustment"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="ui-label text-muted-foreground">Series opponent adjustment</p>
-            <Badge tone="accent">{matchingPlayoffAdjustment.settingLabel}</Badge>
-          </div>
-          <p class="mt-1 text-[11px] font-bold">{matchingPlayoffAdjustment.reasonLabel}</p>
-          <p class="mt-0.5 text-[11px] text-muted-foreground">
-            {matchingPlayoffAdjustment.detailLabel}
-          </p>
-        </section>
-      {/if}
-
-      <div class="mt-2 border-t border-line-soft pt-2">
-        {#if filmRead !== null && filmRead.startersKnown}
-          <p class="font-mono text-[9px] text-muted-foreground uppercase">
-            {#if freeStarters.names.length > 0}
-              Starters: {freeStarters.names.join(', ')}
-            {:else}
-              Starting lineup unavailable.
-            {/if}
-          </p>
-          {#if !freeStarters.complete}
-            <p class="mt-1 font-mono text-[9px] text-muted-foreground uppercase">
-              Starting lineup evidence is incomplete.
-            </p>
-          {/if}
-        {:else}
-          <p class="font-mono text-[9px] text-muted-foreground uppercase">
-            Starting lineup evidence unavailable.
-          </p>
-        {/if}
-        {#if filmRead !== null && filmRead.missingMinutes.length > 0}
-          <p class="mt-1 font-mono text-[9px] text-muted-foreground uppercase">
-            No historical minutes for {filmRead.missingMinutes.join(', ')}; left out of the film
-            read.
-          </p>
-        {/if}
-        {#if filmRead !== null && filmRead.missingVersion.length > 0}
-          <p class="mt-1 font-mono text-[9px] text-muted-foreground uppercase">
-            No player version for {filmRead.missingVersion.join(', ')}; left out of the film read.
-          </p>
-        {/if}
-      </div>
-
-      {#if filmReport !== null}
-        <div class="mt-3 grid gap-3 lg:grid-cols-2">
-          <section
-            class="rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Opponent rotation"
-          >
-            <p class="ui-label text-muted-foreground">Rotation</p>
-            <ul class="mt-1.5 flex flex-col gap-1">
-              {#each filmReport.rotation as player (player.playerVersionId)}
-                <li class="flex min-w-0 items-center gap-2 text-[11px]">
-                  <FullCourtPortrait {player} {art} size="sm" />
-                  <span class="min-w-0 flex-1 truncate font-semibold">{player.displayName}</span>
-                  {#if player.starter}
-                    <span class="shrink-0 font-mono text-[8px] font-bold text-primary uppercase"
-                      >Starter</span
-                    >
-                  {/if}
-                  <span class="shrink-0 font-mono text-[9px] text-muted-foreground tabular-nums">
-                    {minutesText(player.minutes)} min · {percentText(player.minutesShare * 100)}
-                  </span>
-                  <span class="shrink-0 font-mono text-[9px] font-bold tabular-nums">
-                    {player.usageRate}% {USAGE_LABELS[player.usageTier]}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          </section>
-
-          <section
-            class="rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Opponent shot profile"
-          >
-            <p class="ui-label text-muted-foreground">Shot profile</p>
-            <ul class="mt-1.5 flex flex-col gap-1">
-              {#each filmReport.shotProfile as zone (zone.zone)}
-                <li class="flex items-baseline justify-between gap-3 font-mono text-[10px]">
-                  <span class="text-muted-foreground">{ZONE_LABELS[zone.zone]}</span>
-                  <span class="font-bold tabular-nums">{percentText(zone.frequency)}</span>
-                </li>
-              {/each}
-            </ul>
-          </section>
-
-          <section
-            class="rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Opponent defensive profile"
-          >
-            <p class="ui-label text-muted-foreground">Defensive pressure</p>
-            <ul class="mt-1.5 flex flex-col gap-1">
-              <li class="flex items-baseline justify-between gap-3 font-mono text-[10px]">
-                <span class="text-muted-foreground">Steal attempts</span>
-                <span class="font-bold tabular-nums"
-                  >{percentText(filmReport.defensiveProfile.stealAttemptRate)}</span
-                >
-              </li>
-              <li class="flex items-baseline justify-between gap-3 font-mono text-[10px]">
-                <span class="text-muted-foreground">Block attempts</span>
-                <span class="font-bold tabular-nums"
-                  >{percentText(filmReport.defensiveProfile.blockAttemptRate)}</span
-                >
-              </li>
-              <li class="flex items-baseline justify-between gap-3 font-mono text-[10px]">
-                <span class="text-muted-foreground">Fouls</span>
-                <span class="font-bold tabular-nums"
-                  >{percentText(filmReport.defensiveProfile.foulRate)}</span
-                >
-              </li>
-              <li class="flex items-baseline justify-between gap-3 font-mono text-[10px]">
-                <span class="text-muted-foreground">Off. glass</span>
-                <span class="font-bold tabular-nums"
-                  >{percentText(filmReport.defensiveProfile.crashOffensiveGlassRate)}</span
-                >
-              </li>
-            </ul>
-          </section>
-
-          <section
-            class="rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Opponent film notes"
-          >
-            <p class="ui-label text-muted-foreground">Notes</p>
-            {#if filmReport.notes.length === 0}
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                No note cleared the evidence thresholds.
-              </p>
-            {:else}
-              <ul class="mt-1.5 flex flex-col gap-2">
-                {#each filmReport.notes as note (note.code)}
-                  <li>
-                    <p class="text-[11px] font-bold">{FILM_FINDING_LABELS[note.code]}</p>
-                    <div class="mt-1">
-                      <FullCourtScoutEvidence items={[{ field: note.metric, value: note.value }]} />
-                    </div>
-                  </li>
+    {#if leagueFilmRecord !== null}
+      <div class="mt-3 grid gap-2 sm:grid-cols-2">
+        {#each topOpponentWeaknesses as opponent, idx (opponent.teamId)}
+          {@const oppIdentity = art === null ? null : art.teamFor(opponent.teamId)}
+          <div class="rounded-lg border border-line-soft bg-surface-1 p-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                {#if oppIdentity !== null && art !== null}
+                  <TeamLogo
+                    manifest={art.manifest}
+                    franchiseId={oppIdentity.franchiseId}
+                    teamExternalId={oppIdentity.teamExternalId}
+                    className="h-5 w-5"
+                  />
+                {/if}
+                <div class="min-w-0">
+                  <p class="font-display truncate text-sm font-extrabold">
+                    #{idx + 1}
+                    {opponent.displayName}
+                  </p>
+                  <p class="ui-micro">{opponent.seasonKey} · {opponent.rating} OVR</p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              {#if opponent.weaknesses.length === 0}
+                <Badge tone="neutral">No major gaps</Badge>
+              {:else}
+                {#each opponent.weaknesses as code (code)}
+                  <Badge tone="negative">{WEAKNESS_LABELS[code]}</Badge>
                 {/each}
-              </ul>
-            {/if}
-          </section>
-        </div>
-      {:else if filmRecord !== null}
-        <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-          {#if filmRead !== null && filmRead.players.length === 0}
-            No historical minutes are available for this opponent, so the film read cannot be built.
-          {:else if opponentTeam.anchorSeason === null}
-            The opponent's season is unavailable, so the film read cannot be built.
-          {:else}
-            The opponent film is unavailable for this fixture.
-          {/if}
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      {@const filmPurchase = fullCourtAssessPurchase({
+        index,
+        state: draft,
+        priceDollars: FILM_PRICE,
+      })}
+      <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
+        <Button
+          size="sm"
+          tone="primary"
+          disabled={busy || !locked || !filmPurchase.legal}
+          aria-label={`Buy opponent film for ${formatMillions(FILM_PRICE)}`}
+          onclick={buyFilm}
+        >
+          <Film size={14} aria-hidden="true" />
+          Buy opponent film
+        </Button>
+        <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
+          {purchaseAffordance(filmPurchase)}
         </p>
-      {:else}
-        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
-          <Button
-            size="sm"
-            tone="primary"
-            disabled={busy || !locked || filmAssessment === null || !filmAssessment.legal}
-            aria-label={`Buy opponent film for ${formatWarChestCr(FILM_PRICE)}`}
-            onclick={buyFilm}
-          >
-            <Film size={14} aria-hidden="true" />
-            Buy opponent film
-          </Button>
-          <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            {#if filmAssessment !== null}
-              {purchaseAffordance(filmAssessment)}
-            {:else}
-              Film is unavailable for this fixture.
-            {/if}
-          </p>
-        </div>
-      {/if}
+      </div>
     {/if}
   </Panel>
 

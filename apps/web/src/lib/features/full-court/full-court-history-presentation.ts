@@ -14,7 +14,7 @@ import {
   capStatusShortLabel,
   formatMillions,
 } from '#lib/features/cap-rush/cap-rush-presentation.js';
-import { formatWarChestCr, fullCourtVariantLabel } from './full-court-draft-presentation.js';
+import { fullCourtVariantLabel } from './full-court-draft-presentation.js';
 
 const TACTICS_LABELS: {
   readonly pace: Readonly<Record<FullCourtTactics['pace'], string>>;
@@ -43,6 +43,7 @@ export interface FullCourtHistoryRosterRow {
   readonly displayName: string;
   readonly seasonKey: string;
   readonly position: string;
+  readonly overall: number;
   readonly salaryLabel: string;
   readonly minutesTarget: number | null;
   readonly starter: boolean;
@@ -100,7 +101,11 @@ export function presentFullCourtHistoryEntry(
   const starters = new Set(rotation?.startingFive ?? []);
   const closers = new Set(rotation?.closingFive ?? []);
   const roster = [...record.draft.picks]
-    .sort((left, right) => left.pickOrdinal - right.pickOrdinal)
+    .sort(
+      (left, right) =>
+        right.player.originalOverall - left.player.originalOverall ||
+        left.pickOrdinal - right.pickOrdinal,
+    )
     .map((pick): FullCourtHistoryRosterRow => {
       const target =
         rotation !== undefined && Object.hasOwn(rotation.minuteTargets, pick.player.playerId)
@@ -112,6 +117,7 @@ export function presentFullCourtHistoryEntry(
         displayName: pick.player.displayName,
         seasonKey: pick.player.seasonKey,
         position: pick.player.positions.join('/'),
+        overall: pick.player.originalOverall,
         salaryLabel: formatMillions(pick.salaryDollars),
         minutesTarget: target,
         starter: starters.has(pick.player.playerId),
@@ -172,10 +178,10 @@ export function presentFullCourtHistoryEntry(
     capStatus,
     capStatusLabel: capStatusShortLabel(capStatus),
     capStatusClass: capStatusClass(capStatus),
-    warChestSpentLabel: formatWarChestCr(warChestSpent),
-    warChestRemainingLabel: formatWarChestCr(warChestRemaining),
-    scoutingSpentLabel: formatWarChestCr(scoutingSpent),
-    spinSpentLabel: formatWarChestCr(spinSpent),
+    warChestSpentLabel: formatMillions(warChestSpent),
+    warChestRemainingLabel: formatMillions(warChestRemaining),
+    scoutingSpentLabel: formatMillions(scoutingSpent),
+    spinSpentLabel: formatMillions(spinSpent),
     strategySummary,
     customRotation: rotation !== undefined,
     roster,

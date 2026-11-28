@@ -99,6 +99,9 @@ test('presents variant, roster, strategy, economy, season finish, and achievemen
   expect(presented.strategySummary).toBe('Fast pace · Perimeter offense · Pressure defense');
   expect(presented.customRotation).toBe(true);
   expect(presented.roster).toHaveLength(6);
+  const overalls = presented.roster.map((row) => row.overall);
+  expect(overalls).toEqual([...overalls].sort((left, right) => right - left));
+  expect(new Set(overalls).size).toBeGreaterThan(1);
   expect(presented.achievements.map((a) => a.name)).toEqual(['Bench Mob', 'The Chess Match']);
   expect(presented.benchSummaryLabel).toBeNull();
   expect(presented.benchBestGameLabel).toBeNull();

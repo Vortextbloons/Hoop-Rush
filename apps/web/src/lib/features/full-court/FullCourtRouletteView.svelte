@@ -18,7 +18,6 @@
     capStatusLabel,
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
-  import { formatWarChestCr } from './full-court-draft-presentation.js';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
   import FullCourtTrainingCampPanel from './FullCourtTrainingCampPanel.svelte';
@@ -78,8 +77,8 @@
       <dd class="font-semibold">{formatMillions(payroll)}</dd>
     </div>
     <div>
-      <dt class="text-muted-foreground">War Chest</dt>
-      <dd class="font-semibold">{formatWarChestCr(warChest)}</dd>
+      <dt class="text-muted-foreground">Budget</dt>
+      <dd class="font-semibold">{formatMillions(warChest)}</dd>
     </div>
     <div>
       <dt class="text-muted-foreground">Spins bought</dt>

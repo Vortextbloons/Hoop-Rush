@@ -130,17 +130,17 @@ function lowWarChestSetup(): { index: FullCourtCatalogIndex; state: FullCourtDra
 }
 
 describe('FullCourtDraftView', () => {
-  test('shows a signing cost and its blockers beside every sign action', () => {
+  test('renders a 10-card positionless round offer sorted by overall with Cap Rush card actions', () => {
     const { state, index } = setup();
     const body = renderView(state, index);
-    const firstPlayer = fullCourtCatalogPage(index, state).rows[0]?.player;
-    if (firstPlayer === undefined) throw new Error('Expected a player on the opening draft board');
+    const firstPlayer = state.offer?.cards[0]?.player;
+    if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
-    expect(body).toContain('Payroll after');
-    expect(body).toContain('Room left');
-    expect(body).toContain('War Chest after');
+    expect(body).toContain('Round 1');
+    expect(body).toContain('Show playstyle');
     expect(body).toContain(`aria-label="Sign ${firstPlayer.displayName}"`);
-    expect(body).toContain('Draft pool');
+    expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
+    expect(body).toContain('Legal finish');
   });
 
   test('gates the lock on the six-player minimum and links the roster from the action bar', () => {
@@ -164,41 +164,40 @@ describe('FullCourtDraftView', () => {
     expect(body).toContain('Locked');
   });
 
-  test('prices player scouting per catalog version without replacing the catalog or profile actions', () => {
+  test('prices player scouting per round card without replacing the profile actions', () => {
     const { state, index } = setup();
     const body = renderView(state, index, () => undefined);
-    const firstPlayer = fullCourtCatalogPage(index, state).rows[0]?.player;
-    if (firstPlayer === undefined) throw new Error('Expected a player on the opening draft board');
+    const firstPlayer = state.offer?.cards[0]?.player;
+    if (firstPlayer === undefined) throw new Error('Expected a player on the opening round offer');
 
-    expect(body).toContain('Scout 2 CR · Lifetime of this run');
-    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} for 2 CR"`);
-    expect(body).toContain('Draft pool');
+    expect(body).toContain('Scout $2M');
+    expect(body).toContain(`aria-label="Scout ${firstPlayer.displayName} for $2M"`);
     expect(body).toContain(`aria-label="${firstPlayer.displayName} details"`);
   });
 
-  test('renders Open catalog for legacy saves without a pool', () => {
+  test('renders Open catalog for legacy saves without an offer or pool', () => {
     const { state, index } = setup();
-    const body = renderView({ ...state, pool: undefined }, index);
+    const body = renderView({ ...state, offer: undefined, pool: undefined }, index);
 
     expect(body).toContain('Open catalog');
   });
 
-  test('marks a purchased scouting report as owned and opens it from the same row', () => {
+  test('marks a purchased scouting report as owned and opens it from the same card', () => {
     const { state, index } = setup();
-    const targetName = fullCourtCatalogPage(index, state).rows[0]?.player.displayName ?? '';
+    const targetName = state.offer?.cards[0]?.player.displayName ?? '';
     const body = renderView(scoutedState(index, state, targetName), index, () => undefined);
 
-    expect(body).toContain('Scouting report · Lifetime of this run');
+    expect(body).toContain('Scouted');
     expect(body).toContain(`aria-label="Open scouting report for ${targetName}"`);
-    expect(body).not.toContain(`aria-label="Scout ${targetName} for 2 CR"`);
+    expect(body).not.toContain(`aria-label="Scout ${targetName} for $2M"`);
   });
 
-  test('blocks a scouting purchase when the War Chest cannot cover the cheapest legal finish', () => {
+  test('blocks a scouting purchase when the budget cannot cover the cheapest legal finish', () => {
     const { state, index } = lowWarChestSetup();
     const body = renderView(state, index, () => undefined);
 
-    expect(body).toContain('Scout 2 CR · Lifetime of this run');
-    expect(body).toContain('to finish');
+    expect(body).toContain('Scout $2M');
+    expect(body).toContain('disabled=""');
   });
 });
 
@@ -222,7 +221,7 @@ describe('FullCourtScoutReport', () => {
     expect(body).toContain('Perimeter');
     expect(body).toContain('68');
     expect(body).toContain('Poor free throw');
-    expect(body).toContain('Paid 2 CR');
+    expect(body).toContain('Paid $2M');
     expect(body).toContain('Bought at draft revision 1.');
   });
 });

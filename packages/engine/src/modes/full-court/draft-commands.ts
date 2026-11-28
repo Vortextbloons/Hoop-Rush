@@ -39,6 +39,7 @@ import {
   type FullCourtCatalogIndex,
 } from './draft-catalog.ts';
 import { createFullCourtDraftPool } from './draft-pool.ts';
+import { drawFullCourtRoundOffer } from './draft-offer.ts';
 import {
   acceptFullCourtCommand,
   rejectFullCourtCommand,
@@ -111,7 +112,7 @@ export function createFullCourtDraftState(
   ) {
     throw new Error('The Full Court catalog and budget cannot fill a legal six-player roster');
   }
-  return fullCourtDraftStateSchema.parse({
+  const initialBase = {
     schemaVersion: FULL_COURT_DRAFT_SCHEMA_VERSION,
     runId: parsed.runId,
     revision: 1,
@@ -120,9 +121,17 @@ export function createFullCourtDraftState(
     catalog: parsed.catalog,
     money,
     ...(pool === undefined ? {} : { pool }),
-    stage: 'drafting',
+    stage: 'drafting' as const,
     picks: [],
     spending: [],
+  };
+  const offer =
+    options.pool === 'open'
+      ? undefined
+      : drawFullCourtRoundOffer({ index, state: initialBase, round: 0 });
+  return fullCourtDraftStateSchema.parse({
+    ...initialBase,
+    ...(offer === undefined ? {} : { offer }),
   });
 }
 
@@ -195,7 +204,9 @@ function applyPickPlayer(
       `command ${command.commandId} already charged the War Chest`,
     );
   }
-  const player = fullCourtPoolPlayerOf(environment.index, state, command.playerVersionId);
+  const player =
+    state.offer?.cards.find((card) => card.player.playerVersionId === command.playerVersionId)
+      ?.player ?? fullCourtPoolPlayerOf(environment.index, state, command.playerVersionId);
   if (player === null) {
     const inCatalog = fullCourtPlayerOf(environment.index, command.playerVersionId) !== null;
     return rejectFullCourtCommand(
@@ -219,11 +230,22 @@ function applyPickPlayer(
     ...state.picks,
     { pickOrdinal: state.picks.length, player, salaryDollars },
   ];
+  const spending = salariesOf(state, picks, command.commandId);
+  const nextOffer =
+    state.offer === undefined || picks.length >= FULL_COURT_MAX_ROSTER_SIZE
+      ? undefined
+      : drawFullCourtRoundOffer({
+          index: environment.index,
+          state: { ...state, picks, spending },
+          round: picks.length,
+        });
+  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...state,
+    ...stateWithoutOffer,
     revision: state.revision + 1,
     picks,
-    spending: salariesOf(state, picks, command.commandId),
+    spending,
+    ...(nextOffer === undefined ? {} : { offer: nextOffer }),
   });
   return acceptFullCourtCommand(state, command, nextState);
 }
@@ -254,11 +276,22 @@ function applyRemovePlayer(
   const picks = state.picks
     .filter((pick) => pick.player.playerVersionId !== command.playerVersionId)
     .map((pick, pickOrdinal) => ({ ...pick, pickOrdinal }));
+  const spending = salariesOf(state, picks, command.commandId);
+  const nextOffer =
+    state.offer === undefined
+      ? undefined
+      : drawFullCourtRoundOffer({
+          index: environment.index,
+          state: { ...state, picks, spending },
+          round: picks.length,
+        });
+  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...state,
+    ...stateWithoutOffer,
     revision: state.revision + 1,
     picks,
-    spending: salariesOf(state, picks, command.commandId),
+    spending,
+    ...(nextOffer === undefined ? {} : { offer: nextOffer }),
   });
   return acceptFullCourtCommand(state, command, nextState);
 }
@@ -286,8 +319,9 @@ function applyFinishDraft(
       `finishing requires at least ${String(FULL_COURT_MIN_ROSTER_SIZE)} picks (have ${String(state.picks.length)})`,
     );
   }
+  const { offer: _previousOffer, ...stateWithoutOffer } = state;
   const nextState = fullCourtDraftStateSchema.parse({
-    ...state,
+    ...stateWithoutOffer,
     revision: state.revision + 1,
     stage: 'complete',
     ...(state.variant === 'roulette'
@@ -312,14 +346,6 @@ function applyPurchaseReport(
       `command ${command.commandId} already charged the War Chest`,
     );
   }
-  if (command.target.kind !== 'player-scouting' && state.stage !== 'complete') {
-    return rejectFullCourtCommand(
-      state,
-      command,
-      'report-unavailable',
-      'confirm the roster before buying lineup or opponent reports',
-    );
-  }
   const targetKey = fullCourtReportTargetKey(command.target);
   if (
     (state.reports ?? []).some((report) => fullCourtReportTargetKey(report.target) === targetKey)
@@ -339,19 +365,21 @@ function applyPurchaseReport(
       'this run has reached its scouting report limit',
     );
   }
-  if (
-    command.target.kind === 'player-scouting' &&
-    fullCourtPoolPlayerOf(environment.index, state, command.target.playerVersionId) === null
-  ) {
-    const inCatalog = fullCourtPlayerOf(environment.index, command.target.playerVersionId) !== null;
-    return rejectFullCourtCommand(
-      state,
-      command,
-      'player-unavailable',
-      inCatalog
-        ? `player version ${command.target.playerVersionId} is not in this draft pool`
-        : `player version ${command.target.playerVersionId} is not in the loaded catalog`,
-    );
+  if (command.target.kind === 'player-scouting') {
+    const targetVersionId = command.target.playerVersionId;
+    const inOffer =
+      state.offer?.cards.some((card) => card.player.playerVersionId === targetVersionId) === true;
+    if (!inOffer && fullCourtPoolPlayerOf(environment.index, state, targetVersionId) === null) {
+      const inCatalog = fullCourtPlayerOf(environment.index, targetVersionId) !== null;
+      return rejectFullCourtCommand(
+        state,
+        command,
+        'player-unavailable',
+        inCatalog
+          ? `player version ${targetVersionId} is not in this draft pool`
+          : `player version ${targetVersionId} is not in the loaded catalog`,
+      );
+    }
   }
   const priceDollars = fullCourtReportPriceDollars(command.target.kind);
   const assessment = fullCourtAssessPurchase({
@@ -431,7 +459,11 @@ export function fullCourtPurchasePhaseRejection(
     }
     return null;
   }
-  if (command.target.kind === 'opponent-film' && phase.playedGameIds.has(command.target.gameId)) {
+  if (
+    command.target.kind === 'opponent-film' &&
+    command.target.gameId !== undefined &&
+    phase.playedGameIds.has(command.target.gameId)
+  ) {
     return reject('Film study is available for your next game.');
   }
   return null;

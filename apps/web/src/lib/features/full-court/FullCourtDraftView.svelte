@@ -1,16 +1,17 @@
 <script lang="ts">
   import type {
+    CapRushPayrollStatus,
     CapRushSourcePlayer,
     FullCourtDraftState,
-    HoopRushManifest,
-    PlayersIndexEntry,
-    Position,
+    FullCourtOfferCard,
     FullCourtReportTarget,
+    Position,
   } from '@hoop-rush/data-contracts';
   import {
     FULL_COURT_MAX_ROSTER_SIZE,
     FULL_COURT_MIN_ROSTER_SIZE,
     POSITIONS,
+    franchiseAbbreviation,
     fullCourtReportPriceDollars,
     fullCourtReportScope,
     fullCourtReportTargetKey,
@@ -21,44 +22,50 @@
     type FullCourtCatalogIndex,
   } from '@hoop-rush/engine';
   import { onMount } from 'svelte';
-  import { Check, Eye, FileSearch, Lock, Users, X } from '@lucide/svelte';
+  import { Check, ChevronDown, Eye, FileSearch, Lock, Users, X } from '@lucide/svelte';
   import DraftPoolFilters from '#lib/components/draft/DraftPoolFilters.svelte';
-  import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerProfileSheet from '#lib/components/PlayerProfileSheet.svelte';
   import type { ProfileTab } from '#lib/components/PlayerProfileSheet.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import IconButton from '#lib/components/ui/IconButton.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
-  import { franchiseIdentityOf, initialsOf, teamLabelFor } from '#lib/branding.js';
-  import { getManifest, getPlayersIndex } from '#lib/data.js';
+  import { teamLabelFor } from '#lib/branding.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { buildPlayerProfile } from '#lib/players/player-profile.js';
   import { capRushProfileInput } from '#lib/features/cap-rush/cap-rush-player-profile.js';
   import {
+    bucketClass,
+    bucketLabel,
     capStatusClass,
     capStatusLabel,
     capStatusShortLabel,
     formatMillions,
   } from '#lib/features/cap-rush/cap-rush-presentation.js';
+  import { loadFullCourtArt, type FullCourtArt } from './full-court-art.js';
   import {
     FULL_COURT_CATALOG_PAGE_SIZE,
-    formatWarChestCr,
     fullCourtCatalogPage,
+    fullCourtCatalogRowForPlayer,
     fullCourtDraftSummary,
-    fullCourtFaceIndex,
-    fullCourtFaceKey,
     fullCourtLockCopy,
     fullCourtPickReasonLabel,
     fullCourtProfileReferences,
     fullCourtSigningImpact,
     fullCourtVariantLabel,
     type FullCourtCatalogRow,
+    type FullCourtCatalogSort,
   } from './full-court-draft-presentation.js';
+  import FullCourtDraftCard from './FullCourtDraftCard.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtRosterFitPanel from './FullCourtRosterFitPanel.svelte';
   import FullCourtScoutDialog from './FullCourtScoutDialog.svelte';
 
   let {
@@ -80,33 +87,52 @@
   } = $props();
 
   const ROSTER_TICKS = Array.from({ length: FULL_COURT_MAX_ROSTER_SIZE }, (_, slot) => slot);
+  const SORT_OPTIONS: readonly { value: FullCourtCatalogSort; label: string }[] = [
+    { value: 'default', label: 'Pool' },
+    { value: 'overall-desc', label: 'OVR' },
+    { value: 'salary-asc', label: '$ Low' },
+    { value: 'salary-desc', label: '$ High' },
+  ];
 
-  let manifest = $state.raw<HoopRushManifest | null>(null);
-  let faces = $state.raw<ReadonlyMap<string, PlayersIndexEntry>>(new Map());
+  let art = $state.raw<FullCourtArt | null>(null);
   let search = $state('');
   let position = $state<Position | null>(null);
+  let sort = $state<FullCourtCatalogSort>('default');
+  let signableOnly = $state(false);
   let pageIndex = $state(0);
+  let selectedVersionId = $state<string | null>(null);
+  let expandedCardIds = $state<Record<string, boolean>>({});
   let profileVersionId = $state<string | null>(null);
   let profileTab = $state<ProfileTab>('details');
   let scoutVersionId = $state<string | null>(null);
 
   onMount(() => {
     let mounted = true;
-    void Promise.allSettled([getManifest(), getPlayersIndex()]).then(([branding, players]) => {
-      if (!mounted) return;
-      if (branding.status === 'fulfilled') manifest = branding.value;
-      if (players.status === 'fulfilled') faces = fullCourtFaceIndex(players.value);
-    });
+    void loadFullCourtArt()
+      .then((loaded) => {
+        if (mounted) art = loaded;
+      })
+      .catch(() => undefined);
     return () => {
       mounted = false;
     };
   });
 
   const summary = $derived(fullCourtDraftSummary(draft, index));
+  const roundOffer = $derived(draft.offer ?? null);
+  const offerCards = $derived.by(() => {
+    if (roundOffer === null) return [];
+    return roundOffer.cards.map((card: FullCourtOfferCard) => ({
+      card,
+      row: fullCourtCatalogRowForPlayer(index, draft, card.player),
+    }));
+  });
   const catalogPage = $derived(
     fullCourtCatalogPage(index, draft, {
       search,
       position,
+      sort,
+      signableOnly,
       limit: FULL_COURT_CATALOG_PAGE_SIZE,
       offset: pageIndex * FULL_COURT_CATALOG_PAGE_SIZE,
     }),
@@ -130,7 +156,7 @@
     Math.min(100, (summary.payrollDollars / draft.money.hardLimitDollars) * 100),
   );
   const catalogCountLabel = $derived.by(() => {
-    const filtered = search.trim() !== '' || position !== null;
+    const filtered = search.trim() !== '' || position !== null || signableOnly;
     const noun = catalogPage.total === 1 ? 'player' : 'players';
     return `${String(catalogPage.total)} ${filtered ? 'matching' : 'available'} ${noun}`;
   });
@@ -187,20 +213,46 @@
     return {
       player,
       view: profileFor(player),
-      face: faceFor(player),
+      face: art?.faceFor(player) ?? null,
       salaryDollars: fullCourtSalaryDollarsOf(player),
       signed: draft.picks.some((pick) => pick.player.playerVersionId === player.playerVersionId),
     };
   });
-  const catalogRoles = $derived(
-    new Map(
-      catalogPage.rows.map(({ player }) => [player.playerVersionId, profileFor(player).archetype]),
-    ),
-  );
+  const inspectedRow = $derived.by((): FullCourtCatalogRow | null => {
+    if (selectedVersionId !== null) {
+      const visible = catalogPage.rows.find(
+        (row) => row.player.playerVersionId === selectedVersionId,
+      );
+      if (visible !== undefined) return visible;
+      const player = index.byVersionId.get(selectedVersionId);
+      if (player !== undefined) return fullCourtCatalogRowForPlayer(index, draft, player);
+    }
+    return catalogPage.rows[0] ?? null;
+  });
+  const inspectedProfile = $derived(inspectedRow === null ? null : profileFor(inspectedRow.player));
+  const inspectedChips = $derived(inspectedProfile === null ? [] : traitChips(inspectedProfile));
+
+  function traitChips(profile: ReturnType<typeof buildPlayerProfile>) {
+    return [
+      ...profile.strengths
+        .slice(0, 3)
+        .map((trait) => ({ label: trait.label, tone: 'good' as const })),
+      ...profile.weaknesses
+        .slice(0, 3)
+        .map((trait) => ({ label: trait.label, tone: 'bad' as const })),
+    ];
+  }
 
   function profileFor(player: CapRushSourcePlayer) {
     const reference = fullCourtProfileReferences(index).forSlot(player.positions[0] ?? '') ?? null;
     return buildPlayerProfile(capRushProfileInput(player, teamLabel(player)), reference);
+  }
+
+  function toggleCardExpanded(versionId: string): void {
+    expandedCardIds = {
+      ...expandedCardIds,
+      [versionId]: !expandedCardIds[versionId],
+    };
   }
 
   function updateSearch(value: string): void {
@@ -213,6 +265,16 @@
     pageIndex = 0;
   }
 
+  function updateSort(next: FullCourtCatalogSort): void {
+    sort = next;
+    pageIndex = 0;
+  }
+
+  function toggleSignableOnly(): void {
+    signableOnly = !signableOnly;
+    pageIndex = 0;
+  }
+
   function previousPage(): void {
     pageIndex = Math.max(0, pageIndex - 1);
   }
@@ -221,23 +283,28 @@
     pageIndex = Math.min(pageCount - 1, pageIndex + 1);
   }
 
-  function faceFor(player: CapRushSourcePlayer): PlayersIndexEntry | null {
-    return faces.get(fullCourtFaceKey(player)) ?? null;
+  function selectPlayer(versionId: string): void {
+    selectedVersionId = versionId;
   }
 
   function teamFor(player: CapRushSourcePlayer) {
-    return manifest === null ? null : franchiseIdentityOf(manifest, player.franchiseId);
+    return art === null ? null : art.teamFor(player.franchiseId);
   }
 
   function teamLabel(player: CapRushSourcePlayer): string {
-    return manifest === null
-      ? player.franchiseId
-      : teamLabelFor(manifest, player.franchiseId, player.eraId);
+    return art === null
+      ? franchiseAbbreviation(player.franchiseId)
+      : teamLabelFor(art.manifest, player.franchiseId, player.eraId);
   }
 
-  function openProfile(versionId: string): void {
+  function teamShortLabel(player: CapRushSourcePlayer): string {
+    const team = teamFor(player);
+    return team?.abbreviation ?? franchiseAbbreviation(player.franchiseId);
+  }
+
+  function openProfile(versionId: string, tab: ProfileTab = 'details'): void {
     profileVersionId = versionId;
-    profileTab = 'details';
+    profileTab = tab;
   }
 
   function scoutRecordFor(versionId: CapRushSourcePlayer['playerVersionId']) {
@@ -252,9 +319,9 @@
     if (assessment.legal) return null;
     if (assessment.reason === 'completion') return 'No legal roster finish remains';
     if (assessment.minimumCompletionDollars !== null) {
-      return `Needs ${formatWarChestCr(assessment.minimumCompletionDollars)} to finish`;
+      return `Needs ${formatMillions(assessment.minimumCompletionDollars)} to finish`;
     }
-    return 'War Chest short';
+    return 'Budget short';
   }
 
   function buyScout(player: CapRushSourcePlayer): void {
@@ -268,47 +335,50 @@
     scoutVersionId = player.playerVersionId;
   }
 
-  function statusTone(
-    status: ReturnType<typeof fullCourtDraftSummary>['status'],
-  ): 'default' | 'muted' | 'primary' | 'accent' | 'negative' {
-    switch (status) {
-      case 'under-cap':
-        return 'default';
-      case 'first-apron':
-        return 'accent';
-      case 'second-apron':
-        return 'primary';
-      case 'illegal':
-        return 'negative';
-    }
-  }
-
   function rowActionLabel(row: FullCourtCatalogRow): string {
     if (row.onRoster) return 'Signed';
     if (row.playerRostered) return 'Rostered';
     return 'Sign';
+  }
+
+  function statusSummaryTone(status: CapRushPayrollStatus): string {
+    return capStatusClass(status);
   }
 </script>
 
 <PageShell
   width="full"
   padding="none"
-  class="px-3 pt-4 pb-[calc(9rem_+_env(safe-area-inset-bottom))] sm:px-6 min-[1100px]:pb-10"
+  class="px-3 pt-4 pb-[calc(7.5rem_+_env(safe-area-inset-bottom))] sm:px-6 lg:pb-10"
   aria-busy={busy ? 'true' : undefined}
 >
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div class="min-w-0">
-      <p class="ui-label">{fullCourtVariantLabel(draft)} · Draft night</p>
+      <p class="ui-label">
+        {fullCourtVariantLabel(draft)} · {roundOffer !== null && !complete
+          ? `Round ${String(roundOffer.round + 1)}`
+          : 'Draft night'}
+      </p>
       <h1
         class="font-display mt-2 text-3xl leading-[0.95] font-extrabold tracking-tight uppercase sm:text-4xl"
       >
-        {complete ? 'Your roster is locked.' : 'Build your roster'}
-      </h1>
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
         {#if complete}
-          Every salary is fixed. Here is the depth, the payroll bill, and the War Chest left behind.
+          Your roster is locked.
+        {:else if roundOffer !== null}
+          Pick your next player.
         {:else}
-          Six to twelve players. Positions shape matchups, never eligibility.
+          Build your roster
+        {/if}
+      </h1>
+      <p class="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+        {#if complete}
+          Roster locked. Review your payroll and remaining budget before tip-off.
+        {:else if roundOffer !== null}
+          Positionless 10-player draw sorted by overall. Sign 6 to 12 players under the $182M hard
+          limit.
+        {:else}
+          Draft 6 to 12 players under the cap. Select any player to inspect playstyle, cap impact,
+          and scouting.
         {/if}
       </p>
     </div>
@@ -338,472 +408,867 @@
   </header>
 
   <div class="mt-4 space-y-3">
-    <Panel as="section" class="px-4 py-3 sm:px-5" aria-label="Draft payroll and War Chest">
-      <StatGrid columns={3} mobile={3}>
-        <StatTile
-          label="Player payroll"
-          size="lg"
-          surface="tile"
-          value={formatMillions(summary.payrollDollars)}
-          note={`${formatMillions(summary.payrollRoomDollars)} under the hard limit`}
-          tone={summary.status === 'illegal' ? 'negative' : 'default'}
-        />
-        <StatTile
-          label="Apron"
-          size="md"
-          surface="tile"
-          value={capStatusLabel(summary.status)}
-          note={`${formatMillions(draft.money.hardLimitDollars)} hard limit`}
-          tone={statusTone(summary.status)}
-        />
-        <StatTile
-          label="War Chest"
-          size="lg"
-          surface="tile"
-          value={formatWarChestCr(summary.warChestDollars)}
-          note={`${formatWarChestCr(summary.spentDollars)} spent`}
-          tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
-        />
-      </StatGrid>
-
-      <div class="mt-3 min-w-0">
-        <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
-          <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}></span>
+    <Panel
+      as="section"
+      class="px-4 py-2.5 sm:px-5 sm:py-3"
+      aria-label="Draft payroll and War Chest"
+    >
+      <div
+        class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
+      >
+        <div class="flex items-center justify-between gap-3 lg:block">
+          <div>
+            <p class="ui-label text-muted-foreground">Player payroll</p>
+            <p
+              class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums {summary.status ===
+              'illegal'
+                ? 'text-negative'
+                : ''}"
+            >
+              {formatMillions(summary.payrollDollars)}
+            </p>
+          </div>
           <span
-            class="absolute inset-y-0 bg-accent/70"
-            style:left={`${capPct}%`}
-            style:width={`${firstApronPct - capPct}%`}
-          ></span>
-          <span
-            class="absolute inset-y-0 bg-primary/70"
-            style:left={`${firstApronPct}%`}
-            style:width={`${100 - firstApronPct}%`}
-          ></span>
-          {#if payrollPct > 0}
-            <span
-              class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
-              style:left={`calc(${payrollPct}% - 1px)`}
-            ></span>
-          {/if}
-        </div>
-        <div class="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <p class="font-mono text-[9px] text-muted-foreground">
-            Cap {formatMillions(draft.money.capLineDollars)} · First apron
-            {formatMillions(draft.money.firstApronDollars)} · Hard limit
-            {formatMillions(draft.money.hardLimitDollars)}
-          </p>
-          <span
-            class="inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold tracking-[0.08em] uppercase {capStatusClass(
+            class="inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.1em] uppercase lg:mt-1 {statusSummaryTone(
               summary.status,
-            )}">{capStatusShortLabel(summary.status)}</span
+            )}">{capStatusLabel(summary.status)}</span
           >
         </div>
+
+        <div class="min-w-0">
+          <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
+            <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}
+            ></span>
+            <span
+              class="absolute inset-y-0 bg-accent/70"
+              style:left={`${capPct}%`}
+              style:width={`${firstApronPct - capPct}%`}
+            ></span>
+            <span
+              class="absolute inset-y-0 bg-primary/70"
+              style:left={`${firstApronPct}%`}
+              style:width={`${100 - firstApronPct}%`}
+            ></span>
+            {#if payrollPct > 0}
+              <span
+                class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
+                style:left={`calc(${payrollPct}% - 1px)`}
+              ></span>
+            {/if}
+          </div>
+          <div
+            class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
+          >
+            <span class="flex justify-between" style:width={`${capPct}%`}>
+              <span>$0</span><span>{formatMillions(draft.money.capLineDollars)}</span>
+            </span>
+            <span
+              class="invisible text-center sm:visible"
+              style:width={`${firstApronPct - capPct}%`}
+            >
+              {formatMillions(draft.money.firstApronDollars)}
+            </span>
+            <span class="text-right" style:width={`${100 - firstApronPct}%`}>
+              {formatMillions(draft.money.hardLimitDollars)}
+            </span>
+          </div>
+        </div>
+
+        <StatGrid columns={3} mobile={3}>
+          <StatTile
+            label="Room"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            tone={summary.payrollRoomDollars < 0 ? 'negative' : 'default'}
+            value={formatMillions(summary.payrollRoomDollars)}
+          />
+          <StatTile
+            label="Budget"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
+            value={formatMillions(summary.warChestDollars)}
+          />
+          <StatTile
+            label="Spent"
+            size="sm"
+            surface="tile"
+            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+            value={formatMillions(summary.spentDollars)}
+          />
+        </StatGrid>
       </div>
 
       <div
-        class="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
+        class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
       >
-        <p class="text-[11px] font-semibold">{depthLabel}</p>
+        <p class="text-[11px] font-bold">{depthLabel}</p>
         <p class="ui-micro">{FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players</p>
       </div>
     </Panel>
 
-    <div class="draft-layout">
-      <div class="draft-main">
-        <Panel
-          as="section"
-          padding="none"
-          aria-label={draft.pool === undefined ? 'Open player catalog' : 'Draft player pool'}
-        >
-          <div class="border-b border-line-soft p-3 sm:p-4">
-            <SectionHeading
-              level={2}
-              size="sm"
-              title={draft.pool === undefined ? 'Open catalog' : 'Draft pool'}
-              description={draft.pool === undefined
-                ? 'Search every eligible historical season. Every position is legal.'
-                : `Curated ${String(draft.pool.playerVersionIds.length)}-player pool for this run. Every position is legal.`}
+    {#if roundOffer !== null && !complete}
+      <section aria-label={`Round ${String(roundOffer.round + 1)} offer`}>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {#each offerCards as { card, row } (card.player.playerVersionId)}
+            {@const player = card.player}
+            {@const team = teamFor(player)}
+            {@const signable = row.assessment.legal && !row.onRoster && !complete}
+            {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
+            {@const impact = fullCourtSigningImpact(row, draft.money)}
+            {@const scoutRecord = scoutRecordFor(player.playerVersionId)}
+            {@const expanded = Boolean(expandedCardIds[player.playerVersionId])}
+            {@const profile = expanded ? profileFor(player) : null}
+            {@const chips = profile === null ? [] : traitChips(profile)}
+            <article
+              class="group flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card transition-colors sm:rounded-xl {row
+                .assessment.legal
+                ? 'border-border hover:border-line-strong'
+                : 'border-border/70 opacity-80'}"
             >
-              {#snippet actions()}
-                <span class="ui-micro">{catalogCountLabel}</span>
-              {/snippet}
-            </SectionHeading>
-
-            <div class="mt-3">
-              <DraftPoolFilters
-                {search}
-                position={position === null ? null : POSITIONS.indexOf(position)}
-                onsearch={updateSearch}
-                onposition={selectPosition}
-              />
-            </div>
-          </div>
-
-          {#if catalogPage.rows.length === 0}
-            <div class="p-8 text-center">
-              <p class="text-sm font-semibold">No players match this view.</p>
-              <p class="mt-1 text-xs text-muted-foreground">
-                Clear the search or choose a different position.
-              </p>
-            </div>
-          {:else}
-            <ul class="grid gap-1.5 p-2 sm:grid-cols-2 sm:p-2.5 xl:grid-cols-3">
-              {#each catalogPage.rows as row (row.player.playerVersionId)}
-                {@const face = faceFor(row.player)}
-                {@const team = teamFor(row.player)}
-                {@const impact = fullCourtSigningImpact(row, draft.money)}
-                {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
-                {@const signable = row.assessment.legal && !row.onRoster && !complete}
-                {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
-                {@const scoutBlocked = scoutBlocker(scoutAssessment)}
-                <li class="min-w-0">
-                  <article
-                    class="flex h-full min-w-0 flex-col overflow-hidden rounded-lg border bg-card {row.onRoster
-                      ? 'border-primary/50 bg-primary/5'
-                      : row.assessment.legal
-                        ? 'border-border hover:border-line-strong'
-                        : 'border-border/70 opacity-80'}"
-                  >
-                    <div class="flex min-w-0 items-start gap-2 p-2.5">
-                      {#if face !== null && manifest !== null}
-                        <button
-                          type="button"
-                          class="shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          aria-label={`${row.player.displayName} details`}
-                          onclick={() => openProfile(row.player.playerVersionId)}
-                        >
-                          <PlayerFace
-                            player={face}
-                            {manifest}
-                            size="md"
-                            fallbackInitials={initialsOf(row.player.displayName)}
-                          />
-                        </button>
-                      {:else}
-                        <span
-                          class="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-surface-3 font-display text-sm font-extrabold text-muted-foreground"
-                          aria-hidden="true">{initialsOf(row.player.displayName)}</span
-                        >
-                      {/if}
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-baseline justify-between gap-2">
-                          <button
-                            type="button"
-                            class="min-w-0 truncate rounded text-left font-display text-sm font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label={`${row.player.displayName} details`}
-                            onclick={() => openProfile(row.player.playerVersionId)}
-                          >
-                            {row.player.displayName}
-                          </button>
-                          <span
-                            class="shrink-0 font-mono text-[11px] font-bold text-muted-foreground tabular-nums"
-                            aria-label={`Overall ${String(row.player.originalOverall)}`}
-                            >{row.player.originalOverall}</span
-                          >
-                        </div>
-                        <p
-                          class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted-foreground"
-                        >
-                          {#if team !== null && manifest !== null}
-                            <TeamLogo
-                              {manifest}
-                              franchiseId={team.franchiseId}
-                              teamExternalId={team.teamExternalId}
-                              className="h-3.5 w-3.5"
-                            />
-                          {/if}
-                          <span class="truncate uppercase"
-                            >{row.player.seasonKey} · {teamLabel(row.player)}</span
-                          >
-                        </p>
-                        <p class="mt-1 text-xs font-semibold text-foreground">
-                          {catalogRoles.get(row.player.playerVersionId)}
-                        </p>
-                        <div class="mt-1 flex flex-wrap gap-1">
-                          {#each row.player.positions as slot (slot)}
-                            <span
-                              class="rounded border border-line-soft bg-surface-1 px-1 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] text-muted-foreground uppercase"
-                              >{slot}</span
-                            >
-                          {/each}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      class="mx-2.5 flex items-baseline justify-between gap-2 border-t border-line-soft py-1.5"
-                    >
-                      <p class="font-display text-lg leading-none font-extrabold tabular-nums">
-                        {formatMillions(row.salaryDollars)}
-                      </p>
-                      <span
-                        class="inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {capStatusClass(
-                          row.statusAfterPick,
-                        )}">{capStatusShortLabel(row.statusAfterPick)}</span
-                      >
-                    </div>
-
-                    {#if onPurchaseReport !== undefined}
-                      <div
-                        class="mx-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-line-soft py-1.5"
-                      >
-                        <p class="min-w-0 flex-1 font-mono text-[9px] text-muted-foreground">
-                          {#if scoutRecord !== null}
-                            Scouting report · {scoutScopeLabel}
-                          {:else}
-                            Scout {formatWarChestCr(scoutPrice)} · {scoutScopeLabel}
-                            {#if scoutBlocked !== null}
-                              <span class="font-bold text-negative"> · {scoutBlocked}</span>
-                            {/if}
-                          {/if}
-                        </p>
-                        {#if scoutRecord !== null}
-                          <Button
-                            size="sm"
-                            tone="secondary"
-                            disabled={busy}
-                            aria-label={`Open scouting report for ${row.player.displayName}`}
-                            onclick={() => openScoutReport(row.player)}
-                          >
-                            <Eye size={13} aria-hidden="true" />
-                            Report
-                          </Button>
-                        {:else}
-                          <Button
-                            size="sm"
-                            tone="secondary"
-                            disabled={busy || !scoutAssessment.legal}
-                            aria-label={`Scout ${row.player.displayName} for ${formatWarChestCr(scoutPrice)}`}
-                            onclick={() => buyScout(row.player)}
-                          >
-                            <FileSearch size={13} aria-hidden="true" />
-                            Scout
-                          </Button>
-                        {/if}
-                      </div>
-                    {/if}
-
-                    {#if signable}
-                      <dl class="mx-2.5 grid gap-0.5 pb-2 font-mono text-[9px] leading-snug">
-                        <div class="flex items-baseline justify-between gap-2">
-                          <dt class="text-muted-foreground">Payroll after</dt>
-                          <dd class="font-bold tabular-nums">{impact.payrollAfter}</dd>
-                        </div>
-                        <div class="flex items-baseline justify-between gap-2">
-                          <dt class="text-muted-foreground">Room left</dt>
-                          <dd class="font-bold tabular-nums">{impact.roomAfter}</dd>
-                        </div>
-                        <div class="flex items-baseline justify-between gap-2">
-                          <dt class="text-muted-foreground">War Chest after</dt>
-                          <dd class="font-bold tabular-nums">{impact.warChestAfter}</dd>
-                        </div>
-                        {#if impact.apronShift !== null}
-                          <div class="flex items-baseline justify-between gap-2 text-accent">
-                            <dt class="font-bold uppercase">Apron</dt>
-                            <dd class="font-bold">{impact.apronShift}</dd>
-                          </div>
-                        {/if}
-                        {#if row.assessment.projectedPayroll !== null}
-                          <div class="flex items-baseline justify-between gap-2">
-                            <dt class="text-muted-foreground">Cheapest finish</dt>
-                            <dd class="font-bold tabular-nums">
-                              {formatMillions(row.assessment.projectedPayroll)}
-                            </dd>
-                          </div>
-                        {/if}
-                      </dl>
-                    {/if}
-
-                    <div class="mt-auto flex items-end gap-2 p-2.5 pt-1">
-                      <p
-                        class="min-w-0 flex-1 text-[10px] leading-snug {blocker === null
-                          ? 'text-muted-foreground'
-                          : 'font-semibold text-negative'}"
-                      >
-                        {#if blocker !== null}
-                          {blocker}
-                        {:else if row.onRoster}
-                          On the roster.
-                        {:else if complete}
-                          Roster is locked.
-                        {:else}
-                          Fits payroll and the War Chest.
-                        {/if}
-                      </p>
-                      <Button
-                        size="sm"
-                        tone={signable ? 'primary' : 'default'}
-                        disabled={busy || !signable}
-                        aria-label={`${rowActionLabel(row)} ${row.player.displayName}`}
-                        onclick={() => onPick(row.player.playerVersionId)}
-                      >
-                        {#if row.onRoster}
-                          <Check size={13} aria-hidden="true" />
-                        {/if}
-                        {rowActionLabel(row)}
-                      </Button>
-                    </div>
-                  </article>
-                </li>
-              {/each}
-            </ul>
-
-            <div
-              class="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft p-2.5"
-            >
-              <p class="ui-micro">
-                {#if catalogPage.total === 0}
-                  No players on this page
-                {:else}
-                  Showing {pageStart}–{pageEnd} of {catalogPage.total}
-                {/if}
-              </p>
-              <div class="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  tone="secondary"
-                  disabled={pageIndex === 0}
-                  onclick={previousPage}
-                >
-                  Previous
-                </Button>
-                <span class="font-mono text-[10px] text-muted-foreground tabular-nums"
-                  >Page {pageIndex + 1} of {pageCount}</span
-                >
-                <Button
-                  size="sm"
-                  tone="secondary"
-                  disabled={pageIndex >= pageCount - 1}
-                  onclick={nextPage}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          {/if}
-        </Panel>
-
-        <div
-          class="finish-bar mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line-strong bg-card/95 p-3 shadow-lg backdrop-blur"
-          role="group"
-          aria-label="Draft actions"
-        >
-          <div class="min-w-0 flex-1">
-            <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span class="font-display text-sm font-extrabold uppercase">{lock.headline}</span>
-              {#if lock.stamp !== null}
-                <span class="lock-stamp">{lock.stamp}</span>
-              {/if}
-            </p>
-            <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{lock.detail}</p>
-          </div>
-          <a
-            href="#draft-roster"
-            class="roster-jump items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Users size={14} aria-hidden="true" />
-            <span>Roster {summary.rosterCount}</span>
-          </a>
-          {#if complete}
-            <Badge tone="positive"><Check size={13} aria-hidden="true" /> Locked</Badge>
-          {:else}
-            <Button tone="primary" disabled={busy || !summary.canFinish} onclick={onFinish}>
-              <Lock size={15} aria-hidden="true" />
-              Lock the roster
-            </Button>
-          {/if}
-        </div>
-      </div>
-
-      <aside id="draft-roster" class="roster-panel" aria-label="Draft roster">
-        <Panel as="section" padding="none">
-          <div class="border-b border-line-soft p-3">
-            <SectionHeading level={2} size="sm" title="Roster" align="center">
-              {#snippet actions()}
-                <span class="ui-micro">{summary.rosterCount} / {FULL_COURT_MAX_ROSTER_SIZE}</span>
-              {/snippet}
-            </SectionHeading>
-            <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-              Six to twelve players. Locking skips every unused place; remove anyone before
-              confirming.
-            </p>
-          </div>
-
-          {#if rosterPicks.length === 0}
-            <p class="p-4 text-center text-xs leading-relaxed text-muted-foreground">
-              No players yet. Search the catalog and sign the first piece of the rotation.
-            </p>
-          {:else}
-            <ul class="roster-list divide-y divide-line-soft">
-              {#each rosterPicks as pick (pick.player.playerVersionId)}
-                {@const face = faceFor(pick.player)}
-                {@const team = teamFor(pick.player)}
-                <li class="flex min-w-0 items-center gap-2 p-2.5">
-                  {#if face !== null && manifest !== null}
-                    <PlayerFace
-                      player={face}
-                      {manifest}
-                      size="sm"
-                      fallbackInitials={initialsOf(pick.player.displayName)}
-                    />
-                  {:else}
-                    <span
-                      class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
-                      aria-hidden="true">{initialsOf(pick.player.displayName)}</span
-                    >
-                  {/if}
+              <div class="flex min-w-0 flex-col gap-1.5 p-2 sm:p-2.5">
+                <div class="flex w-full items-start gap-2">
+                  <FullCourtPortrait {player} {art} size="sm" />
                   <div class="min-w-0 flex-1">
-                    <button
-                      type="button"
-                      class="block max-w-full truncate rounded text-left font-display text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`${pick.player.displayName} details`}
-                      onclick={() => openProfile(pick.player.playerVersionId)}
-                    >
-                      {pick.player.displayName}
-                    </button>
+                    <div class="flex items-baseline justify-between gap-1">
+                      <button
+                        type="button"
+                        class="font-display min-w-0 truncate rounded text-left text-xs leading-tight font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
+                        aria-label={`${player.displayName} details`}
+                        onclick={() => openProfile(player.playerVersionId)}
+                      >
+                        {player.displayName}
+                      </button>
+                      <span
+                        class="shrink-0 font-mono text-[10px] font-bold text-muted-foreground tabular-nums"
+                        aria-label={`Overall ${String(player.originalOverall)}`}
+                        >{player.originalOverall}</span
+                      >
+                    </div>
                     <p
-                      class="flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted-foreground"
+                      class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[8px] text-muted-foreground"
                     >
-                      {#if team !== null && manifest !== null}
+                      {#if team !== null && art !== null}
                         <TeamLogo
-                          {manifest}
+                          manifest={art.manifest}
                           franchiseId={team.franchiseId}
                           teamExternalId={team.teamExternalId}
-                          className="h-3 w-3"
+                          className="h-3.5 w-3.5"
                         />
                       {/if}
                       <span class="truncate uppercase"
-                        >{pick.player.seasonKey} · {formatPositions(pick.player.positions)}</span
+                        >{teamShortLabel(player)} · {player.seasonKey}</span
                       >
                     </p>
                   </div>
-                  <div class="shrink-0 text-right">
-                    <p class="font-mono text-xs font-bold tabular-nums">
-                      {formatMillions(pick.salaryDollars)}
-                    </p>
-                    <p class="ui-micro">Pick {pick.pickOrdinal + 1}</p>
-                  </div>
-                  {#if !complete}
-                    <button
-                      type="button"
-                      class="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-soft text-muted-foreground outline-none transition-colors hover:border-negative/50 hover:text-negative focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                </div>
+
+                <div class="flex w-full flex-wrap items-center gap-1">
+                  <span
+                    class="rounded border px-1 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {bucketClass(
+                      card.bucket,
+                    )}">{bucketLabel(card.bucket)}</span
+                  >
+                  <span
+                    class="rounded border border-line-soft bg-surface-1 px-1 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] text-muted-foreground uppercase"
+                    >{player.positions.join('/')}</span
+                  >
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="mx-2 flex min-h-8 items-center justify-between gap-2 rounded border border-line-soft bg-surface-1 px-1.5 font-mono text-[8px] font-bold tracking-[0.07em] text-muted-foreground uppercase outline-none transition-colors hover:border-line-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:mx-2.5"
+                aria-expanded={expanded}
+                onclick={() => toggleCardExpanded(player.playerVersionId)}
+              >
+                <span>{expanded ? 'Playstyle' : 'Show playstyle'}</span>
+                <ChevronDown
+                  size={11}
+                  class="shrink-0 transition-transform {expanded ? 'rotate-180' : ''}"
+                  aria-hidden="true"
+                />
+              </button>
+
+              {#if expanded && profile !== null}
+                <div class="mx-2 mt-1.5 grid shrink-0 gap-2 sm:mx-2.5">
+                  <p
+                    class="w-full truncate font-mono text-[8px] font-bold tracking-[0.08em] text-accent uppercase"
+                  >
+                    {profile.archetype}
+                  </p>
+                  {#if chips.length > 0}
+                    <div class="flex w-full flex-wrap items-start gap-1">
+                      {#each chips as chip (chip.label)}
+                        <span
+                          class="shrink-0 rounded border px-1 py-0.5 font-mono text-[7.5px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
+                          'good'
+                            ? 'border-positive/40 bg-positive/10 text-positive'
+                            : 'border-negative/45 bg-negative/10 text-negative'}">{chip.label}</span
+                        >
+                      {/each}
+                    </div>
+                  {/if}
+                  <button
+                    type="button"
+                    class="min-h-0 justify-self-center rounded border border-accent/40 bg-accent/10 px-2.5 py-1 font-mono text-[7.5px] leading-tight font-bold tracking-[0.07em] text-accent uppercase outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring"
+                    onclick={() => openProfile(player.playerVersionId, 'ratings')}
+                  >
+                    All attributes
+                  </button>
+                </div>
+              {/if}
+
+              <div class="mx-2 mt-auto border-t border-line-soft py-1.5 sm:mx-2.5">
+                <div class="flex items-baseline justify-between gap-1.5">
+                  <p
+                    class="font-display text-base leading-[1.2] font-extrabold tracking-tight tabular-nums sm:text-xl"
+                  >
+                    {formatMillions(card.salaryDollars)}
+                  </p>
+                  <span
+                    class="inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {capStatusClass(
+                      row.statusAfterPick,
+                    )}"
+                  >
+                    <span class="sm:hidden">{capStatusShortLabel(row.statusAfterPick)}</span>
+                    <span class="hidden sm:inline">{capStatusLabel(row.statusAfterPick)}</span>
+                  </span>
+                </div>
+                {#if row.assessment.legal && row.assessment.projectedPayroll !== null}
+                  <p class="mt-1 font-mono text-[8px] leading-snug text-muted-foreground">
+                    Legal finish
+                    <span class="font-semibold text-foreground tabular-nums"
+                      >{formatMillions(row.assessment.projectedPayroll)}</span
+                    >
+                  </p>
+                {/if}
+              </div>
+
+              {#if impact.apronShift !== null}
+                <p
+                  class="mx-2 mb-1 rounded border border-accent/35 bg-accent/[0.08] px-1.5 py-1 font-mono text-[8px] leading-snug font-bold tracking-[0.03em] text-accent uppercase sm:mx-2.5"
+                >
+                  {impact.apronShift}
+                </p>
+              {/if}
+
+              {#if blocker !== null}
+                <p
+                  class="mx-2 mb-1 rounded border border-line-soft bg-surface-1 px-1.5 py-1 text-[9px] leading-snug text-muted-foreground sm:mx-2.5"
+                >
+                  {blocker}
+                </p>
+              {/if}
+
+              {#if onPurchaseReport !== undefined}
+                <div class="mx-2 mb-1.5 flex items-center justify-between gap-1.5 sm:mx-2.5">
+                  {#if scoutRecord !== null}
+                    <span class="font-mono text-[8px] font-bold text-positive uppercase"
+                      >Scouted</span
+                    >
+                    <Button
+                      size="sm"
+                      tone="secondary"
                       disabled={busy}
-                      aria-label={`Remove ${pick.player.displayName} from the roster`}
+                      aria-label={`Open scouting report for ${player.displayName}`}
+                      onclick={() => openScoutReport(player)}
+                    >
+                      <Eye size={12} aria-hidden="true" />
+                      Report
+                    </Button>
+                  {:else}
+                    <span class="font-mono text-[8px] text-muted-foreground">
+                      Scout {formatMillions(scoutPrice)}
+                    </span>
+                    <Button
+                      size="sm"
+                      tone="secondary"
+                      disabled={busy || !scoutAssessment.legal}
+                      aria-label={`Scout ${player.displayName} for ${formatMillions(scoutPrice)}`}
+                      onclick={() => buyScout(player)}
+                    >
+                      <FileSearch size={12} aria-hidden="true" />
+                      Scout
+                    </Button>
+                  {/if}
+                </div>
+              {/if}
+
+              <div class="p-2 pt-0 sm:p-2.5">
+                <Button
+                  tone={signable ? 'primary' : 'secondary'}
+                  class="w-full"
+                  aria-label={`${rowActionLabel(row)} ${player.displayName}`}
+                  disabled={busy || !signable}
+                  onclick={() => onPick(player.playerVersionId)}
+                >
+                  {#if row.onRoster}
+                    <Check size={14} aria-hidden="true" />
+                  {/if}
+                  {rowActionLabel(row)}
+                </Button>
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] lg:items-start">
+        <aside id="draft-roster" class="scroll-mt-4" aria-label="Draft roster">
+          <Panel as="section" padding="none">
+            <div class="border-b border-line-soft p-3">
+              <SectionHeading level={2} size="sm" title="Roster">
+                {#snippet actions()}
+                  <span class="ui-micro">{summary.rosterCount} / {FULL_COURT_MAX_ROSTER_SIZE}</span>
+                {/snippet}
+              </SectionHeading>
+              <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
+                Six to twelve players. Lock at any point once you reach six.
+              </p>
+            </div>
+
+            {#if rosterPicks.length === 0}
+              <EmptyState
+                surface="none"
+                title="No players signed yet"
+                message="Pick a player from Round 1 above to start your roster."
+              />
+            {:else}
+              <ul class="divide-y divide-line-soft">
+                {#each rosterPicks as pick (pick.player.playerVersionId)}
+                  {@const team = teamFor(pick.player)}
+                  <li class="flex min-w-0 items-center gap-2 p-2.5">
+                    <FullCourtPortrait player={pick.player} {art} size="sm" />
+                    <div class="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                        onclick={() => openProfile(pick.player.playerVersionId)}
+                      >
+                        {pick.player.displayName}
+                      </button>
+                      <p class="ui-micro flex min-w-0 items-center gap-1">
+                        {#if team !== null && art !== null}
+                          <TeamLogo
+                            manifest={art.manifest}
+                            franchiseId={team.franchiseId}
+                            teamExternalId={team.teamExternalId}
+                            className="h-3 w-3"
+                          />
+                        {/if}
+                        <span class="truncate"
+                          >{pick.player.seasonKey} · {formatPositions(pick.player.positions)}</span
+                        >
+                      </p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="font-mono text-xs font-bold tabular-nums">
+                        {formatMillions(pick.salaryDollars)}
+                      </p>
+                      <p class="ui-micro">Round {pick.pickOrdinal + 1}</p>
+                    </div>
+                    <IconButton
+                      label={`Remove ${pick.player.displayName} from the roster`}
+                      size="sm"
+                      disabled={busy}
                       onclick={() => onRemove(pick.player.playerVersionId)}
                     >
-                      <X size={15} aria-hidden="true" />
-                    </button>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-          {/if}
+                      <X size={14} aria-hidden="true" />
+                    </IconButton>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </Panel>
+        </aside>
 
-          <div class="space-y-1.5 border-t border-line-soft p-3">
+        <div class="space-y-3">
+          <Panel as="section" padding="md" aria-label="Draft lock">
             <p class="text-[11px] leading-snug font-semibold">{absenceLabel}</p>
-          </div>
-        </Panel>
-      </aside>
+            <div class="mt-2.5 rounded-lg border border-line-soft bg-surface-1 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-display text-sm font-extrabold uppercase">{lock.headline}</span>
+                {#if lock.stamp !== null}
+                  <Badge tone="positive">{lock.stamp}</Badge>
+                {/if}
+              </div>
+              <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{lock.detail}</p>
+              <Button
+                tone="primary"
+                class="mt-3 w-full"
+                disabled={busy || !summary.canFinish}
+                onclick={onFinish}
+              >
+                <Lock size={15} aria-hidden="true" />
+                Lock the roster
+              </Button>
+            </div>
+          </Panel>
+
+          {#if onPurchaseReport !== undefined && (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
+            <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
+          {/if}
+        </div>
+      </div>
+    {:else}
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div class="min-w-0 flex-1">
+          <Panel
+            as="section"
+            padding="none"
+            aria-label={draft.pool === undefined ? 'Open player catalog' : 'Draft player pool'}
+          >
+            <div class="border-b border-line-soft p-3 sm:p-4">
+              <SectionHeading
+                level={2}
+                size="sm"
+                title={draft.pool === undefined ? 'Open catalog' : 'Draft pool'}
+                description={draft.pool === undefined
+                  ? 'Search all eligible historical seasons.'
+                  : `${String(draft.pool.playerVersionIds.length)}-player pool for this run.`}
+              >
+                {#snippet actions()}
+                  <span class="ui-micro">{catalogCountLabel}</span>
+                {/snippet}
+              </SectionHeading>
+
+              <div class="mt-3 space-y-2.5">
+                <DraftPoolFilters
+                  {search}
+                  position={position === null ? null : POSITIONS.indexOf(position)}
+                  onsearch={updateSearch}
+                  onposition={selectPosition}
+                />
+
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <SegmentedControl
+                    label="Sort players"
+                    value={sort}
+                    onchange={updateSort}
+                    options={SORT_OPTIONS}
+                  />
+                  <Button
+                    size="sm"
+                    tone={signableOnly ? 'primary' : 'secondary'}
+                    aria-pressed={signableOnly}
+                    onclick={toggleSignableOnly}
+                  >
+                    Signable only
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {#if catalogPage.rows.length === 0}
+              <EmptyState
+                surface="none"
+                title="No players match this view"
+                message="Clear the search, position filter, or signable toggle."
+              />
+            {:else}
+              <ul
+                class="grid grid-cols-2 gap-2 p-2.5 sm:gap-2.5 sm:p-3 md:grid-cols-3 xl:grid-cols-4"
+              >
+                {#each catalogPage.rows as row (row.player.playerVersionId)}
+                  {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
+                  {@const isInspected =
+                    inspectedRow?.player.playerVersionId === row.player.playerVersionId}
+                  <li class="min-w-0">
+                    <FullCourtDraftCard
+                      {row}
+                      {art}
+                      money={draft.money}
+                      {busy}
+                      {complete}
+                      selected={isInspected}
+                      scouted={scoutRecord !== null}
+                      onSelect={() => selectPlayer(row.player.playerVersionId)}
+                      onPick={() => onPick(row.player.playerVersionId)}
+                    />
+                  </li>
+                {/each}
+              </ul>
+
+              <div
+                class="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft p-2.5 sm:px-4"
+              >
+                <p class="ui-micro">
+                  {#if catalogPage.total === 0}
+                    No players on this page
+                  {:else}
+                    Showing {pageStart}–{pageEnd} of {catalogPage.total}
+                  {/if}
+                </p>
+                <div class="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    tone="secondary"
+                    disabled={pageIndex === 0}
+                    onclick={previousPage}
+                  >
+                    Previous
+                  </Button>
+                  <span class="ui-micro tabular-nums">Page {pageIndex + 1} of {pageCount}</span>
+                  <Button
+                    size="sm"
+                    tone="secondary"
+                    disabled={pageIndex >= pageCount - 1}
+                    onclick={nextPage}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            {/if}
+          </Panel>
+        </div>
+
+        <div class="w-full shrink-0 space-y-3 lg:sticky lg:top-4 lg:w-[370px] xl:w-[400px]">
+          <Panel as="section" padding="md" aria-label="Selected player">
+            {#if inspectedRow === null}
+              <EmptyState
+                surface="none"
+                title="No player selected"
+                message="Choose a player from the list to inspect playstyle, cap impact, and scouting."
+              />
+            {:else}
+              {@const row = inspectedRow}
+              {@const team = teamFor(row.player)}
+              {@const impact = fullCourtSigningImpact(row, draft.money)}
+              {@const blocker = fullCourtPickReasonLabel(row.assessment, draft.money)}
+              {@const signable = row.assessment.legal && !row.onRoster && !complete}
+              {@const scoutRecord = scoutRecordFor(row.player.playerVersionId)}
+              {@const scoutBlocked = scoutBlocker(scoutAssessment)}
+
+              <div class="flex items-start gap-2.5">
+                <FullCourtPortrait player={row.player} {art} size="md" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <h3 class="font-display min-w-0 truncate text-lg font-extrabold tracking-tight">
+                      {row.player.displayName}
+                    </h3>
+                    <span
+                      class="shrink-0 font-mono text-xs font-bold text-muted-foreground tabular-nums"
+                      aria-label={`Overall ${String(row.player.originalOverall)}`}
+                      >{row.player.originalOverall}</span
+                    >
+                  </div>
+                  <p
+                    class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted-foreground uppercase"
+                  >
+                    {#if team !== null && art !== null}
+                      <TeamLogo
+                        manifest={art.manifest}
+                        franchiseId={team.franchiseId}
+                        teamExternalId={team.teamExternalId}
+                        className="h-3.5 w-3.5"
+                      />
+                    {/if}
+                    <span class="truncate"
+                      >{teamShortLabel(row.player)} · {row.player.seasonKey}</span
+                    >
+                  </p>
+                  <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span
+                      class="rounded border border-line-soft bg-surface-1 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] text-muted-foreground uppercase"
+                    >
+                      {row.player.positions.join('/')}
+                    </span>
+                    {#if inspectedProfile !== null}
+                      <span
+                        class="truncate font-mono text-[9px] font-bold tracking-[0.08em] text-accent uppercase"
+                      >
+                        {inspectedProfile.archetype}
+                      </span>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+
+              {#if inspectedChips.length > 0}
+                <div class="mt-2.5 flex flex-wrap items-start gap-1">
+                  {#each inspectedChips as chip (chip.label)}
+                    <span
+                      class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px] leading-tight font-bold tracking-[0.04em] uppercase {chip.tone ===
+                      'good'
+                        ? 'border-positive/40 bg-positive/10 text-positive'
+                        : 'border-negative/45 bg-negative/10 text-negative'}">{chip.label}</span
+                    >
+                  {/each}
+                </div>
+              {/if}
+
+              <div class="mt-3 border-t border-line-soft pt-2.5">
+                <div class="flex items-baseline justify-between gap-2">
+                  <p
+                    class="font-display text-2xl leading-none font-extrabold tracking-tight tabular-nums"
+                  >
+                    {formatMillions(row.salaryDollars)}
+                  </p>
+                  <span
+                    class="inline-flex shrink-0 rounded-full border px-2 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {capStatusClass(
+                      row.statusAfterPick,
+                    )}"
+                  >
+                    {capStatusLabel(row.statusAfterPick)}
+                  </span>
+                </div>
+                <dl class="mt-2 grid gap-1 font-mono text-[10px]">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <dt class="text-muted-foreground">Payroll after</dt>
+                    <dd class="font-bold tabular-nums">{impact.payrollAfter}</dd>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-2">
+                    <dt class="text-muted-foreground">Room left</dt>
+                    <dd class="font-bold tabular-nums">{impact.roomAfter}</dd>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-2">
+                    <dt class="text-muted-foreground">Budget after</dt>
+                    <dd class="font-bold tabular-nums">{impact.warChestAfter}</dd>
+                  </div>
+                  {#if row.assessment.projectedPayroll !== null}
+                    <div class="flex items-baseline justify-between gap-2">
+                      <dt class="text-muted-foreground">Cheapest finish</dt>
+                      <dd class="font-bold tabular-nums">
+                        {formatMillions(row.assessment.projectedPayroll)}
+                      </dd>
+                    </div>
+                  {/if}
+                </dl>
+              </div>
+
+              {#if impact.apronShift !== null}
+                <p
+                  class="mt-2 rounded border border-accent/35 bg-accent/[0.08] px-2 py-1 font-mono text-[9px] font-bold tracking-[0.04em] text-accent uppercase"
+                >
+                  {impact.apronShift}
+                </p>
+              {/if}
+
+              {#if blocker !== null && !row.onRoster}
+                <p
+                  class="mt-2 rounded border border-negative/40 bg-negative/10 px-2 py-1 text-[11px] font-semibold text-negative"
+                >
+                  {blocker}
+                </p>
+              {/if}
+
+              {#if onPurchaseReport !== undefined}
+                <div
+                  class="mt-2.5 flex items-center justify-between gap-2 border-t border-line-soft pt-2.5"
+                >
+                  {#if scoutRecord !== null}
+                    <div class="min-w-0">
+                      <Badge tone="positive">Scouted</Badge>
+                      <p class="ui-micro mt-0.5">Scouting report · {scoutScopeLabel}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      tone="secondary"
+                      disabled={busy}
+                      aria-label={`Open scouting report for ${row.player.displayName}`}
+                      onclick={() => openScoutReport(row.player)}
+                    >
+                      <Eye size={13} aria-hidden="true" />
+                      Report
+                    </Button>
+                  {:else}
+                    <div class="min-w-0">
+                      <p class="ui-micro">
+                        {#if scoutBlocked !== null}
+                          <span class="font-semibold text-negative">{scoutBlocked}</span>
+                        {:else}
+                          Scout {formatMillions(scoutPrice)}
+                        {/if}
+                      </p>
+                      <p class="ui-micro text-muted-foreground">
+                        Scout {formatMillions(scoutPrice)} · {scoutScopeLabel}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      tone="secondary"
+                      disabled={busy || !scoutAssessment.legal}
+                      aria-label={`Scout ${row.player.displayName} for ${formatMillions(scoutPrice)}`}
+                      onclick={() => buyScout(row.player)}
+                    >
+                      <FileSearch size={13} aria-hidden="true" />
+                      Scout
+                    </Button>
+                  {/if}
+                </div>
+              {/if}
+
+              <div class="mt-3 flex items-center gap-2">
+                {#if row.onRoster && !complete}
+                  <Button
+                    tone="secondary"
+                    class="flex-1"
+                    disabled={busy}
+                    onclick={() => onRemove(row.player.playerVersionId)}
+                  >
+                    <X size={14} aria-hidden="true" />
+                    Remove
+                  </Button>
+                {:else}
+                  <Button
+                    tone={signable ? 'primary' : 'secondary'}
+                    class="flex-1"
+                    disabled={busy || !signable}
+                    onclick={() => onPick(row.player.playerVersionId)}
+                  >
+                    {#if row.onRoster}
+                      <Check size={14} aria-hidden="true" />
+                    {/if}
+                    {rowActionLabel(row)}
+                  </Button>
+                {/if}
+                <button
+                  type="button"
+                  class="min-h-10 shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 font-mono text-[10px] font-bold tracking-[0.07em] text-accent uppercase outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring"
+                  onclick={() => openProfile(row.player.playerVersionId, 'ratings')}
+                >
+                  All attributes
+                </button>
+              </div>
+            {/if}
+          </Panel>
+
+          <aside id="draft-roster" class="scroll-mt-4" aria-label="Draft roster">
+            <Panel as="section" padding="none">
+              <div class="border-b border-line-soft p-3">
+                <SectionHeading level={2} size="sm" title="Roster">
+                  {#snippet actions()}
+                    <span class="ui-micro"
+                      >{summary.rosterCount} / {FULL_COURT_MAX_ROSTER_SIZE}</span
+                    >
+                  {/snippet}
+                </SectionHeading>
+                <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  Six to twelve players. Locking freezes every salary for the run.
+                </p>
+              </div>
+
+              {#if rosterPicks.length === 0}
+                <EmptyState
+                  surface="none"
+                  title="No players signed yet"
+                  message="Sign 6 to 12 players from the pool to start your rotation."
+                />
+              {:else}
+                <ul
+                  class="max-h-[38vh] divide-y divide-line-soft overflow-y-auto overscroll-contain"
+                >
+                  {#each rosterPicks as pick (pick.player.playerVersionId)}
+                    {@const team = teamFor(pick.player)}
+                    <li class="flex min-w-0 items-center gap-2 p-2.5">
+                      <FullCourtPortrait player={pick.player} {art} size="sm" />
+                      <div class="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                          onclick={() => selectPlayer(pick.player.playerVersionId)}
+                        >
+                          {pick.player.displayName}
+                        </button>
+                        <p class="ui-micro flex min-w-0 items-center gap-1">
+                          {#if team !== null && art !== null}
+                            <TeamLogo
+                              manifest={art.manifest}
+                              franchiseId={team.franchiseId}
+                              teamExternalId={team.teamExternalId}
+                              className="h-3 w-3"
+                            />
+                          {/if}
+                          <span class="truncate"
+                            >{pick.player.seasonKey} · {formatPositions(
+                              pick.player.positions,
+                            )}</span
+                          >
+                        </p>
+                      </div>
+                      <div class="shrink-0 text-right">
+                        <p class="font-mono text-xs font-bold tabular-nums">
+                          {formatMillions(pick.salaryDollars)}
+                        </p>
+                        <p class="ui-micro">Pick {pick.pickOrdinal + 1}</p>
+                      </div>
+                      {#if !complete}
+                        <IconButton
+                          label={`Remove ${pick.player.displayName} from the roster`}
+                          size="sm"
+                          disabled={busy}
+                          onclick={() => onRemove(pick.player.playerVersionId)}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </IconButton>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+
+              <div class="space-y-2.5 border-t border-line-soft p-3">
+                <p class="text-[11px] leading-snug font-semibold">{absenceLabel}</p>
+                <div class="rounded-lg border border-line-soft bg-surface-1 p-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-display text-sm font-extrabold uppercase"
+                      >{lock.headline}</span
+                    >
+                    {#if lock.stamp !== null}
+                      <Badge tone="positive">{lock.stamp}</Badge>
+                    {/if}
+                  </div>
+                  <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{lock.detail}</p>
+                  {#if !complete}
+                    <Button
+                      tone="primary"
+                      class="mt-2.5 w-full"
+                      disabled={busy || !summary.canFinish}
+                      onclick={onFinish}
+                    >
+                      <Lock size={15} aria-hidden="true" />
+                      Lock the roster
+                    </Button>
+                  {/if}
+                </div>
+              </div>
+            </Panel>
+          </aside>
+
+          {#if onPurchaseReport !== undefined && (draft.reports ?? []).some((report) => report.kind === 'lineup-fit')}
+            <FullCourtRosterFitPanel {draft} {index} {busy} {onPurchaseReport} {art} />
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <div
+      class="fixed right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-30 flex items-center gap-2 rounded-xl border border-line-strong bg-card/95 p-2.5 shadow-lg backdrop-blur lg:hidden"
+      role="group"
+      aria-label="Draft actions"
+    >
+      <a
+        href="#draft-roster"
+        class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Users size={14} aria-hidden="true" />
+        <span>Roster {summary.rosterCount}</span>
+      </a>
+      <div class="min-w-0 flex-1">
+        <p class="font-display truncate text-xs font-extrabold uppercase">{lock.headline}</p>
+      </div>
+      {#if complete}
+        <Badge tone="positive"><Check size={13} aria-hidden="true" /> Locked</Badge>
+      {:else}
+        <Button size="sm" tone="primary" disabled={busy || !summary.canFinish} onclick={onFinish}>
+          <Lock size={14} aria-hidden="true" />
+          Lock
+        </Button>
+      {/if}
     </div>
   </div>
 </PageShell>
@@ -813,7 +1278,7 @@
   <PlayerProfileSheet
     profile={selectedProfile.view}
     face={selectedProfile.face}
-    {manifest}
+    manifest={art?.manifest ?? null}
     money={{
       salaryLabel: formatMillions(selectedProfile.salaryDollars),
       statusLabel: selectedProfile.signed ? 'Signed' : 'Projected',
@@ -838,78 +1303,3 @@
     }}
   />
 {/if}
-
-<style>
-  .draft-layout {
-    display: grid;
-    gap: 1rem;
-  }
-  .draft-main {
-    min-width: 0;
-    order: -1;
-  }
-  .roster-panel {
-    min-width: 0;
-    scroll-margin-top: 1rem;
-    scroll-margin-bottom: 8rem;
-  }
-  .roster-list {
-    max-height: 48vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  .roster-jump {
-    display: inline-flex;
-    min-height: 2.25rem;
-  }
-  .lock-stamp {
-    padding: 0.05rem 0.4rem;
-    border: 1px solid color-mix(in srgb, var(--color-positive) 55%, transparent);
-    border-radius: 0.25rem;
-    color: var(--color-positive);
-    font-family: var(--font-mono);
-    font-size: 0.5625rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    line-height: 1.5;
-    text-transform: uppercase;
-  }
-  /* Pinned below the single-column layout so the roster jump and the lock stay
-     reachable wherever the reader is in the draft. */
-  .finish-bar {
-    position: fixed;
-    right: 0.75rem;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    left: 0.75rem;
-    z-index: 30;
-  }
-  @media (min-width: 1100px) {
-    .draft-layout {
-      grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
-      align-items: start;
-    }
-    .draft-main {
-      order: 0;
-    }
-    .roster-panel {
-      order: -1;
-      position: sticky;
-      top: 1rem;
-    }
-    .roster-jump {
-      display: none;
-    }
-    .finish-bar {
-      position: sticky;
-      right: auto;
-      bottom: 0.75rem;
-      left: auto;
-    }
-  }
-  @media (max-width: 639px) {
-    .roster-list {
-      max-height: none;
-      overflow: visible;
-    }
-  }
-</style>

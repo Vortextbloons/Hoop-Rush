@@ -9,15 +9,19 @@
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import type { FullCourtArt } from './full-court-art.ts';
 
   let {
     awards,
     rosterStats,
     userTeamId,
+    art = null,
   }: {
     awards: FullCourtAwardsBoard;
     rosterStats: readonly FullCourtPlayerSeasonRow[];
     userTeamId: string;
+    art?: FullCourtArt | null;
   } = $props();
 
   let statScope = $state<'team' | 'leaders'>('team');
@@ -106,19 +110,22 @@
                 : 'No qualified candidates yet.'}
             </p>
           {:else}
-            <div class="mt-3 border-t border-line-soft/70 pt-2.5">
-              <div class="flex items-baseline justify-between gap-2">
-                <p class="truncate text-sm font-bold text-foreground">
-                  {winner.player.displayName}
+            <div class="mt-3 flex items-center gap-3 border-t border-line-soft/70 pt-2.5">
+              <FullCourtPortrait player={winner.player} {art} size="md" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-baseline justify-between gap-2">
+                  <p class="truncate text-sm font-bold text-foreground">
+                    {winner.player.displayName}
+                  </p>
+                  {#if isUser}
+                    <Badge tone="primary">Your team</Badge>
+                  {/if}
+                </div>
+                <p class="font-mono text-[10px] text-muted-foreground uppercase">
+                  {winner.player.teamName}
                 </p>
-                {#if isUser}
-                  <Badge tone="primary">Your team</Badge>
-                {/if}
+                <p class="mt-1 text-xs font-semibold text-foreground">{winner.summary}</p>
               </div>
-              <p class="font-mono text-[10px] text-muted-foreground uppercase">
-                {winner.player.teamName}
-              </p>
-              <p class="mt-1 text-xs font-semibold text-foreground">{winner.summary}</p>
             </div>
             {#if award.finalists.length > 1}
               <ol class="mt-2.5 space-y-1 border-t border-line-soft/50 pt-2">
@@ -240,8 +247,11 @@
           {#each tableRows as row (row.teamId + row.playerId)}
             <tr class={row.teamId === userTeamId ? 'bg-primary/5' : ''}>
               <th scope="row" data-align="start">
-                <span class={row.teamId === userTeamId ? 'text-primary' : ''}>
-                  {row.displayName}
+                <span class="flex items-center gap-2">
+                  <FullCourtPortrait player={row} {art} size="sm" />
+                  <span class={row.teamId === userTeamId ? 'text-primary' : ''}>
+                    {row.displayName}
+                  </span>
                 </span>
               </th>
               {#if statScope === 'leaders'}

@@ -234,8 +234,7 @@ describe('FullCourtSeasonView sections', () => {
     expect(body).toContain('aria-label="Full Court lineup lab"');
     expect(body).toContain('Bench points');
     expect(body).toContain('Player A · Player B · Player C · Player D · Player E');
-    expect(body).toContain('Rank is withheld below');
-    expect(body).toContain('100 possessions');
+    expect(body).toContain('100 possessions are marked with *');
     expect(body).not.toContain('No lineup facts in this save');
     expect(body).not.toContain('aria-label="Full Court regular season"');
   });

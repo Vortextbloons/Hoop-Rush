@@ -10,14 +10,14 @@
     fullCourtReportTargetKey,
   } from '@hoop-rush/data-contracts';
   import { fullCourtAssessPurchase, type FullCourtCatalogIndex } from '@hoop-rush/engine';
-  import { ClipboardList, Play } from '@lucide/svelte';
+  import { ClipboardList, Play, Shuffle } from '@lucide/svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
-  import { formatWarChestCr } from './full-court-draft-presentation.js';
 
   const CAMP_TARGET = { kind: 'training-camp' } as const satisfies FullCourtReportTarget;
   const CAMP_PRICE = fullCourtReportPriceDollars('training-camp');
@@ -29,6 +29,7 @@
     campOpen,
     practiceOpen,
     practice,
+    opponents = [],
     onPurchaseReport,
     onRunPractice,
     ariaLabel = 'Full Court War Room training camp',
@@ -40,11 +41,14 @@
     campOpen: boolean;
     practiceOpen: boolean;
     practice: FullCourtPracticeReport | null;
+    opponents?: readonly { readonly teamId: string; readonly displayName: string }[];
     onPurchaseReport: (target: FullCourtReportTarget) => void;
-    onRunPractice: () => void;
+    onRunPractice: (opponentTeamId?: string) => void;
     ariaLabel?: string;
     art?: FullCourtArt | null;
   } = $props();
+
+  let selectedOpponentId = $state('random');
 
   const campRecord = $derived(
     (draft.reports ?? []).find(
@@ -75,7 +79,13 @@
 
   function runPractice(): void {
     if (busy || !practiceOpen || campRecord === null) return;
-    onRunPractice();
+    onRunPractice(selectedOpponentId === 'random' ? undefined : selectedOpponentId);
+  }
+
+  function runRandomPractice(): void {
+    if (busy || !practiceOpen || campRecord === null) return;
+    selectedOpponentId = 'random';
+    onRunPractice(undefined);
   }
 </script>
 
@@ -92,7 +102,7 @@
         <Badge tone="positive">Booked</Badge>
       {:else}
         <span class="font-mono text-[10px] font-bold text-muted-foreground tabular-nums">
-          {formatWarChestCr(CAMP_PRICE)}
+          {formatMillions(CAMP_PRICE)}
         </span>
       {/if}
     {/snippet}
@@ -118,7 +128,7 @@
           size="sm"
           tone="primary"
           disabled={busy || !campAssessment.legal}
-          aria-label={`Book training camp for ${formatWarChestCr(CAMP_PRICE)}`}
+          aria-label={`Book training camp for ${formatMillions(CAMP_PRICE)}`}
           onclick={buyCamp}
         >
           <ClipboardList size={14} aria-hidden="true" />
@@ -126,11 +136,11 @@
         </Button>
         <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
           {#if campAssessment.legal}
-            {formatWarChestCr(campAssessment.warChestAfterPurchase)} War Chest after booking.
+            {formatMillions(campAssessment.warChestAfterPurchase)} budget after booking.
           {:else if campAssessment.minimumCompletionDollars !== null}
-            Needs {formatWarChestCr(campAssessment.minimumCompletionDollars)} for the cheapest legal finish.
+            Needs {formatMillions(campAssessment.minimumCompletionDollars)} for the cheapest legal finish.
           {:else}
-            The War Chest cannot cover training camp.
+            Budget cannot cover training camp.
           {/if}
         </p>
       </div>
@@ -143,18 +153,35 @@
     <div class="mt-3 border-t border-line-soft pt-3">
       {#if practiceOpen}
         <div class="flex flex-wrap items-center gap-2">
+          {#if opponents.length > 0}
+            <select
+              aria-label="Training camp opponent"
+              bind:value={selectedOpponentId}
+              class="h-9 rounded-lg border border-line-strong bg-surface-1 px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="random">Random opponent</option>
+              {#each opponents as opponent (opponent.teamId)}
+                <option value={opponent.teamId}>{opponent.displayName}</option>
+              {/each}
+            </select>
+          {/if}
           <Button
             size="sm"
-            tone="secondary"
+            tone="primary"
             disabled={busy}
-            aria-label={practice === null ? 'Open training camp practice' : 'Run practice again'}
+            aria-label={practice === null ? 'Run scrimmage' : 'Run scrimmage again'}
             onclick={runPractice}
           >
             <Play size={14} aria-hidden="true" />
-            {practice === null ? 'Open practice' : 'Run practice again'}
+            {practice === null ? 'Run scrimmage' : 'Run scrimmage again'}
+          </Button>
+          <Button size="sm" tone="secondary" disabled={busy} onclick={runRandomPractice}>
+            <Shuffle size={14} aria-hidden="true" />
+            Pull random
           </Button>
           <p class="min-w-0 flex-1 text-[11px] text-muted-foreground">
-            Free to open and rerun. Coaching edits stay free; the same seed keeps comparisons fair.
+            Free sandbox scrimmage against any league opponent. Tweak rotation or tactics and test
+            again.
           </p>
         </div>
       {:else if campOpen}

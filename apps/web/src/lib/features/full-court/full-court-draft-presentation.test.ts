@@ -26,7 +26,6 @@ import { buildCapRushTestCatalog, capRushTestCatalogSource } from '@hoop-rush/te
 import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
 import {
   FULL_COURT_CATALOG_PAGE_SIZE,
-  formatWarChestCr,
   fullCourtCatalogPage,
   fullCourtDraftSummary,
   fullCourtFaceIndex,
@@ -201,9 +200,9 @@ describe('full court draft presentation', () => {
     expect(fullCourtPickReasonLabel(row.assessment, draft.money)).toBe('Already rostered');
   });
 
-  it('formats the War Chest through the fixed CR conversion', () => {
-    expect(formatWarChestCr(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('450 CR');
-    expect(formatWarChestCr(437_500_000)).toBe('437.5 CR');
+  it('formats the budget in millions without credits', () => {
+    expect(formatMillions(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('$200M');
+    expect(formatMillions(185_500_000)).toBe('$185.5M');
   });
 
   it('prices a signing from the engine assessment the card shows', () => {
@@ -218,7 +217,7 @@ describe('full court draft presentation', () => {
     expect(impact.roomAfter).toBe(
       formatMillions(state.money.hardLimitDollars - row.assessment.payrollAfterPick),
     );
-    expect(impact.warChestAfter).toBe(formatWarChestCr(row.assessment.warChestAfterPick));
+    expect(impact.warChestAfter).toBe(formatMillions(row.assessment.warChestAfterPick));
   });
 
   it('reports an apron shift only when the signing crosses a line', () => {
@@ -298,5 +297,35 @@ describe('full court draft presentation', () => {
     });
     const faces = fullCourtFaceIndex(index);
     expect(faces.get(fullCourtFaceKey(player))?.playerId).toBe(player.playerId);
+  });
+
+  it('sorts by overall or salary and filters to signable players when requested', () => {
+    const setupValue = setup();
+    const { index, state } = setupValue;
+    const lowToHigh = fullCourtCatalogPage(index, state, {
+      sort: 'salary-asc',
+      limit: index.catalog.candidates.length,
+    });
+    const highToLow = fullCourtCatalogPage(index, state, {
+      sort: 'salary-desc',
+      limit: index.catalog.candidates.length,
+    });
+    const lowFirst = lowToHigh.rows[0];
+    const lowLast = lowToHigh.rows.at(-1);
+    const highFirst = highToLow.rows[0];
+    const highLast = highToLow.rows.at(-1);
+    if (!lowFirst || !lowLast || !highFirst || !highLast) {
+      throw new Error('Expected non-empty sorted catalog rows');
+    }
+    expect(lowFirst.salaryDollars).toBeLessThanOrEqual(lowLast.salaryDollars);
+    expect(highFirst.salaryDollars).toBeGreaterThanOrEqual(highLast.salaryDollars);
+
+    const drafted = stateWithPicks(setupValue, 1);
+    const signable = fullCourtCatalogPage(index, drafted, {
+      signableOnly: true,
+      limit: index.catalog.candidates.length,
+    });
+    expect(signable.rows.length).toBeGreaterThan(0);
+    expect(signable.rows.every((row) => row.assessment.legal && !row.onRoster)).toBe(true);
   });
 });

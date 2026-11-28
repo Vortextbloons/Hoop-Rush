@@ -228,3 +228,115 @@ export function fullCourtFilmReport(input: {
     notes: filmNotes(input.rotation, minutes),
   };
 }
+
+export type FullCourtOpponentWeaknessCode =
+  | 'no-spacing'
+  | 'thin-spacing'
+  | 'no-rim-protection'
+  | 'no-perimeter-stopper'
+  | 'weak-defensive-glass'
+  | 'turnover-prone'
+  | 'foul-prone'
+  | 'thin-depth'
+  | 'no-primary-creator';
+
+export interface FullCourtLeagueOpponentPlayer {
+  readonly overall: number;
+  readonly minutes: number;
+  readonly ratings: SimulationRatings;
+  readonly tendencies: SimulationTendencies;
+}
+
+export interface FullCourtLeagueOpponentInput {
+  readonly teamId: string;
+  readonly displayName: string;
+  readonly seasonKey: string;
+  readonly players: readonly FullCourtLeagueOpponentPlayer[];
+}
+
+export interface FullCourtOpponentWeaknessSummary {
+  readonly teamId: string;
+  readonly displayName: string;
+  readonly seasonKey: string;
+  readonly rating: number;
+  readonly weaknesses: readonly FullCourtOpponentWeaknessCode[];
+}
+
+function teamOverallRating(players: readonly FullCourtLeagueOpponentPlayer[]): number {
+  if (players.length === 0) return 0;
+  const totalMin = players.reduce((sum, player) => sum + Math.max(0, player.minutes), 0);
+  if (totalMin <= 0) {
+    return (
+      Math.round((players.reduce((sum, player) => sum + player.overall, 0) / players.length) * 10) /
+      10
+    );
+  }
+  const weighted = players.reduce(
+    (sum, player) => sum + player.overall * Math.max(0, player.minutes),
+    0,
+  );
+  return Math.round((weighted / totalMin) * 10) / 10;
+}
+
+function opponentWeaknessesOf(
+  players: readonly FullCourtLeagueOpponentPlayer[],
+): readonly FullCourtOpponentWeaknessCode[] {
+  const weaknesses: FullCourtOpponentWeaknessCode[] = [];
+  const spacers = players.filter(
+    (player) => player.ratings.threePoint >= 66 && player.tendencies.threePointRate >= 22,
+  );
+  if (spacers.length === 0) weaknesses.push('no-spacing');
+  else if (spacers.length === 1) weaknesses.push('thin-spacing');
+
+  if (
+    !players.some((player) => player.ratings.interiorDefense >= 72 && player.ratings.block >= 65)
+  ) {
+    weaknesses.push('no-rim-protection');
+  }
+  if (!players.some((player) => player.ratings.perimeterDefense >= 74)) {
+    weaknesses.push('no-perimeter-stopper');
+  }
+  if (!players.some((player) => player.ratings.defensiveRebound >= 62)) {
+    weaknesses.push('weak-defensive-glass');
+  }
+  if (!players.some((player) => player.tendencies.usageRate >= 24)) {
+    weaknesses.push('no-primary-creator');
+  }
+  const totalMin = players.reduce((sum, player) => sum + Math.max(0, player.minutes), 0);
+  if (totalMin > 0) {
+    const foulRate =
+      players.reduce(
+        (sum, player) => sum + player.tendencies.foulRate * Math.max(0, player.minutes),
+        0,
+      ) / totalMin;
+    const turnoverRate =
+      players.reduce(
+        (sum, player) => sum + player.tendencies.turnoverRate * Math.max(0, player.minutes),
+        0,
+      ) / totalMin;
+    if (foulRate >= 14) weaknesses.push('foul-prone');
+    if (turnoverRate >= 16) weaknesses.push('turnover-prone');
+  }
+  if (players.filter((player) => player.minutes >= 10).length < 8) {
+    weaknesses.push('thin-depth');
+  }
+  return weaknesses;
+}
+
+/**
+ * League-wide Opponent Film upgrade: ranks every opponent by rotation strength so
+ * the biggest threats surface first alongside their exploitable weaknesses.
+ */
+export function fullCourtLeagueWeaknesses(
+  opponents: readonly FullCourtLeagueOpponentInput[],
+): readonly FullCourtOpponentWeaknessSummary[] {
+  return [...opponents]
+    .map((team) => ({
+      teamId: team.teamId,
+      displayName: team.displayName,
+      seasonKey: team.seasonKey,
+      rating: teamOverallRating(team.players),
+      weaknesses: opponentWeaknessesOf(team.players),
+    }))
+    .sort((left, right) => right.rating - left.rating || compareStrings(left.teamId, right.teamId));
+}

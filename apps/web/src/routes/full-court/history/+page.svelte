@@ -181,12 +181,20 @@
                         </p>
                       </div>
                     </div>
-                    <span class="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                      {player.salaryLabel}
-                      {#if player.minutesTarget !== null}
-                        · {player.minutesTarget}m
-                      {/if}
-                    </span>
+                    <div class="shrink-0 text-right">
+                      <p
+                        class="font-mono text-[11px] font-bold tabular-nums"
+                        aria-label={`Overall ${String(player.overall)}`}
+                      >
+                        {player.overall} OVR
+                      </p>
+                      <p class="font-mono text-[10px] tabular-nums text-muted-foreground">
+                        {player.salaryLabel}
+                        {#if player.minutesTarget !== null}
+                          · {player.minutesTarget}m
+                        {/if}
+                      </p>
+                    </div>
                   </li>
                 {/each}
               </ul>

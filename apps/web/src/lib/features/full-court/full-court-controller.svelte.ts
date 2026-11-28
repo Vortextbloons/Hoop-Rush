@@ -171,7 +171,12 @@ export class FullCourtController {
     });
   }
 
-  startDraft(variant: 'standard' | 'roulette' = 'standard'): Promise<void> {
+  #practiceRunCount = 0;
+
+  startDraft(
+    variant: 'standard' | 'roulette' = 'standard',
+    perks: readonly ('lineup-fit' | 'opponent-film' | 'training-camp')[] = [],
+  ): Promise<void> {
     return this.#act(async () => {
       if (this.#assets === null) return;
       const runId = idSchema.parse(newRequestId('full-court'));
@@ -183,6 +188,17 @@ export class FullCourtController {
         variant,
         catalog: this.#assets.catalogSource,
       });
+      for (const perk of perks) {
+        if (this.draft === null) break;
+        const target: FullCourtReportTarget = { kind: perk };
+        await this.#submit({
+          command: 'purchase-full-court-report',
+          commandId: newSeasonId('command'),
+          runId,
+          expectedRevision: this.draft.revision,
+          target,
+        });
+      }
       localStorage.setItem(FULL_COURT_ACTIVE_RUN_KEY, runId);
       await this.#openRun(runId);
     });
@@ -495,22 +511,13 @@ export class FullCourtController {
     return this.#act(async () => {
       const draft = this.draft;
       if (draft === null) return;
-      if (target.kind === 'training-camp') {
-        if (draft.stage !== 'complete') {
-          throw new Error('Confirm the roster before booking training camp.');
-        }
-        const season = this.season;
-        if (
-          season !== null
-            ? season.checkpoint.completedThroughSlot !== 0
-            : !(draft.variant === 'roulette' && draft.roulette?.status !== 'finalized')
-        ) {
-          throw new Error('Training camp closes before the first regular-season game.');
-        }
-      }
-      if (target.kind === 'opponent-film') {
+      if (target.kind === 'opponent-film' && target.gameId !== undefined) {
         const next = this.nextFilmTarget();
-        if (next?.gameId !== target.gameId || next.opponentTeamId !== target.opponentTeamId) {
+        if (
+          next === null ||
+          next.gameId !== target.gameId ||
+          next.opponentTeamId !== target.opponentTeamId
+        ) {
           throw new Error('Film study is available for your next game.');
         }
       }
@@ -524,7 +531,7 @@ export class FullCourtController {
     });
   }
 
-  runPractice(): Promise<void> {
+  runPractice(requestedOpponentId?: string): Promise<void> {
     return this.#act(async () => {
       const season = this.season;
       const draft = this.draft;
@@ -540,27 +547,40 @@ export class FullCourtController {
       if (checkpoint === null || checkpoint.lockDigest !== season.lock.digest) {
         throw new Error('Training camp practice needs the saved season. Reload the run.');
       }
-      if (checkpoint.completedThroughSlot !== 0 || this.playoffs !== null) {
-        throw new Error('Training camp practice closes before the first regular-season game.');
-      }
       const camp = (currentDraft.reports ?? []).find((report) => report.kind === 'training-camp');
       if (camp === undefined) {
-        throw new Error('Book training camp before opening the practice report.');
+        throw new Error('Unlock training camp before running a scrimmage.');
       }
-      const fixture = fullCourtNextUserFixture(season.lock, checkpoint, null);
-      if (fixture === null) throw new Error('No practice opponent is available.');
-      const opponentTeamId =
-        fixture.homeTeamId === season.lock.season.userTeamId
-          ? fixture.awayTeamId
-          : fixture.homeTeamId;
+      const opponents = season.lock.season.teams.filter(
+        (team) => team.teamId !== season.lock.season.userTeamId,
+      );
+      if (opponents.length === 0) throw new Error('No practice opponent is available.');
+      const pickedOpponent =
+        requestedOpponentId && requestedOpponentId !== 'random'
+          ? opponents.find((team) => team.teamId === requestedOpponentId)
+          : opponents[Math.floor(Math.random() * opponents.length)];
+      const opponentTeamId = (pickedOpponent ?? opponents[0])?.teamId;
+      if (opponentTeamId === undefined) throw new Error('No practice opponent is available.');
       const worker = (this.#worker ??= this.#createWorker());
       const simulatePractice = worker.simulatePractice?.bind(worker);
       if (simulatePractice === undefined) {
         throw new Error('Training camp practice is unavailable in this worker.');
       }
-      const defensiveMatchups = this.#activeDefensiveMatchupsFor(fixture.gameId, opponentTeamId);
+      this.#practiceRunCount += 1;
+      const fixture = fullCourtNextUserFixture(
+        season.lock,
+        checkpoint,
+        this.playoffs?.view ?? null,
+      );
+      const defensiveMatchups =
+        fixture === null
+          ? undefined
+          : this.#activeDefensiveMatchupsFor(fixture.gameId, opponentTeamId);
       const report = await simulatePractice(season.lock, {
-        seed: fullCourtTrainingCampSeed(season.lock.season.runSeed, camp.reportId),
+        seed: fullCourtTrainingCampSeed(
+          season.lock.season.runSeed,
+          `${camp.reportId}:${opponentTeamId}:${String(this.#practiceRunCount)}`,
+        ),
         opponentTeamId,
         options: {
           rotation: fullCourtRotationInputForPlan(season.coaching),

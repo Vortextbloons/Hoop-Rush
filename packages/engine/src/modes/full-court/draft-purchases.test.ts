@@ -131,10 +131,10 @@ describe('full court report purchases', () => {
     expect(fullCourtReportPriceDollars('player-scouting')).toBe(2_000_000);
     expect(fullCourtReportPriceDollars('lineup-fit')).toBe(5_000_000);
     expect(fullCourtReportPriceDollars('opponent-film')).toBe(3_000_000);
-    expect(fullCourtReportPriceDollars('training-camp')).toBe(10_000_000);
+    expect(fullCourtReportPriceDollars('training-camp')).toBe(15_000_000);
     expect(fullCourtReportScope('player-scouting')).toBe('run');
     expect(fullCourtReportScope('lineup-fit')).toBe('run');
-    expect(fullCourtReportScope('opponent-film')).toBe('game');
+    expect(fullCourtReportScope('opponent-film')).toBe('run');
     expect(fullCourtReportScope('training-camp')).toBe('run');
   });
 
@@ -257,17 +257,19 @@ describe('full court report purchases', () => {
     expect(outcome.result.rejection?.code).toBe('player-unavailable');
   });
 
-  it('withholds lineup and film reports until the roster is confirmed', () => {
+  it('allows buying run perks at the beginning before the roster is confirmed', () => {
     const setup = fullCourtTestSetup();
+    let state = setup.state;
     for (const target of [
       { kind: 'lineup-fit' },
-      { kind: 'opponent-film', gameId: 'game-1', opponentTeamId: 'celtics' },
+      { kind: 'opponent-film' },
       { kind: 'training-camp' },
     ] as const) {
-      const outcome = buy(setup, setup.state, target);
-      expect(outcome.result.rejection?.code).toBe('report-unavailable');
-      expect(outcome.state).toBe(setup.state);
+      const outcome = buy(setup, state, target);
+      expect(outcome.result.status).toBe('accepted');
+      state = outcome.state;
     }
+    expect(state.reports ?? []).toHaveLength(3);
   });
 
   it('sells lineup fit and one film per fixture after confirmation', () => {

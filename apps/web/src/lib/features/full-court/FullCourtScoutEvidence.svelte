@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { SimulationRatings, SimulationTendencies } from '@hoop-rush/data-contracts';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import type { FullCourtArt, FullCourtArtPlayer } from './full-court-art.ts';
 
   type ScoutField = keyof SimulationRatings | keyof SimulationTendencies;
 
@@ -53,9 +55,16 @@
   let {
     items,
     emptyLabel = null,
+    art = null,
   }: {
-    items: readonly { field: ScoutField; value: number; name?: string }[];
+    items: readonly {
+      field: ScoutField;
+      value: number;
+      name?: string;
+      player?: FullCourtArtPlayer | null;
+    }[];
     emptyLabel?: string | null;
+    art?: FullCourtArt | null;
   } = $props();
 
   function labelOf(field: ScoutField): string {
@@ -79,19 +88,24 @@
     <p class="font-mono text-[9px] text-muted-foreground">{emptyLabel}</p>
   {/if}
 {:else}
-  <ul class="flex flex-wrap gap-1">
+  <ul class="flex flex-wrap gap-1.5">
     {#each items as item, index (index)}
       <li
-        class="rounded border border-line-soft bg-surface-1 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-line-soft bg-surface-2/80 px-2 py-1 text-[11px] text-muted-foreground"
       >
-        {#if item.name !== undefined}
-          <span class="font-bold text-foreground">{item.name}</span>
-          <span aria-hidden="true"> · </span>
+        {#if item.player}
+          <FullCourtPortrait player={item.player} {art} size="sm" />
         {/if}
-        {labelOf(item.field)}
-        <span class="font-bold text-foreground tabular-nums"
-          >{valueText(item.field, item.value)}</span
-        >
+        <span class="min-w-0">
+          {#if item.name !== undefined}
+            <span class="font-semibold text-foreground">{item.name}</span>
+            <span aria-hidden="true"> · </span>
+          {/if}
+          <span>{labelOf(item.field)}</span>
+          <span class="font-mono text-[10px] font-bold text-foreground tabular-nums"
+            >{valueText(item.field, item.value)}</span
+          >
+        </span>
       </li>
     {/each}
   </ul>

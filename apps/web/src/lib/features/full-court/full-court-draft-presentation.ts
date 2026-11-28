@@ -7,11 +7,7 @@ import type {
   PlayersIndexEntry,
   Position,
 } from '@hoop-rush/data-contracts';
-import {
-  FULL_COURT_MAX_ROSTER_SIZE,
-  FULL_COURT_MIN_ROSTER_SIZE,
-  fullCourtCrAmount,
-} from '@hoop-rush/data-contracts';
+import { FULL_COURT_MAX_ROSTER_SIZE, FULL_COURT_MIN_ROSTER_SIZE } from '@hoop-rush/data-contracts';
 import {
   fullCourtAbsenceTolerance,
   fullCourtAssessPick,
@@ -88,9 +84,13 @@ export interface FullCourtCatalogRow {
   readonly playerRostered: boolean;
 }
 
+export type FullCourtCatalogSort = 'default' | 'overall-desc' | 'salary-asc' | 'salary-desc';
+
 export interface FullCourtCatalogQuery {
   readonly search?: string;
   readonly position?: Position | null;
+  readonly sort?: FullCourtCatalogSort;
+  readonly signableOnly?: boolean;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -104,6 +104,32 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function compareOverallDesc(left: CapRushSourcePlayer, right: CapRushSourcePlayer): number {
+  return (
+    right.originalOverall - left.originalOverall ||
+    compareText(left.displayName, right.displayName) ||
+    compareText(left.seasonKey, right.seasonKey) ||
+    compareText(left.playerVersionId, right.playerVersionId)
+  );
+}
+
+function sortCatalogCandidates(
+  players: readonly CapRushSourcePlayer[],
+  sort: FullCourtCatalogSort,
+  hasPool: boolean,
+): readonly CapRushSourcePlayer[] {
+  if (sort === 'default') {
+    return hasPool ? players : [...players].sort(compareOverallDesc);
+  }
+  if (sort === 'overall-desc') {
+    return [...players].sort(compareOverallDesc);
+  }
+  return [...players].sort((left, right) => {
+    const diff = fullCourtSalaryDollarsOf(left) - fullCourtSalaryDollarsOf(right);
+    return (sort === 'salary-asc' ? diff : -diff) || compareOverallDesc(left, right);
+  });
+}
+
 function matchesCatalogQuery(
   player: CapRushSourcePlayer,
   search: string,
@@ -111,6 +137,40 @@ function matchesCatalogQuery(
 ): boolean {
   if (position !== null && !player.positions.includes(position)) return false;
   return search === '' || player.displayName.toLowerCase().includes(search);
+}
+
+export function fullCourtCatalogRowForPlayer(
+  index: FullCourtCatalogIndex,
+  draft: FullCourtDraftState,
+  player: CapRushSourcePlayer,
+  rosterSets?: {
+    readonly playerIds: ReadonlySet<string>;
+    readonly versionIds: ReadonlySet<string>;
+  },
+): FullCourtCatalogRow {
+  const salaryDollars = fullCourtSalaryDollarsOf(player);
+  const assessment = fullCourtAssessPick({
+    index,
+    state: draft,
+    playerId: player.playerId,
+    salaryDollars,
+  });
+  const onRoster =
+    rosterSets !== undefined
+      ? rosterSets.versionIds.has(player.playerVersionId)
+      : draft.picks.some((pick) => pick.player.playerVersionId === player.playerVersionId);
+  const playerRostered =
+    rosterSets !== undefined
+      ? rosterSets.playerIds.has(player.playerId)
+      : draft.picks.some((pick) => pick.player.playerId === player.playerId);
+  return {
+    player,
+    salaryDollars,
+    assessment,
+    statusAfterPick: fullCourtPayrollStatus(assessment.payrollAfterPick, draft.money),
+    onRoster,
+    playerRostered,
+  };
 }
 
 /**
@@ -124,41 +184,31 @@ export function fullCourtCatalogPage(
 ): FullCourtCatalogPage {
   const search = (query.search ?? '').trim().toLowerCase();
   const position = query.position ?? null;
+  const sort = query.sort ?? 'default';
+  const signableOnly = query.signableOnly ?? false;
   const limit = Math.max(0, Math.trunc(query.limit ?? FULL_COURT_CATALOG_PAGE_SIZE));
   const offset = Math.max(0, Math.trunc(query.offset ?? 0));
   const filtered = fullCourtEligibleCandidates(index, draft).filter((player) =>
     matchesCatalogQuery(player, search, position),
   );
-  const matched =
-    draft.pool !== undefined
-      ? filtered
-      : [...filtered].sort(
-          (left, right) =>
-            right.originalOverall - left.originalOverall ||
-            compareText(left.displayName, right.displayName) ||
-            compareText(left.seasonKey, right.seasonKey) ||
-            compareText(left.playerVersionId, right.playerVersionId),
-        );
-  const rosterPlayerIds = new Set(draft.picks.map((pick) => pick.player.playerId));
-  const rosterVersionIds = new Set(draft.picks.map((pick) => pick.player.playerVersionId));
-  const rows = matched.slice(offset, offset + limit).map((player): FullCourtCatalogRow => {
-    const salaryDollars = fullCourtSalaryDollarsOf(player);
-    const assessment = fullCourtAssessPick({
-      index,
-      state: draft,
-      playerId: player.playerId,
-      salaryDollars,
-    });
+  const sorted = sortCatalogCandidates(filtered, sort, draft.pool !== undefined);
+  const rosterSets = {
+    playerIds: new Set(draft.picks.map((pick) => pick.player.playerId)),
+    versionIds: new Set(draft.picks.map((pick) => pick.player.playerVersionId)),
+  };
+  if (signableOnly) {
+    const signableRows = sorted
+      .map((player) => fullCourtCatalogRowForPlayer(index, draft, player, rosterSets))
+      .filter((row) => row.assessment.legal && !row.onRoster && draft.stage !== 'complete');
     return {
-      player,
-      salaryDollars,
-      assessment,
-      statusAfterPick: fullCourtPayrollStatus(assessment.payrollAfterPick, draft.money),
-      onRoster: rosterVersionIds.has(player.playerVersionId),
-      playerRostered: rosterPlayerIds.has(player.playerId),
+      rows: signableRows.slice(offset, offset + limit),
+      total: signableRows.length,
     };
-  });
-  return { rows, total: matched.length };
+  }
+  const rows = sorted
+    .slice(offset, offset + limit)
+    .map((player) => fullCourtCatalogRowForPlayer(index, draft, player, rosterSets));
+  return { rows, total: sorted.length };
 }
 
 const APRON_SHIFT_LABELS: Readonly<Record<CapRushPayrollStatus, string>> = {
@@ -193,7 +243,7 @@ export function fullCourtSigningImpact(
   return {
     payrollAfter: formatMillions(row.assessment.payrollAfterPick),
     roomAfter: formatMillions(money.hardLimitDollars - row.assessment.payrollAfterPick),
-    warChestAfter: formatWarChestCr(row.assessment.warChestAfterPick),
+    warChestAfter: formatMillions(row.assessment.warChestAfterPick),
     apronShift: statusAfter === statusBefore ? null : `Crosses ${APRON_SHIFT_LABELS[statusAfter]}`,
   };
 }
@@ -214,18 +264,13 @@ export function fullCourtPickReasonLabel(
       return `Over the ${formatMillions(money.hardLimitDollars)} hard limit`;
     case 'cash':
       return assessment.warChestAfterPick < 0
-        ? 'War Chest short'
-        : 'Leaves too little War Chest to finish';
+        ? 'Budget short'
+        : 'Leaves too little budget to finish';
     case 'completion':
       return assessment.projectedPayroll === null
         ? 'No legal finish'
         : `Cheapest finish ${formatMillions(assessment.projectedPayroll)}`;
   }
-}
-
-export function formatWarChestCr(dollars: number): string {
-  const amount = Math.round(fullCourtCrAmount(dollars) * 10) / 10;
-  return `${String(amount)} CR`;
 }
 
 export interface FullCourtLockCopy {
@@ -237,7 +282,7 @@ export interface FullCourtLockCopy {
 
 /**
  * The lock step is the last decision of draft night, so its copy states the
- * exact payroll, room, and War Chest that freeze on confirm.
+ * exact payroll, room, and budget that freeze on confirm.
  */
 export function fullCourtLockCopy(
   draft: FullCourtDraftState,
@@ -247,7 +292,7 @@ export function fullCourtLockCopy(
     return {
       stamp: 'Locked',
       headline: 'Draft complete',
-      detail: `${String(summary.rosterCount)} players on ${formatMillions(summary.payrollDollars)} payroll, ${formatWarChestCr(summary.warChestDollars)} War Chest left. Every salary is fixed for the run.`,
+      detail: `${String(summary.rosterCount)} players on ${formatMillions(summary.payrollDollars)} payroll, ${formatMillions(summary.warChestDollars)} budget left. Every salary is fixed for the run.`,
     };
   }
   if (!summary.canFinish) {
@@ -262,7 +307,7 @@ export function fullCourtLockCopy(
   return {
     stamp: null,
     headline: filled ? 'Roster is full' : 'Lock the roster',
-    detail: `${String(summary.rosterCount)} players, ${formatMillions(summary.payrollDollars)} payroll, ${formatWarChestCr(summary.warChestDollars)} War Chest left. ${filled ? 'Lock to freeze every salary.' : 'Unused places are skipped and every salary freezes.'}`,
+    detail: `${String(summary.rosterCount)} players, ${formatMillions(summary.payrollDollars)} payroll, ${formatMillions(summary.warChestDollars)} budget left. ${filled ? 'Lock to freeze every salary.' : 'Unused places are skipped and every salary freezes.'}`,
   };
 }
 

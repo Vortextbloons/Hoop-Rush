@@ -39,8 +39,10 @@
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { ScheduleCell } from '#lib/components/ui/types.js';
   import { getManifest } from '#lib/data.js';
+  import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
+  import FullCourtPortrait from './FullCourtPortrait.svelte';
   import {
     fullCourtFinalRecap,
     fullCourtGameDayReadiness,
@@ -78,6 +80,7 @@
     section = 'home',
     notice = null,
     onDismissNotice,
+    art = null,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -95,10 +98,12 @@
     /** Typed stop feedback from the controller. */
     notice?: FullCourtSimulationNotice | null;
     onDismissNotice?: () => void;
+    art?: FullCourtArt | null;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let selectedRound = $state<number | null>(null);
+  let showAllLineups = $state(false);
 
   onMount(() => {
     let mounted = true;
@@ -485,14 +490,24 @@
           </div>
           {#each [series.highTeamId, series.lowTeamId] as teamId (teamId)}
             {@const wins = capRushSeriesWins(series, teamId)}
+            {@const teamIdentity = identityOf(teamId)}
             <div
-              class="mt-1 flex items-center gap-1.5 text-[11px] {winner === teamId
+              class="mt-1.5 flex items-center gap-1.5 text-[11px] {winner === teamId
                 ? 'font-bold text-foreground'
                 : 'text-muted-foreground'}"
             >
               <span class="w-4 shrink-0 text-center font-mono text-[9px] tabular-nums"
                 >{seriesSeed(series, teamId)}</span
               >
+              {#if teamIdentity !== null && manifest !== null}
+                <TeamLogo
+                  {manifest}
+                  franchiseId={teamIdentity.franchiseId}
+                  teamExternalId={teamIdentity.teamExternalId}
+                  alt=""
+                  className="h-4 w-4 shrink-0"
+                />
+              {/if}
               <span class="min-w-0 flex-1 truncate" title={teamName(teamId)}
                 >{teamName(teamId)}</span
               >
@@ -884,7 +899,7 @@
     </div>
 
     {#if matchup !== null}
-      <div class="mt-5 rounded-xl border border-line-strong bg-surface-2/40 p-3">
+      <div class="mt-4 rounded-xl border border-primary/30 bg-surface-2/50 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <p class="ui-label" data-tone="muted">{matchup.label}</p>
           {#if matchup.series !== null}
@@ -927,11 +942,15 @@
             </p>
           </div>
         {/if}
+        {@render simControlsBar()}
       </div>
     {:else if playoff !== null && championId === null}
       <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
         No game is ready for your five. The rest of the bracket is finishing.
       </p>
+      {@render simControlsBar()}
+    {:else}
+      {@render simControlsBar()}
     {/if}
 
     <div class="mt-4">
@@ -940,10 +959,9 @@
         {restingPlayerIds}
         {busy}
         {onRestingChange}
+        {art}
       />
     </div>
-
-    {@render simControlsBar()}
   </Panel>
 {/snippet}
 
@@ -1090,6 +1108,10 @@
     {/if}
   </Panel>
 
+  {#if awards !== null}
+    <FullCourtAwardsPanel {awards} rosterStats={userRosterStats} {userTeamId} {art} />
+  {/if}
+
   <Panel as="section" padding="md" aria-label="Full Court lineup lab">
     <SectionHeading eyebrow="Lineup Lab" title="Actual fives" level={2} size="md">
       {#snippet actions()}
@@ -1097,11 +1119,12 @@
       {/snippet}
     </SectionHeading>
     {#if seasonStats.lineups.rows.length > 0}
+      {@const visibleLineups = showAllLineups
+        ? seasonStats.lineups.rows
+        : seasonStats.lineups.rows.slice(0, 8)}
       <p class="mt-2 text-xs text-muted-foreground">
-        Minutes, points for and against, and net rating use only facts recorded from lineup stints
-        and the exact possession tape at simulation time. A unit that breaks and returns is one row.
-        Rank is withheld below
-        {seasonStats.lineups.sampleThreshold} possessions; * marks a below-sample row.
+        5-man unit performance across played games. Units with fewer than
+        {seasonStats.lineups.sampleThreshold} possessions are marked with *.
       </p>
       <div class="overflow-x-auto">
         <table class="ui-stats-table mt-3" aria-label="Full Court season lineups">
@@ -1118,11 +1141,22 @@
             </tr>
           </thead>
           <tbody>
-            {#each seasonStats.lineups.rows as lineup (lineup.key)}
+            {#each visibleLineups as lineup (lineup.key)}
               <tr>
-                <th scope="row" data-align="start"
-                  >{lineup.players.map((player) => player.displayName).join(' · ')}</th
-                >
+                <th scope="row" data-align="start">
+                  <div class="flex items-center gap-2">
+                    <div class="flex shrink-0 -space-x-2">
+                      {#each lineup.players as player (player.playerId)}
+                        <div class="rounded-full ring-2 ring-surface-1">
+                          <FullCourtPortrait {player} {art} size="sm" />
+                        </div>
+                      {/each}
+                    </div>
+                    <span class="min-w-0 text-xs font-semibold">
+                      {lineup.players.map((player) => player.displayName).join(' · ')}
+                    </span>
+                  </div>
+                </th>
                 <td>{lineup.games}</td>
                 <td>{lineup.minutes.toFixed(1)}</td>
                 <td>{lineup.pointsFor}</td>
@@ -1147,6 +1181,15 @@
           </tbody>
         </table>
       </div>
+      {#if seasonStats.lineups.rows.length > 8}
+        <div class="mt-3">
+          <Button size="sm" tone="secondary" onclick={() => (showAllLineups = !showAllLineups)}>
+            {showAllLineups
+              ? 'Show top 8 lineups'
+              : `Show all ${String(seasonStats.lineups.rows.length)} lineups`}
+          </Button>
+        </div>
+      {/if}
       {#if seasonStats.lineups.omitted.lineups > 0}
         <p class="mt-2 text-xs text-muted-foreground">
           {seasonStats.lineups.omitted.lineups} low-usage
@@ -1167,10 +1210,6 @@
       <p class="mt-2 text-xs text-muted-foreground">Play a game to record the first actual five.</p>
     {/if}
   </Panel>
-
-  {#if awards !== null}
-    <FullCourtAwardsPanel {awards} rosterStats={userRosterStats} {userTeamId} />
-  {/if}
 {/snippet}
 
 {#snippet leaguePanel()}
