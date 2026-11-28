@@ -151,7 +151,7 @@ describe('full court home controls', () => {
       pendingForfeit: false,
       busy: false,
     });
-    expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
+    expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Play next game', count: 1 });
     expect(controls.secondary).toHaveLength(1);
     expect(controls.secondary[0]).toMatchObject({
       label: 'Sim series',
@@ -171,7 +171,7 @@ describe('full court home controls', () => {
       pendingForfeit: false,
       busy: false,
     });
-    expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Sim next game', count: 1 });
+    expect(controls.primary).toMatchObject({ kind: 'sim', label: 'Play next game', count: 1 });
     expect(controls.secondary[0]).toMatchObject({
       label: 'Sim rest of bracket',
     });

@@ -141,7 +141,7 @@ describe('FullCourtSeasonView sections', () => {
   test('keeps the existing props working without a section', () => {
     const body = renderView({});
     expect(body).toContain('aria-label="Full Court season progress"');
-    expect(body).toContain('Sim next game');
+    expect(body).toContain('Play next game');
     expect(body).not.toContain('aria-label="Full Court regular season"');
   });
 
@@ -194,7 +194,7 @@ describe('FullCourtSeasonView sections', () => {
       restingPlayerIds: [second.playerId],
     });
     expect(blocked).toContain('Uncheck rest until at least five players can play');
-    expect(blocked).not.toContain('Sim next game');
+    expect(blocked).not.toContain('Play next game');
   });
 
   test('home shows the postseason screen once the bracket exists', () => {
@@ -204,7 +204,7 @@ describe('FullCourtSeasonView sections', () => {
       playoff: bracketView(),
     });
     expect(body).toContain('Postseason');
-    expect(body).toContain('Sim next game');
+    expect(body).toContain('Play next game');
     expect(body).toContain('aria-label="Full Court postseason"');
   });
 
@@ -227,7 +227,7 @@ describe('FullCourtSeasonView sections', () => {
     });
     expect(body).toContain('aria-label="Full Court final recap"');
     expect(body).toContain('Full Court champions');
-    expect(body).not.toContain('Sim next game');
+    expect(body).not.toContain('Play next game');
     expect(body).not.toContain('Start playoffs');
   });
 
@@ -302,7 +302,7 @@ test('forfeit confirmation replaces the sim actions with the alert', () => {
   expect(body).toContain('Confirm the forfeit');
   expect(body).toContain('Confirm forfeit');
   expect(body).not.toContain('Sim remaining games');
-  expect(body).not.toContain('Sim next game');
+  expect(body).not.toContain('Play next game');
 });
 
 test('shows opponent tactical adjustment in playoff preview only once series evidence triggers it', () => {

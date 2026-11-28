@@ -1,11 +1,14 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
   import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import LoadingState from '#lib/components/ui/LoadingState.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
+  import { FULL_COURT_ACTIVE_RUN_KEY } from '#lib/features/full-court/full-court-active-run.js';
   import FullCourtReportView from '#lib/features/full-court/FullCourtReportView.svelte';
   import { loadFullCourtArt, type FullCourtArt } from '#lib/features/full-court/full-court-art.ts';
   import {
@@ -26,6 +29,11 @@
   let entry = $state.raw<FullCourtHistoryEntryView | null>(null);
   let data = $state.raw<FullCourtReportData | null>(null);
   let art = $state.raw<FullCourtArt | null>(null);
+
+  function startNewGame(): void {
+    localStorage.removeItem(FULL_COURT_ACTIVE_RUN_KEY);
+    void goto(resolve('/full-court'));
+  }
 
   onMount(() => {
     let active = true;
@@ -73,7 +81,10 @@
     <ActionLink href={resolve('/full-court/history')} tone="ghost" size="sm">
       ← Run history
     </ActionLink>
-    <ActionLink href={resolve('/full-court')} tone="ghost" size="sm">Full Court home</ActionLink>
+    <div class="flex flex-wrap items-center gap-2">
+      <ActionLink href={resolve('/full-court')} tone="ghost" size="sm">Full Court home</ActionLink>
+      <Button tone="primary" size="sm" onclick={startNewGame}>Start new game</Button>
+    </div>
   </div>
 
   {#if loading}

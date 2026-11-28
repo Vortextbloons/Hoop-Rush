@@ -136,6 +136,14 @@
       offset: pageIndex * FULL_COURT_CATALOG_PAGE_SIZE,
     }),
   );
+  const DRAFT_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+  const positionCounts = $derived(
+    DRAFT_POSITIONS.map((position) => ({
+      position,
+      count: draft.picks.filter((pick) => pick.player.positions.includes(position)).length,
+    })),
+  );
+  let rosterDetails = $state<HTMLDetailsElement>();
   const rosterPicks = $derived([...draft.picks].reverse());
   const complete = $derived(draft.stage === 'complete');
   const pageCount = $derived(
@@ -380,106 +388,126 @@
           ></span>
         {/each}
       </div>
+      <dl class="mt-2 grid grid-cols-5 gap-1 text-center" aria-label="Roster position coverage">
+        {#each positionCounts as { position, count } (position)}
+          <div class="rounded-md bg-surface-2 py-1">
+            <dt class="ui-micro">{position}</dt>
+            <dd class="font-mono text-sm font-semibold tabular-nums">{count}</dd>
+          </div>
+        {/each}
+      </dl>
+      <p class="mt-1 text-xs text-muted-foreground">Players count at every listed position.</p>
       <p class="ui-micro mt-1.5">Six needed to lock</p>
     </div>
   </header>
 
   <div class="mt-4 space-y-3">
     <Panel as="section" class="px-4 py-2.5 sm:px-5 sm:py-3" aria-label="Draft payroll and budget">
-      <div
-        class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
-      >
-        <div class="flex items-center justify-between gap-3 lg:block">
-          <div>
-            <p class="ui-label text-muted-foreground">Player payroll</p>
-            <p
-              class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums {summary.status ===
-              'illegal'
-                ? 'text-negative'
-                : ''}"
-            >
-              {formatMillions(summary.payrollDollars)}
+      <details>
+        <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold">
+          Payroll {formatMillions(summary.payrollDollars)} · Budget {formatMillions(
+            summary.warChestDollars,
+          )}
+        </summary>
+        <div class="pb-2 pt-2">
+          <div
+            class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(260px,auto)] lg:items-center lg:gap-5"
+          >
+            <div class="flex items-center justify-between gap-3 lg:block">
+              <div>
+                <p class="ui-label text-muted-foreground">Player payroll</p>
+                <p
+                  class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums {summary.status ===
+                  'illegal'
+                    ? 'text-negative'
+                    : ''}"
+                >
+                  {formatMillions(summary.payrollDollars)}
+                </p>
+              </div>
+              <span
+                class="inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.1em] uppercase lg:mt-1 {statusSummaryTone(
+                  summary.status,
+                )}">{capStatusLabel(summary.status)}</span
+              >
+            </div>
+
+            <div class="min-w-0">
+              <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
+                <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}
+                ></span>
+                <span
+                  class="absolute inset-y-0 bg-accent/70"
+                  style:left={`${capPct}%`}
+                  style:width={`${firstApronPct - capPct}%`}
+                ></span>
+                <span
+                  class="absolute inset-y-0 bg-primary/70"
+                  style:left={`${firstApronPct}%`}
+                  style:width={`${100 - firstApronPct}%`}
+                ></span>
+                {#if payrollPct > 0}
+                  <span
+                    class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
+                    style:left={`calc(${payrollPct}% - 1px)`}
+                  ></span>
+                {/if}
+              </div>
+              <div
+                class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
+              >
+                <span class="flex justify-between" style:width={`${capPct}%`}>
+                  <span>$0</span><span>{formatMillions(draft.money.capLineDollars)}</span>
+                </span>
+                <span
+                  class="invisible text-center sm:visible"
+                  style:width={`${firstApronPct - capPct}%`}
+                >
+                  {formatMillions(draft.money.firstApronDollars)}
+                </span>
+                <span class="text-right" style:width={`${100 - firstApronPct}%`}>
+                  {formatMillions(draft.money.hardLimitDollars)}
+                </span>
+              </div>
+            </div>
+
+            <StatGrid columns={3} mobile={3}>
+              <StatTile
+                label="Room"
+                size="sm"
+                surface="tile"
+                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+                tone={summary.payrollRoomDollars < 0 ? 'negative' : 'default'}
+                value={formatMillions(summary.payrollRoomDollars)}
+              />
+              <StatTile
+                label="Budget"
+                size="sm"
+                surface="tile"
+                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+                tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
+                value={formatMillions(summary.warChestDollars)}
+              />
+              <StatTile
+                label="Spent"
+                size="sm"
+                surface="tile"
+                valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+                value={formatMillions(summary.spentDollars)}
+              />
+            </StatGrid>
+          </div>
+
+          <div
+            class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
+          >
+            <p class="text-[11px] font-bold">{depthLabel}</p>
+            <p class="ui-micro">
+              {FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players
             </p>
           </div>
-          <span
-            class="inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.1em] uppercase lg:mt-1 {statusSummaryTone(
-              summary.status,
-            )}">{capStatusLabel(summary.status)}</span
-          >
         </div>
-
-        <div class="min-w-0">
-          <div class="relative h-2.5 w-full overflow-hidden rounded-full bg-surface-3">
-            <span class="absolute inset-y-0 left-0 bg-positive/70" style:width={`${capPct}%`}
-            ></span>
-            <span
-              class="absolute inset-y-0 bg-accent/70"
-              style:left={`${capPct}%`}
-              style:width={`${firstApronPct - capPct}%`}
-            ></span>
-            <span
-              class="absolute inset-y-0 bg-primary/70"
-              style:left={`${firstApronPct}%`}
-              style:width={`${100 - firstApronPct}%`}
-            ></span>
-            {#if payrollPct > 0}
-              <span
-                class="absolute inset-y-0 w-0.5 bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.65)]"
-                style:left={`calc(${payrollPct}% - 1px)`}
-              ></span>
-            {/if}
-          </div>
-          <div
-            class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
-          >
-            <span class="flex justify-between" style:width={`${capPct}%`}>
-              <span>$0</span><span>{formatMillions(draft.money.capLineDollars)}</span>
-            </span>
-            <span
-              class="invisible text-center sm:visible"
-              style:width={`${firstApronPct - capPct}%`}
-            >
-              {formatMillions(draft.money.firstApronDollars)}
-            </span>
-            <span class="text-right" style:width={`${100 - firstApronPct}%`}>
-              {formatMillions(draft.money.hardLimitDollars)}
-            </span>
-          </div>
-        </div>
-
-        <StatGrid columns={3} mobile={3}>
-          <StatTile
-            label="Room"
-            size="sm"
-            surface="tile"
-            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-            tone={summary.payrollRoomDollars < 0 ? 'negative' : 'default'}
-            value={formatMillions(summary.payrollRoomDollars)}
-          />
-          <StatTile
-            label="Budget"
-            size="sm"
-            surface="tile"
-            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-            tone={summary.warChestDollars === 0 ? 'negative' : 'default'}
-            value={formatMillions(summary.warChestDollars)}
-          />
-          <StatTile
-            label="Spent"
-            size="sm"
-            surface="tile"
-            valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
-            value={formatMillions(summary.spentDollars)}
-          />
-        </StatGrid>
-      </div>
-
-      <div
-        class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line-soft pt-2.5"
-      >
-        <p class="text-[11px] font-bold">{depthLabel}</p>
-        <p class="ui-micro">{FULL_COURT_MIN_ROSTER_SIZE}–{FULL_COURT_MAX_ROSTER_SIZE} players</p>
-      </div>
+      </details>
     </Panel>
 
     {#if onPurchaseReport !== undefined && !complete}
@@ -744,66 +772,71 @@
               </p>
             </div>
 
-            {#if rosterPicks.length === 0}
-              <EmptyState
-                surface="none"
-                title="No players signed yet"
-                message="Sign 6 to 12 players to start your rotation."
-              />
-            {:else}
-              <ul class="divide-y divide-line-soft">
-                {#each rosterPicks as pick (pick.player.playerVersionId)}
-                  {@const team = teamFor(pick.player)}
-                  <li class="flex min-w-0 items-center gap-2 p-2.5">
-                    <FullCourtPortrait player={pick.player} {art} size="sm" />
-                    <div class="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                        onclick={() => openProfile(pick.player.playerVersionId)}
-                      >
-                        {pick.player.displayName}
-                      </button>
-                      <p class="ui-micro flex min-w-0 items-center gap-1">
-                        {#if team !== null && art !== null}
-                          <TeamLogo
-                            manifest={art.manifest}
-                            franchiseId={team.franchiseId}
-                            teamExternalId={team.teamExternalId}
-                            className="h-3 w-3"
-                          />
-                        {/if}
-                        <span class="truncate"
-                          >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
-                          {formatPositions(pick.player.positions)}</span
+            <details bind:this={rosterDetails} open={complete}>
+              <summary class="cursor-pointer px-3 py-3 text-sm font-semibold"
+                >View signed players</summary
+              >
+              {#if rosterPicks.length === 0}
+                <EmptyState
+                  surface="none"
+                  title="No players signed yet"
+                  message="Sign 6 to 12 players to start your rotation."
+                />
+              {:else}
+                <ul class="divide-y divide-line-soft">
+                  {#each rosterPicks as pick (pick.player.playerVersionId)}
+                    {@const team = teamFor(pick.player)}
+                    <li class="flex min-w-0 items-center gap-2 p-2.5">
+                      <FullCourtPortrait player={pick.player} {art} size="sm" />
+                      <div class="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                          onclick={() => openProfile(pick.player.playerVersionId)}
                         >
-                      </p>
-                    </div>
-                    <div class="shrink-0 text-right">
-                      <FullCourtRating
-                        value={pick.player.originalOverall}
+                          {pick.player.displayName}
+                        </button>
+                        <p class="ui-micro flex min-w-0 items-center gap-1">
+                          {#if team !== null && art !== null}
+                            <TeamLogo
+                              manifest={art.manifest}
+                              franchiseId={team.franchiseId}
+                              teamExternalId={team.teamExternalId}
+                              className="h-3 w-3"
+                            />
+                          {/if}
+                          <span class="truncate"
+                            >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
+                            {formatPositions(pick.player.positions)}</span
+                          >
+                        </p>
+                      </div>
+                      <div class="shrink-0 text-right">
+                        <FullCourtRating
+                          value={pick.player.originalOverall}
+                          size="sm"
+                          layout="inline"
+                          align="right"
+                        />
+                        <p
+                          class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
+                        >
+                          {formatMillions(pick.salaryDollars)}
+                        </p>
+                      </div>
+                      <IconButton
+                        label={`Remove ${pick.player.displayName} from the roster`}
                         size="sm"
-                        layout="inline"
-                        align="right"
-                      />
-                      <p
-                        class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
+                        disabled={busy}
+                        onclick={() => onRemove(pick.player.playerVersionId)}
                       >
-                        {formatMillions(pick.salaryDollars)}
-                      </p>
-                    </div>
-                    <IconButton
-                      label={`Remove ${pick.player.displayName} from the roster`}
-                      size="sm"
-                      disabled={busy}
-                      onclick={() => onRemove(pick.player.playerVersionId)}
-                    >
-                      <X size={14} aria-hidden="true" />
-                    </IconButton>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
+                        <X size={14} aria-hidden="true" />
+                      </IconButton>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </details>
           </Panel>
         </aside>
 
@@ -1183,70 +1216,75 @@
                 </p>
               </div>
 
-              {#if rosterPicks.length === 0}
-                <EmptyState
-                  surface="none"
-                  title="No players signed yet"
-                  message="Sign 6 to 12 players to start your rotation."
-                />
-              {:else}
-                <ul
-                  class="max-h-[38vh] divide-y divide-line-soft overflow-y-auto overscroll-contain"
+              <details bind:this={rosterDetails} open={complete}>
+                <summary class="cursor-pointer px-3 py-3 text-sm font-semibold"
+                  >View signed players</summary
                 >
-                  {#each rosterPicks as pick (pick.player.playerVersionId)}
-                    {@const team = teamFor(pick.player)}
-                    <li class="flex min-w-0 items-center gap-2 p-2.5">
-                      <FullCourtPortrait player={pick.player} {art} size="sm" />
-                      <div class="min-w-0 flex-1">
-                        <button
-                          type="button"
-                          class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                          onclick={() => selectPlayer(pick.player.playerVersionId)}
-                        >
-                          {pick.player.displayName}
-                        </button>
-                        <p class="ui-micro flex min-w-0 items-center gap-1">
-                          {#if team !== null && art !== null}
-                            <TeamLogo
-                              manifest={art.manifest}
-                              franchiseId={team.franchiseId}
-                              teamExternalId={team.teamExternalId}
-                              className="h-3 w-3"
-                            />
-                          {/if}
-                          <span class="truncate"
-                            >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
-                            {formatPositions(pick.player.positions)}</span
+                {#if rosterPicks.length === 0}
+                  <EmptyState
+                    surface="none"
+                    title="No players signed yet"
+                    message="Sign 6 to 12 players to start your rotation."
+                  />
+                {:else}
+                  <ul
+                    class="max-h-[38vh] divide-y divide-line-soft overflow-y-auto overscroll-contain"
+                  >
+                    {#each rosterPicks as pick (pick.player.playerVersionId)}
+                      {@const team = teamFor(pick.player)}
+                      <li class="flex min-w-0 items-center gap-2 p-2.5">
+                        <FullCourtPortrait player={pick.player} {art} size="sm" />
+                        <div class="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            class="font-display block max-w-full truncate rounded text-left text-xs font-extrabold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            onclick={() => selectPlayer(pick.player.playerVersionId)}
                           >
-                        </p>
-                      </div>
-                      <div class="shrink-0 text-right">
-                        <FullCourtRating
-                          value={pick.player.originalOverall}
-                          size="sm"
-                          layout="inline"
-                          align="right"
-                        />
-                        <p
-                          class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
-                        >
-                          {formatMillions(pick.salaryDollars)}
-                        </p>
-                      </div>
-                      {#if !complete}
-                        <IconButton
-                          label={`Remove ${pick.player.displayName} from the roster`}
-                          size="sm"
-                          disabled={busy}
-                          onclick={() => onRemove(pick.player.playerVersionId)}
-                        >
-                          <X size={14} aria-hidden="true" />
-                        </IconButton>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
+                            {pick.player.displayName}
+                          </button>
+                          <p class="ui-micro flex min-w-0 items-center gap-1">
+                            {#if team !== null && art !== null}
+                              <TeamLogo
+                                manifest={art.manifest}
+                                franchiseId={team.franchiseId}
+                                teamExternalId={team.teamExternalId}
+                                className="h-3 w-3"
+                              />
+                            {/if}
+                            <span class="truncate"
+                              >{teamShortLabel(pick.player)} · {pick.player.seasonKey} ·
+                              {formatPositions(pick.player.positions)}</span
+                            >
+                          </p>
+                        </div>
+                        <div class="shrink-0 text-right">
+                          <FullCourtRating
+                            value={pick.player.originalOverall}
+                            size="sm"
+                            layout="inline"
+                            align="right"
+                          />
+                          <p
+                            class="mt-0.5 font-mono text-[10px] font-bold tabular-nums text-muted-foreground"
+                          >
+                            {formatMillions(pick.salaryDollars)}
+                          </p>
+                        </div>
+                        {#if !complete}
+                          <IconButton
+                            label={`Remove ${pick.player.displayName} from the roster`}
+                            size="sm"
+                            disabled={busy}
+                            onclick={() => onRemove(pick.player.playerVersionId)}
+                          >
+                            <X size={14} aria-hidden="true" />
+                          </IconButton>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </details>
 
               <div class="space-y-2.5 border-t border-line-soft p-3">
                 <p class="text-[11px] leading-snug font-semibold">{absenceLabel}</p>
@@ -1296,6 +1334,9 @@
     >
       <a
         href="#draft-roster"
+        onclick={() => {
+          if (rosterDetails) rosterDetails.open = true;
+        }}
         class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-bold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Users size={14} aria-hidden="true" />

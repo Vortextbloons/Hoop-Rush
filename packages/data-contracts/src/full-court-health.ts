@@ -6,6 +6,7 @@ export const FULL_COURT_HEALTH_VERSION = 'full-court-health-v1';
 
 export const fullCourtPlayerHealthSchema = z.object({
   loadBasisPoints: z.number().int().min(0).max(10_000),
+  cumulativeLoadBasisPoints: z.number().int().min(1).max(10_000).optional(),
   availableFromDay: z.number().int().nonnegative().nullable(),
 });
 export type FullCourtPlayerHealth = z.infer<typeof fullCourtPlayerHealthSchema>;

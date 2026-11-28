@@ -22,7 +22,14 @@
   /** Per-game rows keyed by player, so a card can show what the season actually produced. */
   const statsByPlayer = $derived(new Map(data.playerRows.map((row) => [row.playerId, row])));
   const rotation = $derived(data.record.coaching.rotation);
-  const starters = $derived(new Set(rotation?.startingFive ?? []));
+  const starters = $derived.by(() => {
+    if (rotation !== undefined) return new Set(rotation.startingFive);
+    const byStarts = [...data.playerRows]
+      .filter((row) => row.starts > 0)
+      .sort((a, b) => b.starts - a.starts || b.mpg - a.mpg || b.ppg - a.ppg)
+      .slice(0, 5);
+    return new Set(byStarts.map((row) => row.playerId));
+  });
   const closers = $derived(new Set(rotation?.closingFive ?? []));
 
   function minutesFor(playerId: string): number | null {

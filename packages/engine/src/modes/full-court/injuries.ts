@@ -62,6 +62,7 @@ export interface FullCourtInjuryParticipant {
   readonly playerVersionId: string | undefined;
   /** Historical minutes per game from the simulation anchors, when available. */
   readonly historicalMpg: number | null;
+  readonly workloadRiskMultiplier?: number;
   readonly seconds: number;
   readonly available: boolean;
 }
@@ -218,7 +219,8 @@ export function drawFullCourtInjuries(
     const probability = Math.min(
       1,
       (profile.episodesPer10kAppearances / APPEARANCES_PER_RATE) *
-        fullCourtInjuryExposureFactor(participant.seconds, participant.historicalMpg),
+        fullCourtInjuryExposureFactor(participant.seconds, participant.historicalMpg) *
+        (participant.workloadRiskMultiplier ?? 1),
     );
     if (probability <= 0) continue;
     const rng = input.context.rngFactory(

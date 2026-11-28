@@ -21,7 +21,7 @@
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
-  import { trueShootingPct, usagePossessions } from '#lib/format.js';
+  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
 
   let {
     awards,
@@ -54,24 +54,30 @@
     rosterStats.reduce((sum, row) => sum + usagePossessions(row.fga, row.fta, row.turnovers), 0),
   );
 
-  const statColumns = $derived(
-    seasonStatColumns<FullCourtPlayerSeasonRow>({
-      games: (row) => row.games,
-      points: (row) => row.ppg.toFixed(1),
-      rebounds: (row) => row.rpg.toFixed(1),
-      assists: (row) => row.apg.toFixed(1),
-      steals: (row) => row.spg.toFixed(1),
-      blocks: (row) => row.bpg.toFixed(1),
-      turnovers: (row) => row.topg.toFixed(1),
-      fgPct: (row) => (row.fgPct === null ? '—' : row.fgPct.toFixed(1)),
-      threePct: (row) => (row.tpPct === null ? '—' : row.tpPct.toFixed(1)),
-      tsPct: (row) => trueShootingPct(row.points, row.fga, row.fta),
-      usagePct: (row) =>
-        teamUsage === 0
-          ? '—'
-          : `${((usagePossessions(row.fga, row.fta, row.turnovers) / teamUsage) * 100).toFixed(1)}`,
-    }),
-  );
+  const statColumns = $derived.by(() => {
+    const columns = seasonStatColumns<FullCourtPlayerSeasonRow>(
+      {
+        games: (row) => row.games,
+        points: (row) => row.ppg.toFixed(1),
+        rebounds: (row) => row.rpg.toFixed(1),
+        assists: (row) => row.apg.toFixed(1),
+        steals: (row) => row.spg.toFixed(1),
+        blocks: (row) => row.bpg.toFixed(1),
+        turnovers: (row) => row.topg.toFixed(1),
+        fgPct: (row) => (row.fgPct === null ? '—' : row.fgPct.toFixed(1)),
+        threePct: (row) => (row.tpPct === null ? '—' : row.tpPct.toFixed(1)),
+        ftPct: (row) => (row.ftPct === null ? '—' : row.ftPct.toFixed(1)),
+        tsPct: (row) => trueShootingPct(row.points, row.fga, row.fta),
+        usagePct: (row) => usagePct(usagePossessions(row.fga, row.fta, row.turnovers), teamUsage),
+      },
+      { includeGames: true },
+    );
+    return [
+      ...columns.slice(0, 1),
+      { key: 'mpg', label: 'MPG', value: (row: FullCourtPlayerSeasonRow) => row.mpg.toFixed(1) },
+      ...columns.slice(1),
+    ];
+  });
 
   const teamRows = $derived([...rosterStats].sort((left, right) => right.mpg - left.mpg));
 </script>

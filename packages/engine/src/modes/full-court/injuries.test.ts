@@ -120,6 +120,26 @@ test('a longer outing against the same minutes raises the seeded injury count', 
   expect(long).toBeGreaterThan(short);
 });
 
+test('cumulative workload increases injury draws at identical minutes', () => {
+  const [player] = fullCourtTestRoster('cumulative-injury', 1);
+  if (!player) throw new Error('Missing workload player');
+  const profiles = profilesOf([{ playerVersionId: versionIdOf(player), rate: 2_000 }]);
+  const count = (workloadRiskMultiplier: number) =>
+    Array.from(
+      { length: 100 },
+      (_, index) =>
+        drawFullCourtInjuries({
+          seed: fullCourtTestSeed(`cumulative-injury-${String(index)}`),
+          dayOffset: 0,
+          teamId: 'home',
+          participants: [participantOf(player, { workloadRiskMultiplier })],
+          profiles,
+          context,
+        }).length,
+    ).reduce((total, games) => total + games, 0);
+  expect(count(1.6)).toBeGreaterThan(count(1));
+});
+
 test('missed games resolve through supplied days and project conservatively past them', () => {
   expect(projectFullCourtInjuryReturn(0, [3, 5, 7], 1)).toEqual({
     availableFromDay: 4,

@@ -101,6 +101,16 @@
       column.key === 'points' ? { ...column, cellClass: 'ui-stats-value-strong' } : column,
     );
 
+    const withMinutes: PlayerStatColumn<FullCourtPlayerSeasonRow>[] = [
+      ...columns.slice(0, 1),
+      {
+        key: 'mpg',
+        label: totals ? 'MIN' : 'MPG',
+        value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
+      },
+      ...columns.slice(1),
+    ];
+
     if (statScope === 'leaders') {
       return [
         {
@@ -110,10 +120,10 @@
           value: (row) => franchiseAbbreviation(row.teamId),
           cellClass: 'text-muted-foreground',
         },
-        ...columns,
+        ...withMinutes,
       ];
     }
-    return columns;
+    return withMinutes;
   });
 
   const teamTotalsRow = $derived.by((): PlayerStatsTotals<FullCourtPlayerSeasonRow> | null => {

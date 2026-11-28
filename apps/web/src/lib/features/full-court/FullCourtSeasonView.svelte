@@ -114,12 +114,6 @@
   let selectedRound = $state<number | null>(null);
   let showAllLineups = $state(false);
   let selectedTeamId = $state<string | null>(null);
-  const selectedTeam = $derived(
-    selectedTeamId === null ? null : (teamsById.get(selectedTeamId) ?? null),
-  );
-  const selectedTeamStanding = $derived(
-    selectedTeamId === null ? null : (standingsById.get(selectedTeamId) ?? null),
-  );
 
   onMount(() => {
     let mounted = true;
@@ -159,6 +153,12 @@
   );
   const rowByTeam = $derived(
     new Map([...standings.west, ...standings.east].map((row) => [row.teamId, row])),
+  );
+  const selectedTeam = $derived(
+    selectedTeamId === null ? null : (teamsById.get(selectedTeamId) ?? null),
+  );
+  const selectedTeamStanding = $derived(
+    selectedTeamId === null ? null : (rowByTeam.get(selectedTeamId) ?? null),
   );
   const userRow = $derived(rowByTeam.get(userTeamId) ?? null);
   const userIdentity = $derived(
@@ -449,7 +449,7 @@
   {@const identity = identityOf(side.teamId)}
   {@const isUser = side.teamId === userTeamId}
   <div
-    class="flex min-w-0 flex-col gap-2 rounded-xl border p-3 {isUser
+    class="flex min-w-0 flex-col gap-1 rounded-lg border p-2 sm:gap-2 sm:p-3 {isUser
       ? 'border-primary/50 bg-primary/5'
       : 'border-line-soft bg-surface-1'}"
   >
@@ -464,7 +464,7 @@
         />
       {/if}
       <p
-        class="font-display min-w-0 flex-1 truncate text-lg leading-tight font-extrabold uppercase"
+        class="font-display min-w-0 basis-full break-words text-sm leading-tight font-extrabold uppercase sm:flex-1 sm:text-lg"
         title={side.name}
       >
         {side.name}
@@ -600,6 +600,64 @@
           </div>
         </div>
       </div>
+    </div>
+
+    {#if matchup !== null}
+      <div class="mt-4 rounded-xl border border-primary/30 bg-surface-2/50 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="ui-label" data-tone="muted">{matchup.label}</p>
+          {#if matchup.series !== null}
+            <Badge tone="accent">
+              Series {matchup.series.userWins}–{matchup.series.opponentWins}
+            </Badge>
+          {:else}
+            <Badge tone={matchup.phase === 'playoff' ? 'accent' : 'neutral'}>
+              {matchup.phase === 'playoff' ? 'Postseason' : 'Next game'}
+            </Badge>
+          {/if}
+        </div>
+        <div
+          class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1.5 sm:gap-2"
+        >
+          {@render matchupSide(matchup.home, matchup.phase === 'playoff' ? null : 'Home')}
+          <span
+            class="self-center text-center font-mono text-[10px] text-muted-foreground uppercase"
+            >vs</span
+          >
+          {@render matchupSide(matchup.away, matchup.phase === 'playoff' ? null : 'Away')}
+        </div>
+        {@render simControlsBar()}
+        {#if matchup.userSide !== null && matchup.series === null}
+          <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">
+            Your five {matchup.userSide === 'home' ? 'host this game' : 'travel for this game'}
+          </p>
+        {/if}
+        {#if matchup.phase === 'playoff' && matchup.userSide !== null && userPlayoffAdjustment !== null}
+          <div
+            class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
+            aria-label="Playoff opponent adjustment"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="ui-label text-muted-foreground">Opponent adjustment</p>
+              <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
+            </div>
+            <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
+            <p class="mt-0.5 text-[11px] text-muted-foreground">
+              {userPlayoffAdjustment.detailLabel}
+            </p>
+          </div>
+        {/if}
+      </div>
+    {:else if playoff !== null && championId === null}
+      <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
+        No game is ready for your five. The rest of the bracket is finishing.
+      </p>
+      {@render simControlsBar()}
+    {:else}
+      {@render simControlsBar()}
+    {/if}
+
+    <div class="mt-4">
       <StatGrid columns={3} mobile={3} gap="md">
         <StatTile label="Remaining" size="md" surface="tile" value={remaining} />
         <StatTile
@@ -622,63 +680,10 @@
         />
       </StatGrid>
     </div>
-
-    {#if matchup !== null}
-      <div class="mt-4 rounded-xl border border-primary/30 bg-surface-2/50 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="ui-label" data-tone="muted">{matchup.label}</p>
-          {#if matchup.series !== null}
-            <Badge tone="accent">
-              Series {matchup.series.userWins}–{matchup.series.opponentWins}
-            </Badge>
-          {:else}
-            <Badge tone={matchup.phase === 'playoff' ? 'accent' : 'neutral'}>
-              {matchup.phase === 'playoff' ? 'Postseason' : 'Next game'}
-            </Badge>
-          {/if}
-        </div>
-        <div
-          class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-stretch"
-        >
-          {@render matchupSide(matchup.home, matchup.phase === 'playoff' ? null : 'Home')}
-          <span
-            class="self-center text-center font-mono text-[10px] text-muted-foreground uppercase"
-            >vs</span
-          >
-          {@render matchupSide(matchup.away, matchup.phase === 'playoff' ? null : 'Away')}
-        </div>
-        {#if matchup.userSide !== null && matchup.series === null}
-          <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">
-            Your five {matchup.userSide === 'home' ? 'host this game' : 'travel for this game'}
-          </p>
-        {/if}
-        {#if matchup.phase === 'playoff' && matchup.userSide !== null && userPlayoffAdjustment !== null}
-          <div
-            class="mt-3 rounded-xl border border-line-soft bg-surface-1 p-3"
-            aria-label="Playoff opponent adjustment"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="ui-label text-muted-foreground">Opponent adjustment</p>
-              <Badge tone="accent">{userPlayoffAdjustment.settingLabel}</Badge>
-            </div>
-            <p class="mt-1 text-[11px] font-bold">{userPlayoffAdjustment.reasonLabel}</p>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">
-              {userPlayoffAdjustment.detailLabel}
-            </p>
-          </div>
-        {/if}
-        {@render simControlsBar()}
-      </div>
-    {:else if playoff !== null && championId === null}
-      <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
-        No game is ready for your five. The rest of the bracket is finishing.
-      </p>
-      {@render simControlsBar()}
-    {:else}
-      {@render simControlsBar()}
-    {/if}
-
-    <div class="mt-4">
+    <details class="mt-4 rounded-lg border border-line-soft px-3">
+      <summary class="min-h-11 cursor-pointer content-center text-sm font-semibold"
+        >Game day readiness</summary
+      >
       <FullCourtGameDayPanel
         readiness={gameDayReadiness}
         {restingPlayerIds}
@@ -686,7 +691,7 @@
         {onRestingChange}
         {art}
       />
-    </div>
+    </details>
   </Panel>
 {/snippet}
 

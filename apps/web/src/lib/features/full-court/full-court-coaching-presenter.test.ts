@@ -536,7 +536,7 @@ describe('Full Court team minutes', () => {
       teamId: 'team',
       throughDay: 10,
       players: {
-        p1: { loadBasisPoints: 9_000, availableFromDay: null },
+        p1: { loadBasisPoints: 9_000, availableFromDay: null, cumulativeLoadBasisPoints: 6_750 },
         p2: { loadBasisPoints: 0, availableFromDay: 14 },
       },
     };
@@ -545,6 +545,7 @@ describe('Full Court team minutes', () => {
     expect(view.starters[0]?.health).toEqual({ tone: 'fatigued', label: 'Heavy load 90%' });
     expect(view.starters[1]?.health).toEqual({ tone: 'unavailable', label: 'Out to day 14' });
     expect(view.starters[2]?.health).toBeNull();
+    expect(view.starters.map((row) => row.cumulativeLoad)).toEqual([68, 0, 0, 0, 0]);
   });
 
   test('treats a return day on the fixture day as available', () => {

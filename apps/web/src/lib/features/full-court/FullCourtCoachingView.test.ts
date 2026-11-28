@@ -128,30 +128,19 @@ describe('FullCourtCoachingView', () => {
     expect(body).not.toContain('Unsaved changes');
   });
 
-  test('switches interface depth without dropping the saved rotation or rules', () => {
-    const quick = renderView({
-      plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' },
-    });
-    expect(quick).toContain('aria-label="Coaching interface"');
-    expect(quick).toContain('Set a strategy, choose your starters, and manage bench minutes.');
-    expect(quick).toContain('aria-label="Rotation source"');
-    expect(quick).toContain('aria-label="Minutes"');
-    expect(quick).toContain('aria-label="Tactics"');
-    expect(quick).toContain('aria-label="Sit Player 7"');
-    expect(quick).toContain('aria-label="Game plan summary"');
-
-    const mastermind = renderView({
-      plan: { ...CUSTOM_PLAN, interfaceLevel: 'mastermind' },
-    });
-    expect(mastermind).toContain('aria-label="Rotation source"');
-    expect(mastermind).toContain('data-testid="full-court-rule-editor"');
-    expect(mastermind).toContain('Add closing lineup');
-    expect(mastermind).toContain('Add foul trouble');
+  test('shows the roster before coaching controls on legacy plans', () => {
+    const body = renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' } });
+    expect(body).not.toContain('aria-label="Coaching interface"');
+    expect(body.indexOf('aria-label="Rotation"')).toBeLessThan(
+      body.indexOf('aria-label="Tactics"'),
+    );
+    expect(body).toContain('aria-label="Sit Player 7"');
+    expect(body).toContain('data-testid="full-court-rule-editor"');
   });
 
-  test('offers offensive roles and passing reads in Remix and Mastermind', () => {
+  test('offers offensive roles and passing targets on every saved interface level', () => {
     expect(renderView({ plan: CUSTOM_PLAN })).toContain('Top passing target');
-    expect(renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' } })).not.toContain(
+    expect(renderView({ plan: { ...CUSTOM_PLAN, interfaceLevel: 'quick' } })).toContain(
       'aria-label="Offensive roles"',
     );
 
@@ -177,7 +166,7 @@ describe('FullCourtCoachingView', () => {
     );
   });
 
-  test('shows named units only in Mastermind and offers them to closing rules', () => {
+  test('shows named units and offers them to closing rules', () => {
     const withUnits: FullCourtCoachingPlan = {
       ...CUSTOM_PLAN,
       interfaceLevel: 'mastermind',
@@ -192,7 +181,7 @@ describe('FullCourtCoachingView', () => {
         },
       ],
     };
-    expect(renderView({ plan: { ...withUnits, interfaceLevel: 'remix' } })).not.toContain(
+    expect(renderView({ plan: { ...withUnits, interfaceLevel: 'remix' } })).toContain(
       'aria-label="Named units"',
     );
 
@@ -260,8 +249,8 @@ describe('FullCourtCoachingView', () => {
     const saveBarIndex = body.indexOf('save-bar');
     expect(courtIndex).toBeGreaterThan(-1);
     expect(courtIndex).toBeGreaterThan(minutesIndex);
-    expect(tacticsIndex).toBeLessThan(minutesIndex);
-    expect(tacticsIndex).toBeLessThan(courtIndex);
+    expect(tacticsIndex).toBeGreaterThan(minutesIndex);
+    expect(tacticsIndex).toBeGreaterThan(courtIndex);
     expect(presetsIndex).toBeGreaterThan(tacticsIndex);
     expect(saveBarIndex).toBeGreaterThan(-1);
     expect(saveBarIndex).toBeLessThan(courtIndex);

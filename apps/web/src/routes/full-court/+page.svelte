@@ -28,7 +28,6 @@
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtGamecast from '#lib/features/full-court/FullCourtGamecast.svelte';
   import FullCourtRouletteView from '#lib/features/full-court/FullCourtRouletteView.svelte';
-  import FullCourtRunSummary from '#lib/features/full-court/FullCourtRunSummary.svelte';
   import { presentFullCourtHistoryEntry } from '#lib/features/full-court/full-court-history-presentation.js';
   import { getPersistence } from '#lib/persistence.js';
   import FullCourtSeasonView from '#lib/features/full-court/FullCourtSeasonView.svelte';
@@ -50,8 +49,8 @@
   let art = $state.raw<FullCourtArt | null>(null);
   let startupError = $state<string | null>(null);
   const seasonSections = [
-    { value: 'home', label: 'Overview' },
-    { value: 'team', label: 'Team & Tactics' },
+    { value: 'home', label: 'Season' },
+    { value: 'team', label: 'Team' },
     { value: 'war-room', label: 'War Room' },
     { value: 'league', label: 'League' },
     { value: 'stats', label: 'Stats & Awards' },
@@ -464,6 +463,13 @@
                     >
                       Open final report
                     </ActionLink>
+                    <Button
+                      tone="secondary"
+                      loading={current.busy}
+                      onclick={() => void abandonRun(current)}
+                    >
+                      Start new game
+                    </Button>
                     <ActionLink href={resolve('/full-court/history')} tone="secondary">
                       Run history
                     </ActionLink>

@@ -71,7 +71,7 @@
     const rawStat = (total: number, games: number): string =>
       totals ? String(Math.round(total)) : games === 0 ? '0.0' : perGameText(total, games);
 
-    return seasonStatColumns<FullCourtPlayerSeasonRow>(
+    const columns = seasonStatColumns<FullCourtPlayerSeasonRow>(
       {
         games: (row) => row.games,
         points: (row) => stat(row.points, row.ppg, row.games),
@@ -94,6 +94,15 @@
     ).map((column) =>
       column.key === 'points' ? { ...column, cellClass: 'ui-stats-value-strong' } : column,
     );
+    return [
+      ...columns.slice(0, 1),
+      {
+        key: 'mpg',
+        label: totals ? 'MIN' : 'MPG',
+        value: (row) => (totals ? String(Math.round(row.minutes)) : row.mpg.toFixed(1)),
+      },
+      ...columns.slice(1),
+    ];
   });
 
   const teamTotalsRow = $derived.by((): PlayerStatsTotals<FullCourtPlayerSeasonRow> | null => {
@@ -108,6 +117,7 @@
     const stl = sum((r) => r.steals);
     const blk = sum((r) => r.blocks);
     const tov = sum((r) => r.turnovers);
+    const min = sum((r) => r.minutes);
     const fgm = sum((r) => r.fgm);
     const fga = sum((r) => r.fga);
     const tpm = sum((r) => r.tpm);
@@ -125,6 +135,8 @@
         switch (column.key) {
           case 'games':
             return teamGames;
+          case 'mpg':
+            return fmt(min);
           case 'points':
             return fmt(pts);
           case 'rebounds':

@@ -24,6 +24,15 @@ const FULL_LOAD = 10_000;
 const RECOVERY_PER_DAY = 3_500;
 const REGULATION_LOAD = 6_000;
 const MAX_ENERGY_LOSS = 0.3;
+const CUMULATIVE_RECOVERY_PER_DAY = 240;
+const OVERLOAD_PER_MINUTE = 220;
+const CUMULATIVE_GRACE = 1_500;
+const MAX_CUMULATIVE_ENERGY_LOSS = 0.24;
+const MAX_CUMULATIVE_INJURY_INCREASE = 0.6;
+
+function cumulativeStress(load: number): number {
+  return Math.max(0, load - CUMULATIVE_GRACE) / (FULL_LOAD - CUMULATIVE_GRACE);
+}
 
 type Side = 'home' | 'away';
 
@@ -79,18 +88,26 @@ function prepareTeamHealth(
   ]) {
     if (!rosterIds.has(id)) throw new Error(`Full Court health references unknown player ${id}`);
   }
-  const recovery =
-    snapshot === undefined ? 0 : (dayOffset - snapshot.throughDay) * RECOVERY_PER_DAY;
+  const days = snapshot === undefined ? 0 : dayOffset - snapshot.throughDay;
+  const recovery = days * RECOVERY_PER_DAY;
   const players: Record<string, FullCourtPlayerHealth> = {};
   let eligible = 0;
   let playing = 0;
   const availability = team.roster.map(({ playerId }) => {
     const prior = snapshot?.players[playerId];
     const loadBasisPoints = Math.max(0, (prior?.loadBasisPoints ?? 0) - recovery);
+    const cumulativeLoadBasisPoints = Math.max(
+      0,
+      (prior?.cumulativeLoadBasisPoints ?? 0) - days * CUMULATIVE_RECOVERY_PER_DAY,
+    );
     const returnDay = prior?.availableFromDay ?? null;
     const availableFromDay = returnDay !== null && returnDay > dayOffset ? returnDay : null;
-    if (loadBasisPoints > 0 || availableFromDay !== null) {
-      players[playerId] = { loadBasisPoints, availableFromDay };
+    if (loadBasisPoints > 0 || cumulativeLoadBasisPoints > 0 || availableFromDay !== null) {
+      players[playerId] = {
+        loadBasisPoints,
+        availableFromDay,
+        ...(cumulativeLoadBasisPoints > 0 ? { cumulativeLoadBasisPoints } : {}),
+      };
     }
     const base = priorAvailability.get(playerId);
     const injured = availableFromDay !== null;
@@ -104,7 +121,10 @@ function prepareTeamHealth(
       playerId,
       available,
       ...(injured ? { reason: 'injury' as const } : resting ? { reason: 'rest' as const } : {}),
-      energy: (base?.energy ?? 1) * (1 - (MAX_ENERGY_LOSS * loadBasisPoints) / FULL_LOAD),
+      energy:
+        (base?.energy ?? 1) *
+        (1 - (MAX_ENERGY_LOSS * loadBasisPoints) / FULL_LOAD) *
+        (1 - MAX_CUMULATIVE_ENERGY_LOSS * cumulativeStress(cumulativeLoadBasisPoints)),
     };
   });
   const health: FullCourtTeamHealth = {
@@ -116,14 +136,30 @@ function prepareTeamHealth(
   return { team: { ...team, availability }, health, eligible, playing };
 }
 
-function addWorkload(health: FullCourtTeamHealth, result: FullCourtTeamResult): void {
+function addWorkload(
+  health: FullCourtTeamHealth,
+  result: FullCourtTeamResult,
+  roster: FullCourtTeamGameInput['roster'],
+): void {
+  const workloads = new Map(
+    roster.map((player) => [player.playerId, player.anchors?.minutesPerGame]),
+  );
+
   for (const player of result.players) {
     if (player.kind === 'clone' || player.seconds === 0) continue;
     const prior = health.players[player.playerId];
     const minutesLoad = Math.round(
       (player.seconds / FULL_COURT_REGULATION_SECONDS) * REGULATION_LOAD,
     );
+    const normalMinutes = Math.max(18, workloads.get(player.playerId) ?? 32);
+    const excessMinutes = Math.max(0, player.seconds / 60 - normalMinutes - 1);
+    const cumulativeLoadBasisPoints = Math.min(
+      FULL_LOAD,
+      (prior?.cumulativeLoadBasisPoints ?? 0) +
+        Math.min(CUMULATIVE_GRACE, Math.round(excessMinutes * OVERLOAD_PER_MINUTE)),
+    );
     health.players[player.playerId] = {
+      ...(cumulativeLoadBasisPoints > 0 ? { cumulativeLoadBasisPoints } : {}),
       loadBasisPoints: Math.min(FULL_LOAD, (prior?.loadBasisPoints ?? 0) + minutesLoad),
       availableFromDay: prior?.availableFromDay ?? null,
     };
@@ -134,6 +170,7 @@ function addWorkload(health: FullCourtTeamHealth, result: FullCourtTeamResult): 
 function applyInjury(health: FullCourtTeamHealth, injury: FullCourtInjuryEvent): void {
   const prior = health.players[injury.playerId];
   health.players[injury.playerId] = {
+    ...prior,
     loadBasisPoints: prior?.loadBasisPoints ?? 0,
     availableFromDay: Math.max(prior?.availableFromDay ?? 0, injury.availableFromDay),
   };
@@ -172,8 +209,6 @@ export function runFullCourtGameWithHealth(
   const run = runFullCourtGame({ ...game, home: home.team, away: away.team }, context, {
     record: options.record === true,
   });
-  addWorkload(health.home, run.result.home);
-  addWorkload(health.away, run.result.away);
   const injuries: FullCourtInjuryEvent[] = [];
   const profiles = options.injuryProfiles;
   if (profiles !== undefined) {
@@ -185,7 +220,15 @@ export function runFullCourtGameWithHealth(
         participants: fullCourtInjuryParticipants(
           prepared[side].team.roster,
           run.result[side].players.filter((player) => player.kind !== 'clone'),
-        ),
+        ).map((participant) => ({
+          ...participant,
+          workloadRiskMultiplier:
+            1 +
+            MAX_CUMULATIVE_INJURY_INCREASE *
+              cumulativeStress(
+                health[side].players[participant.playerId]?.cumulativeLoadBasisPoints ?? 0,
+              ),
+        })),
         profiles,
         futureDays: options.futureGameDays?.[side],
         context,
@@ -194,5 +237,6 @@ export function runFullCourtGameWithHealth(
       injuries.push(...drawn);
     }
   }
+  for (const side of sides) addWorkload(health[side], run.result[side], prepared[side].team.roster);
   return { kind: 'played', ...run, health, injuries };
 }

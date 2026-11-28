@@ -60,7 +60,7 @@ describe('FullCourtPostseasonView', () => {
   test('shows the Cap Rush bracket with the user series', () => {
     const body = renderPostseason({});
     expect(body).toContain('aria-label="Your playoff series"');
-    expect(body).toContain('Sim next game');
+    expect(body).toContain('Play next game');
     expect(body).toContain('Sim series');
     expect(body).toContain('aria-label="Full Court playoff bracket"');
     expect(body).toContain('Western Conference');
@@ -74,7 +74,7 @@ describe('FullCourtPostseasonView', () => {
     const body = renderPostseason({ playoff: crowned });
     expect(body).toContain('Champions.');
     expect(body).toContain('Bracket complete');
-    expect(body).not.toContain('Sim next game');
+    expect(body).not.toContain('Play next game');
   });
 
   test('tells a non-qualifier the bracket runs without them', () => {

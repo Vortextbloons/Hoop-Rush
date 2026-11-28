@@ -508,6 +508,7 @@ export interface FullCourtTeamMinutesRow {
   readonly savedMinutes: number | null;
   readonly closer: boolean;
   readonly health: FullCourtPlayerHealthView | null;
+  readonly cumulativeLoad: number;
 }
 
 export interface FullCourtTeamMinutesView {
@@ -539,6 +540,9 @@ export function fullCourtTeamMinutes(
       savedMinutes: savedMinutes?.[player.playerId] ?? null,
       closer: closers.has(player.playerId),
       health: fullCourtPlayerHealthView(health?.players[player.playerId], dayOffset),
+      cumulativeLoad: Math.round(
+        (health?.players[player.playerId]?.cumulativeLoadBasisPoints ?? 0) / 100,
+      ),
     };
   });
   const starters = rows

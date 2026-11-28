@@ -768,7 +768,7 @@ export function fullCourtHomeControls(input: {
     const userAlive = playoff.userOutcome.status === 'pending';
     return withStatus(
       {
-        primary: sim('Sim next game', 1),
+        primary: sim('Play next game', 1),
         secondary: [
           userAlive
             ? sim('Sim series', CAP_RUSH_SERIES_GAMES, { ignoreOpponentAdjustment: true })
@@ -819,7 +819,7 @@ export function fullCourtHomeControls(input: {
   }
   return withStatus(
     {
-      primary: sim('Sim next game', 1, interrupted),
+      primary: sim('Play next game', 1, interrupted),
       secondary,
     },
     'Sim one game, to the next review, or through the regular season. Batches pause at a review or an actionable injury.',

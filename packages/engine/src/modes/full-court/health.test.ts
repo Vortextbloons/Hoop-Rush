@@ -62,6 +62,53 @@ test('actual minutes carry workload into a back-to-back and days off clear it', 
   );
 });
 
+test('repeated heavy minutes outlast acute fatigue and recover with rest', () => {
+  const homeRoster = fullCourtTestRoster('cumulative', 8, () => ({ minutesPerGame: 38 }));
+  const player = homeRoster[0];
+  if (player === undefined) throw new Error('Expected a player');
+  const game = fullCourtTestInput({
+    seed: 'cumulative',
+    homeRoster,
+    homeRotation: {
+      startingFive: homeRoster.slice(0, 5).map((entry) => entry.playerId),
+      minuteTargets: Object.fromEntries(
+        homeRoster.map((entry, index) => [entry.playerId, index < 5 ? 44 : index === 5 ? 20 : 0]),
+      ),
+    },
+  });
+  const load = (health: ReturnType<typeof fullCourtTeamHealthSchema.parse>) =>
+    health.players[player.playerId]?.cumulativeLoadBasisPoints ?? 0;
+  const opener = runFullCourtGameWithHealth(game, 0, context);
+  if (opener.kind !== 'played') throw new Error('Expected an opening game');
+  const fresh = runFullCourtGameWithHealth(game, 2, context, {
+    health: { home: opener.health.home },
+  });
+  if (fresh.kind !== 'played') throw new Error('Expected a second game');
+  expect(fresh.result).toEqual(opener.result);
+
+  let home = fresh.health.home;
+  for (const day of [4, 6, 8, 10, 12]) {
+    const next = runFullCourtGameWithHealth(game, day, context, { health: { home } });
+    if (next.kind !== 'played') throw new Error('Expected a playable schedule');
+    expect(checkFullCourtGameResult(next.result)).toEqual([]);
+    home = next.health.home;
+  }
+  expect(load(home)).toBeGreaterThan(load(fresh.health.home));
+  const loaded = runFullCourtGameWithHealth(game, 14, context, { health: { home } });
+  expect(loaded).toEqual(runFullCourtGameWithHealth(game, 14, context, { health: { home } }));
+  if (loaded.kind !== 'played') throw new Error('Expected a game');
+  const energy = (result: typeof loaded.result) =>
+    result.home.players.find((line) => line.playerId === player.playerId)?.energyRemaining ?? 0;
+  expect(energy(loaded.result)).toBeLessThan(energy(fresh.result));
+
+  const rested = runFullCourtGameWithHealth(game, 14, context, {
+    health: { home },
+    restingPlayerIds: { home: [player.playerId] },
+  });
+  if (rested.kind !== 'played') throw new Error('Expected a playable rest game');
+  expect(load(rested.health.home)).toBeLessThan(load(home));
+});
+
 test('a documented injury forces a forfeit until the calendar return day', () => {
   const [injured, ...reserves] = fullCourtTestRoster('short-health', 5);
   const awayRoster = fullCourtTestRoster('short-away', 5);

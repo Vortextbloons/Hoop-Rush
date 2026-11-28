@@ -121,6 +121,19 @@ function lowWarChestSetup(): { index: FullCourtCatalogIndex; state: FullCourtDra
   };
 }
 
+test('counts a dual-position pick at both positions', () => {
+  const { index, state } = setup();
+  const complete = completedState(index, state);
+  const picks = complete.picks.map((pick, i) => ({
+    ...pick,
+    player: { ...pick.player, positions: i === 0 ? (['PG', 'SG'] as const) : (['C'] as const) },
+  }));
+  const body = renderView(fullCourtDraftStateSchema.parse({ ...complete, picks }), index);
+  const coverage = body.split('aria-label="Roster position coverage"')[1]?.split('</dl>')[0];
+  expect(coverage).toMatch(/>PG<\/dt>\s*<dd class="[^"]*tabular-nums">1<\/dd>/);
+  expect(coverage).toMatch(/>SG<\/dt>\s*<dd class="[^"]*tabular-nums">1<\/dd>/);
+});
+
 describe('FullCourtDraftView', () => {
   test('renders a 10-card positionless round offer sorted by overall with Cap Rush card actions', () => {
     const { state, index } = setup();

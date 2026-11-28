@@ -6,7 +6,6 @@
     FullCourtBlueprint,
     FullCourtCoachingPlan,
     FullCourtCoachingRule,
-    FullCourtInterfaceLevel,
     FullCourtTactics,
     FullCourtTeamHealth,
     SimulationPlayer,
@@ -106,11 +105,6 @@
     { value: 'automatic', label: 'Automatic' },
     { value: 'custom', label: 'Custom' },
   ] as const satisfies readonly { value: FullCourtRotationMode; label: string }[];
-  const INTERFACE_OPTIONS = [
-    { value: 'quick', label: 'Quick Coach' },
-    { value: 'remix', label: 'Remix' },
-    { value: 'mastermind', label: 'Mastermind' },
-  ] as const satisfies readonly { value: FullCourtInterfaceLevel; label: string }[];
   const HIERARCHY_ROLES = [
     {
       key: 'primaryPlayerId',
@@ -184,7 +178,6 @@
     { label: 'Bench', rows: minutes.bench, total: minutes.benchMinutes },
   ]);
   const blueprintRotation = $derived(activeRotationForBlueprint(draft, defaultRotation));
-  const mastermind = $derived(draft.interfaceLevel === 'mastermind' && !readOnly);
   const playerNames = $derived(
     new Map<string, string>(roster.map((player) => [player.playerId, player.displayName])),
   );
@@ -193,18 +186,6 @@
   const hasStaggerScorers = $derived(
     draft.hierarchy.primaryPlayerId !== null || draft.hierarchy.secondaryPlayerId !== null,
   );
-  const interfaceDescription = $derived(
-    draft.interfaceLevel === 'quick'
-      ? 'Set a strategy, choose your starters, and manage bench minutes.'
-      : draft.interfaceLevel === 'remix'
-        ? 'Choose team tactics, offensive roles, and who starts and closes.'
-        : 'Set lineup groups, planned unit minutes, and situational rules.',
-  );
-
-  function setInterfaceLevel(level: FullCourtInterfaceLevel): void {
-    draft.interfaceLevel = level;
-    markEdited();
-  }
 
   function addRule(kind: FullCourtCoachingRule['kind']): void {
     const ruleId = nextFullCourtRuleId(draft.rules);
@@ -559,112 +540,7 @@
           : 'Set the rotation and tactics that apply from your next game.'}
       />
 
-      <div
-        class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-3 py-2"
-      >
-        <div class="min-w-0">
-          <p class="ui-label" data-tone="muted">Coaching interface</p>
-          <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-            {interfaceDescription}
-          </p>
-        </div>
-        {#if readOnly}
-          <Badge tone={draft.interfaceLevel === 'quick' ? 'neutral' : 'primary'}>
-            {INTERFACE_OPTIONS.find((option) => option.value === draft.interfaceLevel)?.label ??
-              'Remix'}
-          </Badge>
-        {:else}
-          <SegmentedControl
-            label="Coaching interface"
-            value={draft.interfaceLevel}
-            options={INTERFACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-            onchange={setInterfaceLevel}
-          />
-        {/if}
-      </div>
-
       <div class="mt-3 grid gap-3">
-        <Panel as="section" padding="sm" aria-label="Tactics">
-          <SectionHeading
-            level={4}
-            size="sm"
-            title="Team tactics"
-            description="Set how your team plays across games."
-          />
-          <div class="mt-3 grid gap-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Pace</span>
-              <SegmentedControl
-                label="Pace"
-                value={draft.tactics.pace}
-                options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.pace = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Shot emphasis</span>
-              <SegmentedControl
-                label="Shot emphasis"
-                value={draft.tactics.offense === 'ball-movement'
-                  ? 'balanced'
-                  : draft.tactics.offense}
-                options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  if (draft.tactics.offense === 'ball-movement') draft.tactics.ballMovement = true;
-                  draft.tactics.offense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <label class="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  class="mt-1 accent-primary"
-                  disabled={locked}
-                  checked={draft.tactics.ballMovement === true ||
-                    draft.tactics.offense === 'ball-movement'}
-                  onchange={(event) => {
-                    if (draft.tactics.offense === 'ball-movement')
-                      draft.tactics.offense = 'balanced';
-                    if (event.currentTarget.checked) draft.tactics.ballMovement = true;
-                    else delete draft.tactics.ballMovement;
-                    markEdited();
-                  }}
-                />
-                <span>
-                  <span class="block text-sm font-semibold">Move the ball</span>
-                  <span class="text-xs text-muted-foreground"
-                    >More passing and assists, with more turnover risk.</span
-                  >
-                </span>
-              </label>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-sm font-semibold">Defense</span>
-              <SegmentedControl
-                label="Defense"
-                value={draft.tactics.defense}
-                options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
-                onchange={(value) => {
-                  draft.tactics.defense = value;
-                  markEdited();
-                }}
-              />
-            </div>
-          </div>
-          <p class="mt-2 text-xs text-muted-foreground">
-            {draft.tactics.defense === 'pressure'
-              ? 'Force more steals at the cost of energy and defensive rebounds.'
-              : draft.tactics.defense === 'protect-paint'
-                ? 'Give up more outside shots to protect the rim and secure rebounds.'
-                : 'Use each player’s usual defensive tendencies.'}
-          </p>
-        </Panel>
-
         <Panel as="section" padding="sm" aria-label="Rotation">
           <SectionHeading level={4} size="sm" title="Rotation">
             {#snippet actions()}
@@ -704,7 +580,12 @@
           {/if}
 
           <div class="mt-4 border-t border-line-soft pt-3" aria-label="Minutes" role="group">
-            <SectionHeading level={4} size="sm" title="Minutes">
+            <SectionHeading
+              level={4}
+              size="sm"
+              title="Minutes"
+              description="Cumulative workload reflects repeated heavy minutes. Lighter minutes and rest help it come down."
+            >
               {#snippet actions()}
                 {#if !readOnly && editingRotation}
                   <Button
@@ -811,6 +692,26 @@
                               <span>· {row.player.overall} OVR</span>
                             {/if}
                           </span>
+                          <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span class="text-xs text-muted-foreground">Workload</span>
+                            <meter
+                              class="h-2 w-12 accent-primary"
+                              min="0"
+                              max="100"
+                              low="25"
+                              high="60"
+                              optimum="0"
+                              value={row.cumulativeLoad}
+                              aria-label={`Cumulative workload for ${row.player.displayName}`}
+                            ></meter>
+                            <span
+                              class="font-mono text-xs tabular-nums {row.cumulativeLoad >= 60
+                                ? 'text-negative'
+                                : row.cumulativeLoad >= 25
+                                  ? 'text-accent'
+                                  : 'text-muted-foreground'}">{row.cumulativeLoad}%</span
+                            >
+                          </div>
                         </div>
                         {#if editingRotation && !readOnly}
                           <div class="flex shrink-0 flex-wrap items-center justify-end gap-1">
@@ -909,135 +810,213 @@
           {/if}
         </Panel>
 
-        {#if !readOnly && draft.interfaceLevel !== 'quick'}
-          <Panel as="section" padding="sm" aria-label="Offensive roles">
-            <SectionHeading
-              level={4}
-              size="sm"
-              title="Offensive roles"
-              description="Choose who takes the lead on offense and who sets up teammates."
-            />
-            <div class="mt-3 grid gap-3 md:grid-cols-3">
-              {#each HIERARCHY_ROLES as role (role.key)}
-                <label class="grid min-w-0 gap-1">
-                  <span class="text-sm font-semibold">{role.label}</span>
-                  <select
-                    class={SELECT_CLASS}
-                    aria-label={role.label}
-                    value={draft.hierarchy[role.key] ?? ''}
+        <Panel as="section" padding="sm" aria-label="Tactics">
+          <details>
+            <summary class="cursor-pointer text-sm font-semibold">Team tactics</summary>
+            <div class="mt-3 grid gap-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Pace</span>
+                <SegmentedControl
+                  label="Pace"
+                  value={draft.tactics.pace}
+                  options={PACE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    draft.tactics.pace = value;
+                    markEdited();
+                  }}
+                />
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Shot emphasis</span>
+                <SegmentedControl
+                  label="Shot emphasis"
+                  value={draft.tactics.offense === 'ball-movement'
+                    ? 'balanced'
+                    : draft.tactics.offense}
+                  options={OFFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    if (draft.tactics.offense === 'ball-movement')
+                      draft.tactics.ballMovement = true;
+                    draft.tactics.offense = value;
+                    markEdited();
+                  }}
+                />
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <label class="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    class="mt-1 accent-primary"
                     disabled={locked}
-                    onchange={(event) => setHierarchyRole(role.key, event.currentTarget.value)}
-                  >
-                    <option value="">Not set</option>
-                    {#each roster as player (player.playerId)}
-                      <option value={player.playerId}>
-                        {player.displayName} · {formatPositions(player.positions)}
-                      </option>
-                    {/each}
-                  </select>
-                  <span class="text-xs text-muted-foreground">{role.hint}</span>
+                    checked={draft.tactics.ballMovement === true ||
+                      draft.tactics.offense === 'ball-movement'}
+                    onchange={(event) => {
+                      if (draft.tactics.offense === 'ball-movement')
+                        draft.tactics.offense = 'balanced';
+                      if (event.currentTarget.checked) draft.tactics.ballMovement = true;
+                      else delete draft.tactics.ballMovement;
+                      markEdited();
+                    }}
+                  />
+                  <span>
+                    <span class="block text-sm font-semibold">Move the ball</span>
+                    <span class="text-xs text-muted-foreground"
+                      >More passing and assists, with more turnover risk.</span
+                    >
+                  </span>
                 </label>
-              {/each}
-            </div>
-            <div class="mt-4 grid gap-3 md:grid-cols-3">
-              <label class="grid gap-1">
-                <span class="text-sm font-semibold">Ball handler</span>
-                <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
-                  <option value="">Choose a player</option>
-                  {#each roster as player (player.playerId)}
-                    <option value={player.playerId}>{player.displayName}</option>
-                  {/each}
-                </select>
-              </label>
-              {#each [0, 1] as slot (slot)}
-                <label class="grid gap-1">
-                  <span class="text-sm font-semibold"
-                    >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
-                  >
-                  <select
-                    class={SELECT_CLASS}
-                    disabled={locked || readHandler === '' || (slot === 1 && reads.length === 0)}
-                    value={reads[slot] ?? ''}
-                    onchange={(event) => setRead(slot, event.currentTarget.value)}
-                  >
-                    <option value="">Use player tendencies</option>
-                    {#each roster as player (player.playerId)}
-                      {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
-                        <option value={player.playerId}>{player.displayName}</option>
-                      {/if}
-                    {/each}
-                  </select>
-                </label>
-              {/each}
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-sm font-semibold">Defense</span>
+                <SegmentedControl
+                  label="Defense"
+                  value={draft.tactics.defense}
+                  options={DEFENSE_OPTIONS.map((option) => ({ ...option, disabled: locked }))}
+                  onchange={(value) => {
+                    draft.tactics.defense = value;
+                    markEdited();
+                  }}
+                />
+              </div>
             </div>
             <p class="mt-2 text-xs text-muted-foreground">
-              The top target gets the strongest preference. Players still follow their tendencies.
+              {draft.tactics.defense === 'pressure'
+                ? 'Force more steals at the cost of energy and defensive rebounds.'
+                : draft.tactics.defense === 'protect-paint'
+                  ? 'Give up more outside shots to protect the rim and secure rebounds.'
+                  : 'Use each player’s usual defensive tendencies.'}
             </p>
-            {#each draft.units as unit, index (index)}
-              <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
-                <legend class="text-sm font-semibold">{unit.name}</legend>
-                {#if scoutedRoster !== null}
-                  {@const strengths = fullCourtLineupFitReport(
-                    scoutedRoster.filter((player) => unit.playerIds.includes(player.playerId)),
-                  ).strengths}
-                  {#if strengths.length}
-                    <p class="text-xs text-muted-foreground md:col-span-2">
-                      {strengths.map((strength) => LINEUP_FINDING_LABELS[strength.code]).join(', ')}
-                    </p>
-                  {/if}
-                {/if}
-                {#each ['floorGeneralPlayerId', 'primaryPlayerId'] as role (role)}
-                  {@const key =
-                    role === 'primaryPlayerId' ? 'primaryPlayerId' : 'floorGeneralPlayerId'}
+          </details>
+        </Panel>
+
+        {#if !readOnly}
+          <Panel as="section" padding="sm" aria-label="Offensive roles">
+            <details>
+              <summary class="cursor-pointer text-sm font-semibold">Offensive roles</summary>
+              <div class="mt-3 grid gap-3 md:grid-cols-3">
+                {#each HIERARCHY_ROLES as role (role.key)}
+                  <label class="grid min-w-0 gap-1">
+                    <span class="text-sm font-semibold">{role.label}</span>
+                    <select
+                      class={SELECT_CLASS}
+                      aria-label={role.label}
+                      value={draft.hierarchy[role.key] ?? ''}
+                      disabled={locked}
+                      onchange={(event) => setHierarchyRole(role.key, event.currentTarget.value)}
+                    >
+                      <option value="">Not set</option>
+                      {#each roster as player (player.playerId)}
+                        <option value={player.playerId}>
+                          {player.displayName} · {formatPositions(player.positions)}
+                        </option>
+                      {/each}
+                    </select>
+                    <span class="text-xs text-muted-foreground">{role.hint}</span>
+                  </label>
+                {/each}
+              </div>
+              <div class="mt-4 grid gap-3 md:grid-cols-3">
+                <label class="grid gap-1">
+                  <span class="text-sm font-semibold">Ball handler</span>
+                  <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
+                    <option value="">Choose a player</option>
+                    {#each roster as player (player.playerId)}
+                      <option value={player.playerId}>{player.displayName}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#each [0, 1] as slot (slot)}
                   <label class="grid gap-1">
-                    <span class="text-xs"
-                      >{key === 'primaryPlayerId' ? 'Scoring priority' : 'Initiator'}</span
+                    <span class="text-sm font-semibold"
+                      >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
                     >
                     <select
                       class={SELECT_CLASS}
-                      disabled={locked}
-                      value={unitRoles(unit)?.[key] ?? ''}
-                      onchange={(event) => setUnitRole(unit, key, event.currentTarget.value)}
+                      disabled={locked || readHandler === '' || (slot === 1 && reads.length === 0)}
+                      value={reads[slot] ?? ''}
+                      onchange={(event) => setRead(slot, event.currentTarget.value)}
                     >
-                      <option value="">Use team role</option>
-                      {#each unit.playerIds as id (id)}
-                        <option value={id}>{playerNames.get(id)}</option>
+                      <option value="">Use player tendencies</option>
+                      {#each roster as player (player.playerId)}
+                        {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
+                          <option value={player.playerId}>{player.displayName}</option>
+                        {/if}
                       {/each}
                     </select>
                   </label>
                 {/each}
-              </fieldset>
-            {/each}
-            <div class="mt-4 rounded-lg border border-line-soft bg-surface-1 px-3 py-2.5">
-              <label class="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  class="mt-0.5 size-4 shrink-0 accent-primary"
-                  checked={draft.staggerStars}
-                  disabled={locked}
-                  onchange={(event) => {
-                    draft.staggerStars = event.currentTarget.checked;
-                    markEdited();
-                  }}
-                />
-                <span class="min-w-0">
-                  <span class="block text-sm font-semibold">Stagger stars</span>
-                  <span class="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                    Keep at least one primary or secondary option on the floor when available.
-                    Foul-outs, injuries, exhaustion, and explicit rules still take priority.
-                  </span>
-                  {#if !hasStaggerScorers}
-                    <span class="mt-1 block text-[11px] font-semibold text-accent">
-                      Assign a primary or secondary option to use this preference.
-                    </span>
+              </div>
+              <p class="mt-2 text-xs text-muted-foreground">
+                The top target gets the strongest preference. Players still follow their tendencies.
+              </p>
+              {#each draft.units as unit, index (index)}
+                <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
+                  <legend class="text-sm font-semibold">{unit.name}</legend>
+                  {#if scoutedRoster !== null}
+                    {@const strengths = fullCourtLineupFitReport(
+                      scoutedRoster.filter((player) => unit.playerIds.includes(player.playerId)),
+                    ).strengths}
+                    {#if strengths.length}
+                      <p class="text-xs text-muted-foreground md:col-span-2">
+                        {strengths
+                          .map((strength) => LINEUP_FINDING_LABELS[strength.code])
+                          .join(', ')}
+                      </p>
+                    {/if}
                   {/if}
-                </span>
-              </label>
-            </div>
+                  {#each ['floorGeneralPlayerId', 'primaryPlayerId'] as role (role)}
+                    {@const key =
+                      role === 'primaryPlayerId' ? 'primaryPlayerId' : 'floorGeneralPlayerId'}
+                    <label class="grid gap-1">
+                      <span class="text-xs"
+                        >{key === 'primaryPlayerId' ? 'Scoring priority' : 'Initiator'}</span
+                      >
+                      <select
+                        class={SELECT_CLASS}
+                        disabled={locked}
+                        value={unitRoles(unit)?.[key] ?? ''}
+                        onchange={(event) => setUnitRole(unit, key, event.currentTarget.value)}
+                      >
+                        <option value="">Use team role</option>
+                        {#each unit.playerIds as id (id)}
+                          <option value={id}>{playerNames.get(id)}</option>
+                        {/each}
+                      </select>
+                    </label>
+                  {/each}
+                </fieldset>
+              {/each}
+              <div class="mt-4 rounded-lg border border-line-soft bg-surface-1 px-3 py-2.5">
+                <label class="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    class="mt-0.5 size-4 shrink-0 accent-primary"
+                    checked={draft.staggerStars}
+                    disabled={locked}
+                    onchange={(event) => {
+                      draft.staggerStars = event.currentTarget.checked;
+                      markEdited();
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold">Stagger stars</span>
+                    <span class="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                      Keep at least one primary or secondary option on the floor when available.
+                      Foul-outs, injuries, exhaustion, and explicit rules still take priority.
+                    </span>
+                    {#if !hasStaggerScorers}
+                      <span class="mt-1 block text-[11px] font-semibold text-accent">
+                        Assign a primary or secondary option to use this preference.
+                      </span>
+                    {/if}
+                  </span>
+                </label>
+              </div>
+            </details>
           </Panel>
         {/if}
 
-        {#if mastermind}
+        {#if !readOnly}
           <Panel as="section" padding="sm" aria-label="Named units">
             <details>
               <summary
@@ -1157,7 +1136,7 @@
           </Panel>
         {/if}
 
-        {#if mastermind}
+        {#if !readOnly}
           <Panel as="section" padding="sm" aria-label="Coaching rules">
             <details>
               <summary
@@ -1187,16 +1166,9 @@
             </details>
           </Panel>
         {/if}
-        {#if readOnly || draft.interfaceLevel === 'quick'}
+        {#if readOnly}
           <Panel as="section" padding="sm" aria-label="Game plan summary">
-            <SectionHeading
-              level={4}
-              size="sm"
-              title="Game plan"
-              description={readOnly
-                ? undefined
-                : 'Open Remix for offensive roles and Mastermind for lineup rules.'}
-            />
+            <SectionHeading level={4} size="sm" title="Game plan" />
             <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               {#each HIERARCHY_ROLES as role (role.key)}
                 {@const id = draft.hierarchy[role.key]}
