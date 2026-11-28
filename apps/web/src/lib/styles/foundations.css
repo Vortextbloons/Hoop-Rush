@@ -135,7 +135,7 @@
   }
 
   /*
-   * Range input with a themed track, a filled lead-in, and a ringed thumb that
+   * Range input with a themed track, a filled lead-in, and a bordered thumb that
    * always sits inside the control box. Set --ui-range-progress (a percentage)
    * on the element to drive the fill.
    */
@@ -180,7 +180,6 @@
     border: 2px solid var(--color-card);
     border-radius: 999px;
     background: var(--color-primary);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, transparent);
     appearance: none;
     -webkit-appearance: none;
   }
@@ -204,7 +203,6 @@
     border: 2px solid var(--color-card);
     border-radius: 999px;
     background: var(--color-primary);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, transparent);
   }
 
   @media (pointer: coarse) {

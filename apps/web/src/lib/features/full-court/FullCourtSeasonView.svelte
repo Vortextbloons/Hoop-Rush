@@ -4,6 +4,7 @@
     CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
     CAP_RUSH_CONFERENCE_NAMES,
     franchiseAbbreviation,
+    type FullCourtDraftState,
     type FullCourtSeasonCheckpoint,
     type FullCourtSeasonScore,
     type FullCourtTeamHealth,
@@ -21,6 +22,7 @@
     buildFullCourtAwards,
     buildFullCourtSeasonStats,
     fullCourtStandings,
+    type FullCourtCatalogIndex,
     type FullCourtSeasonLock,
   } from '@hoop-rush/engine';
   import { Dialog } from 'bits-ui';
@@ -86,6 +88,8 @@
     onEditRotation,
     onEditMatchups,
     coachingDirty = false,
+    draft = null,
+    index = null,
   }: {
     lock: FullCourtSeasonLock;
     checkpoint: FullCourtSeasonCheckpoint;
@@ -112,6 +116,8 @@
     onEditRotation?: () => void;
     onEditMatchups?: () => void;
     coachingDirty?: boolean;
+    draft?: FullCourtDraftState | null;
+    index?: FullCourtCatalogIndex | null;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -1120,6 +1126,8 @@
       isUserTeam={selectedTeam.teamId === userTeamId}
       {manifest}
       {art}
+      {draft}
+      {index}
     />
   {/if}
 </DialogShell>

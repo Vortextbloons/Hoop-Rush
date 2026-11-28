@@ -175,6 +175,12 @@ describe('FullCourtCoachingView', () => {
       },
     });
     expect(mastermind).toContain('aria-label="Offensive roles"');
+    expect(mastermind).toContain('aria-label="Ball handler"');
+    expect(mastermind).toContain('Choose ball handler');
+    expect(mastermind).toContain('aria-label="Top passing target"');
+    expect(mastermind).toContain('aria-label="Second passing target"');
+    expect(mastermind).toContain('Use player tendencies');
+    expect(mastermind).not.toContain('aria-label="Ball handler" disabled');
     expect(mastermind).toContain('aria-label="Primary option"');
     expect(mastermind).toContain('aria-label="Second option"');
     expect(mastermind).toContain('aria-label="Floor general"');

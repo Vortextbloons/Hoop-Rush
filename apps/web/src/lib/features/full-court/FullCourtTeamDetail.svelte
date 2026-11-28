@@ -1,11 +1,13 @@
 <script lang="ts">
   import {
     CAP_RUSH_CONFERENCE_NAMES,
+    type FullCourtDraftState,
     type FullCourtSeasonScore,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import {
     buildFullCourtPlayerSeasonStats,
+    type FullCourtCatalogIndex,
     type FullCourtPlayerSeasonRow,
     type FullCourtSeasonLock,
     type FullCourtStandingsRow,
@@ -26,6 +28,7 @@
     usageSharePct,
   } from '#lib/format.js';
   import type { FullCourtArt } from './full-court-art.ts';
+  import FullCourtPlayerScoutSheet from './FullCourtPlayerScoutSheet.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
 
   type LeagueTeam = FullCourtSeasonLock['season']['teams'][number];
@@ -37,6 +40,8 @@
     isUserTeam = false,
     manifest = null,
     art = null,
+    draft = null,
+    index = null,
   }: {
     team: LeagueTeam;
     standing: FullCourtStandingsRow | null;
@@ -44,9 +49,14 @@
     isUserTeam?: boolean;
     manifest?: HoopRushManifest | null;
     art?: FullCourtArt | null;
+    draft?: FullCourtDraftState | null;
+    index?: FullCourtCatalogIndex | null;
   } = $props();
 
   let statValues = $state<'game' | 'totals'>('game');
+  let scoutPlayerId = $state<string | null>(null);
+
+  const canScout = $derived(isUserTeam && draft !== null && index !== null);
 
   const identity = $derived(manifest === null ? null : franchiseIdentityOf(manifest, team.teamId));
   const gamesPlayed = $derived(standing === null ? 0 : standing.wins + standing.losses);
@@ -276,13 +286,41 @@
     stickyIdentity
   >
     {#snippet identity(row)}
-      <span class="ui-stats-player">
-        <FullCourtPortrait player={row} {art} size="sm" />
-        <span class="ui-stats-player-text">
-          <span class="ui-stats-player-name">{row.displayName}</span>
-          <span class="ui-stats-player-meta">{row.positions.slice(0, 2).join('/')}</span>
+      {#if canScout}
+        <button
+          type="button"
+          class="ui-stats-player min-h-10 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
+          aria-haspopup="dialog"
+          aria-label={`View ${row.displayName} scouting report`}
+          onclick={() => (scoutPlayerId = row.playerId)}
+        >
+          <FullCourtPortrait player={row} {art} size="sm" />
+          <span class="ui-stats-player-text">
+            <span class="ui-stats-player-name">{row.displayName}</span>
+            <span class="ui-stats-player-meta">{row.positions.slice(0, 2).join('/')}</span>
+          </span>
+        </button>
+      {:else}
+        <span class="ui-stats-player">
+          <FullCourtPortrait player={row} {art} size="sm" />
+          <span class="ui-stats-player-text">
+            <span class="ui-stats-player-name">{row.displayName}</span>
+            <span class="ui-stats-player-meta">{row.positions.slice(0, 2).join('/')}</span>
+          </span>
         </span>
-      </span>
+      {/if}
     {/snippet}
   </PlayerStatsSection>
 </div>
+
+{#if canScout && draft !== null && index !== null}
+  <FullCourtPlayerScoutSheet
+    {draft}
+    {index}
+    {art}
+    playerId={scoutPlayerId}
+    onOpenChange={(open) => {
+      if (!open) scoutPlayerId = null;
+    }}
+  />
+{/if}

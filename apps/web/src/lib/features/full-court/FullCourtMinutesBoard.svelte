@@ -364,7 +364,7 @@
 
   @media (min-width: 640px) {
     .minute-row {
-      grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 11rem) auto;
+      grid-template-columns: auto minmax(0, 1fr) minmax(7.5rem, 10rem) auto;
       grid-template-areas: 'portrait id control actions';
     }
   }
@@ -462,7 +462,7 @@
   .minute-control {
     display: grid;
     min-width: 0;
-    gap: 0.15rem;
+    gap: 0.35rem;
     grid-area: control;
   }
 
@@ -490,6 +490,12 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.2rem;
+  }
+
+  @media (min-width: 640px) {
+    .minute-stepper {
+      justify-content: center;
+    }
   }
 
   .minute-step {

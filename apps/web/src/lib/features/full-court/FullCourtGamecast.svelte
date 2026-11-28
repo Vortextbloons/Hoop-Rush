@@ -2,9 +2,11 @@
   import {
     buildFullCourtGameReport,
     unitNameForPlayerIds,
+    type FullCourtCatalogIndex,
     type FullCourtGameHealthOutcome,
     type FullCourtGameResult,
   } from '@hoop-rush/engine';
+  import type { FullCourtDraftState } from '@hoop-rush/data-contracts';
   import type { BroadcastFeedRow } from '#lib/gamecast/GamecastFeed.svelte';
   import GamecastLiveLayout from '#lib/gamecast/GamecastLiveLayout.svelte';
   import GamecastPlaybackControls from '#lib/gamecast/GamecastPlaybackControls.svelte';
@@ -22,6 +24,7 @@
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
+  import FullCourtPlayerScoutSheet from './FullCourtPlayerScoutSheet.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
   import {
     fullCourtBestLineup,
@@ -36,13 +39,20 @@
     replayNote = null,
     onClose,
     art = null,
+    draft = null,
+    index = null,
   }: {
     game: Extract<FullCourtGameHealthOutcome, { kind: 'played' }>;
     userTeamId: string;
     replayNote?: string | null;
     onClose: () => void;
     art?: FullCourtArt | null;
+    draft?: FullCourtDraftState | null;
+    index?: FullCourtCatalogIndex | null;
   } = $props();
+
+  let scoutPlayerId = $state<string | null>(null);
+  const canScout = $derived(draft !== null && index !== null);
 
   type PlayerLine = FullCourtGameResult['home']['players'][number];
   type LineupReportRow = NonNullable<typeof lineupReport>['lineupRows'][number];
@@ -488,16 +498,43 @@
         rowKey={(player) => player.playerId}
       >
         {#snippet identity(player)}
-          <span class="ui-stats-player">
-            <FullCourtPortrait {player} {art} size="sm" />
-            <span class="ui-stats-player-text">
-              <span class="ui-stats-player-name {isUserTeam ? 'text-primary' : ''}"
-                >{player.displayName}</span
-              >
+          {#if isUserTeam && canScout}
+            <button
+              type="button"
+              class="ui-stats-player min-h-10 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
+              aria-haspopup="dialog"
+              aria-label={`View ${player.displayName} scouting report`}
+              onclick={() => (scoutPlayerId = player.playerId)}
+            >
+              <FullCourtPortrait {player} {art} size="sm" />
+              <span class="ui-stats-player-text">
+                <span class="ui-stats-player-name text-primary">{player.displayName}</span>
+              </span>
+            </button>
+          {:else}
+            <span class="ui-stats-player">
+              <FullCourtPortrait {player} {art} size="sm" />
+              <span class="ui-stats-player-text">
+                <span class="ui-stats-player-name {isUserTeam ? 'text-primary' : ''}"
+                  >{player.displayName}</span
+                >
+              </span>
             </span>
-          </span>
+          {/if}
         {/snippet}
       </PlayerStatsSection>
     {/each}
   {/if}
 </Panel>
+
+{#if canScout && draft !== null && index !== null}
+  <FullCourtPlayerScoutSheet
+    {draft}
+    {index}
+    {art}
+    playerId={scoutPlayerId}
+    onOpenChange={(open) => {
+      if (!open) scoutPlayerId = null;
+    }}
+  />
+{/if}

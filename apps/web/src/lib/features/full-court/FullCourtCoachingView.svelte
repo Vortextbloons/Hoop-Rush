@@ -12,7 +12,8 @@
   } from '@hoop-rush/data-contracts';
   import type { FullCourtBlueprintBindingPreview } from '@hoop-rush/engine';
   import { untrack } from 'svelte';
-  import { AlertTriangle, Check } from '@lucide/svelte';
+  import { AlertTriangle, Check, Hand, Send, Target } from '@lucide/svelte';
+  import type { LucideIcon } from '@lucide/svelte';
   import ActionRow from '#lib/components/ui/ActionRow.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
@@ -25,6 +26,7 @@
   import FullCourtCourtLineup from './FullCourtCourtLineup.svelte';
   import FullCourtHierarchyCards from './FullCourtHierarchyCards.svelte';
   import FullCourtMinutesBoard from './FullCourtMinutesBoard.svelte';
+  import FullCourtRoleCards from './FullCourtRoleCards.svelte';
   import FullCourtRotationLadder from './FullCourtRotationLadder.svelte';
   import FullCourtRuleEditor from './FullCourtRuleEditor.svelte';
   import FullCourtUnitPlanner from './FullCourtUnitPlanner.svelte';
@@ -533,6 +535,63 @@
   );
   const reads = $derived(draft.passingReads?.[readHandler] ?? []);
 
+  const PLAYMAKING_ROLES = [
+    {
+      key: 'handler',
+      label: 'Ball handler',
+      hint: 'Runs the offense and looks for the first passing target.',
+      icon: Hand,
+      emptyText: 'Choose a player',
+    },
+    {
+      key: 'target0',
+      label: 'Top passing target',
+      hint: 'Gets the strongest preference when the handler looks to pass.',
+      icon: Target,
+      emptyText: 'Use player tendencies',
+    },
+    {
+      key: 'target1',
+      label: 'Second passing target',
+      hint: 'The fallback read when the top target is covered.',
+      icon: Send,
+      emptyText: 'Use player tendencies',
+    },
+  ] as const satisfies readonly {
+    key: 'handler' | 'target0' | 'target1';
+    label: string;
+    hint: string;
+    icon: LucideIcon;
+    emptyText: string;
+  }[];
+
+  type PlaymakingRole = (typeof PLAYMAKING_ROLES)[number]['key'];
+
+  const playmakingValues = $derived<Partial<Record<PlaymakingRole, string | null>>>({
+    handler: readHandler === '' ? null : readHandler,
+    target0: reads[0] ?? null,
+    target1: reads[1] ?? null,
+  });
+
+  const playmakingDisabled = $derived<readonly PlaymakingRole[]>(
+    readHandler === '' ? ['target0', 'target1'] : reads.length === 0 ? ['target1'] : [],
+  );
+
+  function passingExclusions(role: PlaymakingRole): readonly string[] {
+    if (role === 'handler') return [];
+    const other = reads[role === 'target0' ? 1 : 0];
+    return [readHandler, other].filter((id): id is string => id !== undefined && id !== '');
+  }
+
+  function setPlaymakingRole(role: PlaymakingRole, playerId: string | null): void {
+    if (role === 'handler') {
+      readHandler = playerId ?? '';
+      return;
+    }
+    if (readHandler === '') return;
+    setRead(role === 'target0' ? 0 : 1, playerId ?? '');
+  }
+
   function setRead(slot: number, target: string): void {
     const next = [...reads];
     if (target === '') next.splice(slot, 1);
@@ -861,38 +920,22 @@
         {/if}
         {#if !readOnly}
           <Panel as="section" padding="sm" aria-label="Offensive roles">
-            <SectionHeading level={4} size="sm" title="Playmaking" />
-            <div class="mt-4 grid gap-3 md:grid-cols-3">
-              <label class="grid gap-1">
-                <span class="text-sm font-semibold">Ball handler</span>
-                <select class={SELECT_CLASS} disabled={locked} bind:value={readHandler}>
-                  <option value="">Choose a player</option>
-                  {#each roster as player (player.playerId)}
-                    <option value={player.playerId}>{player.displayName}</option>
-                  {/each}
-                </select>
-              </label>
-              {#each [0, 1] as slot (slot)}
-                <label class="grid gap-1">
-                  <span class="text-sm font-semibold"
-                    >{slot === 0 ? 'Top passing target' : 'Second passing target'}</span
-                  >
-                  <select
-                    class={SELECT_CLASS}
-                    disabled={locked || readHandler === '' || (slot === 1 && reads.length === 0)}
-                    value={reads[slot] ?? ''}
-                    onchange={(event) => setRead(slot, event.currentTarget.value)}
-                  >
-                    <option value="">Use player tendencies</option>
-                    {#each roster as player (player.playerId)}
-                      {#if player.playerId !== readHandler && player.playerId !== reads[1 - slot]}
-                        <option value={player.playerId}>{player.displayName}</option>
-                      {/if}
-                    {/each}
-                  </select>
-                </label>
-              {/each}
-            </div>
+            <SectionHeading
+              level={4}
+              size="sm"
+              title="Playmaking"
+              description="Choose the ball handler, then the reads he looks for."
+            />
+            <FullCourtRoleCards
+              roles={PLAYMAKING_ROLES}
+              values={playmakingValues}
+              {roster}
+              {art}
+              {locked}
+              disabledKeys={playmakingDisabled}
+              excludedIds={passingExclusions}
+              onChange={setPlaymakingRole}
+            />
             <p class="mt-2 text-xs text-muted-foreground">
               The top target gets the strongest preference. Players still follow their tendencies.
             </p>

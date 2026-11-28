@@ -445,6 +445,8 @@
           checkpoint={season.checkpoint}
           scores={season.scores}
           {playoff}
+          draft={draft ?? null}
+          index={current.index ?? null}
           health={health ?? null}
           restingPlayerIds={current.restingPlayerIds}
           busy={current.busy}
@@ -496,6 +498,8 @@
                 game={current.latestGame}
                 userTeamId={season.lock.season.userTeamId}
                 {art}
+                draft={draft ?? null}
+                index={current.index ?? null}
                 onClose={() => (activeGamecast = null)}
               />
             {/key}
@@ -506,6 +510,8 @@
                 userTeamId={season.lock.season.userTeamId}
                 replayNote={savedReplaySummary.replayNote}
                 {art}
+                draft={draft ?? null}
+                index={current.index ?? null}
                 onClose={() => (activeGamecast = null)}
               />
             {/key}

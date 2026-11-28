@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import type { Snippet } from 'svelte';
   import { X } from '@lucide/svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
@@ -12,7 +13,8 @@
     PlayerProfileView,
   } from '#lib/players/player-profile.js';
 
-  export type ProfileTab = 'details' | 'production' | 'tendencies' | 'ratings' | 'apron';
+  export type ProfileTab =
+    'details' | 'production' | 'tendencies' | 'ratings' | 'scouting' | 'apron';
 
   let {
     profile,
@@ -24,6 +26,7 @@
     money = null,
     tabs,
     tab = $bindable<ProfileTab>('details'),
+    scouting = null,
   }: {
     profile: PlayerProfileView;
     open?: boolean;
@@ -39,6 +42,7 @@
     tabs?: readonly ProfileTab[];
     /** Owned by the caller, so a trigger can open the sheet on a chosen tab. */
     tab?: ProfileTab;
+    scouting?: Snippet | null;
   } = $props();
 
   const availableTabs = $derived.by((): ProfileTab[] => {
@@ -48,6 +52,7 @@
     if (apron !== null && apron.status.kind === 'none') {
       base = base.filter((entry) => entry !== 'apron');
     }
+    if (scouting !== null && !base.includes('scouting')) base = [...base, 'scouting'];
     return base;
   });
 
@@ -226,6 +231,7 @@
           {entry === 'production' ? 'Stats' : null}
           {entry === 'tendencies' ? 'Tendencies' : null}
           {entry === 'ratings' ? 'Ratings' : null}
+          {entry === 'scouting' ? 'Scouting' : null}
           {entry === 'apron' ? 'Apron' : null}
           {#if entry === 'apron'}
             <span
@@ -553,6 +559,8 @@
           from the underlying data.
         </p>
       </div>
+    {:else if active === 'scouting' && scouting !== null}
+      {@render scouting()}
     {:else if active === 'apron' && apron !== null && apron.status.kind !== 'none'}
       <div class="grid gap-3">
         <div
