@@ -427,10 +427,10 @@ describe('full court tactics API', () => {
       },
     );
     expect(finishingWeightOf(prepared, homeRoster, 0, 1)).toBeCloseTo(
-      finishingWeightOf(basePrep, homeRoster, 0, 1) * 1.6,
+      finishingWeightOf(basePrep, homeRoster, 0, 1) * 2,
     );
     expect(finishingWeightOf(prepared, homeRoster, 0, 2)).toBeCloseTo(
-      finishingWeightOf(basePrep, homeRoster, 0, 2) * 1.3,
+      finishingWeightOf(basePrep, homeRoster, 0, 2) * 1.5,
     );
     expect(finishingWeightOf(prepared, homeRoster, 2, 1)).toBe(
       finishingWeightOf(basePrep, homeRoster, 2, 1),
@@ -555,7 +555,7 @@ describe('full court tactics API', () => {
     const openAfter = finishingWeightOf(open, rimHeavy, 1, 0);
     const packedAfter = finishingWeightOf(packed, rimHeavy, 1, 0);
 
-    expect(openAfter / before).toBeLessThanOrEqual(1.35);
+    expect(openAfter / before).toBeLessThanOrEqual(1.4);
     expect(openAfter / before).toBeGreaterThan(1);
     expect(packedAfter / before).toBeLessThan(openAfter / before);
     expect(packedAfter).toBeGreaterThan(before);

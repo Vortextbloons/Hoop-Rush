@@ -339,4 +339,24 @@ describe('FullCourtCoachingView', () => {
     expect(body).not.toContain('Defensive matchups');
     expect(body).not.toContain('Opponent roster');
   });
+
+  test('displays saved passing reads on load without re-selecting the ball handler', () => {
+    const body = renderView({
+      plan: {
+        ...CUSTOM_PLAN,
+        hierarchy: {
+          passingReads: {
+            p1: ['p2', 'p3'],
+            p4: ['p5'],
+          },
+        },
+      },
+    });
+    expect(body).toContain('aria-label="Saved passing reads"');
+    expect(body).toContain('Player 1 → Player 2, Player 3');
+    expect(body).toContain('Player 4 → Player 5');
+    expect(body).toContain('Change ball handler');
+    expect(body).toContain('Change top passing target');
+    expect(body).toContain('Change second passing target');
+  });
 });

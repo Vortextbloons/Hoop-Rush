@@ -26,15 +26,16 @@ const CAP_RUSH_BRACKET: OpponentIndexEntry = {
   contentHash: contentHashSchema.parse('c'.repeat(64)),
 };
 
-function loaders(manifest: HoopRushManifest): FullCourtAssetLoaders {
+function loaders(manifest: HoopRushManifest, eraId = '2020s'): FullCourtAssetLoaders {
   const catalog = buildCapRushTestCatalog();
   return {
     loadCatalog: () => Promise.resolve(catalog),
     loadPreamble: () =>
       Promise.resolve({
         manifest,
-        profile: buildEraSimulationProfile(),
+        profile: buildEraSimulationProfile({ eraId: eraIdSchema.parse(eraId) }),
         bracket: buildFixtureBracket(),
+        legacyProfile: buildEraSimulationProfile({ eraId: eraIdSchema.parse('1990s') }),
       }),
   };
 }
@@ -58,7 +59,8 @@ describe('loadFullCourtAssets', () => {
     });
     expect(assets.field).toHaveLength(30);
     expect(assets.field.map((team) => team.teamId)).toContain('lakers');
-    expect(assets.profile.eraId).toBe(eraIdSchema.parse('1990s'));
+    expect(assets.profile.eraId).toBe(eraIdSchema.parse('2020s'));
+    expect((await assets.loadLegacyProfile?.())?.eraId).toBe(eraIdSchema.parse('1990s'));
   });
 
   it('falls back to the asset hash for a legacy draft catalog entry', async () => {

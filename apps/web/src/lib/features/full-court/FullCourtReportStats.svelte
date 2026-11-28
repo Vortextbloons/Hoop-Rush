@@ -6,6 +6,7 @@
   } from '@hoop-rush/data-contracts';
   import type {
     FullCourtAwardsBoard,
+    FullCourtNotableMomentsSummary,
     FullCourtPlayerSeasonRow,
     FullCourtStandings,
   } from '@hoop-rush/engine';
@@ -20,6 +21,7 @@
   import { getManifest } from '#lib/data.js';
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
+  import FullCourtMomentsPanel from './FullCourtMomentsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import { trueShootingPct, usageSharePct } from '#lib/format.js';
 
@@ -29,12 +31,14 @@
     userTeamId,
     standings,
     art = null,
+    moments = null,
   }: {
     awards: FullCourtAwardsBoard;
     rosterStats: readonly FullCourtPlayerSeasonRow[];
     userTeamId: string;
     standings: FullCourtStandings;
     art?: FullCourtArt | null;
+    moments?: FullCourtNotableMomentsSummary | null;
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -79,6 +83,14 @@
 </script>
 
 <FullCourtAwardsPanel {awards} rosterStats={teamRows} {userTeamId} {art} />
+
+{#if moments !== null}
+  <FullCourtMomentsPanel
+    userMoments={moments.userMoments}
+    leagueMoments={moments.leagueMoments}
+    {art}
+  />
+{/if}
 
 <Panel as="section" padding="md" aria-label="Team statistics">
   <SectionHeading

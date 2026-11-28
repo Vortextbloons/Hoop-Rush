@@ -61,6 +61,22 @@ export async function loadFullCourtReport(runId: string): Promise<FullCourtRepor
       checkpoint,
       catalogAssetHash: assets.catalogAssetHash,
       loadProfiles: () => loadFullCourtHealthProfiles(assets.catalogAssetHash),
+      ...(assets.loadLegacyProfile === undefined
+        ? {}
+        : {
+            loadLegacySeason: async () => {
+              const legacyProfile = await assets.loadLegacyProfile?.();
+              return legacyProfile == null
+                ? null
+                : buildFullCourtRegularSeason({
+                    draft: record.draft,
+                    catalog: assets.catalog,
+                    catalogSource: assets.catalogSource,
+                    field: assets.field,
+                    profile: legacyProfile,
+                  });
+            },
+          }),
     });
   } catch {
     return null;

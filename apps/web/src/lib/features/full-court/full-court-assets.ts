@@ -8,8 +8,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { capRushLeagueFieldOf, type CapRushLeagueField } from '@hoop-rush/engine';
 import { cachedAssets } from '#lib/assets/cached-assets.js';
+import { getBracket, getEraSimulationProfile, getManifest } from '#lib/data.js';
 import { loadDraftCatalog } from '#lib/data-assets.js';
-import { loadRunPreamble } from '#lib/run-preamble.js';
+
+export const FULL_COURT_ERA_ID = '2020s';
+export const FULL_COURT_LEGACY_ERA_ID = '2010s';
 
 export interface FullCourtAssets {
   readonly catalog: SeasonDraftCatalog;
@@ -18,6 +21,7 @@ export interface FullCourtAssets {
   readonly catalogAssetHash: string;
   readonly field: readonly CapRushLeagueField[];
   readonly profile: EraSimulationProfile;
+  readonly loadLegacyProfile?: () => Promise<EraSimulationProfile | null>;
 }
 
 export interface FullCourtAssetLoaders {
@@ -26,22 +30,50 @@ export interface FullCourtAssetLoaders {
     manifest: HoopRushManifest;
     profile: EraSimulationProfile;
     bracket: OpponentBracket;
+    legacyProfile?: EraSimulationProfile | null;
   }>;
 }
 
 const defaultLoadCatalog: FullCourtAssetLoaders['loadCatalog'] = () => loadDraftCatalog();
-const defaultLoadPreamble: FullCourtAssetLoaders['loadPreamble'] = () =>
-  loadRunPreamble((manifest) => manifest.capRushBracket);
+const defaultLoadPreamble: FullCourtAssetLoaders['loadPreamble'] = async () => {
+  const manifest = await getManifest();
+  const profileEntry = manifest.eraSimulationProfiles.find(
+    (profile) => profile.eraId === FULL_COURT_ERA_ID,
+  );
+  if (!profileEntry) {
+    throw new Error(`The ${FULL_COURT_ERA_ID} simulation profile is unavailable.`);
+  }
+  const bracketEntry = manifest.capRushBracket;
+  if (!bracketEntry) {
+    throw new Error('The Full Court data assets are unavailable.');
+  }
+  const [profile, bracket] = await Promise.all([
+    getEraSimulationProfile(profileEntry),
+    getBracket(bracketEntry),
+  ]);
+  return { manifest, profile, bracket };
+};
+
+const defaultLegacyProfile = cachedAssets(async (): Promise<EraSimulationProfile | null> => {
+  const manifest = await getManifest();
+  const legacyEntry = manifest.eraSimulationProfiles.find(
+    (profile) => profile.eraId === FULL_COURT_LEGACY_ERA_ID,
+  );
+  if (!legacyEntry) return null;
+  return getEraSimulationProfile(legacyEntry);
+});
 
 const defaultAssets = cachedAssets(() =>
-  loadFullCourtAssetsUncached(defaultLoadCatalog, defaultLoadPreamble),
+  loadFullCourtAssetsUncached(defaultLoadCatalog, defaultLoadPreamble, () =>
+    defaultLegacyProfile.load(),
+  ),
 );
 
 /**
- * Full Court drafts from the shared verified catalog and plays Cap Rush's
- * 30-franchise field, so it reads the same packaged assets with the same
- * identity hashes. The unlocked season is built from this result and then
- * frozen by `lockFullCourtRegularSeason`.
+ * Full Court drafts from the shared verified catalog, simulates under the
+ * packaged 2020s era profile, and plays Cap Rush's 30-franchise field.
+ * Existing saves created under the legacy 2010s profile resolve through
+ * `loadLegacyProfile` when verifying their locked season digest.
  *
  * Injected loaders bypass the module cache so tests and callers can observe
  * each load.
@@ -61,6 +93,7 @@ export function loadFullCourtAssets(
 async function loadFullCourtAssetsUncached(
   loadCatalog: FullCourtAssetLoaders['loadCatalog'],
   loadPreamble: FullCourtAssetLoaders['loadPreamble'],
+  loadLegacyProfile?: () => Promise<EraSimulationProfile | null>,
 ): Promise<FullCourtAssets> {
   const [catalog, preamble] = await Promise.all([loadCatalog(), loadPreamble()]);
   const catalogEntry = preamble.manifest.draftCatalog;
@@ -75,11 +108,16 @@ async function loadFullCourtAssetsUncached(
     playerVersionIdVersion: catalog.playerVersionIdVersion,
     positionNormalizationVersion: catalog.positionNormalizationVersion,
   };
+  const resolvedLegacyLoader =
+    preamble.legacyProfile !== undefined
+      ? () => Promise.resolve(preamble.legacyProfile ?? null)
+      : loadLegacyProfile;
   return {
     catalog,
     catalogSource,
     catalogAssetHash: catalogEntry.contentHash,
     field: capRushLeagueFieldOf(preamble.bracket),
     profile: preamble.profile,
+    ...(resolvedLegacyLoader === undefined ? {} : { loadLegacyProfile: resolvedLegacyLoader }),
   };
 }

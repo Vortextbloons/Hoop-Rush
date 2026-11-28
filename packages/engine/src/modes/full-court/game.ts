@@ -14,6 +14,7 @@ import { ENGINE_CONSTANTS } from '../../sim/constants.ts';
 import type { EffectsHook } from '../../game/effects.ts';
 import { freeThrowProbability } from '../../sim/fouls.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
+import { markTeamPrepContentStable } from '../../sim/possession-wasm.ts';
 import {
   createGameState,
   createTripContext,
@@ -554,6 +555,11 @@ class RotationRuntime {
     return this.slots.map((index) => this.playerAt(index).playerId);
   }
 
+  /** True when manual defensive assignments can change the prepared lineup. */
+  hasResolvedMatchups(): boolean {
+    return this.resolvedMatchups !== null;
+  }
+
   private lineupKey(): number | string {
     const indices = this.activeRecorderIndices();
     let key = 0;
@@ -583,6 +589,7 @@ class RotationRuntime {
       this.opponentDefense,
       this.hierarchy,
     );
+    if (prep === rawPrep) markTeamPrepContentStable(prep);
     const lineup: LineupState = {
       players,
       team,
@@ -1236,8 +1243,12 @@ function applySwap(
 
 function refreshLineups(runtimes: readonly [RotationRuntime, RotationRuntime]): boolean {
   const [home, away] = runtimes;
-  const homeChanged = home.refreshLineup(away.activePlayerIds());
-  const awayChanged = away.refreshLineup(home.activePlayerIds());
+  const homeChanged = home.refreshLineup(
+    home.hasResolvedMatchups() ? away.activePlayerIds() : undefined,
+  );
+  const awayChanged = away.refreshLineup(
+    away.hasResolvedMatchups() ? home.activePlayerIds() : undefined,
+  );
   return homeChanged || awayChanged;
 }
 

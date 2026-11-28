@@ -17,6 +17,10 @@ const POOL_CACHE_MAX_POOLS_DEFAULT = 60;
 const POOL_CACHE_MAX_POOLS_LITE = 10;
 const POOL_CACHE_MAX_ASSETS_DEFAULT = 24;
 const POOL_CACHE_MAX_ASSETS_LITE = 8;
+const PRUNE_EVERY_WRITES = 8;
+const PRUNE_HARD_SLACK = 8;
+let poolWritesSincePrune = 0;
+let assetWritesSincePrune = 0;
 function poolCacheMaxPools(): number {
   return isLiteMode() ? POOL_CACHE_MAX_POOLS_LITE : POOL_CACHE_MAX_POOLS_DEFAULT;
 }
@@ -66,6 +70,18 @@ function getDb(): Promise<HoopRushCacheDb> {
   }
   return dbPromise;
 }
+async function pruneCache<T extends { key: string; savedAt: number }>(
+  table: EntityTable<T, 'key'>,
+  count: number,
+  max: number,
+): Promise<void> {
+  if (count <= max) return;
+  const victims = await table
+    .orderBy('savedAt')
+    .limit(count - max)
+    .primaryKeys();
+  if (victims.length > 0) await table.bulkDelete(victims);
+}
 export async function readCachedPool(
   key: string,
   expectedHash: string,
@@ -103,12 +119,12 @@ export async function writeCachedPool(
     const db = await getDb();
     await db.pools.put({ key, contentHash, pool, savedAt: Date.now() });
     rememberParsedPool(key, contentHash, pool);
-    const count = await db.pools.count();
+    poolWritesSincePrune += 1;
     const max = poolCacheMaxPools();
-    if (count > max) {
-      const excess = count - max;
-      const victims = await db.pools.orderBy('savedAt').limit(excess).primaryKeys();
-      if (victims.length > 0) await db.pools.bulkDelete(victims);
+    const count = await db.pools.count();
+    if (poolWritesSincePrune >= PRUNE_EVERY_WRITES || count > max + PRUNE_HARD_SLACK) {
+      poolWritesSincePrune = 0;
+      await pruneCache(db.pools, count, max);
     }
   } catch (error) {
     console.warn('[pool-cache] writeCachedPool failed', error);
@@ -132,12 +148,12 @@ export async function writeCachedAsset(contentHash: string, value: unknown): Pro
   try {
     const db = await getDb();
     await db.assets.put({ key: contentHash, value, savedAt: Date.now() });
-    const count = await db.assets.count();
+    assetWritesSincePrune += 1;
     const max = poolCacheMaxAssets();
-    if (count > max) {
-      const excess = count - max;
-      const victims = await db.assets.orderBy('savedAt').limit(excess).primaryKeys();
-      if (victims.length > 0) await db.assets.bulkDelete(victims);
+    const count = await db.assets.count();
+    if (assetWritesSincePrune >= PRUNE_EVERY_WRITES || count > max + PRUNE_HARD_SLACK) {
+      assetWritesSincePrune = 0;
+      await pruneCache(db.assets, count, max);
     }
   } catch (error) {
     console.warn('[pool-cache] writeCachedAsset failed', error);

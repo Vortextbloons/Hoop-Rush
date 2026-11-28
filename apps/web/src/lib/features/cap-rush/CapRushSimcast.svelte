@@ -6,6 +6,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { initialsOf } from '#lib/branding.js';
   import { ratioPct } from '#lib/format.js';
+  import type { HavocBattleEvent } from '@hoop-rush/data-contracts';
   import type { CapRushArt } from './cap-rush-art.js';
   import { capRushPlaybackItems } from './cap-rush-playback.js';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
@@ -89,7 +90,12 @@
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const sides = $derived(
-    localBox === undefined || opponentBox === undefined ? [] : [localBox, opponentBox],
+    localBox === undefined || opponentBox === undefined
+      ? []
+      : [localBox, opponentBox].map((box) => ({
+          ...box,
+          topPoints: Math.max(0, ...box.lines.map((line) => line.points)),
+        })),
   );
   const leader = $derived(
     localBox?.score === opponentBox?.score
@@ -98,16 +104,57 @@
         ? 'local'
         : 'opponent',
   );
-  const possession = $derived(
-    visible.events.findLast((event) => event.kind === 'possession-start'),
+
+  const FEED_TAIL = 18;
+  let windowItems: readonly GamecastBattlePlaybackItem[] | null = null;
+  let windowCursor = 0;
+  let windowTail: GamecastBattlePlaybackItem[] = [];
+  let windowPossessions = { home: 0, away: 0 };
+  let windowPossession: HavocBattleEvent | null = null;
+  // Playback only moves forward, so each tick appends the newly revealed items
+  // and drops the ones that scrolled out of the feed tail.
+  const playbackWindow = $derived.by(() => {
+    if (windowItems !== items) {
+      windowItems = items;
+      windowCursor = 0;
+      windowTail = [];
+      windowPossessions = { home: 0, away: 0 };
+      windowPossession = null;
+    }
+    const count = Math.min(items.length, cursor);
+    if (count < windowCursor) {
+      windowCursor = 0;
+      windowTail = [];
+      windowPossessions = { home: 0, away: 0 };
+      windowPossession = null;
+    }
+    for (let index = windowCursor; index < count; index += 1) {
+      const item = items[index];
+      if (item === undefined) continue;
+      windowTail.push(item);
+      const event = item.event;
+      if (event !== null && event.kind === 'possession-start') {
+        windowPossessions[event.offenseSide] += 1;
+        windowPossession = event;
+      }
+    }
+    if (windowTail.length > FEED_TAIL) windowTail.splice(0, windowTail.length - FEED_TAIL);
+    windowCursor = count;
+    return {
+      feed: windowTail.slice().reverse(),
+      possessions: { ...windowPossessions },
+      possession: windowPossession,
+    };
+  });
+  const possession = $derived(playbackWindow.possession);
+  const possessionTotal = $derived(
+    playbackWindow.possessions.home + playbackWindow.possessions.away,
   );
-  const feed = $derived(items.slice(0, cursor).slice(-18).reverse());
+  const feed = $derived(playbackWindow.feed);
 
   const apronFacts = $derived.by(() => {
     if (playback === null) return [];
-    const counts = { home: 0, away: 0 };
-    for (const event of visible.events)
-      if (event.kind === 'possession-start') counts[event.offenseSide] += 1;
+    const counts = playbackWindow.possessions;
     return playback.evidence.facts.filter((fact) => {
       const offense = fact.kind === 'strike' ? (fact.side === 'home' ? 'away' : 'home') : fact.side;
       return finished || counts[offense] > fact.possessionOrdinal;
@@ -251,8 +298,7 @@
           {#each side.lines as row (row.instanceId)}
             {@const face =
               row.sourcePlayerId === undefined ? null : art?.faceForPlayerId(row.sourcePlayerId)}
-            {@const hot =
-              row.points > 0 && row.points === Math.max(...side.lines.map((line) => line.points))}
+            {@const hot = row.points > 0 && row.points === side.topPoints}
             <li class="bc-row" class:hot>
               <span class="bc-ident">
                 {#if face && art}<PlayerFace
@@ -323,9 +369,7 @@
   <section class="bc-feed" aria-label="Play-by-play feed">
     <header class="bc-feed-head">
       <h3>Live feed</h3>
-      <span class="bc-feed-count"
-        >{visible.events.filter((event) => event.kind === 'possession-start').length} possessions</span
-      >
+      <span class="bc-feed-count">{possessionTotal} possessions</span>
     </header>
     {#if feed.length > 0}
       <ul class="bc-feed-list" aria-live="polite">

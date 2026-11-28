@@ -89,13 +89,13 @@ const IDENTITY_ROLE_SCALE: OffensiveRoleScale = { finish: 1, initiate: 1, pass: 
  * fixed attempt count or rating change.
  */
 const HIERARCHY_ROLE_MULTIPLIERS: Readonly<Record<OffensiveHierarchyRole, OffensiveRoleScale>> = {
-  primary: { finish: 1.28, initiate: 1.12, pass: 0.92 },
+  primary: { finish: 1.34, initiate: 1.14, pass: 0.9 },
   secondary: { finish: 1.14, initiate: 1.05, pass: 0.97 },
-  'floor-general': { finish: 0.96, initiate: 1.22, pass: 1.08 },
+  'floor-general': { finish: 0.96, initiate: 1.26, pass: 1.1 },
 };
 
 const HIERARCHY_SCALE_FLOOR = 0.85;
-const HIERARCHY_SCALE_CEILING = 1.35;
+const HIERARCHY_SCALE_CEILING = 1.4;
 /** A role always nudges the source weights, but a low-usage player is not forced into a star load. */
 const HIERARCHY_READINESS_FLOOR = 0.7;
 const HIERARCHY_USAGE_REFERENCE = 40;
@@ -270,7 +270,7 @@ export function applyFullCourtHierarchyToPrep(
           const index = indexByKey.get(prep.keyOf(teammate));
           const finishScale = index === undefined ? 1 : (scales[index]?.finish ?? 1);
           const read = reads?.indexOf(teammate.playerId);
-          const readScale = read === 0 ? 1.6 : read === 1 ? 1.3 : 1;
+          const readScale = read === 0 ? 2 : read === 1 ? 1.5 : 1;
           return (action.weights[teammateIndex] ?? 0) * finishScale * readScale;
         });
         return {

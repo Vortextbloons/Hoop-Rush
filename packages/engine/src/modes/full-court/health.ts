@@ -18,7 +18,11 @@ import {
   fullCourtInjuryParticipants,
   type FullCourtInjuryEvent,
 } from './injuries.ts';
-import { FULL_COURT_MIN_ROSTER, FULL_COURT_REGULATION_SECONDS } from './rotation.ts';
+import {
+  FULL_COURT_MIN_ROSTER,
+  FULL_COURT_REGULATION_SECONDS,
+  type FullCourtAvailabilityEntry,
+} from './rotation.ts';
 
 const FULL_LOAD = 10_000;
 const RECOVERY_PER_DAY = 3_500;
@@ -136,6 +140,18 @@ function prepareTeamHealth(
     players,
   };
   return { team: { ...team, availability }, health, eligible, playing };
+}
+
+/**
+ * The availability a scheduled game will actually use, so editors can preview the
+ * same rotation the simulation resolves instead of the stale all-available team.
+ */
+export function fullCourtAvailabilityForGame(
+  team: FullCourtTeamGameInput,
+  dayOffset: number,
+  health: FullCourtTeamHealth | undefined,
+): readonly FullCourtAvailabilityEntry[] {
+  return prepareTeamHealth(team, dayOffset, health, undefined).team.availability;
 }
 
 function playerStrainFactor(

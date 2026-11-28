@@ -45,10 +45,24 @@
     return side === localSide ? 'You' : 'Opponent';
   }
 
+  const COLUMNS_CACHE_LIMIT = 8;
+  const columnsCache = new Map<
+    number,
+    readonly PlayerStatColumn<GamecastBattleParticipantLine>[]
+  >();
+  let columnsCacheInputs = '';
+
   function columnsFor(
     teamUsage: number,
   ): readonly PlayerStatColumn<GamecastBattleParticipantLine>[] {
-    return [
+    const inputs = `${perGame ? '1' : '0'}:${String(games)}`;
+    if (inputs !== columnsCacheInputs) {
+      columnsCacheInputs = inputs;
+      columnsCache.clear();
+    }
+    const cached = columnsCache.get(teamUsage);
+    if (cached !== undefined) return cached;
+    const columns: readonly PlayerStatColumn<GamecastBattleParticipantLine>[] = [
       {
         key: 'role',
         label: 'Role',
@@ -89,20 +103,34 @@
       { key: 'turnovers', label: 'TO', value: (line) => statOf(line.turnovers) },
       { key: 'fouls', label: 'PF', value: (line) => statOf(line.fouls) },
     ];
+    if (columnsCache.size >= COLUMNS_CACHE_LIMIT) {
+      const oldest = columnsCache.keys().next().value;
+      if (oldest !== undefined) columnsCache.delete(oldest);
+    }
+    columnsCache.set(teamUsage, columns);
+    return columns;
   }
-</script>
 
-<div class="hm-boxes-container">
-  <div class="hm-boxes" data-havoc-multiplayer-boxes data-theme={theme}>
-    {#each orderedBoxes as box (box.side)}
-      {@const topPoints = Math.max(0, ...box.lines.map((line) => line.points))}
-      {@const teamUsage = box.lines.reduce(
+  const boxStats = $derived.by(() =>
+    orderedBoxes.map((box) => {
+      const teamUsage = box.lines.reduce(
         (total, line) =>
           total +
           usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
         0,
-      )}
-      {@const columns = columnsFor(teamUsage)}
+      );
+      return {
+        box,
+        topPoints: Math.max(0, ...box.lines.map((line) => line.points)),
+        columns: columnsFor(teamUsage),
+      };
+    }),
+  );
+</script>
+
+<div class="hm-boxes-container">
+  <div class="hm-boxes" data-havoc-multiplayer-boxes data-theme={theme}>
+    {#each boxStats as { box, topPoints, columns } (box.side)}
       <section
         class="hm-box"
         data-side={box.side}

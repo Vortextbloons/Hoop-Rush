@@ -17,6 +17,7 @@ import {
   fullCourtCoachingPlan,
   fullCourtCoachingSignature,
   fullCourtPlayerHealthView,
+  fullCourtStaffRotation,
   rebalanceFullCourtMinuteTargets,
   fullCourtTeamMinutes,
   fullCourtUnitNameForLineup,
@@ -51,6 +52,42 @@ function customDraft(): FullCourtCoachingDraft {
   draft.rotationMode = 'custom';
   return draft;
 }
+
+test('staff rotation preview applies the injury report', () => {
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C', 'PG', 'SG', 'C'] as const;
+  const roster = positions.map((position, index) =>
+    buildSimulationPlayer({
+      playerId: playerIdSchema.parse(`s${String(index + 1)}`),
+      displayName: `Starter ${String(index + 1)}`,
+      positions: [position],
+    }),
+  );
+  const team = { teamId: 'preview', displayName: 'Preview', roster };
+  const before = fullCourtStaffRotation(team, null, null);
+  expect(before.startingFive).toContain('s1');
+
+  const health = {
+    version: 'full-court-health-v1',
+    teamId: 'preview',
+    throughDay: 2,
+    players: { s1: { loadBasisPoints: 6000, availableFromDay: 5 } },
+  } as const;
+  const after = fullCourtStaffRotation(team, health, 3);
+  expect(after.startingFive).not.toContain('s1');
+  expect(after.startingFive).toContain('s6');
+  expect(after.minuteTargets.s1 ?? 0).toBe(0);
+  expect(Object.values(after.minuteTargets).reduce((sum, minutes) => sum + minutes, 0)).toBe(240);
+
+  const shortHanded = {
+    ...health,
+    players: Object.fromEntries(
+      roster
+        .slice(0, 4)
+        .map((player) => [player.playerId, { loadBasisPoints: 0, availableFromDay: 5 }]),
+    ),
+  };
+  expect(() => fullCourtStaffRotation(team, shortHanded, 3)).not.toThrow();
+});
 
 test('rebalances excess minutes while preserving the last edit and a closing reserve', () => {
   const draft = customDraft();

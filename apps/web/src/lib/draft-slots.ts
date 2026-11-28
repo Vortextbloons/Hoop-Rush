@@ -4,7 +4,7 @@ import {
   planLineupReposition,
   slotRequirement,
   type LineupRepositionPlan,
-} from '@hoop-rush/engine';
+} from '@hoop-rush/engine/domain';
 import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES } from './player-positions';
 export { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES };
 export function canFillSlot(player: PlayersIndexEntry, slotIndex: number): boolean {

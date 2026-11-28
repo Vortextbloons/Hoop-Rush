@@ -594,6 +594,8 @@
               output={controller.currentOutput}
               visible={controller.visible}
               feed={controller.feed}
+              abilities={controller.abilities}
+              abilityCount={controller.abilityCount}
               progress={controller.progress}
               localParticipantId={controller.participantId ?? 'p1'}
               series={controller.series}

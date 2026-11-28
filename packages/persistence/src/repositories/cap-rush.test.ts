@@ -940,6 +940,12 @@ describe('cap rush repository', () => {
     await db.capRushLeagueResults.bulkPut(scoresAgain.slice(0, 5));
     expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
     expect(await db.capRushLeagueResults.count()).toBe(leagueGames.length);
+
+    // The aggregate is authoritative: a missing box must not make complete
+    // score rows look stale and trigger a projection over the remaining boxes.
+    await db.capRushLeagueGames.delete([state.runId, first.gameId]);
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+    expect(await db.capRushLeagueResults.count()).toBe(leagueGames.length);
   });
 
   it('rolls back boxes, score rows, aggregate, and the receipt when the score write fails', async () => {

@@ -19,6 +19,7 @@ export function loadDraftCatalog(): Promise<SeasonDraftCatalog> {
     parse: parseSeasonDraftCatalog,
     find: (manifest) => manifest.draftCatalog ?? null,
     missingMessage: 'The season draft catalog artifact is unavailable.',
+    indexedDbCache: false,
   });
 }
 
@@ -39,6 +40,7 @@ export async function loadPlayoffProfiles(
     parse: parseSeasonPlayoffProfiles,
     find: (manifest) => manifest.playoffProfiles ?? null,
     missingMessage: 'The playoff profiles artifact is unavailable.',
+    indexedDbCache: false,
   });
 }
 

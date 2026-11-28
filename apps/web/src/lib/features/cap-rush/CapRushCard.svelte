@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { CapRushCardView } from '@hoop-rush/application/cap-rush';
   import { CAP_RUSH_HARD_LIMIT_DOLLARS, franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { capRushPayrollStatus } from '@hoop-rush/engine';
+  import { capRushPayrollStatus } from '@hoop-rush/engine/domain';
   import { ChevronDown } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';

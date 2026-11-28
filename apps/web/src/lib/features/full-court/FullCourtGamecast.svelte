@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     buildFullCourtGameReport,
+    fullCourtGameMomentsFromResult,
     unitNameForPlayerIds,
     type FullCourtCatalogIndex,
     type FullCourtGameHealthOutcome,
@@ -16,6 +17,7 @@
     gamecastBoxScoreTotals,
   } from '#lib/gamecast/gamecast-box-score.js';
   import { gamecastPeriodLabel } from '#lib/gamecast/gamecast-broadcast-view.js';
+  import { ArrowUpRight } from '@lucide/svelte';
   import { onMount } from 'svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
@@ -23,6 +25,7 @@
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import FullCourtGameMomentsStrip from './FullCourtGameMomentsStrip.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtPlayerScoutSheet from './FullCourtPlayerScoutSheet.svelte';
   import type { FullCourtArt } from './full-court-art.ts';
@@ -163,6 +166,16 @@
   const userSideIndex = $derived.by((): 0 | 1 => (game.result.home.teamId === userTeamId ? 0 : 1));
   const rotation = $derived(fullCourtRotationSummary(userTeam, userSideIndex, game.tape));
   const bestLineup = $derived(fullCourtBestLineup(lineupReport?.lineupRows ?? []));
+  const gameMoments = $derived(
+    finished
+      ? fullCourtGameMomentsFromResult({
+          result: game.result,
+          userTeamId,
+          gameId: game.result.seed,
+          gameNumber: game.result.gameNumber,
+        })
+      : [],
+  );
 
   onMount(() => {
     const timer = setInterval(() => {
@@ -423,6 +436,7 @@
           {Math.round(bestLineup.pacePossessions)} possessions.
         </p>
       {/if}
+      <FullCourtGameMomentsStrip moments={gameMoments} {art} label="Game notable moments" />
     </section>
     {#if lineupReport !== null}
       <PlayerStatsSection
@@ -501,7 +515,7 @@
           {#if isUserTeam && canScout}
             <button
               type="button"
-              class="ui-stats-player min-h-10 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
+              class="ui-stats-player min-h-10 border-0 bg-transparent p-0 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
               aria-haspopup="dialog"
               aria-label={`View ${player.displayName} scouting report`}
               onclick={() => (scoutPlayerId = player.playerId)}
@@ -510,6 +524,7 @@
               <span class="ui-stats-player-text">
                 <span class="ui-stats-player-name text-primary">{player.displayName}</span>
               </span>
+              <ArrowUpRight size={12} aria-hidden="true" class="text-muted-foreground" />
             </button>
           {:else}
             <span class="ui-stats-player">

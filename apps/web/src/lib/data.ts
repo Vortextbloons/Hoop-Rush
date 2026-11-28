@@ -136,6 +136,7 @@ export function getPlayersIndex(): Promise<PlayersIndex> {
     find: (manifest) => manifest.playersIndex ?? null,
     missingMessage: 'The global players index is unavailable.',
     retryOnHashMismatch: true,
+    indexedDbCache: false,
   });
 }
 
@@ -158,6 +159,7 @@ export function getRosterDetails(): Promise<RosterDetails> {
     find: (manifest) => manifest.rosterDetails ?? null,
     missingMessage: 'Roster details are unavailable.',
     retryOnHashMismatch: true,
+    indexedDbCache: false,
   });
 }
 

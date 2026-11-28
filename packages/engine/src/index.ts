@@ -229,6 +229,7 @@ export {
 } from './modes/fixed-five/verification.ts';
 export {
   replayFixedFiveLog,
+  replayFixedFiveLogTail,
   isDraftComplete,
   isFixedFiveDraftTurn,
   picksCommittedOf,
@@ -416,6 +417,7 @@ export {
   type FullCourtTrainingCampOptions,
 } from './modes/full-court/preparation.ts';
 export {
+  fullCourtAvailabilityForGame,
   type FullCourtGameHealthOptions,
   type FullCourtGameHealthOutcome,
 } from './modes/full-court/health.ts';
@@ -466,6 +468,15 @@ export {
   type FullCourtLeagueLeaders,
   type FullCourtPlayerSeasonRow,
 } from './modes/full-court/awards.ts';
+export {
+  buildFullCourtNotableMoments,
+  fullCourtGameMomentsFromResult,
+  type FullCourtMomentsTeamInput,
+  type FullCourtNotableMoment,
+  type FullCourtNotableMomentCategory,
+  type FullCourtNotableMomentsSummary,
+  type FullCourtNotableMomentTier,
+} from './modes/full-court/moments.ts';
 export {
   buildFullCourtSeasonStats,
   buildFullCourtSeasonSummary,

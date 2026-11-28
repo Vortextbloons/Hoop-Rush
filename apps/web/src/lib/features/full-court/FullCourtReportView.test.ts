@@ -6,6 +6,7 @@ import type { FullCourtHistoryEntryView } from './full-court-history-presentatio
 import type { FullCourtReportData } from './full-court-report-data.ts';
 import type {
   FullCourtAwardsBoard,
+  FullCourtNotableMoment,
   FullCourtPlayerSeasonRow,
   FullCourtStandingsRow,
 } from '@hoop-rush/engine';
@@ -195,5 +196,36 @@ describe('FullCourtReport tabs', () => {
     expect(body).toContain('36m target');
     expect(body).toContain('24.5');
     expect(body).toContain('Bench Mob');
+  });
+
+  test('summary renders signature performances when topMoments are supplied', () => {
+    const moment: FullCourtNotableMoment = {
+      id: 'm-1',
+      gameId: 'g-1',
+      phase: 'regular',
+      gameNumber: 12,
+      gameLabel: 'Game 12',
+      teamId: 'team-a',
+      teamName: 'Milwaukee Bucks',
+      opponentTeamId: 'team-b',
+      opponentTeamName: 'Boston Celtics',
+      userInvolved: true,
+      isUserPlayerOrTeam: true,
+      playerId: 'p-1',
+      playerName: 'Alex Star',
+      category: 'efficiency',
+      tier: 'standout',
+      headline: 'Scoring Efficiency Clinic',
+      statLine: '36 PTS · 11-14 FG · 82.0% TS',
+      scoreLabel: 'W 121–109',
+      won: true,
+      rankScore: 112,
+    };
+    const body = render(FullCourtReportSummary, {
+      props: { entry, rosterStats: data.playerRows, userRow, awards, topMoments: [moment] },
+    }).body;
+    expect(body).toContain('Signature performances');
+    expect(body).toContain('Scoring Efficiency Clinic');
+    expect(body).toContain('36 PTS · 11-14 FG · 82.0% TS');
   });
 });

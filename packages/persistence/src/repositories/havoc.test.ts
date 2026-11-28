@@ -1684,6 +1684,40 @@ describe('DexieHavocRepository', () => {
     db.close();
   });
 
+  it('discards the active run with its scoped games, commands, and tapes', async () => {
+    const { db, repo } = createRepository('havoc-discard-scoped');
+    const states = await applyDraftChain(repo, true);
+    const game = buildGame(states.locked, 1, 'havoc', 'cmd-game-discard');
+    await applyGameBundle(repo, states.locked, game, { tape: buildGameTape(1, 'havoc') });
+
+    const gameRow = await db.havocGames.toCollection().first();
+    const commandRow = await db.havocCommands.toCollection().first();
+    const tapeRow = await db.havocRetainedTapes.toCollection().first();
+    const lockedRow = await db.havocLockedInputs.toCollection().first();
+    if (!gameRow || !commandRow || !tapeRow || !lockedRow)
+      throw new Error('expected run-scoped rows');
+    await db.havocGames.put({ ...gameRow, runId: RUN_ID_2 });
+    await db.havocCommands.put({
+      ...commandRow,
+      commandId: 'cmd-foreign',
+      runId: RUN_ID_2,
+    } as never);
+    await db.havocRetainedTapes.put({ ...tapeRow, runId: RUN_ID_2 });
+    await db.havocLockedInputs.put({ ...lockedRow, runId: RUN_ID_2 });
+
+    await repo.clearActiveRun();
+    expect(await db.havocActiveRuns.count()).toBe(0);
+    expect(await db.havocGames.count()).toBe(1);
+    expect(await db.havocCommands.count()).toBe(1);
+    expect(await db.havocRetainedTapes.count()).toBe(1);
+    expect(await db.havocLockedInputs.count()).toBe(1);
+    expect((await db.havocGames.toCollection().first())?.runId).toBe(RUN_ID_2);
+    expect((await db.havocCommands.toCollection().first())?.runId).toBe(RUN_ID_2);
+    expect((await db.havocRetainedTapes.toCollection().first())?.runId).toBe(RUN_ID_2);
+    expect((await db.havocLockedInputs.toCollection().first())?.runId).toBe(RUN_ID_2);
+    db.close();
+  });
+
   it('rolls back every table when one write in the commit fails', async () => {
     const { db, repo } = createRepository('havoc-rollback');
     const states = await applyDraftChain(repo, true);

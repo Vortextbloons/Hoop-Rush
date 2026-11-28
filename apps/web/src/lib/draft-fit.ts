@@ -13,8 +13,13 @@ import {
   type DraftFitReport,
   type DraftFitScore,
   type DraftFitTier,
-} from '@hoop-rush/engine';
-export type { DraftFitNeed, DraftFitReport, DraftFitScore, DraftFitTier } from '@hoop-rush/engine';
+} from '@hoop-rush/engine/domain';
+export type {
+  DraftFitNeed,
+  DraftFitReport,
+  DraftFitScore,
+  DraftFitTier,
+} from '@hoop-rush/engine/domain';
 import { getEraSimulationProfile, getPool } from '#lib/data.js';
 import { loadProjectionModel } from '#lib/data-assets.js';
 

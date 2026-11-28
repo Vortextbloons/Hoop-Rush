@@ -813,6 +813,16 @@ export class FullCourtController {
         checkpoint: existing,
         catalogAssetHash: assets.catalogAssetHash,
         loadProfiles: () => this.#loadHealthProfiles(assets.catalogAssetHash),
+        ...(assets.loadLegacyProfile === undefined
+          ? {}
+          : {
+              loadLegacySeason: async () => {
+                const legacyProfile = await assets.loadLegacyProfile?.();
+                return legacyProfile == null
+                  ? null
+                  : buildFullCourtRegularSeason({ ...assets, profile: legacyProfile, draft });
+              },
+            }),
       }));
     const [checkpoint, savedCoaching, savedReplay] = await Promise.all([
       startFullCourtSeason(lock, regular),

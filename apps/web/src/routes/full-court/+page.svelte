@@ -4,11 +4,7 @@
   import { Check } from '@lucide/svelte';
   import { onMount } from 'svelte';
   import { FULL_COURT_DEFAULT_MONEY, fullCourtReportPriceDollars } from '@hoop-rush/data-contracts';
-  import {
-    defaultFullCourtCoachingRotation,
-    fullCourtStandings,
-    fullCourtWarChestDollars,
-  } from '@hoop-rush/engine';
+  import { fullCourtStandings, fullCourtWarChestDollars } from '@hoop-rush/engine';
   import { formatMillions } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
@@ -21,7 +17,10 @@
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import FullCourtAbandonRun from '#lib/features/full-court/FullCourtAbandonRun.svelte';
-  import { historicalThreePointShare } from '#lib/features/full-court/full-court-coaching-presenter.js';
+  import {
+    fullCourtStaffRotation,
+    historicalThreePointShare,
+  } from '#lib/features/full-court/full-court-coaching-presenter.js';
   import FullCourtCoachingView from '#lib/features/full-court/FullCourtCoachingView.svelte';
   import FullCourtDraftView from '#lib/features/full-court/FullCourtDraftView.svelte';
   import FullCourtFinalReview from '#lib/features/full-court/FullCourtFinalReview.svelte';
@@ -203,7 +202,9 @@
       ? null
       : shares.reduce((sum, share) => sum + share, 0) / shares.length;
   });
-  const defaultRotation = $derived(userTeam && defaultFullCourtCoachingRotation(userTeam));
+  const defaultRotation = $derived(
+    userTeam && fullCourtStaffRotation(userTeam, health, nextUserFixture?.dayOffset ?? null),
+  );
   const savedReplay = $derived(current?.savedReplay ?? null);
   const savedReplaySummary = $derived(
     savedReplay === null ? null : fullCourtWatchedReplaySummary(savedReplay),

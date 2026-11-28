@@ -194,7 +194,7 @@ describe('full court draft presentation', () => {
   });
 
   it('formats the budget in millions without credits', () => {
-    expect(formatMillions(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('$210M');
+    expect(formatMillions(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars)).toBe('$231M');
     expect(FULL_COURT_DEFAULT_MONEY.startingWarChestDollars).toBeGreaterThanOrEqual(
       FULL_COURT_DEFAULT_MONEY.hardLimitDollars,
     );

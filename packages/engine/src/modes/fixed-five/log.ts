@@ -315,27 +315,87 @@ function isDraftPayload(
   );
 }
 
-export function replayFixedFiveLog(
+function createFixedFiveReplayBase(
   mode: FixedFiveRoomMode,
   roomId: string,
   rootSeed: Seed,
   dataVersion: string,
   variant: FixedFiveRoomSettings['variant'],
   assets: FixedFiveDraftLogInputs,
-  commands: FixedFiveCommand[],
-  sourceMode: FixedFiveRoomSettings['sourceMode'] = 'classic',
-  multiplayerVersion = FIXED_FIVE_MULTIPLAYER_VERSION,
+  sourceMode: FixedFiveRoomSettings['sourceMode'],
+  snake: boolean,
 ): DraftReplay {
-  const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
-  const hasStart = ordered.some((c) => c.payload.kind === 'start');
-  const snake = SNAKE_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
-  const allowReposition = REPOSITION_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
   if (mode === 'duel' && sourceMode === 'sandbox') {
-    let state = createSandboxDuelDraft(rootSeed, undefined, snake ? 'snake' : 'alternating');
-    let skipped = 0;
+    return {
+      mode: 'sandbox-duel',
+      hasStart: false,
+      state: createSandboxDuelDraft(rootSeed, undefined, snake ? 'snake' : 'alternating'),
+      skipped: 0,
+    };
+  }
+  if (mode === 'duel') {
+    return {
+      mode,
+      hasStart: false,
+      state: createDuelDraft(rootSeed, assets.catalog, assets.poolById, assets.context),
+      skipped: 0,
+    };
+  }
+  if (mode === 'sandbox-shared-82') {
+    if (snake) {
+      return {
+        mode,
+        hasStart: false,
+        draftStyle: 'snake',
+        state: createSandboxDuelDraft(rootSeed),
+        skipped: 0,
+      };
+    }
+    return {
+      mode,
+      hasStart: false,
+      draftStyle: 'legacy',
+      p1: createSandboxBuilder(),
+      p2: createSandboxBuilder(),
+      skipped: 0,
+    };
+  }
+  return {
+    mode,
+    hasStart: false,
+    p1: createParticipantClassicDraft(
+      draftIdFor(roomId, 'p1'),
+      variant,
+      fixedFiveDraftSeed(rootSeed, 'p1'),
+      dataVersion,
+      assets.catalog,
+      assets.context,
+    ),
+    p2: createParticipantClassicDraft(
+      draftIdFor(roomId, 'p2'),
+      variant,
+      fixedFiveDraftSeed(rootSeed, 'p2'),
+      dataVersion,
+      assets.catalog,
+      assets.context,
+    ),
+    skipped: 0,
+  };
+}
+
+function applyFixedFiveCommands(
+  replay: DraftReplay,
+  assets: FixedFiveDraftLogInputs,
+  ordered: FixedFiveCommand[],
+  allowReposition: boolean,
+): DraftReplay {
+  const hasStart = replay.hasStart || ordered.some((c) => c.payload.kind === 'start');
+  if (replay.mode === 'sandbox-duel') {
+    let state = replay.state;
+    let skipped = replay.skipped;
     for (const command of ordered) {
       if (
-        !isDraftPayload(mode, command.payload.kind, {
+        !isDraftPayload('duel', command.payload.kind, {
           sandboxDuel: true,
           allowReposition,
         })
@@ -353,11 +413,11 @@ export function replayFixedFiveLog(
     }
     return { mode: 'sandbox-duel', hasStart, state, skipped };
   }
-  if (mode === 'duel') {
-    let state = createDuelDraft(rootSeed, assets.catalog, assets.poolById, assets.context);
-    let skipped = 0;
+  if (replay.mode === 'duel') {
+    let state = replay.state;
+    let skipped = replay.skipped;
     for (const command of ordered) {
-      if (!isDraftPayload(mode, command.payload.kind, { allowReposition })) continue;
+      if (!isDraftPayload('duel', command.payload.kind, { allowReposition })) continue;
       try {
         state = applyDuelPayload(state, assets, command.actorParticipantId, command.payload, {
           allowDisplacement: allowReposition,
@@ -367,15 +427,15 @@ export function replayFixedFiveLog(
         skipped += 1;
       }
     }
-    return { mode, hasStart, state, skipped };
+    return { mode: 'duel', hasStart, state, skipped };
   }
-  if (mode === 'sandbox-shared-82') {
-    if (snake) {
-      let state = createSandboxDuelDraft(rootSeed);
-      let skipped = 0;
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      let state = replay.state;
+      let skipped = replay.skipped;
       for (const command of ordered) {
         if (
-          !isDraftPayload(mode, command.payload.kind, {
+          !isDraftPayload('sandbox-shared-82', command.payload.kind, {
             sandboxSnake: true,
             allowReposition,
           })
@@ -391,13 +451,13 @@ export function replayFixedFiveLog(
           skipped += 1;
         }
       }
-      return { mode, hasStart, draftStyle: 'snake', state, skipped };
+      return { mode: 'sandbox-shared-82', hasStart, draftStyle: 'snake', state, skipped };
     }
-    let p1 = createSandboxBuilder();
-    let p2 = createSandboxBuilder();
-    let skipped = 0;
+    let p1 = replay.p1;
+    let p2 = replay.p2;
+    let skipped = replay.skipped;
     for (const command of ordered) {
-      if (!isDraftPayload(mode, command.payload.kind)) continue;
+      if (!isDraftPayload('sandbox-shared-82', command.payload.kind)) continue;
       try {
         if (command.actorParticipantId === 'p1') {
           p1 = applySandboxPayload(p1, assets, command.payload);
@@ -408,27 +468,13 @@ export function replayFixedFiveLog(
         skipped += 1;
       }
     }
-    return { mode, hasStart, draftStyle: 'legacy', p1, p2, skipped };
+    return { mode: 'sandbox-shared-82', hasStart, draftStyle: 'legacy', p1, p2, skipped };
   }
-  let p1 = createParticipantClassicDraft(
-    draftIdFor(roomId, 'p1'),
-    variant,
-    fixedFiveDraftSeed(rootSeed, 'p1'),
-    dataVersion,
-    assets.catalog,
-    assets.context,
-  );
-  let p2 = createParticipantClassicDraft(
-    draftIdFor(roomId, 'p2'),
-    variant,
-    fixedFiveDraftSeed(rootSeed, 'p2'),
-    dataVersion,
-    assets.catalog,
-    assets.context,
-  );
-  let skipped = 0;
+  let p1 = replay.p1;
+  let p2 = replay.p2;
+  let skipped = replay.skipped;
   for (const command of ordered) {
-    if (!isDraftPayload(mode, command.payload.kind, { allowReposition })) continue;
+    if (!isDraftPayload('classic-shared-82', command.payload.kind, { allowReposition })) continue;
     try {
       if (command.actorParticipantId === 'p1') {
         p1 = applyClassicPayload(p1, assets, command.payload, {
@@ -443,7 +489,46 @@ export function replayFixedFiveLog(
       skipped += 1;
     }
   }
-  return { mode, hasStart, p1, p2, skipped };
+  return { mode: 'classic-shared-82', hasStart, p1, p2, skipped };
+}
+
+export function replayFixedFiveLog(
+  mode: FixedFiveRoomMode,
+  roomId: string,
+  rootSeed: Seed,
+  dataVersion: string,
+  variant: FixedFiveRoomSettings['variant'],
+  assets: FixedFiveDraftLogInputs,
+  commands: FixedFiveCommand[],
+  sourceMode: FixedFiveRoomSettings['sourceMode'] = 'classic',
+  multiplayerVersion = FIXED_FIVE_MULTIPLAYER_VERSION,
+): DraftReplay {
+  const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
+  const snake = SNAKE_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
+  const allowReposition = REPOSITION_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
+  const base = createFixedFiveReplayBase(
+    mode,
+    roomId,
+    rootSeed,
+    dataVersion,
+    variant,
+    assets,
+    sourceMode,
+    snake,
+  );
+  return applyFixedFiveCommands(base, assets, ordered, allowReposition);
+}
+
+export function replayFixedFiveLogTail(
+  replay: DraftReplay,
+  assets: FixedFiveDraftLogInputs,
+  commands: FixedFiveCommand[],
+  multiplayerVersion = FIXED_FIVE_MULTIPLAYER_VERSION,
+): DraftReplay {
+  if (commands.length === 0) return replay;
+  const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
+  const allowReposition = REPOSITION_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
+  return applyFixedFiveCommands(replay, assets, ordered, allowReposition);
 }
 
 export function isDraftComplete(replay: DraftReplay): boolean {

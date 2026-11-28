@@ -411,6 +411,84 @@ describe('substitution decisions', () => {
     expect(plan.startingSlots).not.toContain(decision.inIndex);
   });
 
+  it('prefers a position-eligible reserve when a starter fouls out', () => {
+    const roster = fullCourtTestRoster('foul-fit', 8);
+    const starters = roster.slice(0, 5).map((player) => player.playerId);
+    const plan = resolveRotationPlan(roster, { startingFive: starters });
+    const pointGuard = plan.startingSlots[0] ?? 0;
+    const fouls = plan.roster.map((_player, index) =>
+      index === pointGuard ? FULL_COURT_FOUL_LIMIT : 0,
+    );
+    // The ineligible forward has the most remaining need, so the old picker chose him.
+    const playedSeconds = plan.roster.map((_player, index) =>
+      index === 7 ? 0 : (plan.targetSeconds[index] ?? 0),
+    );
+    const decision = planSubstitution(snapshotOfPlan(plan, { fouls, playedSeconds }), EARLY);
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('foul-out');
+    expect(decision.slot).toBe(0);
+    expect(decision.inIndex).toBe(5);
+  });
+
+  it('falls back to the bench when no reserve can fill the vacated position', () => {
+    const roster = fullCourtTestRoster('foul-fallback', 7).map((player, index) =>
+      index === 5 ? { ...player, positions: ['SF' as const] } : player,
+    );
+    const starters = roster.slice(0, 5).map((player) => player.playerId);
+    const plan = resolveRotationPlan(roster, { startingFive: starters });
+    const fouls = plan.roster.map((_player, index) => (index === 0 ? FULL_COURT_FOUL_LIMIT : 0));
+    const decision = planSubstitution(snapshotOfPlan(plan, { fouls }), EARLY);
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('foul-out');
+    expect([5, 6]).toContain(decision.inIndex);
+  });
+
+  it('prefers a position-eligible reserve on a fatigue swap', () => {
+    const roster = fullCourtTestRoster('tired-fit', 8);
+    const starters = roster.slice(0, 5).map((player) => player.playerId);
+    const plan = resolveRotationPlan(roster, { startingFive: starters });
+    const pointGuard = plan.startingSlots[0] ?? 0;
+    const energies = plan.roster.map((_player, index) =>
+      index === pointGuard ? FULL_COURT_TIRED_ENERGY - 0.05 : index === 5 ? 0.6 : 1,
+    );
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, {
+        energies,
+        stintSeconds: plan.startingSlots.map(() => 600),
+      }),
+      EARLY,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('fatigue');
+    expect(decision.outIndex).toBe(pointGuard);
+    expect(decision.inIndex).toBe(5);
+  });
+
+  it('still replaces an exhausted starter when the eligible reserve is too tired', () => {
+    const roster = fullCourtTestRoster('tired-fallback', 8);
+    const starters = roster.slice(0, 5).map((player) => player.playerId);
+    const plan = resolveRotationPlan(roster, { startingFive: starters });
+    const pointGuard = plan.startingSlots[0] ?? 0;
+    const energies = plan.roster.map((_player, index) =>
+      index === pointGuard ? 0.1 : index === 5 ? 0.2 : 1,
+    );
+    const decision = planSubstitution(
+      snapshotOfPlan(plan, {
+        energies,
+        stintSeconds: plan.startingSlots.map(() => 600),
+      }),
+      EARLY,
+    );
+    expect(decision.kind).toBe('swap');
+    if (decision.kind !== 'swap') return;
+    expect(decision.reason).toBe('fatigue');
+    expect(decision.outIndex).toBe(pointGuard);
+    expect(decision.inIndex).not.toBe(5);
+  });
+
   it('brings the closing five in during a close fourth quarter', () => {
     const roster = fullCourtTestRoster('closer', 9);
     const five = roster.slice(0, 5).map((player) => player.playerId);

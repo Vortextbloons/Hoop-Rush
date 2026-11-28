@@ -177,7 +177,11 @@ export class DexieFullCourtSeasonRepository {
   }
 
   private async scoresOfSlot(runId: string, slot: number): Promise<FullCourtSeasonScore[]> {
-    const rows = await this.db.fullCourtSeasonScores.where('runId').equals(runId).toArray();
+    const prefix = `crl-${String(slot).padStart(2, '0')}-`;
+    const rows = await this.db.fullCourtSeasonScores
+      .where('[runId+gameId]')
+      .between([runId, prefix], [runId, `${prefix}\uffff`])
+      .toArray();
     return sortScores(
       rows.filter((row) => row.score.slot === slot).map((row) => parseScoreRecord(row).score),
     );

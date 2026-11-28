@@ -65,6 +65,7 @@ const POSITION_ORDER: Readonly<Record<string, number>> = {
   PF: 3,
   C: 4,
 };
+const textCollator = new Intl.Collator();
 const lowercaseNameCache = new WeakMap<PlayersIndexEntry, string>();
 export function lowercaseName(row: PlayersIndexEntry): string {
   let folded = lowercaseNameCache.get(row);
@@ -78,7 +79,11 @@ function seasonStartYear(seasonKey: string): number {
   return Number.parseInt(seasonKey, 10);
 }
 function compareName(a: PlayersIndexEntry, b: PlayersIndexEntry): number {
-  return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || 0;
+  return (
+    textCollator.compare(a.lastName, b.lastName) ||
+    textCollator.compare(a.firstName, b.firstName) ||
+    0
+  );
 }
 function compareBy<T>(
   rows: RosterRow[],
@@ -111,7 +116,7 @@ function compareDetailBy(
   });
 }
 function compareText(a: string, b: string): number {
-  return a.localeCompare(b);
+  return textCollator.compare(a, b);
 }
 export function sortRoster(
   rows: RosterRow[],

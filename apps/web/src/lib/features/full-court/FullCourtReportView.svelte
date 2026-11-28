@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FullCourtPlayerSeasonRow } from '@hoop-rush/engine';
+  import { buildFullCourtNotableMoments, type FullCourtPlayerSeasonRow } from '@hoop-rush/engine';
   import { Award, Coins, LayoutGrid, Trophy, Users } from '@lucide/svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -52,6 +52,14 @@
   );
   const rosterStats = $derived<readonly FullCourtPlayerSeasonRow[]>(
     data.playerRows.filter((row) => row.teamId === data.seasonLock.season.userTeamId),
+  );
+  const moments = $derived(
+    buildFullCourtNotableMoments({
+      teams: data.seasonLock.season.teams,
+      userTeamId: data.seasonLock.season.userTeamId,
+      regularScores: data.regularScores,
+      ...(data.bracket === null ? {} : { series: data.bracket.series }),
+    }),
   );
 </script>
 
@@ -137,7 +145,14 @@
     class="report-panel"
   >
     {#if activeTab === 'summary'}
-      <FullCourtReportSummary {entry} {rosterStats} {userRow} awards={data.awards} {art} />
+      <FullCourtReportSummary
+        {entry}
+        {rosterStats}
+        {userRow}
+        awards={data.awards}
+        {art}
+        topMoments={moments.userMoments.slice(0, 3)}
+      />
     {:else if activeTab === 'roster'}
       <FullCourtReportRoster {entry} {data} {art} />
     {:else if activeTab === 'stats'}
@@ -147,6 +162,7 @@
         userTeamId={data.seasonLock.season.userTeamId}
         standings={data.standings}
         {art}
+        {moments}
       />
     {:else}
       <FullCourtReportPlayoffs {entry} {data} {art} />

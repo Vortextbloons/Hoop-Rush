@@ -40,6 +40,7 @@ import {
   deriveEffectivePhase,
   mergeFixedFiveCommands,
   replayFixedFiveLog,
+  replayFixedFiveLogTail,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
 } from './log.ts';
@@ -305,6 +306,69 @@ describe('replayFixedFiveLog', () => {
     expect(deriveEffectivePhase('drafting', replay, false)).toBe('lobby');
     expect(deriveEffectivePhase('completed', replay, false)).toBe('completed');
     expect(deriveEffectivePhase('integrity-failed', replay, true)).toBe('integrity-failed');
+  });
+
+  it('applies only the appended tail and matches a full replay', () => {
+    const { byId } = poolFixture();
+    const catalog = catalogFixture();
+    const assets = {
+      catalog,
+      pool: poolFixture().pool,
+      poolById: byId,
+      context,
+    };
+    const p1Draft = createParticipantClassicDraft(
+      `${ROOM_ID}:p1`,
+      'ratings',
+      fixedFiveDraftSeed(ROOT, 'p1'),
+      'data-v1',
+      catalog,
+      context,
+    );
+    const p2Draft = createParticipantClassicDraft(
+      `${ROOM_ID}:p2`,
+      'ratings',
+      fixedFiveDraftSeed(ROOT, 'p2'),
+      'data-v1',
+      catalog,
+      context,
+    );
+    const p1Move = enumerateClassicSafeMoves(catalog, byId, p1Draft)[0];
+    const p2Move = enumerateClassicSafeMoves(catalog, byId, p2Draft)[0];
+    if (!p1Move || !p2Move) throw new Error('fixture has no classic safe moves');
+    const commands = [
+      commandOf(0, 'p1', { kind: 'start' }),
+      commandOf(1, 'p1', {
+        kind: 'classic-pick',
+        playerId: p1Move.playerId,
+        slotIndex: p1Move.slotIndex,
+      }),
+      commandOf(2, 'p2', {
+        kind: 'classic-pick',
+        playerId: p2Move.playerId,
+        slotIndex: p2Move.slotIndex,
+      }),
+    ];
+    const full = replayFixedFiveLog(
+      'classic-shared-82',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+    );
+    const prefix = replayFixedFiveLog(
+      'classic-shared-82',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands.slice(0, 2),
+    );
+    const tail = replayFixedFiveLogTail(prefix, assets, commands.slice(2));
+    expect(tail).toEqual(full);
   });
 
   it('applies duel repositions only for reposition-aware versions', () => {

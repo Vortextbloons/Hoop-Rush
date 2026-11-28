@@ -5,6 +5,7 @@
   } from '@hoop-rush/data-contracts';
   import type { HavocMultiplayerGameOutput } from '@hoop-rush/persistence';
   import type {
+    GamecastBattleAbilityLine,
     GamecastBattleFeedLine,
     GamecastBattleVisibleState,
   } from '#lib/gamecast/gamecast-battle-playback.js';
@@ -14,6 +15,8 @@
     output,
     visible,
     feed,
+    abilities = undefined,
+    abilityCount = undefined,
     progress,
     localParticipantId,
     series,
@@ -22,6 +25,8 @@
     output: HavocMultiplayerGameOutput;
     visible: GamecastBattleVisibleState;
     feed: readonly GamecastBattleFeedLine[];
+    abilities?: readonly GamecastBattleAbilityLine[];
+    abilityCount?: number;
     progress: number;
     localParticipantId: HavocMultiplayerParticipantId;
     series: HavocMultiplayerSeriesSnapshot | null;
@@ -37,6 +42,8 @@
   gameNumber={output.gameNumber}
   {visible}
   {feed}
+  {abilities}
+  {abilityCount}
   {progress}
   {localSide}
   {minimal}

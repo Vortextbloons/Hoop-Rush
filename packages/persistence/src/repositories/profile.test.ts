@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test, vi } from 'bun:test';
 import {
   PROFILE_SAVE_SCHEMA_VERSION,
   achievementTitleFor,
@@ -162,6 +162,35 @@ describe('local profiles', () => {
       const profiles = await repo.list();
       expect(profiles.find((item) => item.id === first.id)?.games).toBe(1);
       expect(await repo.bind('challenge:run')).toBe(first.id);
+    } finally {
+      db.close();
+    }
+  });
+
+  test('folds a game batch into one profile write and dedupes receipts', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('profile-batch'));
+    await db.open();
+    try {
+      const repo = new DexieProfileRepository(db);
+      const profile = await repo.initialize(crypto.randomUUID());
+      await repo.bind('challenge:season');
+      const facts = { won: true, multiplayer: false, players: [] };
+      const games = Array.from({ length: 82 }, (_, index) => ({
+        gameId: String(index + 1),
+        facts,
+      }));
+      const firstGame = games[0];
+      if (firstGame === undefined) throw new Error('Missing test game');
+      const put = vi.spyOn(db.profiles, 'put');
+      await repo.recordGames('challenge:season', [...games, firstGame]);
+      expect(put).toHaveBeenCalledTimes(1);
+      put.mockRestore();
+      expect((await repo.list()).find((item) => item.id === profile.id)?.games).toBe(82);
+      expect(await db.profileGames.count()).toBe(82);
+      await repo.recordGames('challenge:season', [firstGame]);
+      expect((await repo.list()).find((item) => item.id === profile.id)?.games).toBe(82);
+      expect(await db.profileGames.count()).toBe(82);
     } finally {
       db.close();
     }

@@ -13,6 +13,7 @@
     type FullCourtStandingsRow,
   } from '@hoop-rush/engine';
   import { franchiseIdentityOf } from '#lib/branding.js';
+  import { ArrowUpRight } from '@lucide/svelte';
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { seasonStatColumns } from '#lib/components/season-stat-columns.js';
@@ -289,7 +290,7 @@
       {#if canScout}
         <button
           type="button"
-          class="ui-stats-player min-h-10 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
+          class="ui-stats-player min-h-10 border-0 bg-transparent p-0 text-left outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-ring"
           aria-haspopup="dialog"
           aria-label={`View ${row.displayName} scouting report`}
           onclick={() => (scoutPlayerId = row.playerId)}
@@ -299,6 +300,7 @@
             <span class="ui-stats-player-name">{row.displayName}</span>
             <span class="ui-stats-player-meta">{row.positions.slice(0, 2).join('/')}</span>
           </span>
+          <ArrowUpRight size={12} aria-hidden="true" class="text-muted-foreground" />
         </button>
       {:else}
         <span class="ui-stats-player">

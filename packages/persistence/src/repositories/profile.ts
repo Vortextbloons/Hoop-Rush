@@ -10,6 +10,8 @@ import {
   type AchievementId,
   type AchievementUnlock,
   type PlayerProfile,
+  type ProfileBinding,
+  type ProfileGame,
 } from '@hoop-rush/data-contracts';
 import { applyProfileGame, type ProfileGameFacts } from '@hoop-rush/engine';
 import type { HoopRushDatabase } from './dexie.ts';
@@ -82,7 +84,10 @@ export class DexieProfileRepository {
   async loadBound(bindingId: string): Promise<PlayerProfile | null> {
     const row = await this.db.profileBindings.get(bindingId);
     if (!row) return null;
-    const binding = profileBindingSchema.parse(row);
+    return this.loadBoundProfile(profileBindingSchema.parse(row));
+  }
+
+  private async loadBoundProfile(binding: ProfileBinding): Promise<PlayerProfile | null> {
     const profile = await this.db.profiles.get(binding.profileId);
     if (profile) return playerProfileSchema.parse(profile);
     playerProfileSchema.parse(await this.db.archivedProfiles.get(binding.profileId));
@@ -190,6 +195,50 @@ export class DexieProfileRepository {
     return this.recordOnce(bindingId, gameId, (profile) => applyProfileGame(profile, facts));
   }
 
+  async recordGames(
+    bindingId: string,
+    games: readonly { gameId: string; facts: ProfileGameFacts }[],
+  ): Promise<void> {
+    if (games.length === 0) return;
+    await this.db.transaction(
+      'rw',
+      this.db.profileBindings,
+      this.db.profileGames,
+      this.db.profiles,
+      this.db.archivedProfiles,
+      async () => {
+        const binding = profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        let profile = await this.loadBoundProfile(binding);
+        if (!profile) return;
+        const receipts: ProfileGame[] = [];
+        const seen = new Set<string>();
+        for (const game of games) {
+          const id = `${bindingId}:${game.gameId}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          const prior = await this.db.profileGames.get(id);
+          if (prior !== undefined) {
+            profileGameSchema.parse(prior);
+            continue;
+          }
+          const result = applyProfileGame(profile, game.facts);
+          profile = playerProfileSchema.parse(result.profile);
+          receipts.push(
+            profileGameSchema.parse({
+              saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
+              id,
+              profileId: profile.id,
+              unlocked: result.unlocked,
+            }),
+          );
+        }
+        if (receipts.length === 0) return;
+        await this.db.profiles.put(profile);
+        await this.db.profileGames.bulkAdd(receipts);
+      },
+    );
+  }
+
   async rememberRematchAfterLoss(
     priorBindingId: string,
     bindingId: string,
@@ -274,8 +323,8 @@ export class DexieProfileRepository {
       this.db.profiles,
       this.db.archivedProfiles,
       async () => {
-        profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
-        const profile = await this.loadBound(bindingId);
+        const binding = profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        const profile = await this.loadBoundProfile(binding);
         if (!profile) return [];
         const id = `${bindingId}:${gameId}`;
         const prior = await this.db.profileGames.get(id);
@@ -307,7 +356,7 @@ export class DexieProfileRepository {
       this.db.profiles,
       this.db.archivedProfiles,
       async () => {
-        for (const game of games) await this.recordGame(bindingId, game.gameId, game.facts);
+        await this.recordGames(bindingId, games);
         await this.recordMatch(bindingId, won);
       },
     );

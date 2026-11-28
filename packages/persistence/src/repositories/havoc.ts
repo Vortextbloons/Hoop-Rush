@@ -478,7 +478,24 @@ export class DexieHavocRepository {
   }
 
   async clearActiveRun(): Promise<void> {
-    await this.db.havocActiveRuns.delete(HAVOC_ACTIVE_RECORD_ID);
+    const { havocActiveRuns, havocCommands, havocGames, havocRetainedTapes, havocLockedInputs } =
+      this.db;
+    await this.db.transaction(
+      'rw',
+      [havocActiveRuns, havocCommands, havocGames, havocRetainedTapes, havocLockedInputs],
+      async () => {
+        const row: unknown = await havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID);
+        const runId =
+          typeof row === 'object' && row !== null ? (row as { runId?: unknown }).runId : undefined;
+        if (typeof runId === 'string') {
+          await havocGames.where('runId').equals(runId).delete();
+          await havocCommands.where('runId').equals(runId).delete();
+          await havocRetainedTapes.where('runId').equals(runId).delete();
+          await havocLockedInputs.where('runId').equals(runId).delete();
+        }
+        await havocActiveRuns.delete(HAVOC_ACTIVE_RECORD_ID);
+      },
+    );
   }
 
   async loadCommandResult(commandId: string): Promise<HavocCommandResult | null> {

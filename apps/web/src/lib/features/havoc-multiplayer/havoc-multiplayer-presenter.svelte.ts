@@ -26,10 +26,14 @@ import type {
 } from '@hoop-rush/application/havoc-multiplayer';
 import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
 import {
+  gamecastBattleAbilityCursor,
   gamecastBattleFeedCursor,
   gamecastBattlePlaybackFold,
   gamecastBattlePlaybackItems,
   gamecastBattleVisibleItemCount,
+  type GamecastBattleAbilityCursor,
+  type GamecastBattleAbilityFeed,
+  type GamecastBattleAbilityLine,
   type GamecastBattleFeedCursor,
   type GamecastBattleFeedLine,
   type GamecastBattlePlaybackItem,
@@ -51,6 +55,8 @@ export interface HavocMultiplayerReaction {
   reaction: ReactionKey;
   atMs: number;
 }
+
+const EMPTY_ABILITY_FEED: GamecastBattleAbilityFeed = { lines: [], count: 0 };
 
 export class HavocMultiplayerPresenter extends RoomPresenterCore<
   HavocMultiplayerParticipantId,
@@ -124,6 +130,18 @@ export class HavocMultiplayerPresenter extends RoomPresenterCore<
     }
     return this.feedCursor?.linesAt(this.visibleCount) ?? [];
   });
+  private abilityItems: readonly GamecastBattlePlaybackItem[] | null = null;
+  private abilityCursor: GamecastBattleAbilityCursor | null = null;
+  private abilityFeed = $derived.by<GamecastBattleAbilityFeed>(() => {
+    if (!this.currentOutput) return EMPTY_ABILITY_FEED;
+    if (this.abilityItems !== this.playbackItems) {
+      this.abilityItems = this.playbackItems;
+      this.abilityCursor = gamecastBattleAbilityCursor(this.currentOutput, this.playbackItems);
+    }
+    return this.abilityCursor?.abilitiesAt(this.visibleCount) ?? EMPTY_ABILITY_FEED;
+  });
+  abilities = $derived<readonly GamecastBattleAbilityLine[]>(this.abilityFeed.lines);
+  abilityCount = $derived(this.abilityFeed.count);
   activeTurn = $derived(
     this.phase === 'drafting' &&
       this.draft?.status === 'drafting' &&

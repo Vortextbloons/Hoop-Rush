@@ -17,6 +17,7 @@ export interface ManifestAssetOptions<T> {
   load?: (url: string, contentHash: string) => Promise<T>;
   retryOnHashMismatch?: boolean | 'always';
   optional?: boolean;
+  indexedDbCache?: boolean;
 }
 
 const CONTENT_HASH_MISMATCH = /content hash mismatch: expected ([0-9a-f]{64}), got ([0-9a-f]{64})/;
@@ -102,7 +103,7 @@ async function loadVerified<T>(
         expectedHash: entry.contentHash,
         parse: options.parse,
       });
-  void writeCachedAsset(entry.contentHash, value);
+  if (options.indexedDbCache !== false) void writeCachedAsset(entry.contentHash, value);
   return value;
 }
 
@@ -115,8 +116,10 @@ async function retryWithFreshManifestAlways<T>(
   const manifest = await getManifest();
   const entry = options.find(manifest);
   if (!entry) throw new Error(options.missingMessage);
-  const cached = await readCachedAsset(entry.contentHash, options.parse);
-  if (cached !== null) return cached;
+  if (options.indexedDbCache !== false) {
+    const cached = await readCachedAsset(entry.contentHash, options.parse);
+    if (cached !== null) return cached;
+  }
   return loadVerified(entry, options, true);
 }
 
@@ -131,8 +134,10 @@ async function loadManifestAssetUncached<T>(options: ManifestAssetOptions<T>): P
     throw new Error(options.missingMessage);
   }
   const target = entry;
-  const cached = await readCachedAsset(target.contentHash, options.parse);
-  if (cached !== null) return cached;
+  if (options.indexedDbCache !== false) {
+    const cached = await readCachedAsset(target.contentHash, options.parse);
+    if (cached !== null) return cached;
+  }
   try {
     return await loadVerified(target, options, false);
   } catch (error) {

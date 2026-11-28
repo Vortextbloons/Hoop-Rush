@@ -199,6 +199,13 @@
     if (dialogKey !== null && playoffProfiles === null) void ensurePlayoffProfiles();
   });
   $effect(() => {
+    if (sortNeedsDetails(sortId) && details === null && !detailsLoading && !detailsError) {
+      void ensureDetails();
+    }
+  });
+  // The default table renders PTS/REB/AST/PER from roster details, so warm the
+  // asset after the page is interactive; the large asset skips IndexedDB caching.
+  $effect(() => {
     if (!manifest || !index || details !== null || detailsRequest !== null) return;
     let cancelled = false;
     deferIdle(() => {

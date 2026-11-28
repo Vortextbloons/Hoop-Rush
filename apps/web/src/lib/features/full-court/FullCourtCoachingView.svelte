@@ -164,6 +164,7 @@
       seededRoster = rosterKey;
       draft = fullCourtCoachingDraft(plan, defaultRotation, rosterIds);
       savedSignature = fullCourtCoachingSignature(plan);
+      readHandler = firstConfiguredReadHandler(draft.passingReads, rosterIds);
       lockedMinutes = [];
       saveError = null;
       savedMessage = null;
@@ -524,8 +525,30 @@
     { id: 'rotation', label: 'Rotation' },
     { id: 'situations', label: 'Game Situations' },
   ] as const;
+  function firstConfiguredReadHandler(
+    passingReads: FullCourtCoachingDraft['passingReads'],
+    validIds: readonly string[],
+  ): string {
+    const valid = new Set(validIds);
+    for (const [handler, targets] of Object.entries(passingReads ?? {})) {
+      if (valid.has(handler) && targets.length > 0) return handler;
+    }
+    return '';
+  }
+
   let lastMinutesEdit: string | null = null;
-  let readHandler = $state('');
+  let readHandler = $state(
+    untrack(() => firstConfiguredReadHandler(draft.passingReads, rosterIds)),
+  );
+  const configuredPassingReads = $derived(
+    Object.entries(draft.passingReads ?? {})
+      .filter(([handler, targets]) => playerNames.has(handler) && targets.length > 0)
+      .map(([handler, targets]) => ({
+        handler,
+        handlerName: playerNames.get(handler) ?? handler,
+        targetNames: targets.map((id) => playerNames.get(id) ?? id),
+      })),
+  );
   const starterStrengths = $derived(
     scoutedRoster === null
       ? []
@@ -630,6 +653,7 @@
   function cancel(): void {
     draft = fullCourtCoachingDraft(plan, defaultRotation, rosterIds);
     savedSignature = fullCourtCoachingSignature(plan);
+    readHandler = firstConfiguredReadHandler(draft.passingReads, rosterIds);
     lockedMinutes = [];
     saveError = null;
     savedMessage = null;
@@ -641,6 +665,7 @@
     draft = defaultFullCourtCoachingDraft(defaultRotation, rosterIds);
     draft.interfaceLevel = level;
     savedSignature = fullCourtCoachingSignature(plan);
+    readHandler = '';
     lockedMinutes = [];
     saveError = null;
     savedMessage = null;
@@ -939,6 +964,27 @@
             <p class="mt-2 text-xs text-muted-foreground">
               The top target gets the strongest preference. Players still follow their tendencies.
             </p>
+            {#if configuredPassingReads.length > 0}
+              <div
+                class="mt-2 flex flex-wrap items-center gap-1.5"
+                aria-label="Saved passing reads"
+              >
+                <span class="ui-micro">Saved reads</span>
+                {#each configuredPassingReads as entry (entry.handler)}
+                  <button
+                    type="button"
+                    class="rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors {readHandler ===
+                    entry.handler
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-line-soft bg-surface-1 text-muted-foreground hover:text-foreground'}"
+                    aria-pressed={readHandler === entry.handler}
+                    onclick={() => (readHandler = entry.handler)}
+                  >
+                    {entry.handlerName} &rarr; {entry.targetNames.join(', ')}
+                  </button>
+                {/each}
+              </div>
+            {/if}
             {#each draft.units as unit, index (index)}
               <fieldset class="mt-4 grid gap-2 md:grid-cols-2">
                 <legend class="text-sm font-semibold">{unit.name}</legend>

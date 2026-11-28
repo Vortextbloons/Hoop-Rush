@@ -133,4 +133,30 @@ describe('resolveFullCourtSeasonLock', () => {
       }),
     ).rejects.toThrow('historical injury profiles that are no longer packaged');
   });
+
+  it('resumes a legacy-era run through loadLegacySeason when primary era inputs differ', async () => {
+    const legacySeason: FullCourtRegularSeason = {
+      ...SEASON,
+      profile: {
+        ...SEASON.profile,
+        parameters: {
+          ...SEASON.profile.parameters,
+          pace: SEASON.profile.parameters.pace - 2,
+        },
+      },
+    };
+    const legacyLock = lockFullCourtRegularSeason(legacySeason, {
+      profiles: PROFILES,
+      catalogAssetHash: CATALOG_HASH,
+    });
+    const resolved = await resolveFullCourtSeasonLock({
+      season: SEASON,
+      checkpoint: createFullCourtSeasonCheckpoint(legacyLock),
+      catalogAssetHash: CATALOG_HASH,
+      loadProfiles: () => Promise.resolve(PROFILES),
+      loadLegacySeason: () => Promise.resolve(legacySeason),
+    });
+    expect(resolved.digest).toBe(legacyLock.digest);
+    expect(resolved.season.profile.parameters.pace).toBe(legacySeason.profile.parameters.pace);
+  });
 });

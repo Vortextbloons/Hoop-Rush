@@ -20,9 +20,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   buildFullCourtBlueprintHierarchy,
+  defaultFullCourtCoachingRotation,
+  fullCourtAvailabilityForGame,
   resolveFullCourtBlueprintHierarchy,
   type FullCourtBlueprintBindingPreview,
   type FullCourtBlueprintRotationRef,
+  type FullCourtGameInput,
 } from '@hoop-rush/engine';
 
 export const FULL_COURT_MINUTE_TOTAL = 240;
@@ -197,6 +200,23 @@ export function fullCourtCoachingDraft(
       playerIds: [...unit.playerIds],
     })),
   };
+}
+
+/**
+ * Staff rotation for the next game, with the current health snapshot applied so
+ * the preview matches the availability the simulation resolves.
+ */
+export function fullCourtStaffRotation(
+  team: FullCourtGameInput['home'],
+  health: FullCourtTeamHealth | null | undefined,
+  dayOffset: number | null,
+): CoachingRotation {
+  if (health == null || dayOffset == null) return defaultFullCourtCoachingRotation(team);
+  const availability = fullCourtAvailabilityForGame(team, dayOffset, health);
+  if (availability.filter((entry) => entry.available).length < FULL_COURT_STARTER_SLOTS) {
+    return defaultFullCourtCoachingRotation(team);
+  }
+  return defaultFullCourtCoachingRotation({ ...team, availability });
 }
 
 /** The reset baseline: balanced tactics, automatic rotation, default rotation values. */

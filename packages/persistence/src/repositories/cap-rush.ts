@@ -976,13 +976,19 @@ export class DexieCapRushRepository {
    * caller actually opens one.
    */
   async listLeagueResults(runId: string): Promise<CapRushLeagueResult[]> {
-    const tables = [this.db.capRushLeagueGames, this.db.capRushLeagueResults];
+    const tables = [
+      this.db.capRushLeagueGames,
+      this.db.capRushLeagueResults,
+      this.db.capRushLeagueAggregates,
+    ];
     const scores = await this.db.transaction('r', tables, async () => {
       const scoreRows = this.db.capRushLeagueResults.where('runId').equals(runId);
-      const [scoreCount, gameCount] = await Promise.all([
-        scoreRows.count(),
-        this.db.capRushLeagueGames.where('runId').equals(runId).count(),
-      ]);
+      const scoreCount = await scoreRows.count();
+      // The aggregate's fold count is the authoritative game count for current
+      // saves; legacy saves without an aggregate still compare against boxes.
+      const aggregate = await this.readLeagueAggregate(runId);
+      const gameCount =
+        aggregate?.games ?? (await this.db.capRushLeagueGames.where('runId').equals(runId).count());
       return scoreCount === gameCount ? scoreRows.toArray() : null;
     });
     if (scores !== null) {

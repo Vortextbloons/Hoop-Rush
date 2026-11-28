@@ -77,6 +77,71 @@ export function gamecastBattleAbilityLines(
   });
 }
 
+const ABILITY_LINE_LIMIT = 64;
+
+export interface GamecastBattleAbilityFeed {
+  readonly lines: readonly GamecastBattleAbilityLine[];
+  readonly count: number;
+}
+
+/**
+ * A monotonic cursor over one broadcast's ability feed. Playback reveals items
+ * in order, so each advance appends only the new ability lines instead of
+ * rescanning the visible prefix. The retained lines stay bounded; `count` keeps
+ * the total number of activations shown.
+ */
+export interface GamecastBattleAbilityCursor {
+  abilitiesAt(visibleCount: number): GamecastBattleAbilityFeed;
+}
+
+class AbilityAppender implements GamecastBattleAbilityCursor {
+  private readonly items: readonly GamecastBattlePlaybackItem[];
+  private readonly source: GamecastBattleAbilityNames;
+  private lines: GamecastBattleAbilityLine[] = [];
+  private count = 0;
+  private revealed = 0;
+  private feed: GamecastBattleAbilityFeed = { lines: this.lines, count: 0 };
+
+  constructor(output: GamecastBattleOutput, items: readonly GamecastBattlePlaybackItem[]) {
+    this.items = items;
+    this.source = gamecastBattleAbilityNames(output.result);
+  }
+
+  abilitiesAt(visibleCount: number): GamecastBattleAbilityFeed {
+    const revealedCount = Number.isNaN(visibleCount)
+      ? 0
+      : Math.max(0, Math.min(this.items.length, Math.trunc(visibleCount)));
+    if (revealedCount < this.revealed) {
+      this.lines = [];
+      this.count = 0;
+      this.revealed = 0;
+      this.feed = { lines: this.lines, count: 0 };
+    }
+    if (revealedCount === this.revealed) return this.feed;
+    for (let index = this.revealed; index < revealedCount; index += 1) {
+      const event = this.items[index]?.event;
+      if (event === undefined || event === null) continue;
+      const line = gamecastBattleAbilityLineOf(event, this.source);
+      if (line === null) continue;
+      this.count += 1;
+      this.lines.push(line);
+      if (this.lines.length > ABILITY_LINE_LIMIT) this.lines.shift();
+    }
+    this.revealed = revealedCount;
+    // Publish a snapshot so reactive consumers see a new value each advance.
+    this.feed = { lines: [...this.lines], count: this.count };
+    return this.feed;
+  }
+}
+
+/** Create a resettable ability cursor for one broadcast. */
+export function gamecastBattleAbilityCursor(
+  output: GamecastBattleOutput,
+  items: readonly GamecastBattlePlaybackItem[],
+): GamecastBattleAbilityCursor {
+  return new AbilityAppender(output, items);
+}
+
 export interface GamecastBattlePlaybackItem {
   key: string;
   kind: 'event' | 'scoring';

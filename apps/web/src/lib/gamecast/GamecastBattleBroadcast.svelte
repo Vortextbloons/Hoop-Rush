@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { formatHavocClock, havocPeriodLabel } from '#lib/features/havoc/havoc-presentation.js';
   import type {
+    GamecastBattleAbilityLine,
     GamecastBattleFeedLine,
     GamecastBattleVisibleState,
   } from '#lib/gamecast/gamecast-battle-playback.js';
@@ -19,6 +20,8 @@
     frame = null,
     visible: suppliedVisible = null,
     feed: suppliedFeed = [],
+    abilities: suppliedAbilities = undefined,
+    abilityCount: suppliedAbilityCount = undefined,
     progress,
     minimal = false,
     theme = 'havoc',
@@ -31,6 +34,10 @@
     frame?: GamecastBattlePlaybackFrame | null;
     visible?: GamecastBattleVisibleState | null;
     feed?: readonly GamecastBattleFeedLine[];
+    /** Precomputed ability feed. When absent the shared component derives it from `visible.events`. */
+    abilities?: readonly GamecastBattleAbilityLine[] | undefined;
+    /** Total activations shown for a supplied ability feed. */
+    abilityCount?: number | undefined;
     progress: number;
     minimal?: boolean;
     theme?: 'havoc' | 'duel';
@@ -70,9 +77,9 @@
         : 'opponent',
   );
   const abilities = $derived(
-    frame?.abilities ?? gamecastBattleAbilityLines(result, visible.events),
+    frame?.abilities ?? suppliedAbilities ?? gamecastBattleAbilityLines(result, visible.events),
   );
-  const abilityCount = $derived(frame?.abilityCount ?? abilities.length);
+  const abilityCount = $derived(frame?.abilityCount ?? suppliedAbilityCount ?? abilities.length);
   const progressPct = $derived(
     Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
   );

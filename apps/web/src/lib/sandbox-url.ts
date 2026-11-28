@@ -12,7 +12,7 @@ import {
   playerIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import { validateLineup } from '@hoop-rush/engine';
+import { validateLineup } from '@hoop-rush/engine/domain';
 import { randomHex } from '#lib/ids.js';
 export interface SandboxUrlState {
   slots: RunPlayerSelection[];

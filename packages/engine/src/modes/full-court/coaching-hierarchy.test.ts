@@ -111,6 +111,8 @@ describe('Full Court offensive hierarchy', () => {
 
     // The primary option's share rises; the team still earns the same possessions.
     expect(hierarchyAttempts).toBeGreaterThan(baselineAttempts * 1.06);
+    // A named scorer should lift his own volume without swallowing the offense.
+    expect(hierarchyAttempts).toBeLessThan(baselineAttempts * 1.4);
     expect(
       Math.abs(hierarchyTeamAttempts - baselineTeamAttempts) / baselineTeamAttempts,
     ).toBeLessThan(0.1);

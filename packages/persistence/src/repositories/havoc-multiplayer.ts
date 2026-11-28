@@ -60,6 +60,22 @@ function commandRowMatches(
 
 const SERIES_ACHIEVEMENT_LABEL = 'Havoc Multiplayer';
 
+// Receipts carry the game number in the id the session assigns (`hvr-<n>`);
+// fall back to the series digest map for receipts built elsewhere.
+function receiptGameNumber(
+  receipt: HavocMultiplayerVerificationReceipt,
+  series: StoredHavocMultiplayerActive['snapshot']['series'],
+): number | null {
+  const match = /^hvr-(\d+)$/.exec(receipt.receiptId);
+  if (match !== null) {
+    const gameNumber = Number(match[1]);
+    if (Number.isSafeInteger(gameNumber)) return gameNumber;
+  }
+  return (
+    series?.games.find((game) => game.resultDigest === receipt.resultDigest)?.gameNumber ?? null
+  );
+}
+
 // A room marks a game verified only after both participants confirm the same
 // result digest, so the stored score is trusted only when it matches that digest.
 function verifiedScores(
@@ -185,12 +201,42 @@ export class DexieHavocMultiplayerRepository {
       'rw',
       [this.db.havocMultiplayerActive, this.db.havocMultiplayerResults],
       async () => {
+        const priorRow = await this.db.havocMultiplayerActive.get(roomId);
+        const prior = priorRow ? storedHavocMultiplayerActiveSchema.parse(priorRow) : null;
         await saveActiveVerification(this.db.havocMultiplayerActive, roomId, verification, (row) =>
           storedHavocMultiplayerActiveSchema.parse(row),
         );
         const verifiedDigests = new Set(verification.map((entry) => entry.resultDigest));
-        const rows = await rowsWhereEquals(this.db.havocMultiplayerResults, 'roomId', roomId);
-        for (const row of rows) {
+        const series = prior?.snapshot.series ?? null;
+        const candidates = new Set<number>();
+        const receipts = [
+          ...verification,
+          ...(prior?.verification ?? []).filter(
+            (entry) => !verifiedDigests.has(entry.resultDigest),
+          ),
+        ];
+        for (const entry of receipts) {
+          const gameNumber = receiptGameNumber(entry, series);
+          if (gameNumber === null) {
+            // A receipt that cannot be mapped still needs the digest scan so a
+            // custom receipt id cannot leave a stale verified flag behind.
+            for (const row of await rowsWhereEquals(
+              this.db.havocMultiplayerResults,
+              'roomId',
+              roomId,
+            )) {
+              const parsedRow = storedHavocMultiplayerResultRowSchema.parse(row);
+              const verified = verifiedDigests.has(parsedRow.resultDigest);
+              if (parsedRow.verified === verified) continue;
+              await this.db.havocMultiplayerResults.put({ ...parsedRow, verified });
+            }
+            return;
+          }
+          candidates.add(gameNumber);
+        }
+        for (const gameNumber of candidates) {
+          const row = await this.db.havocMultiplayerResults.get([roomId, gameNumber]);
+          if (row === undefined) continue;
           const parsedRow = storedHavocMultiplayerResultRowSchema.parse(row);
           const verified = verifiedDigests.has(parsedRow.resultDigest);
           if (parsedRow.verified === verified) continue;

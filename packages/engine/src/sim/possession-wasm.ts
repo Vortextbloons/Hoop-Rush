@@ -64,6 +64,49 @@ interface CachedTeamTables {
 }
 
 const teamTablesCache = new WeakMap<TeamPrep, CachedTeamTables>();
+const TEAM_TABLES_CONTENT_LIMIT = 512;
+const teamTablesContentCache = new Map<string, CachedTeamTables>();
+const contentStablePreps = new WeakSet<TeamPrep>();
+const profileContentIds = new WeakMap<EraSimulationProfile, number>();
+const playerContentIds = new WeakMap<SimulationPlayer, number>();
+let nextContentId = 1;
+
+function contentIdOf<T extends object>(ids: WeakMap<T, number>, value: T): number {
+  const existing = ids.get(value);
+  if (existing !== undefined) return existing;
+  const id = nextContentId;
+  nextContentId += 1;
+  ids.set(value, id);
+  return id;
+}
+
+/**
+ * Marks a preparation whose tables depend only on the content key below.
+ * Full Court marks the lineups its tactics, hierarchy, and matchup projections
+ * left untouched; a rewritten preparation changes tables without changing player
+ * identity, so it must build fresh instead of sharing the content cache.
+ */
+export function markTeamPrepContentStable(prep: TeamPrep): void {
+  contentStablePreps.add(prep);
+}
+
+function teamTablesContentKey(
+  team: SimulationTeam,
+  prep: TeamPrep,
+  profile: EraSimulationProfile,
+  passingAnchorFactor: number,
+): string {
+  const ids: number[] = [];
+  for (const player of team.players) ids.push(contentIdOf(playerContentIds, player));
+  return [
+    String(contentIdOf(profileContentIds, profile)),
+    String(passingAnchorFactor),
+    String(prep.spacing),
+    prep.responsibilitySlots.join(','),
+    String(team.players.length),
+    ids.join(','),
+  ].join('|');
+}
 
 interface StaticLayout {
   readonly prep: readonly [TeamPrep, TeamPrep];
@@ -253,6 +296,21 @@ function buildCachedTeamTables(
   ) {
     return existing;
   }
+  const contentKey = contentStablePreps.has(prep)
+    ? teamTablesContentKey(team, prep, profile, passingAnchorFactor)
+    : null;
+  if (contentKey !== null) {
+    const shared = teamTablesContentCache.get(contentKey);
+    if (shared !== undefined) {
+      // Refresh recency, then bind the shared tables to this preparation so the
+      // ordinary per-preparation lookup keeps hitting.
+      teamTablesContentCache.delete(contentKey);
+      teamTablesContentCache.set(contentKey, shared);
+      const promoted: CachedTeamTables = { ...shared, players: team.players };
+      teamTablesCache.set(prep, promoted);
+      return promoted;
+    }
+  }
   const keyOf = (player: SimulationPlayer): string => prep.keyOf(player);
   const count = team.players.length;
   const pickData: number[] = [];
@@ -345,6 +403,13 @@ function buildCachedTeamTables(
     assistData,
   };
   teamTablesCache.set(prep, cached);
+  if (contentKey !== null) {
+    teamTablesContentCache.set(contentKey, cached);
+    if (teamTablesContentCache.size > TEAM_TABLES_CONTENT_LIMIT) {
+      const oldest = teamTablesContentCache.keys().next().value;
+      if (oldest !== undefined) teamTablesContentCache.delete(oldest);
+    }
+  }
   return cached;
 }
 

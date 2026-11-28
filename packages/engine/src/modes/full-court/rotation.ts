@@ -978,6 +978,24 @@ function benchCandidates(snapshot: FullCourtRotationSnapshot): number[] {
   return result;
 }
 
+/**
+ * Prefer reserves who can fill the outgoing slot's position. Falls back to the
+ * whole bench when no exact fit exists, so a forced exit is never blocked by a
+ * position shortage.
+ */
+function slotCandidatesFor(
+  snapshot: FullCourtRotationSnapshot,
+  slot: number,
+  candidates: readonly number[],
+): readonly number[] {
+  const requirement = slotRequirement(slot);
+  const eligible = candidates.filter((index) => {
+    const player = snapshot.plan.roster[index];
+    return player !== undefined && canPlay(player.positions, requirement);
+  });
+  return eligible.length > 0 ? eligible : candidates;
+}
+
 /** An emergency continuation player cannot leave; nobody can replace them. */
 function mayLeave(snapshot: FullCourtRotationSnapshot, index: number): boolean {
   return snapshot.emergency[index] !== true;
@@ -1134,11 +1152,12 @@ function foulTroubleRuleSwap(
   if (bench.length === 0) return null;
   let incoming: number | null;
   if (rule.replacementIndex === null) {
-    const byNeed = pickHighestNeed(snapshot, bench);
+    const candidates = slotCandidatesFor(snapshot, slot, bench);
+    const byNeed = pickHighestNeed(snapshot, candidates);
     incoming =
       byNeed !== null && needSeconds(snapshot, byNeed) > 0
         ? byNeed
-        : pickByPriority(snapshot, bench);
+        : pickByPriority(snapshot, candidates);
   } else {
     // A named reserve who is unavailable, spent, or already on the floor leaves
     // the rule inactive so the staff rotation can handle the possession.
@@ -1277,11 +1296,12 @@ export function planSubstitution(
     if ((snapshot.fouls[outIndex] ?? 0) < FULL_COURT_FOUL_LIMIT) continue;
     if (!mayLeave(snapshot, outIndex)) continue;
     if (bench.length === 0) return { kind: 'emergency', playerIndex: outIndex };
-    const byNeed = pickHighestNeed(snapshot, bench);
+    const candidates = slotCandidatesFor(snapshot, slot, bench);
+    const byNeed = pickHighestNeed(snapshot, candidates);
     const replacement =
       byNeed !== null && needSeconds(snapshot, byNeed) > 0
         ? byNeed
-        : pickByPriority(snapshot, bench);
+        : pickByPriority(snapshot, candidates);
     if (replacement === null) return { kind: 'emergency', playerIndex: outIndex };
     return { kind: 'swap', slot, outIndex, inIndex: replacement, reason: 'foul-out' };
   }
@@ -1290,7 +1310,11 @@ export function planSubstitution(
     const energy = snapshot.energies[outIndex] ?? 0;
     if (energy > FULL_COURT_SEVERE_FATIGUE_ENERGY) continue;
     if (!mayLeave(snapshot, outIndex)) continue;
-    const replacement = pickFreshest(snapshot, bench, energy + FULL_COURT_FATIGUE_SWAP_GAIN);
+    const candidates = slotCandidatesFor(snapshot, slot, bench);
+    let replacement = pickFreshest(snapshot, candidates, energy + FULL_COURT_FATIGUE_SWAP_GAIN);
+    if (replacement === null && candidates.length < bench.length) {
+      replacement = pickFreshest(snapshot, bench, energy + FULL_COURT_FATIGUE_SWAP_GAIN);
+    }
     if (replacement === null) continue;
     return { kind: 'swap', slot, outIndex, inIndex: replacement, reason: 'fatigue' };
   }
@@ -1409,11 +1433,12 @@ export function planSubstitution(
     tiredIndex = index;
   }
   if (tiredIndex === -1) return { kind: 'none' };
-  const fresh = pickFreshest(
-    snapshot,
-    bench,
-    (snapshot.energies[tiredIndex] ?? 0) + FULL_COURT_FATIGUE_SWAP_GAIN,
-  );
+  const threshold = (snapshot.energies[tiredIndex] ?? 0) + FULL_COURT_FATIGUE_SWAP_GAIN;
+  const candidates = slotCandidatesFor(snapshot, tiredSlot, bench);
+  let fresh = pickFreshest(snapshot, candidates, threshold);
+  if (fresh === null && candidates.length < bench.length) {
+    fresh = pickFreshest(snapshot, bench, threshold);
+  }
   if (fresh === null) return { kind: 'none' };
   const covered = withScorerCoverage(snapshot, {
     kind: 'swap',

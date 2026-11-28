@@ -74,6 +74,7 @@
   const salaries = $derived(
     isUserTeam ? new Map(locked.picks.map((pick) => [pick.slot, pick.salaryDollars])) : null,
   );
+  const leagueResults = $derived(new Map(leagueGames.map((game) => [game.gameId, game])));
   const schedule = $derived.by(() => {
     if (locked.leagueSchedule === undefined) return [];
     return locked.leagueSchedule
@@ -84,7 +85,7 @@
         home: game.homeTeamId === teamId,
         opponentId: game.homeTeamId === teamId ? game.awayTeamId : game.homeTeamId,
         gameId: game.gameId,
-        result: leagueGames.find((candidate) => candidate.gameId === game.gameId) ?? null,
+        result: leagueResults.get(game.gameId) ?? null,
       }));
   });
   const penalties = $derived(isUserTeam ? apronPenaltyRows(locked.payrollStatus) : []);

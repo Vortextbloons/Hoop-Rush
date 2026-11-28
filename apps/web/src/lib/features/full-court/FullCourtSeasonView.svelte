@@ -20,6 +20,7 @@
   } from '@lucide/svelte';
   import {
     buildFullCourtAwards,
+    buildFullCourtNotableMoments,
     buildFullCourtSeasonStats,
     fullCourtStandings,
     type FullCourtCatalogIndex,
@@ -47,6 +48,8 @@
   import type { FullCourtArt } from './full-court-art.ts';
   import FullCourtAwardsPanel from './FullCourtAwardsPanel.svelte';
   import FullCourtGameDayPanel from './FullCourtGameDayPanel.svelte';
+  import FullCourtGameMomentsStrip from './FullCourtGameMomentsStrip.svelte';
+  import FullCourtMomentsPanel from './FullCourtMomentsPanel.svelte';
   import FullCourtPortrait from './FullCourtPortrait.svelte';
   import FullCourtPostseasonView from './FullCourtPostseasonView.svelte';
   import FullCourtTeamDetail from './FullCourtTeamDetail.svelte';
@@ -202,10 +205,23 @@
   const regularComplete = $derived(played === CAP_RUSH_CONFERENCE_GAMES_PER_TEAM);
 
   const schedule = $derived(fullCourtUserSchedule(lock, scores));
+  const moments = $derived(
+    buildFullCourtNotableMoments({
+      teams: lock.season.teams,
+      userTeamId,
+      regularScores: scores,
+      ...(playoff === null ? {} : { series: playoff.series }),
+    }),
+  );
   const scheduleCells = $derived(
     schedule.map((cell): ScheduleCell => {
       const result = cell.result;
       const homeAway = cell.userHome ? 'vs' : 'at';
+      const topMoment = moments.byGameId.get(cell.gameId)?.[0] ?? null;
+      const momentNote =
+        topMoment === null
+          ? ''
+          : ` · ${topMoment.headline}: ${topMoment.playerName ?? topMoment.teamName} (${topMoment.statLine})`;
       return {
         key: String(cell.slot),
         label: `${cell.slot} ${cell.opponentAbbreviation}`,
@@ -219,16 +235,19 @@
         ariaLabel:
           result === null
             ? `Game ${cell.slot} ${homeAway} ${cell.opponentName}, not played`
-            : `Game ${cell.slot} ${homeAway} ${cell.opponentName}, ${result.won ? 'win' : 'loss'} ${result.scoreLabel}`,
+            : `Game ${cell.slot} ${homeAway} ${cell.opponentName}, ${result.won ? 'win' : 'loss'} ${result.scoreLabel}${momentNote}`,
         title:
           result === null
             ? `Game ${cell.slot} ${homeAway} ${cell.opponentAbbreviation} · not played`
-            : `Game ${cell.slot} ${homeAway} ${cell.opponentAbbreviation} · ${result.won ? 'W' : 'L'} ${result.compactLabel}`,
+            : `Game ${cell.slot} ${homeAway} ${cell.opponentAbbreviation} · ${result.won ? 'W' : 'L'} ${result.compactLabel}${momentNote}`,
       };
     }),
   );
   const latestCell = $derived(schedule.findLast((cell) => cell.result !== null) ?? null);
   const latestResult = $derived(latestCell?.result ?? null);
+  const latestMoments = $derived(
+    latestCell === null ? [] : (moments.byGameId.get(latestCell.gameId) ?? []),
+  );
 
   /** The postseason screen owns every bracket action and every postseason view. */
   const playoffMode = $derived(playoff !== null || regularComplete);
@@ -629,6 +648,11 @@
         label={`Game ${String(latestCell.slot)} result`}
         class="mt-2"
       />
+      <FullCourtGameMomentsStrip
+        moments={latestMoments}
+        {art}
+        label="Latest game notable moments"
+      />
     </Panel>
   {:else}
     <Panel as="section" padding="sm" aria-label="Latest Full Court result">
@@ -699,6 +723,12 @@
   {#if awards !== null}
     <FullCourtAwardsPanel {awards} rosterStats={userRosterStats} {userTeamId} {art} />
   {/if}
+
+  <FullCourtMomentsPanel
+    userMoments={moments.userMoments}
+    leagueMoments={moments.leagueMoments}
+    {art}
+  />
 
   <Panel as="section" padding="md" aria-label="Full Court lineup lab">
     <SectionHeading

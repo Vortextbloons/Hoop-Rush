@@ -218,9 +218,12 @@ function buildVerifiedSeries(winners: readonly ('p1' | 'p2')[]): HavocMultiplaye
   });
 }
 
-function buildVerification(resultDigest: string): HavocMultiplayerVerificationReceipt {
+function buildVerification(
+  resultDigest: string,
+  gameNumber = 1,
+): HavocMultiplayerVerificationReceipt {
   return havocMultiplayerVerificationReceiptSchema.parse({
-    receiptId: 'receipt-1',
+    receiptId: `hvr-${String(gameNumber)}`,
     challenge: 'a'.repeat(64),
     receiptDigest: 'b'.repeat(64),
     resultDigest,
@@ -315,6 +318,28 @@ describe('DexieHavocMultiplayerRepository', () => {
     await repo.saveVerification(ROOM_ID, [mismatch]);
     expect((await repo.loadResults(ROOM_ID))[0]?.verified).toBe(false);
     expect((await repo.loadActive(ROOM_ID))?.verification).toEqual([mismatch]);
+    db.close();
+  });
+
+  it('updates only the results named by verification receipts', async () => {
+    const { db, repo } = createRepository('havoc-multiplayer-verification-rows');
+    await repo.saveActive(buildActiveState());
+    const first = buildGameOutput(ROOM_ID, 1);
+    const second = buildGameOutput(ROOM_ID, 2);
+    await repo.saveResult(first);
+    await repo.saveResult(second);
+    const secondRow = await db.havocMultiplayerResults.get([ROOM_ID, 2]);
+    if (secondRow === undefined) throw new Error('expected a stored result');
+    await db.havocMultiplayerResults.put({
+      ...secondRow,
+      result: { ...secondRow.result, home: null },
+    } as never);
+
+    await repo.saveVerification(ROOM_ID, [buildVerification(first.resultDigest, 1)]);
+
+    expect((await db.havocMultiplayerResults.get([ROOM_ID, 1]))?.verified).toBe(true);
+    // The untouched row is still malformed, proving it was never parsed.
+    expect((await db.havocMultiplayerResults.get([ROOM_ID, 2]))?.verified).toBe(false);
     db.close();
   });
 

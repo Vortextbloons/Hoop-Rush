@@ -1,6 +1,7 @@
 <script lang="ts">
   import type {
     FullCourtAwardsBoard,
+    FullCourtNotableMoment,
     FullCourtPlayerSeasonRow,
     FullCourtStandingsRow,
   } from '@hoop-rush/engine';
@@ -11,6 +12,7 @@
   import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { FullCourtHistoryEntryView } from './full-court-history-presentation.ts';
   import type { FullCourtArt } from './full-court-art.ts';
+  import FullCourtGameMomentsStrip from './FullCourtGameMomentsStrip.svelte';
   import FullCourtReportHardware from './FullCourtReportHardware.svelte';
 
   let {
@@ -19,12 +21,14 @@
     userRow,
     awards,
     art = null,
+    topMoments = [],
   }: {
     entry: FullCourtHistoryEntryView;
     rosterStats: readonly FullCourtPlayerSeasonRow[];
     userRow: FullCourtStandingsRow | null;
     awards: FullCourtAwardsBoard;
     art?: FullCourtArt | null;
+    topMoments?: readonly FullCourtNotableMoment[];
   } = $props();
 
   const leader = $derived(
@@ -115,6 +119,13 @@
     <p class="mt-1 text-xs text-muted-foreground">{entry.benchBestGameLabel}</p>
   {/if}
 </Panel>
+
+{#if topMoments.length > 0}
+  <Panel as="section" padding="md" aria-label="Run notable moments">
+    <SectionHeading eyebrow="Highlights" title="Signature performances" level={2} size="sm" />
+    <FullCourtGameMomentsStrip moments={topMoments} {art} label="Signature performances" />
+  </Panel>
+{/if}
 
 <style>
   .summary-strip {

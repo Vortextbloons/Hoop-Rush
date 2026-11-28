@@ -10,7 +10,7 @@ import {
 import { createEngineContext } from '../../sim/kernel.ts';
 import { checkFullCourtGameResult } from './game.ts';
 import { fullCourtTestInput, fullCourtTestRoster } from './game-test-support.ts';
-import { runFullCourtGameWithHealth } from './health.ts';
+import { runFullCourtGameWithHealth, fullCourtAvailabilityForGame } from './health.ts';
 import { buildFullCourtGameLineups, buildFullCourtGameLineupsFromFacts } from './report.ts';
 
 const context = createEngineContext();
@@ -37,6 +37,29 @@ function injuryProfilesOf(
     players: records,
   });
 }
+
+test('the next-game preview uses the same injury availability as the game', () => {
+  const roster = fullCourtTestRoster('availability-preview', 8);
+  const injured = roster[0];
+  if (injured === undefined) throw new Error('Missing fixture player');
+  const health = fullCourtTeamHealthSchema.parse({
+    version: FULL_COURT_HEALTH_VERSION,
+    teamId: 'home',
+    throughDay: 2,
+    players: {
+      [injured.playerId]: { loadBasisPoints: 6000, availableFromDay: 5 },
+    },
+  });
+  const team = { teamId: 'home', displayName: 'Home', roster };
+  const out = fullCourtAvailabilityForGame(team, 3, health);
+  const entry = out.find((value) => value.playerId === injured.playerId);
+  expect(entry?.available).toBe(false);
+  expect(entry?.reason).toBe('injury');
+  expect(entry?.energy ?? 1).toBeLessThan(1);
+
+  const cleared = fullCourtAvailabilityForGame(team, 5, health);
+  expect(cleared.find((value) => value.playerId === injured.playerId)?.available).toBe(true);
+});
 
 test('actual minutes carry workload into a back-to-back and days off clear it', () => {
   const homeRoster = fullCourtTestRoster('health', 5);

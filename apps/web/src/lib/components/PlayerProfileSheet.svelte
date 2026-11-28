@@ -52,7 +52,6 @@
     if (apron !== null && apron.status.kind === 'none') {
       base = base.filter((entry) => entry !== 'apron');
     }
-    if (scouting !== null && !base.includes('scouting')) base = [...base, 'scouting'];
     return base;
   });
 

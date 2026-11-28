@@ -148,6 +148,33 @@ test('creates, commits, replays, and resumes a Full Court season', async () => {
   }
 });
 
+test('reads only the committed slot scores during a slot commit', async () => {
+  resetIndexedDb();
+  const { first } = openTestDatabasePair('full-court-season-slot-range');
+  try {
+    const repository = createFullCourtSeasonRepository(first);
+    await repository.create(initialCheckpoint());
+    const slotOne = slotCheckpoint(1);
+    const scoresOne = scoresForSlot(1);
+    await repository.commitSlot(slotOne, scoresOne);
+
+    const otherSlot = scoresForSlot(2)[0];
+    if (otherSlot === undefined) throw new Error('Missing test score');
+    // A malformed row outside the committed slot proves the commit reads the
+    // slot range instead of every score row for the run.
+    await first.fullCourtSeasonScores.put({
+      saveSchemaVersion: 99,
+      runId: RUN_ID,
+      gameId: otherSlot.gameId,
+      score: otherSlot,
+    } as never);
+
+    expect(await repository.commitSlot(slotOne, scoresOne)).toEqual({ status: 'replayed' });
+  } finally {
+    first.close();
+  }
+});
+
 test('serializes competing slot commits across two database connections', async () => {
   resetIndexedDb();
   const { first, second } = openTestDatabasePair('full-court-season-race');

@@ -43,6 +43,7 @@ import {
   isFixedFiveDraftTurn,
   mergeFixedFiveCommands,
   replayFixedFiveLog,
+  replayFixedFiveLogTail,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
   type DraftReplay,
@@ -237,6 +238,21 @@ export interface FixedFiveSessionAssets {
   index: PlayersIndex;
 }
 
+interface FixedFiveReplayCache {
+  replay: DraftReplay;
+  commands: FixedFiveCommand[];
+  commandCount: number;
+  lastOrdinal: number;
+  assets: FixedFiveSessionAssets;
+  roomId: string;
+  rootSeed: Seed;
+  mode: FixedFiveRoomSnapshot['settings']['mode'];
+  variant: FixedFiveRoomSnapshot['settings']['variant'];
+  dataVersion: string;
+  sourceMode: FixedFiveRoomSnapshot['settings']['sourceMode'];
+  multiplayerVersion: string;
+}
+
 export interface FixedFiveRoomRepositoryPort {
   listCommands(roomId: string): Promise<FixedFiveCommand[]>;
   appendCommand(command: FixedFiveCommand): Promise<void>;
@@ -307,6 +323,7 @@ export class FixedFiveRoomSession {
   private room: FixedFiveRoomSnapshot | null = null;
   private commands: FixedFiveCommand[] = [];
   private replay: DraftReplay | null = null;
+  private replayCache: FixedFiveReplayCache | null = null;
   private facts: RoomLogFacts = roomLogFacts([]);
   private assets: FixedFiveSessionAssets | null = null;
   private assetsError: string | null = null;
@@ -1060,21 +1077,86 @@ export class FixedFiveRoomSession {
     const room = this.room;
     const assets = this.assets;
     if (!room || !assets || !room.rootSeed) return null;
+    const { mode, variant, versions, sourceMode } = room.settings;
+    const cache = this.replayCache;
+    if (
+      cache &&
+      cache.assets === assets &&
+      cache.roomId === room.roomId &&
+      cache.rootSeed === room.rootSeed &&
+      cache.mode === mode &&
+      cache.variant === variant &&
+      cache.dataVersion === versions.dataVersion &&
+      cache.sourceMode === sourceMode &&
+      cache.multiplayerVersion === versions.multiplayerVersion &&
+      this.canAppendToReplayCache(cache)
+    ) {
+      try {
+        const replay = replayFixedFiveLogTail(
+          cache.replay,
+          assets,
+          this.commands.slice(cache.commandCount),
+          versions.multiplayerVersion,
+        );
+        this.replayCache = {
+          ...cache,
+          replay,
+          commands: this.commands,
+          commandCount: this.commands.length,
+          lastOrdinal: this.lastOrdinal,
+        };
+        return replay;
+      } catch {
+        // A failed tail application falls back to a full replay.
+      }
+    }
     try {
-      return replayFixedFiveLog(
-        room.settings.mode,
+      const replay = replayFixedFiveLog(
+        mode,
         room.roomId,
         room.rootSeed,
-        room.settings.versions.dataVersion,
-        room.settings.variant,
+        versions.dataVersion,
+        variant,
         assets,
         this.commands,
-        room.settings.sourceMode,
-        room.settings.versions.multiplayerVersion,
+        sourceMode,
+        versions.multiplayerVersion,
       );
+      this.replayCache = {
+        replay,
+        commands: this.commands,
+        commandCount: this.commands.length,
+        lastOrdinal: this.lastOrdinal,
+        assets,
+        roomId: room.roomId,
+        rootSeed: room.rootSeed,
+        mode,
+        variant,
+        dataVersion: versions.dataVersion,
+        sourceMode,
+        multiplayerVersion: versions.multiplayerVersion,
+      };
+      return replay;
     } catch {
+      this.replayCache = null;
       return null;
     }
+  }
+
+  private canAppendToReplayCache(cache: FixedFiveReplayCache): boolean {
+    if (this.commands.length < cache.commandCount) return false;
+    for (let index = 0; index < cache.commandCount; index += 1) {
+      const cached = cache.commands[index];
+      const current = this.commands[index];
+      if (!cached || !current) return false;
+      if (cached.commandId !== current.commandId || cached.ordinal !== current.ordinal) {
+        return false;
+      }
+    }
+    for (let index = cache.commandCount; index < this.commands.length; index += 1) {
+      if ((this.commands[index]?.ordinal ?? -1) <= cache.lastOrdinal) return false;
+    }
+    return true;
   }
 
   private recomputePhase(): void {

@@ -523,3 +523,68 @@ test('makes conference standings teams clickable and renders team detail stats',
   if (firstPlayer === undefined) throw new Error('Expected at least one player on opponent roster');
   expect(detailBody).toContain(firstPlayer.displayName);
 });
+
+test('renders notable moments on latest result and stats tab when player stats trigger milestones', () => {
+  const userGame = lock.season.games.find(
+    (game) => game.slot === 1 && (game.homeTeamId === userTeamId || game.awayTeamId === userTeamId),
+  );
+  if (userGame === undefined) throw new Error('Expected user slot 1 fixture');
+  const userTeam = lock.season.teams.find((team) => team.teamId === userTeamId);
+  const star = userTeam?.roster[0];
+  if (star === undefined) throw new Error('Expected user roster star');
+
+  const userHome = userGame.homeTeamId === userTeamId;
+  const starLine = {
+    playerId: star.playerId,
+    started: true,
+    seconds: 2220,
+    points: 42,
+    rebounds: 12,
+    offRebounds: 2,
+    defRebounds: 10,
+    assists: 13,
+    steals: 2,
+    blocks: 1,
+    turnovers: 2,
+    fouls: 2,
+    fgm: 15,
+    fga: 22,
+    tpm: 5,
+    tpa: 8,
+    ftm: 7,
+    fta: 8,
+  };
+  const score = fullCourtSeasonScoreSchema.parse({
+    gameId: userGame.gameId,
+    slot: 1,
+    homeTeamId: userGame.homeTeamId,
+    awayTeamId: userGame.awayTeamId,
+    outcome: {
+      kind: 'played',
+      homePoints: userHome ? 124 : 112,
+      awayPoints: userHome ? 112 : 124,
+      playerStats: {
+        home: userHome ? [starLine] : [],
+        away: userHome ? [] : [starLine],
+      },
+    },
+  });
+
+  const homeBody = renderView({
+    section: 'home',
+    checkpoint: { ...opened, completedThroughSlot: 1 },
+    scores: [score],
+  });
+  expect(homeBody).toContain('aria-label="Latest game notable moments"');
+  expect(homeBody).toContain('40-Point Triple-Double');
+  expect(homeBody).toContain(star.displayName);
+
+  const statsBody = renderView({
+    section: 'stats',
+    checkpoint: { ...opened, completedThroughSlot: 1 },
+    scores: [score],
+  });
+  expect(statsBody).toContain('aria-label="Full Court notable moments"');
+  expect(statsBody).toContain('40-Point Triple-Double');
+  expect(statsBody).toContain('42 PTS · 12 REB · 13 AST');
+});
